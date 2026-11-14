@@ -3514,39 +3514,20 @@ class OpenAIProvider private constructor(
         // slot could show a different request's failure after a fallback or a parallel call.
         // Parse raw JSON first: literal redaction before parsing can corrupt JSON when a key
         // contains a quote, and does not find a JSON-escaped credential. The body itself is not retained.
-        val fromRelay = io.github.nanomuse.net.OwnProviderProxy.isRelay(basePath)
-        val relayError = io.github.nanomuse.cloud.AllowanceSignal.fromHttpError(
-            statusCode, body, fromRelay = fromRelay, hasHttpStatus = hasHttpStatus,
-        )?.let {
-            // nanoMuse: allowance guidance and links can echo credentials too, not just message.
-            io.github.nanomuse.cloud.ProviderRefusalSanitizer.sanitize(it, requestCredentials)
-        }
-        // nanoMuse: relay refusals keep their existing special handling and allowance actions.
-        // Unknown stream codes still need a generic card rather than a made-up HTTP status.
-        val diagnosticCode = if (!hasHttpStatus && statusCode !in 300..599) 0 else statusCode
-        val reach = if (relayError != null) null else io.github.nanomuse.net.ProviderReach.fromHttp(
-            diagnosticCode, body,
+        val diagnostic = io.github.nanomuse.net.ProviderErrorDiagnostics.capture(
+            code = statusCode, body = body,
             host = if (isOAuth && !forceChatCompletions) "chatgpt.com" else io.github.nanomuse.net.OwnProviderProxy.hostOf(basePath),
-            oauth = isOAuth,
-            // nanoMuse: retain either delta-seconds or an HTTP-date without overflowing;
-            // an invalid supplied header must not turn into a guessed short wait.
-            retryAfterS = io.github.nanomuse.net.ProviderReach.retryAfterSeconds(retryAfter),
-            retryAfterPresent = retryAfter != null,
-            credentials = requestCredentials,
-            // nanoMuse: an otherwise unclassified provider failure still gets details.
-            includeOtherFailures = true,
+            oauth = isOAuth, requestModel = requestModelId, credentials = requestCredentials,
+            retryAfter = retryAfter, fromRelay = io.github.nanomuse.net.OwnProviderProxy.isRelay(basePath),
             hasHttpStatus = hasHttpStatus,
-        )?.let { io.github.nanomuse.net.ProviderReach.withRequestModel(it, requestModelId, credentials = requestCredentials) }
-        fun withDiagnostics(error: LLMError): LLMError = error.apply {
-            nmProviderReach = reach
-            nmRelayError = relayError
-        }
+        )
+        fun withDiagnostics(error: LLMError): LLMError = diagnostic.attach(error)
         if (statusCode == 401) return withDiagnostics(LLMError.InvalidApiKey())
         if (statusCode == 429) return withDiagnostics(LLMError.RateLimited())
 
         // nanoMuse: parsed provider message only. Opaque JSON metadata and HTML are not
         // needed to explain a failure and may echo prompts or encoded credentials.
-        val errorMessage = io.github.nanomuse.net.ProviderReach.diagnosticMessage(body, credentials = requestCredentials)
+        val errorMessage = diagnostic.message
         val message = when {
             errorMessage.isNotBlank() && statusCode != 0 -> "[$statusCode] $errorMessage"
             errorMessage.isNotBlank() -> errorMessage

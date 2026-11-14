@@ -60,7 +60,9 @@ class GeminiProvider(
         thinkingLevel: ThinkingLevel,
     ): LLMResponse = withContext(Dispatchers.IO) {
         val body = buildRequestBody(messages, systemPrompt, maxTokens, temperature, imageParts, tools, thinkingLevel)
-        val url = "$basePath/models/${model.id}:generateContent?key=$apiKey"
+        // nanoMuse: this URL, not a later model selection, identifies the failed request.
+        val requestModel = model.id
+        val url = "$basePath/models/$requestModel:generateContent?key=$apiKey"
         val request = Request.Builder()
             .url(url)
             .post(body.toString().toRequestBody("application/json".toMediaType()))
@@ -70,11 +72,13 @@ class GeminiProvider(
             .applyUserAgentOverride(null)
             .build()
 
+        // nanoMuse: redact both the configured key and the one actually present in the URL.
+        val credentials = requestCredentials(request)
         val response = client.newCall(request).execute()
         val responseBody = response.body?.string() ?: ""
 
         if (!response.isSuccessful) {
-            throw mapHttpError(response.code, responseBody)
+            throw mapHttpError(response.code, responseBody, response.header("Retry-After"), requestModel, credentials)
         }
 
         val json = JSONObject(responseBody)
@@ -107,7 +111,9 @@ class GeminiProvider(
         thinkingLevel: ThinkingLevel,
     ): Flow<LLMStreamChunk> = callbackFlow {
         val body = buildRequestBody(messages, systemPrompt, maxTokens, temperature, imageParts, tools, thinkingLevel)
-        val url = "$basePath/models/${model.id}:streamGenerateContent?alt=sse&key=$apiKey"
+        // nanoMuse: snapshot the model in the URL before the request starts.
+        val requestModel = model.id
+        val url = "$basePath/models/$requestModel:streamGenerateContent?alt=sse&key=$apiKey"
         val request = Request.Builder()
             .url(url)
             .post(body.toString().toRequestBody("application/json".toMediaType()))
@@ -116,11 +122,13 @@ class GeminiProvider(
             .applyUserAgentOverride(null)
             .build()
 
+        // nanoMuse: capture credentials from this call, not a later provider selection.
+        val credentials = requestCredentials(request)
         val response = client.newCall(request).execute()
         if (!response.isSuccessful) {
             val errorBody = response.body?.string() ?: ""
             response.close()
-            throw mapHttpError(response.code, errorBody)
+            throw mapHttpError(response.code, errorBody, response.header("Retry-After"), requestModel, credentials)
         }
 
         val reader = BufferedReader(InputStreamReader(response.body!!.byteStream()))
@@ -134,6 +142,17 @@ class GeminiProvider(
                 val payload = l.removePrefix("data: ")
 
                 val json = try { JSONObject(payload) } catch (_: Exception) { continue }
+                // nanoMuse: do not mistake an in-band error for a successful empty completion.
+                if (json.has("error") && !json.isNull("error")) {
+                    val streamError = json.optJSONObject("error")
+                    val code = streamError?.optInt("code", 0) ?: 0
+                    val status = streamError?.opt("status") as? String
+                    throw mapHttpError(
+                        code, json.toString(), null, requestModel, credentials,
+                        hasHttpStatus = false,
+                        transientStream = status in setOf("INTERNAL", "UNAVAILABLE", "DEADLINE_EXCEEDED"),
+                    )
+                }
 
                 if (!started) {
                     send(LLMStreamChunk.Started)
@@ -506,13 +525,23 @@ class GeminiProvider(
         )
     }
 
-    private fun mapHttpError(statusCode: Int, body: String): LLMError {
-        if (statusCode == 401 || statusCode == 403) return LLMError.InvalidApiKey()
-        if (statusCode == 429) return LLMError.RateLimited()
-        val message = "Gemini API error $statusCode: ${body.take(200)}"
-        val transientCodes = setOf(500, 502, 503, 504, 529)
-        if (statusCode in transientCodes) return LLMError.TransientError(message)
-        return LLMError.ProviderError(message)
+    // nanoMuse: Gemini sends its key in the query, so it must be redacted as well as headers.
+    private fun requestCredentials(request: Request): List<String> =
+        io.github.nanomuse.net.ProviderCredentials.fromHeaders(
+            request.headers.names().associateWith { request.headers.values(it) }, apiKey,
+        ) + listOfNotNull(request.url.queryParameter("key"))
+
+    private fun mapHttpError(
+        statusCode: Int, body: String, retryAfter: String?, requestModel: String?,
+        credentials: Collection<String>, hasHttpStatus: Boolean = true, transientStream: Boolean = false,
+    ): LLMError {
+        val captured = io.github.nanomuse.net.ProviderErrorDiagnostics.capture(
+            code = statusCode, body = body, host = io.github.nanomuse.net.OwnProviderProxy.hostOf(basePath),
+            oauth = false, requestModel = requestModel, credentials = credentials,
+            retryAfter = retryAfter, fromRelay = io.github.nanomuse.net.OwnProviderProxy.isRelay(basePath),
+            hasHttpStatus = hasHttpStatus,
+        )
+        return captured.nativeError(statusCode, hasHttpStatus, transientStream = transientStream)
     }
 
     private fun mapError(error: Throwable): LLMError {

@@ -63,8 +63,12 @@ validador do catálogo e suas quatro cópias concordam. No CI `43637928693` de `
 unitários Android passaram e o APK instrumentado foi montado; os três previews sintéticos passaram,
 mas o smoke de dispositivo falhou. A jornada adaptada **não foi comprovada**: conserva o gate do 413
 terminal em LEAN, prevê uma segunda sequência FULL → BASIC → LEAN no wire e mantém a medição
-FULL/dieta. Nenhuma API real ou Poco foi validado. Os rascunhos locais dos clientes de provedores
-permanecem separados.
+FULL/dieta. Nenhuma API real ou Poco foi validado.
+
+Os clientes Anthropic e Gemini também passam a carregar diagnóstico por requisição para 413,
+429 e outras recusas, inclusive `Retry-After` quando fornecido; o OpenAI compartilha a mesma
+captura. Quatro testes locais do classificador passaram com stubs do relay; os novos testes dos
+clientes com MockWebServer dependem do CI Android. Eles não provam a troca no loop real.
 
 ## T4b: integração de chat em validação
 

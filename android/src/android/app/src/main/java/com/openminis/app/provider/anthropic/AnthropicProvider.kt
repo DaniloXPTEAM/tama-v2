@@ -94,11 +94,14 @@ class AnthropicProvider(
     ): LLMResponse = withContext(Dispatchers.IO) {
         val body = buildRequestBody(messages, systemPrompt, maxTokens, stream = false, temperature = temperature, imageParts = imageParts, tools = tools, thinkingLevel = thinkingLevel)
         val request = buildRequest(body.toString(), body)
+        // nanoMuse: snapshot the model and credentials for this specific wire request.
+        val requestModel = body.opt("model") as? String
+        val credentials = requestCredentials(request)
         val response = client.newCall(request).execute()
         val responseBody = response.body?.string() ?: ""
 
         if (!response.isSuccessful) {
-            throw mapHttpError(response.code, responseBody)
+            throw mapHttpError(response.code, responseBody, response.header("Retry-After"), requestModel, credentials)
         }
 
         val json = JSONObject(responseBody)
@@ -133,6 +136,9 @@ class AnthropicProvider(
         // MB on long agent loops and stacked under GC pressure.
         val bodyStr = body.toString()
         val request = buildRequest(bodyStr, body)
+        // nanoMuse: a later model or credential change cannot rewrite this failure's details.
+        val requestModel = body.opt("model") as? String
+        val credentials = requestCredentials(request)
 
         val startTime = System.currentTimeMillis()
 
@@ -161,12 +167,14 @@ class AnthropicProvider(
                         requestBody = bodyStr,
                         durationMs = durationMs,
                         responseStatusCode = response.code,
-                        responseBody = errorBody.take(2000),
+                        // nanoMuse: keep only the decoded, redacted provider message, not metadata.
+                        responseBody = io.github.nanomuse.net.ProviderReach.diagnosticMessage(errorBody, maxChars = 2000, credentials = credentials),
                     )
                 )
             }
-            android.util.Log.e("AnthropicProvider", "Stream failed: ${response.code} isOAuth=$isOAuth body=${errorBody.take(300)}")
-            throw mapHttpError(response.code, errorBody)
+            // nanoMuse: raw errors can echo prompts or credentials, including JSON-escaped keys.
+            android.util.Log.e("AnthropicProvider", "Stream failed: ${response.code}")
+            throw mapHttpError(response.code, errorBody, response.header("Retry-After"), requestModel, credentials)
         }
 
         // Log successful request (debug builds only — see above)
@@ -198,8 +206,18 @@ class AnthropicProvider(
                 if (payload == "[DONE]") break
 
                 val event = try { JSONObject(payload) } catch (_: Exception) { continue }
-                android.util.Log.d("ToolChain[Provider]", "RAW SSE: $payload")
                 val eventType = event.safeOptString("type", "")
+                // nanoMuse: a successful HTTP stream can still contain a provider error.
+                // Never log raw SSE: it can contain conversation text or escaped credentials.
+                val streamError = event.optJSONObject("error")
+                if (eventType == "error" || streamError != null) {
+                    val code = streamError?.optInt("code", 0) ?: 0
+                    val type = streamError?.opt("type") as? String
+                    throw mapHttpError(
+                        code, event.toString(), null, requestModel, credentials,
+                        hasHttpStatus = false, transientStream = type in setOf("api_error", "overloaded_error"),
+                    )
+                }
 
                 when (eventType) {
                     "message_start" -> {
@@ -214,7 +232,8 @@ class AnthropicProvider(
                             currentToolId = contentBlock.safeOptString("id", "")
                             currentToolName = contentBlock.safeOptString("name", "")
                             toolInputBuffer.clear()
-                            android.util.Log.d("ToolChain[Provider]", "→ ToolUseStart id=$currentToolId name=$currentToolName")
+                            // nanoMuse: identifiers and tool names are provider-supplied; do not log them.
+                            android.util.Log.d("ToolChain[Provider]", "Tool use started")
                             send(LLMStreamChunk.ToolUseStart(currentToolId!!, currentToolName!!))
                         }
                     }
@@ -233,7 +252,8 @@ class AnthropicProvider(
                                 val partial = delta.safeOptString("partial_json", "")
                                 if (partial.isNotEmpty() && currentToolId != null) {
                                     toolInputBuffer.append(partial)
-                                    android.util.Log.d("ToolChain[Provider]", "→ ToolInputDelta id=$currentToolId accumulated=${toolInputBuffer.length}chars")
+                                    // nanoMuse: report size only; the id can be provider-supplied data.
+                                    android.util.Log.d("ToolChain[Provider]", "Tool input received: ${toolInputBuffer.length} chars")
                                     send(LLMStreamChunk.ToolInputDelta(currentToolId!!, toolInputBuffer.toString()))
                                 }
                             }
@@ -246,7 +266,8 @@ class AnthropicProvider(
                             } catch (_: Exception) {
                                 JSONObject()
                             }
-                            android.util.Log.d("ToolChain[Provider]", "→ ToolCallComplete id=$currentToolId name=$currentToolName args=${args.toString().take(300)}")
+                            // nanoMuse: tool arguments may contain private data; do not write them to logcat.
+                            android.util.Log.d("ToolChain[Provider]", "Tool call complete")
                             send(LLMStreamChunk.ToolCallComplete(currentToolId!!, currentToolName!!, args))
                             currentToolId = null
                             currentToolName = null
@@ -1034,25 +1055,26 @@ class AnthropicProvider(
         )
     }
 
-    private fun mapHttpError(statusCode: Int, body: String): LLMError {
-        if (statusCode == 401 || statusCode == 403) return LLMError.InvalidApiKey()
-        if (statusCode == 429) return LLMError.RateLimited()
+    // nanoMuse: retain only request-scoped, decoded and redacted diagnostics.
+    private fun requestCredentials(request: Request): List<String> =
+        io.github.nanomuse.net.ProviderCredentials.fromHeaders(
+            request.headers.names().associateWith { request.headers.values(it) }, apiKey,
+        )
 
-        val message = try {
-            val json = JSONObject(body)
-            val error = json.optJSONObject("error")
-            val errorType = error?.safeOptString("type", "") ?: "error"
-            val errorMessage = error?.safeOptString("message", "") ?: body
-            "[$errorType] $errorMessage"
-        } catch (_: Exception) {
-            "HTTP $statusCode: ${body.take(500)}"
-        }
-
-        val transientCodes = setOf(500, 502, 503, 504, 529)
-        if (statusCode in transientCodes) {
-            return LLMError.TransientError(message)
-        }
-        return LLMError.ProviderError(message)
+    private fun mapHttpError(
+        statusCode: Int, body: String, retryAfter: String?, requestModel: String?,
+        credentials: Collection<String>, hasHttpStatus: Boolean = true, transientStream: Boolean = false,
+    ): LLMError {
+        val diagnostics = io.github.nanomuse.net.ProviderErrorDiagnostics
+        val captured = diagnostics.capture(
+            code = statusCode, body = body, host = io.github.nanomuse.net.OwnProviderProxy.hostOf(basePath),
+            oauth = isOAuth, requestModel = requestModel, credentials = credentials,
+            retryAfter = retryAfter, fromRelay = io.github.nanomuse.net.OwnProviderProxy.isRelay(basePath),
+            hasHttpStatus = hasHttpStatus,
+        )
+        return captured.nativeError(
+            statusCode, hasHttpStatus, diagnostics.safeErrorType(body, credentials), transientStream,
+        )
     }
 
     private fun mapError(error: Throwable): LLMError {
