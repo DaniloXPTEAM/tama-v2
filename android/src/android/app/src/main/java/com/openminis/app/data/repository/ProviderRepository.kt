@@ -795,6 +795,11 @@ class ProviderRepository(private val context: Context) {
             ) {
                 instance.imageEndpointResolved = null
             }
+            // nanoMuse: a changed endpoint/format cannot reuse an earlier automatic
+            // cost authorization, even if the endpoint is later changed back.
+            io.github.nanomuse.router.AutoModelStore.synchronizeRoute(
+                context, instance.id, io.github.nanomuse.router.AutoModelStore.routeFingerprint(instance),
+            )
             config.instances[idx] = instance
             saveConfig(config)
             // Any change that could move the model list (base URL, credential
@@ -812,6 +817,7 @@ class ProviderRepository(private val context: Context) {
 
     fun removeInstance(instanceId: String): Unit = synchronized(configLock) {
         ensureConfigLoaded()
+        io.github.nanomuse.router.AutoModelStore.accountChanged(context, instanceId)
         invalidateModelCache(instanceId)
         val config = workingCopy()
         val removedEntryIds = config.modelEntries
@@ -2185,7 +2191,7 @@ class ProviderRepository(private val context: Context) {
                 val manager = com.openminis.app.auth.OAuthManager.forInstance(context, instance)
                 val freshToken = manager?.validAccessToken()
                 if (freshToken != null && freshToken != apiKey) {
-                    saveApiKey(instance.id, freshToken)
+                    saveApiKey(instance.id, freshToken, oauthRefresh = true)
                     apiKey = freshToken
                     android.util.Log.i("ProviderRepo", "refreshModels: OAuth token refreshed")
                 }
@@ -2417,7 +2423,12 @@ class ProviderRepository(private val context: Context) {
     }
 
     // API Key management
-    fun saveApiKey(instanceId: String, key: String) {
+    fun saveApiKey(instanceId: String, key: String, oauthRefresh: Boolean = false) {
+        // A deliberately changed key can point at a different billable account. Rotating
+        // the access token of an already signed-in OAuth session is not a new consent.
+        if (!oauthRefresh && encryptedPrefs.getString("apikey_$instanceId", null) != key) {
+            io.github.nanomuse.router.AutoModelStore.accountChanged(context, instanceId)
+        }
         encryptedPrefs.edit().putString("apikey_$instanceId", key).apply()
     }
 
@@ -2438,6 +2449,9 @@ class ProviderRepository(private val context: Context) {
         loadApiKey(instance.id) ?: if (instance.allowsEmptyAPIKey) "" else null
 
     fun deleteApiKey(instanceId: String) {
+        if (encryptedPrefs.contains("apikey_$instanceId")) {
+            io.github.nanomuse.router.AutoModelStore.accountChanged(context, instanceId)
+        }
         encryptedPrefs.edit().remove("apikey_$instanceId").apply()
     }
 

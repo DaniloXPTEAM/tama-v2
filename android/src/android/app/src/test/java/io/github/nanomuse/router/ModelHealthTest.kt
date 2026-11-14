@@ -56,7 +56,10 @@ class ModelHealthTest {
         assertEquals(4_000L, wait.untilMillis)
         now = 3_999
         assertNotNull(health.snapshot("a", "p").cooldown)
-        assertNull(health.snapshot("b", "p").cooldown)
+        // A 429 can be an account-wide TPM limit; do not immediately retry
+        // the same account under another model when the scope is unknown.
+        assertNotNull(health.snapshot("b", "p").cooldown)
+        assertNull(health.snapshot("b", "other").cooldown)
         now = 4_000
         assertNull(health.snapshot("a", "p").cooldown)
         val quota = health.failure("a", "p", ModelHealth.Failure.QUOTA)
@@ -69,7 +72,10 @@ class ModelHealthTest {
         assertNull(auth.untilMillis)
         now += 2_000
         assertNotNull(health.snapshot("b", "p").cooldown)
+        // A response that was already in flight must not undo a newer 401.
         health.success("b", "p", 42)
+        assertNotNull(health.snapshot("a", "p").cooldown)
+        health.clearAccount("p")
         assertNull(health.snapshot("a", "p").cooldown)
     }
 
@@ -99,6 +105,24 @@ class ModelHealthTest {
         assertEquals(100, health.snapshot("e", "p").usedThisMinute)
         now = 70_000
         assertEquals(0, health.snapshot("e", "p").usedThisMinute)
+    }
+
+    @Test fun aCooldownBetweenSelectionAndDispatchCannotBeBypassed() {
+        val health = ModelHealth { 0L }
+        assertNull(health.snapshot("e", "p").cooldown)
+        health.failure("another-entry", "p", ModelHealth.Failure.RATE_LIMIT, 3)
+        val blocked = health.reserveFor("e", "p", 10, 100) as ModelHealth.Reservation.Blocked
+        assertEquals(3_000L, blocked.cooldown.untilMillis)
+        assertEquals(0, health.snapshot("e", "p").usedThisMinute)
+    }
+
+    @Test fun ticketsCannotBeCancelledOrFinishedByAnotherLedger() {
+        val a = ModelHealth { 0L }
+        val b = ModelHealth { 0L }
+        val ticket = (a.reserve("p", 10, 100) as ModelHealth.Reservation.Granted).ticket
+        try { b.finish(ticket); fail("wrong owner accepted") } catch (_: IllegalArgumentException) { }
+        try { b.cancelBeforeDispatch(ticket); fail("wrong owner accepted") } catch (_: IllegalArgumentException) { }
+        assertEquals(10, a.snapshot("e", "p").usedThisMinute)
     }
 
     @Test fun reservationsAreAtomicAcrossConcurrentTurns() {

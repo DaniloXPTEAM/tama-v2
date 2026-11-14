@@ -262,6 +262,8 @@ class XAIOAuthManager(context: Context, instanceId: String) : OAuthManager(conte
         if (accessToken.isEmpty()) {
             throw Exception("xAI token exchange: no access_token in response")
         }
+        // A completed login may be a different billable account.
+        invalidateAutomaticConsent()
         // Cache token bundle via the same key used by validAccessToken /
         // refreshToken in the base class.
         val expiresIn = json.optLong("expires_in", 0)

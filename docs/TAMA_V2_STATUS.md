@@ -24,7 +24,7 @@ depois T5, T6, T8 e T7; T9 aguarda o Poco e T12 fica na leitura estática já fe
 | T2: detalhes tocáveis | PARCIAL | `43626037252`: cinco testes Compose instrumentados passaram isoladamente; a jornada abriu os detalhes de 413, mas não comprovou a recuperação após o retry. | Jornada não verificada no emulador; paridade dos outros provedores continua pendente. |
 | T3: metas medidas | PARCIAL | Metas recalibradas pela fixture host e limiares de regressão abaixo; compilação e unitários no CI Android pendentes. | Integrar em T4 e usar orçamento real por chamada, sem tratar estimativas como contagem faturada. |
 | T4: roteador e perfis | PARCIAL | O job Android de `e94734e` compilou o APK, passou unitários e montou o APK instrumentado; os previews sintéticos passaram, mas o smoke de dispositivo falhou. O wire e o Poco continuam não comprovados. | Manter a investigação do emulador pausada; validar no dispositivo quando autorizado. A falta de ferramentas após redução é avisada, não considerada uma tarefa concluída. |
-| T4b: auto-combo | PARCIAL — NÚCLEO | Política pura de seleção, estado por conta, autorização por rota, aprendizado de recusa e filtragem de raciocínio foram iniciados; **seleção, consentimento e janela móvel ainda não estão ligados ao envio**. | Integrar seleção e reservas ao loop real, telas e avisos; exercitar failover e fila sem repetir tools. |
+| T4b: auto-combo | PARCIAL — INTEGRAÇÃO EM VALIDAÇÃO | Seleção e reserva foram ligadas ao loop de chat, com consentimento e classificação conservadora; o exercício local usa stubs e **não comprova o envio Android**. | Compilar e testar o loop real, inclusive failover, fila, logins, ferramentas e imagem; não considerar concluído sem prova. |
 | T12: subagentes | PARCIAL | `84436db`: investigação estática em [TAMA_V2_SUBAGENTES.md](TAMA_V2_SUBAGENTES.md): não foi encontrada no Android examinado uma orquestração conversa/executor independente; `minis-model-use`, fila e slots não bastam. Há um plano de implementação e testes. | Primeiro concluir T4b sequencial; não declarar execução paralela sem teste dinâmico. |
 | T5: atalhos sem modelo | PENDENTE | Nenhum atalho novo foi adicionado nesta etapa. | Reusar handlers e preservar `RiskGate` e `OffloadGate`. |
 | T6: tools sob demanda | PENDENTE | Sem `load_tools` nesta alteração. | Carregar grupos sem alterar o prefixo estável. |
@@ -66,25 +66,30 @@ terminal em LEAN, prevê uma segunda sequência FULL → BASIC → LEAN no wire 
 FULL/dieta. Nenhuma API real ou Poco foi validado. Os rascunhos locais dos clientes de provedores
 permanecem separados.
 
-## T4b: núcleo de seleção, ainda não integrado
+## T4b: integração de chat em validação
 
-O `ModelRouter` filtra identidade duplicada, modelo oculto/desativado, falta de credencial,
-autorização, capacidades, perfil, contexto, orçamento e cooldown; mantém o modelo atual quando
-adequado. `ModelHealth` reserva por conta de forma atômica, preserva a estimativa mesmo após erro e
-mantém uso por pelo menos 60 segundos após a conclusão. Cotas, preços, outras instalações e
-contagens reais do fornecedor seguem desconhecidos: isto é um limitador conservador, não uma
-promessa de faturamento. O armazenamento local separa consentimento e evidências pelo modelo,
-instância, endpoint e autenticação, por padrão em modo manual; uma recusa explícita de ferramentas
-pode ser lembrada. Esses componentes **ainda não decidem nem bloqueiam chamadas reais**.
+O `ModelRouter` filtra modelos ocultos/desativados, sem credencial, autorização, capacidade,
+perfil, contexto, orçamento ou em cooldown. No loop de chat automático agora há seleção, verificação
+novamente antes do envio, reserva atômica e troca apenas para falhas classificadas; uso manual
+permanece o padrão. A janela de 60 s é local, em memória e conservadora: não mede outras instalações,
+preços nem a contagem do fornecedor. A tela de modelos dá acesso à revisão por entrada; mudanças
+explícitas de conta ou rota revogam a autorização. O histórico filtra raciocínio e assinaturas pela
+identidade do cliente construído e por uma geração local da conta, preservando ferramentas e
+resultados. A compactação automática é adiada no modo automático porque sua chamada ainda não
+passa pela mesma reserva.
 
-A vista de histórico no loop agora retira raciocínio e assinaturas opacas de outra rota ou de
-origem desconhecida, preservando as mensagens salvas, chamadas de ferramenta e resultados; o
-serializador Gemini pode representar chamadas sem assinatura como texto. Um teste host de seleção
-simula 429 → segundo modelo sem repetir a ferramenta, mas não substitui teste do `ChatViewModel`, do
-wire, de cobranças ou da geração de imagem, que usa um endpoint separado. Em host passaram 21 testes
-JUnit de seleção, janela, persistência fake, histórico e classificação, mais quatro do planejador;
-foram usados stubs para Android e algumas classes, não um build Android desta alteração. A seleção
-automática, o acionamento da reserva, as telas e o retorno ao modelo preferido permanecem pendentes.
+O exercício host com stubs passou para seleção, cota, cooldown, consentimento, classificação e
+identidade de histórico; a sintaxe Kotlin e os XMLs foram verificados. **Isso não é compilação do
+app nem teste do loop real.** Continuam pendentes a jornada e o wire de failover, o teste real de
+logins/refresh e revogação concorrente, a seleção/contabilização do endpoint próprio de imagem,
+os avisos detalhados e a paridade de todos os provedores. Chamadas auxiliares fora do loop de chat
+não são cobertas pela janela. Não houve chamadas pagas nem teste no Poco.
+
+No commit anterior `9de900a`, [Android 43651965248](https://github.com/DaniloXPTEAM/tamaaiv2/actions/runs/43651965248)
+passou build, unitários e montagem do APK instrumentado, mas falhou no smoke de dispositivo; o
+[iOS 43651965227](https://github.com/DaniloXPTEAM/tamaaiv2/actions/runs/43651965227) e a Test Suite
+passaram. Esse CI **não** inclui a integração descrita acima. A investigação do emulador permanece
+pausada.
 
 ## T0b/T3: fixture host por perfil, antes da integração no envio
 

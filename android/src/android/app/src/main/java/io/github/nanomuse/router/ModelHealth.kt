@@ -23,6 +23,8 @@ class ModelHealth(private val clockMillis: () -> Long) {
         data class Granted(val ticket: Ticket) : Reservation
         /** Null deadline means an in-flight request or an unknown waiting time. */
         data class Full(val used: Long, val availableAtMillis: Long?) : Reservation
+        /** A cooldown appeared after selection and before the reservation. */
+        data class Blocked(val cooldown: Cooldown) : Reservation
     }
 
     private data class Event(
@@ -35,6 +37,7 @@ class ModelHealth(private val clockMillis: () -> Long) {
 
     private val events = linkedMapOf<Long, Event>()
     private val entries = mutableMapOf<String, Cooldown>()
+    private val entryAccounts = mutableMapOf<String, String>()
     private val providers = mutableMapOf<String, Cooldown>()
     private val statistics = mutableMapOf<String, Stats>()
     private var sequence = 0L
@@ -59,6 +62,18 @@ class ModelHealth(private val clockMillis: () -> Long) {
     private fun used(providerId: String): Long = events.values.asSequence()
         .filter { it.providerId == providerId }
         .fold(0L) { total, event -> plus(total, event.charged) }
+
+    /**
+     * Check health and reserve in one critical section. Selection alone cannot protect a
+     * request from another chat recording an account failure just before dispatch.
+     */
+    @Synchronized
+    fun reserveFor(entryId: String, providerId: String, estimatedTokens: Long, tokensPerMinute: Int?): Reservation {
+        require(entryId.isNotBlank() && providerId.isNotBlank())
+        prune(now())
+        (providers[providerId] ?: entries[entryId])?.let { return Reservation.Blocked(it) }
+        return reserve(providerId, estimatedTokens, tokensPerMinute)
+    }
 
     /** Unknown TPM permits a reservation but remains unknown; it is never declared unlimited. */
     @Synchronized
@@ -121,7 +136,7 @@ class ModelHealth(private val clockMillis: () -> Long) {
     }
 
     /**
-     * Auth and account quota/credit are account-scoped. A valid Retry-After is honored exactly;
+     * Auth, rate limits, and account quota/credit are conservatively account-scoped. A valid Retry-After is honored exactly;
      * a malformed provided header and quota without a deadline stay unavailable until reset.
      * Other missing headers get conservative local heuristics, identified as such in the result.
      */
@@ -137,12 +152,14 @@ class ModelHealth(private val clockMillis: () -> Long) {
         val at = now()
         prune(at)
         val validRetry = retryAfterSeconds?.takeIf { it >= 0 }
-        val accountBlocked = reason == Failure.AUTH || reason == Failure.QUOTA || reason == Failure.NO_CREDIT
+        val accountBlocked = reason == Failure.AUTH || reason == Failure.QUOTA ||
+            reason == Failure.NO_CREDIT || reason == Failure.RATE_LIMIT
         val wait = when {
             // Authentication failures need a credential change or an explicit retry, not a timer.
             reason == Failure.AUTH -> Cooldown(reason, null, DeadlineSource.UNKNOWN)
             validRetry != null -> Cooldown(reason, plus(at, validRetry.toLong() * 1000), DeadlineSource.RETRY_AFTER)
-            retryAfterPresent || accountBlocked -> Cooldown(reason, null, DeadlineSource.UNKNOWN)
+            retryAfterPresent || reason == Failure.QUOTA || reason == Failure.NO_CREDIT ->
+                Cooldown(reason, null, DeadlineSource.UNKNOWN)
             else -> Cooldown(reason, plus(at, when (reason) {
                 Failure.RATE_LIMIT -> 60_000L
                 Failure.SERVER -> 30_000L
@@ -163,6 +180,7 @@ class ModelHealth(private val clockMillis: () -> Long) {
             else -> wait
         }
         blocks[key] = effective
+        entryAccounts[entryId] = providerId
         val stats = statistics.getOrPut(entryId) { Stats() }
         stats.failures = (stats.failures + 1).coerceAtMost(1_000_000)
         return effective
@@ -172,8 +190,9 @@ class ModelHealth(private val clockMillis: () -> Long) {
     fun success(entryId: String, providerId: String, latencyMillis: Long) {
         require(entryId.isNotBlank() && providerId.isNotBlank() && latencyMillis >= 0)
         prune(now())
-        entries.remove(entryId)
-        providers.remove(providerId)
+        // This response may have started before another concurrent request recorded a
+        // newer auth/quota failure. A success is not proof that such a block cleared.
+        // Timed blocks expire normally; unknown blocks need explicit account action.
         val stats = statistics.getOrPut(entryId) { Stats() }
         stats.failures = 0
         stats.latencyMs = latencyMillis
@@ -184,6 +203,15 @@ class ModelHealth(private val clockMillis: () -> Long) {
     fun clearBlock(entryId: String, providerId: String) {
         entries.remove(entryId)
         providers.remove(providerId)
+    }
+
+    /** A new credential or endpoint invalidates blocks for that account, but never its usage. */
+    @Synchronized
+    fun clearAccount(providerId: String) {
+        require(providerId.isNotBlank())
+        providers.remove(providerId)
+        val accountEntries = entryAccounts.filterValues { it == providerId }.keys.toList()
+        accountEntries.forEach { id -> entries.remove(id); entryAccounts.remove(id) }
     }
 
     @Synchronized

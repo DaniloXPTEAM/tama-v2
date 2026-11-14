@@ -23,6 +23,11 @@ import io.github.nanomuse.chat.ContextBudget // nanoMuse
 import io.github.nanomuse.chat.ContextEstimate // nanoMuse
 import io.github.nanomuse.chat.PromptSize // nanoMuse: count-only prompt diagnostics
 import io.github.nanomuse.chat.PromptProfiles // nanoMuse: one snapshot for the actual outbound profile
+import io.github.nanomuse.router.AutoModelStore
+import io.github.nanomuse.router.AutoModelRuntime
+import io.github.nanomuse.router.AutoModelTurn
+import io.github.nanomuse.router.ModelHealth
+import io.github.nanomuse.router.ModelRouter
 import io.github.nanomuse.router.Need
 import io.github.nanomuse.router.Profile
 import io.github.nanomuse.router.ProviderBudget
@@ -58,8 +63,13 @@ import com.openminis.app.data.model.LLMMessage
 import com.openminis.app.data.model.LLMModel
 import com.openminis.app.data.model.LLMStreamChunk
 import com.openminis.app.data.model.LLMUsage
+import com.openminis.app.data.model.ModelEntry
 import com.openminis.app.data.model.ModelGroup
+import com.openminis.app.data.model.ProviderCredential
+import com.openminis.app.data.model.ProviderInstance
+import com.openminis.app.data.model.ProviderType
 import com.openminis.app.data.model.RoutingStrategy
+import com.openminis.app.data.model.normalizeModalityName
 import com.openminis.app.data.model.hasImageInput
 import com.openminis.app.data.model.ThinkingLevel
 import com.openminis.app.R
@@ -1167,6 +1177,16 @@ class ChatViewModel(
     private val nmTrackedLocalRuns = io.github.nanomuse.pet.PetRunBindings<Job>()
     private var currentProvider: LLMProvider? = null
     private var currentModel: LLMModel? = null
+    // Bind opaque-history compatibility to the endpoint/account used when each client was
+    // actually constructed, not a later live configuration lookup.
+    private val nmProviderRoutes = java.util.Collections.synchronizedMap(
+        java.util.WeakHashMap<LLMProvider, String>(),
+    )
+    private fun nmCreateProvider(instance: ProviderInstance, key: String, model: LLMModel): LLMProvider {
+        val snapshot = instance.copy()
+        val fingerprint = AutoModelStore.historyFingerprint(context, snapshot)
+        return ProviderFactory.create(snapshot, key, model, context).also { nmProviderRoutes[it] = fingerprint }
+    }
 
     // nanoMuse: a mode is a request shape, never an authorization to use tools.
     private val _nmProfileOverride = MutableStateFlow<Profile?>(null)
@@ -1174,6 +1194,8 @@ class ChatViewModel(
     private val _nmActiveProfile = MutableStateFlow<Profile?>(null)
     val nmActiveProfile: StateFlow<Profile?> = _nmActiveProfile.asStateFlow()
     @Volatile private var nmPreviousRoute = SessionState()
+    // The person's preferred entry survives a temporary automatic switch in this session.
+    @Volatile private var nmPreferredAutoEntryId: String? = null
 
     fun nmSetProfileOverride(profile: Profile?) {
         _nmProfileOverride.value = profile
@@ -1202,22 +1224,28 @@ class ChatViewModel(
     }
 
     /** No model inherits a different model's observed limit. Missing metadata stays unknown. */
-    private fun nmBudgetFor(provider: LLMProvider): ProviderBudget {
+    private fun nmBudgetForEntry(entryId: String, modelId: String): ProviderBudget {
         val config = providerRepository.config.value
-        val entry = config.modelEntries.find { it.id == _activeEntryId.value }
-            ?.takeIf { it.model.id == provider.model.id && this.currentProvider === provider }
+        val entry = config.modelEntries.find { it.id == entryId && it.model.id == modelId }
             ?: return ProviderBudget()
         val instance = config.instances.find { it.id == entry.providerInstanceId } ?: return ProviderBudget()
         val vendor = io.github.nanomuse.cloud.ProviderCatalogue.match(
             io.github.nanomuse.cloud.ProviderCatalogue.load(context), instance,
         )
-        val modelLimits = vendor?.models?.get(provider.model.id)?.limits
+        val modelLimits = vendor?.models?.get(modelId)?.limits
         val observedTpm = modelLimits?.freeTpm ?: vendor?.limits?.freeTpm
         return ProviderBudget(
             tokensPerMinute = ProviderBudgetStore.read(context, instance.id, observedTpm),
             maxOutputTokens = modelLimits?.maxOutput ?: vendor?.limits?.maxOutput,
         )
     }
+
+    private fun nmBudgetFor(provider: LLMProvider): ProviderBudget =
+        if (this.currentProvider === provider) _activeEntryId.value?.let { nmBudgetForEntry(it, provider.model.id) }
+            ?: ProviderBudget() else ProviderBudget()
+
+    /** Unknown/one-off routes cannot assert compatibility of opaque history. */
+    private fun nmRouteFingerprint(provider: LLMProvider): String? = nmProviderRoutes[provider]
 
     // nanoMuse: model-scoped calibration survives Continue and process restart. The request
     // budget below is refreshed before each provider call, including model-group fallback.
@@ -1294,7 +1322,7 @@ class ChatViewModel(
      * fixed list of definition objects, no I/O.
      */
     // nanoMuse: keep the original definitions available for count-only before/after diagnostics.
-    private fun originalAgentTools(): List<AgentToolDefinition> = AgentTools.makeAgentTools(
+    private fun originalAgentTools(model: LLMModel? = currentModel): List<AgentToolDefinition> = AgentTools.makeAgentTools(
             // [T-android-vision-group / GH#182] The main model's own vision
             // capability. When false but a Vision Group is configured, read_image
             // is still exposed and routes through the group (see
@@ -1303,7 +1331,7 @@ class ChatViewModel(
             // threading the real flag lets a text-only model without a Vision
             // Group correctly LOSE the tool (iOS parity), while a configured
             // Vision Group keeps it.
-            supportsImageInput = currentModelHasNativeVision,
+            supportsImageInput = model?.hasImageInput == true,
             visionGroupConfigured = com.openminis.app.tools.VisionGroupResolver.isConfigured(
                 providerRepository, context,
             ),
@@ -3505,9 +3533,13 @@ class ChatViewModel(
         measureContextTokens: () -> Int,
         measureRawTokens: () -> Int,
         prepareAfterSummary: suspend () -> Unit,
+        allowAutomaticCompaction: Boolean = true,
     ): ContextMaintenance.Action {
         val wasDeferred = maintenance.softDeferred
         val action = maintenance.check(budget, measureContextTokens, measureRawTokens) { tokens, attempt ->
+            // Compaction has its own provider call and has not yet been wired to the
+            // auto-mode consent/reservation gate. Defer instead of making an untracked call.
+            if (!allowAutomaticCompaction) return@check false
             AppLogger.info(TAG, "[AutoCompact] attempt=$attempt estimated=$tokens " +
                 "window=${budget.window} hardLimit=${budget.hardLimit}")
             appendSystemInfo(
@@ -3780,6 +3812,9 @@ class ChatViewModel(
                 // untouched (it has no in-group alternative to fall back to).
                 val groupBound = _selectedGroupId.value
                 val activeEntry = _activeEntryId.value
+                // An automatic turn may temporarily use an approved entry outside the
+                // group; the per-dispatch router rechecks availability and consent.
+                val autoSelectionEnabled = AutoModelStore.enabled(context)
                 // nanoMuse: a member taken out of the bound group reaches the chats already
                 // open, too. Upstream re-resolved only when the member's provider was
                 // disabled; a group edited in Settings (the Cloud card's "Change": the
@@ -3789,7 +3824,7 @@ class ChatViewModel(
                 // deepseek-v4.1-flash kept talking to qwen3.8-27b and could not tell why.
                 val leftGroup = groupBound != null && activeEntry != null &&
                     config.modelGroups.firstOrNull { it.id == groupBound }?.memberEntryIds?.contains(activeEntry) == false
-                if (currentProvider != null && groupBound != null && activeEntry != null &&
+                if (!autoSelectionEnabled && currentProvider != null && groupBound != null && activeEntry != null &&
                     config.modelEntries.isNotEmpty() &&
                     (leftGroup || !providerRepository.isEntryProviderEnabled(activeEntry))
                 ) {
@@ -3828,7 +3863,7 @@ class ChatViewModel(
                 } else {
                     null
                 }
-                if (pinned != null && io.github.nanomuse.cloud.NanoMuseCloud.owns(context, pinned)) {
+                if (!autoSelectionEnabled && pinned != null && io.github.nanomuse.cloud.NanoMuseCloud.owns(context, pinned)) {
                     val cloudGroup = providerRepository.defaultPrimaryGroupId
                         ?.let { id -> config.modelGroups.firstOrNull { it.id == id } }
                         ?.takeIf { io.github.nanomuse.cloud.NanoMuseCloud.ownsGroup(it.name) && pinned.id !in it.memberEntryIds }
@@ -3848,7 +3883,7 @@ class ChatViewModel(
                 // and spending, on it; upstream re-resolves group bindings only. Drop the
                 // provider so the default chain below runs; restoreFromBinding refuses the
                 // pin too, so a reload cannot bring it back.
-                if (pinned != null && currentProvider != null && !providerRepository.isEntryProviderEnabled(pinned.id)) {
+                if (!autoSelectionEnabled && pinned != null && currentProvider != null && !providerRepository.isEntryProviderEnabled(pinned.id)) {
                     AppLogger.info(TAG, "🔀RESOLVE pinned entry=${pinned.id} provider disabled — falling back to the default")
                     currentProvider = null
                 }
@@ -4161,7 +4196,7 @@ class ChatViewModel(
                         // nanoMuse: `&& instance.isEnabled`, so a remembered model on a provider
                         // switched off since (the Cloud instance) falls back to the default.
                         if (providerRepository.hasAnyCredential(instance) && instance.isEnabled) {
-                            currentProvider = ProviderFactory.create(instance, apiKey, entry.model, context)
+                            currentProvider = nmCreateProvider(instance, apiKey, entry.model)
                             _providerName.value = instance.label.ifEmpty { entry.model.provider }
                             resolved = true
                             // No binding row (e.g. a synced session that only
@@ -4797,7 +4832,7 @@ class ChatViewModel(
                     _selectedGroupId.value = null
                     _selectedGroupName.value = ""
                     _activeEntryId.value = entry.id
-                    currentProvider = ProviderFactory.create(instance, apiKey, entry.model, context)
+                    currentProvider = nmCreateProvider(instance, apiKey, entry.model)
                     true
                 }
                 else -> false
@@ -4866,7 +4901,7 @@ class ChatViewModel(
         _providerName.value = instance.label.ifEmpty { targetEntry.model.provider }
         _selectedGroupName.value = group.name
         _activeEntryId.value = targetEntry.id
-        currentProvider = ProviderFactory.create(instance, apiKey, targetEntry.model, context)
+        currentProvider = nmCreateProvider(instance, apiKey, targetEntry.model)
         return true
     }
 
@@ -4875,6 +4910,7 @@ class ChatViewModel(
         _selectedGroupName.value = providerRepository.group(groupId)?.name ?: ""
         val resolved = resolveProviderFromGroup(groupId)
         if (resolved) {
+            nmPreferredAutoEntryId = _activeEntryId.value
             persistBinding("""{"type":"group","groupId":"$groupId"}""")
             applyGroupSessionDefaults(groupId)
         }
@@ -4886,6 +4922,7 @@ class ChatViewModel(
         _selectedGroupName.value = providerRepository.group(groupId)?.name ?: ""
         val resolved = resolveProviderFromGroup(groupId, entryId)
         if (resolved) {
+            nmPreferredAutoEntryId = _activeEntryId.value
             persistBinding("""{"type":"group","groupId":"$groupId","lastEntryId":"$entryId"}""")
             applyGroupSessionDefaults(groupId)
             // [T-newchat-default-model-fallback-android] Record the actually-
@@ -4950,7 +4987,7 @@ class ChatViewModel(
         // UI but left currentProvider null, and the first send failed.
         if (providerRepository.hasAnyCredential(instance)) {
             val apiKey = providerRepository.usableApiKey(instance) ?: ""
-            currentProvider = ProviderFactory.create(instance, apiKey, entry.model, context)
+            currentProvider = nmCreateProvider(instance, apiKey, entry.model)
         }
         return true
     }
@@ -4972,7 +5009,8 @@ class ChatViewModel(
         _selectedGroupId.value = null
         _selectedGroupName.value = ""
         _activeEntryId.value = entry.id
-        currentProvider = ProviderFactory.create(instance, apiKey, entry.model, context)
+        nmPreferredAutoEntryId = entry.id
+        currentProvider = nmCreateProvider(instance, apiKey, entry.model)
         persistBinding("""{"type":"entry","entryId":"$entryId"}""")
         // [T-newchat-default-model-fallback-android] Remember this as the
         // global last-used model so the NEXT new chat (when no default group
@@ -5044,7 +5082,7 @@ class ChatViewModel(
             if (!providerRepository.hasAnyCredential(instance)) continue
             val apiKey = providerRepository.usableApiKey(instance) ?: ""
             val p = try {
-                ProviderFactory.create(instance, apiKey, entry.model, context)
+                nmCreateProvider(instance, apiKey, entry.model)
             } catch (_: Exception) { continue }
             result.add(FallbackCandidate(provider = p, entryId = entry.id))
         }
@@ -5111,7 +5149,7 @@ class ChatViewModel(
             currentModel = entry.model
             _modelName.value = entry.model.displayName
             _activeEntryId.value = entry.id
-            val provider = ProviderFactory.create(instance, apiKey, entry.model, context)
+            val provider = nmCreateProvider(instance, apiKey, entry.model)
             currentProvider = provider
             return provider
         }
@@ -5777,10 +5815,8 @@ class ChatViewModel(
                     if (freshToken != null) {
                         val storedKey = providerRepository.loadApiKey(instance.id)
                         if (freshToken != storedKey) {
-                            providerRepository.saveApiKey(instance.id, freshToken)
-                            provider = com.openminis.app.provider.ProviderFactory.create(
-                                instance, freshToken, currentModel ?: provider.model, context
-                            )
+                            providerRepository.saveApiKey(instance.id, freshToken, oauthRefresh = true)
+                            provider = nmCreateProvider(instance, freshToken, currentModel ?: provider.model)
                             currentProvider = provider
                         }
                     }
@@ -7032,7 +7068,7 @@ class ChatViewModel(
         // send: either compact silently (auto-compact on) or ask first. The
         // whole point is that the request which tripped the threshold must not
         // be the one that goes out over-length.
-        if (!skipContextCheck) {
+        if (!skipContextCheck && !AutoModelStore.enabled(context)) {
             when (checkContextBeforeSend()) {
                 PreSendContextAction.PROCEED -> {}
                 PreSendContextAction.COMPACT_THEN_SEND -> {
@@ -7067,9 +7103,28 @@ class ChatViewModel(
         // inside the send button's tap closure).
         if (_hasInjectedShareContent.value) _hasInjectedShareContent.value = false
 
-        val initialProvider = currentProvider
+        // Bootstrap an approved client when no manual route was resolved. It cannot
+        // dispatch: the router still qualifies the actual request and reserves quota.
+        val initialProvider = currentProvider ?: if (AutoModelStore.enabled(context)) {
+            val config = providerRepository.config.value
+            config.modelEntries.firstNotNullOfOrNull { entry ->
+                val instance = config.instances.find { it.id == entry.providerInstanceId } ?: return@firstNotNullOfOrNull null
+                if (entry.isHidden || !instance.isEnabled || !instance.providerType.isUsable ||
+                    !providerRepository.hasAnyCredential(instance) ||
+                    !AutoModelStore.approved(context, AutoModelStore.identity(entry, instance))) return@firstNotNullOfOrNull null
+                runCatching {
+                    nmCreateProvider(instance, providerRepository.usableApiKey(instance).orEmpty(), entry.model).also { client ->
+                        currentProvider = client
+                        currentModel = entry.model
+                        _activeEntryId.value = entry.id
+                        _modelName.value = entry.model.displayName
+                        _providerName.value = instance.label.ifEmpty { entry.model.provider }
+                    }
+                }.getOrNull()
+            }
+        } else null
         if (initialProvider == null) {
-            _error.value = context.getString(R.string.nm_chat_no_model) // nanoMuse: where to fix it, in the person's language
+            _error.value = context.getString(if (AutoModelStore.enabled(context)) R.string.nm_auto_none else R.string.nm_chat_no_model)
             return
         }
         var provider: LLMProvider = initialProvider
@@ -7226,11 +7281,9 @@ class ChatViewModel(
                         if (freshToken != null) {
                             val storedKey = providerRepository.loadApiKey(instance.id)
                             if (freshToken != storedKey) {
-                                providerRepository.saveApiKey(instance.id, freshToken)
+                                providerRepository.saveApiKey(instance.id, freshToken, oauthRefresh = true)
                                 // Recreate provider with fresh token
-                                provider = com.openminis.app.provider.ProviderFactory.create(
-                                    instance, freshToken, currentModel ?: provider.model, context
-                                )
+                                provider = nmCreateProvider(instance, freshToken, currentModel ?: provider.model)
                                 currentProvider = provider
                                 android.util.Log.i(TAG, "OAuth token refreshed before send")
                             }
@@ -7641,8 +7694,8 @@ class ChatViewModel(
                         if (freshToken != null) {
                             val storedKey = providerRepository.loadApiKey(instance.id)
                             if (freshToken != storedKey) {
-                                providerRepository.saveApiKey(instance.id, freshToken)
-                                provider = ProviderFactory.create(instance, freshToken, currentModel ?: provider.model, context)
+                                providerRepository.saveApiKey(instance.id, freshToken, oauthRefresh = true)
+                                provider = nmCreateProvider(instance, freshToken, currentModel ?: provider.model)
                                 currentProvider = provider
                             }
                         }
@@ -8015,7 +8068,7 @@ class ChatViewModel(
                 ?.takeIf { this@ChatViewModel.currentProvider === currentProvider }
                 ?.providerInstanceId
             return io.github.nanomuse.router.ModelRouteHistory.forProvider(
-                effectiveAgentHistory(), instanceId, currentProvider.model.id,
+                effectiveAgentHistory(), instanceId, currentProvider.model.id, nmRouteFingerprint(currentProvider),
             )
         }
 
@@ -8026,6 +8079,8 @@ class ChatViewModel(
         var nmUsedTools = false
         var nmWarnedWithoutTools = false
         var nmAttempt: TurnRequestPlanner.Attempt? = null
+        // Captured at dispatch, not looked up later after a settings change.
+        var nmLastSentRoute: String? = null
         var nmSystemPrompt: String? = null
         var nmRequestTools: List<AgentToolDefinition> = emptyList()
         fun nmProviderPrefix(): String =
@@ -8043,6 +8098,225 @@ class ChatViewModel(
             nmSystemPrompt = attempt.system
             nmRequestTools = attempt.tools
             _nmActiveProfile.value = attempt.route.profile
+        }
+
+        // A deliberately supplied one-turn provider remains a manual choice. Automatic
+        // routing is opt-in and never sends to a model without per-route cost consent.
+        val nmAutoTurn = if (AutoModelStore.enabled(context) && this@ChatViewModel.currentProvider === provider)
+            AutoModelTurn(AutoModelRuntime.health) else null
+        if (nmAutoTurn != null && nmPreferredAutoEntryId == null) nmPreferredAutoEntryId = _activeEntryId.value
+        var nmAutoCandidate: ModelRouter.Candidate? = null
+        var nmAutoIdentity: AutoModelStore.Identity? = null
+        var nmAutoClientAccountVersion: Long? = null
+        var nmAutoNewUserTurn = true
+        val nmAutoLocalBlocks = mutableMapOf<String, String>()
+        class AutoDispatchBlocked(val entryId: String, val explanation: String) : Exception(explanation)
+
+        data class AutoChoice(
+            val candidate: ModelRouter.Candidate,
+            val entry: ModelEntry,
+            val instance: ProviderInstance,
+            val identity: AutoModelStore.Identity,
+            val model: LLMModel,
+            val accountVersion: Long,
+        )
+        fun nmAutoNeeds(messages: List<LLMMessage>): Set<Need> = buildSet {
+            // Image generation is a separate endpoint, not a property required of
+            // the chat model. The media path must authorize its own image model.
+            addAll(nmRoute.needs - Need.IMAGE_GENERATION)
+            if (messages.any { message -> message.imageParts.isNotEmpty() || message.contentParts.any { part ->
+                    part is AgentContentPart.ImageData || (part is AgentContentPart.ToolResult && part.imageData != null)
+                } }) add(Need.VISION)
+        }
+        fun nmAutoCapabilities(entry: ModelEntry, instance: ProviderInstance): Set<Need> {
+            val vendor = io.github.nanomuse.cloud.ProviderCatalogue.match(
+                io.github.nanomuse.cloud.ProviderCatalogue.load(context), instance,
+            )
+            val identity = AutoModelStore.identity(entry, instance)
+            val caps = AutoModelStore.capabilities(context, identity,
+                vendor?.models?.get(entry.model.id)?.capabilities.orEmpty()).toMutableSet()
+            val auth = vendor?.let { io.github.nanomuse.cloud.ProviderCatalogue.authOf(instance, it) }
+            val authCaps = auth?.let { vendor?.authCapabilities?.get(it) }
+            if (authCaps != null) {
+                if ("chat" !in authCaps) caps.remove(Need.CHAT)
+                if ("vision" !in authCaps) caps.remove(Need.VISION)
+                if ("image" !in authCaps) caps.remove(Need.IMAGE_GENERATION)
+            }
+            return caps
+        }
+        fun nmAutoModel(entry: ModelEntry, caps: Set<Need>): LLMModel {
+            val model = entry.model
+            // The serializers consult model modalities, so confirmed vision must be
+            // reflected there rather than guessed from the model name.
+            val inputs = model.inputModalities.orEmpty().filterNot { it.normalizeModalityName() == "image" }
+            return model.copy(inputModalities = (inputs + if (Need.VISION in caps) listOf("image") else emptyList())
+                .ifEmpty { listOf("text") })
+        }
+        fun nmAutoCandidates(messages: List<LLMMessage>): List<AutoChoice> {
+            val config = providerRepository.config.value
+            val catalogue = io.github.nanomuse.cloud.ProviderCatalogue.load(context)
+            val needs = nmAutoNeeds(messages)
+            // A different model retries the intended profile, not the final 413 downgrade.
+            val intended = nmRoute.copy(profile = nmRoute.requestedProfile, budgetLimited = false)
+            return config.modelEntries.toList().mapNotNull { entry ->
+                val instance = config.instances.find { it.id == entry.providerInstanceId } ?: return@mapNotNull null
+                val identity = AutoModelStore.identity(entry, instance)
+                val approved = AutoModelStore.approved(context, identity)
+                val caps = nmAutoCapabilities(entry, instance)
+                val effectiveModel = nmAutoModel(entry, caps)
+                val credentialed = providerRepository.hasAnyCredential(instance) &&
+                    instance.providerType !in setOf(ProviderType.antigravity, ProviderType.unsupported)
+                val budget = nmBudgetForEntry(entry.id, entry.model.id)
+                val vendor = io.github.nanomuse.cloud.ProviderCatalogue.match(catalogue, instance)
+                val knownWindow = entry.model.contextWindow ?: vendor?.models?.get(entry.model.id)?.limits?.context
+                val groupWindow = _selectedGroupId.value?.let { id ->
+                    config.modelGroups.find { it.id == id }?.contextLimitTokens?.takeIf { it > 0 }
+                }
+                val contextLimit = listOfNotNull(knownWindow, groupWindow).minOrNull()
+                val history = io.github.nanomuse.router.ModelRouteHistory.forProvider(
+                    messages, instance.id, entry.model.id, AutoModelStore.historyFingerprint(context, instance),
+                )
+                val prefix = if (instance.providerType == ProviderType.anthropic &&
+                    instance.credentialType == ProviderCredential.oauth) io.github.nanomuse.cloud.ClaudeSignIn.identifier else ""
+                // Avoid building three prompt shapes for disabled/unapproved entries.
+                val attempt = if (instance.isEnabled && !entry.isHidden && credentialed && approved && caps.containsAll(needs)) {
+                    val calibrationRoute = "${instance.id}|${instance.providerType}|${instance.customBaseURL.orEmpty()}|" +
+                        "${instance.appendV1Suffix}|${instance.useResponsesAPI}"
+                    val calibration = nmCalibrationStore.load(calibrationRoute, entry.model.id)
+                    TurnRequestPlanner.prepare(nmCurrentInput, originalAgentTools(effectiveModel), intended, budget, prefix) { system, tools ->
+                        val raw = ContextEstimate.request(history, system, tools, imageTokens = BPETokenizer::countImageTokens)
+                        maxOf(raw, calibration.estimate(raw))
+                    }
+                } else null
+                val output = attempt?.let { planned ->
+                    val defaultOutput = if (instance.providerType == ProviderType.anthropic) 64_000 else 16_384
+                    val ceiling = minOf(GLOBAL_MAX_TOKENS_CEILING, effectiveModel.maxOutputTokens ?: defaultOutput)
+                    val remaining = contextLimit?.let { it.toLong() - planned.inputEstimate.toLong() }
+                    val preferred = if (remaining == null) ceiling else minOf(ceiling.toLong(), remaining).coerceAtLeast(0).toInt()
+                    TurnRequestPlanner.outputLimit(preferred, budget, planned.inputEstimate)
+                }
+                val candidate = ModelRouter.Candidate(
+                    entryId = entry.id, providerId = instance.id, capabilities = caps,
+                    profile = attempt?.route?.profile ?: intended.profile,
+                    inputTokens = attempt?.inputEstimate, outputTokens = output,
+                    contextLimit = contextLimit, tokensPerMinute = budget.tokensPerMinute,
+                    enabled = instance.isEnabled, visible = !entry.isHidden, credentialed = credentialed,
+                    automaticApproved = approved,
+                )
+                AutoChoice(candidate, entry, instance, identity, effectiveModel, AutoModelRuntime.accountVersion(instance.id))
+            }
+        }
+        fun nmAutoReason(reason: ModelRouter.Reason): String = context.getString(when (reason) {
+            ModelRouter.Reason.DISABLED -> R.string.nm_auto_reason_disabled
+            ModelRouter.Reason.HIDDEN -> R.string.nm_auto_reason_hidden
+            ModelRouter.Reason.NO_CREDENTIAL -> R.string.nm_auto_reason_credential
+            ModelRouter.Reason.NOT_APPROVED -> R.string.nm_auto_reason_consent
+            ModelRouter.Reason.MISSING_CAPABILITY -> R.string.nm_auto_reason_capability
+            ModelRouter.Reason.PROFILE_TOO_SMALL -> R.string.nm_auto_reason_profile
+            ModelRouter.Reason.UNKNOWN_REQUEST_SIZE -> R.string.nm_auto_reason_size
+            ModelRouter.Reason.CONTEXT_LIMIT -> R.string.nm_auto_reason_context
+            ModelRouter.Reason.MINUTE_LIMIT -> R.string.nm_auto_reason_minute
+            ModelRouter.Reason.COOLDOWN -> R.string.nm_auto_reason_cooldown
+            ModelRouter.Reason.EXCLUDED -> R.string.nm_auto_reason_excluded
+            ModelRouter.Reason.DUPLICATE_ID -> R.string.nm_auto_reason_duplicate
+        })
+        fun nmAutoFailureReason(reason: ModelHealth.Failure): String = context.getString(when (reason) {
+            ModelHealth.Failure.RATE_LIMIT -> R.string.nm_auto_failure_rate
+            ModelHealth.Failure.QUOTA -> R.string.nm_auto_failure_quota
+            ModelHealth.Failure.NO_CREDIT -> R.string.nm_auto_failure_credit
+            ModelHealth.Failure.AUTH -> R.string.nm_auto_failure_auth
+            ModelHealth.Failure.SERVER -> R.string.nm_auto_failure_server
+            ModelHealth.Failure.NETWORK -> R.string.nm_auto_failure_network
+            ModelHealth.Failure.REQUEST_TOO_LARGE -> R.string.nm_auto_failure_size
+        })
+        fun nmAutoWait(until: Long?): String = if (until == null) context.getString(R.string.nm_auto_wait_unknown) else {
+            val remaining = (until - android.os.SystemClock.elapsedRealtime()).coerceAtLeast(0L)
+            context.getString(R.string.nm_auto_wait_seconds, ((remaining + 999L) / 1000L).coerceAtMost(Int.MAX_VALUE.toLong()).toInt())
+        }
+        fun nmAutoNoCandidate(choices: List<AutoChoice>, none: ModelRouter.Choice.None): LLMError.ProviderError {
+            val labels = choices.associate { it.entry.id to it.entry.model.displayName }
+            val byEntry = nmAutoTurn?.failureRecords().orEmpty().associateBy { it.entryId }
+            val details = none.rejected.map { rejected ->
+                val failed = byEntry[rejected.entryId]
+                val reason = if (failed != null) "${nmAutoFailureReason(failed.reason)} · ${nmAutoWait(failed.cooldown.untilMillis)}"
+                    else if (nmAutoLocalBlocks.containsKey(rejected.entryId)) nmAutoLocalBlocks.getValue(rejected.entryId)
+                    else if (rejected.reason == ModelRouter.Reason.COOLDOWN)
+                        "${nmAutoReason(rejected.reason)} · ${nmAutoWait(rejected.untilMillis)}"
+                    else nmAutoReason(rejected.reason)
+                "• ${labels[rejected.entryId] ?: rejected.entryId}: $reason"
+            }
+            return LLMError.ProviderError((listOf(context.getString(R.string.nm_auto_none)) + details).joinToString("\n"))
+        }
+        suspend fun nmAutoSelect(stickyEntryId: String?): AutoChoice {
+            val turnState = checkNotNull(nmAutoTurn)
+            while (true) {
+                if (!AutoModelStore.enabled(context)) throw LLMError.ProviderError(context.getString(R.string.nm_auto_disabled_during_turn))
+                val messages = applyRequestImageBudget(effectiveAgentHistory(), preview = true)
+                val choices = nmAutoCandidates(messages)
+                when (val selection = turnState.pick(choices.map { it.candidate }, nmAutoNeeds(messages), stickyEntryId)) {
+                    is ModelRouter.Choice.None -> throw nmAutoNoCandidate(choices, selection)
+                    is ModelRouter.Choice.Selected -> {
+                        val selected = choices.first { it.entry.id == selection.candidate.entryId }
+                        // Copy the health snapshot used by pick. The actual reservation below
+                        // still checks the ledger atomically immediately before dispatch.
+                        return selected.copy(candidate = selection.candidate)
+                    }
+                }
+            }
+        }
+        suspend fun nmAutoActivate(choice: AutoChoice) {
+            val config = providerRepository.config.value
+            val entry = config.modelEntries.find { it.id == choice.entry.id && it.model.id == choice.entry.model.id }
+            val instance = entry?.let { found -> config.instances.find { it.id == found.providerInstanceId } }
+            if (entry == null || instance == null || !instance.isEnabled || entry.isHidden ||
+                AutoModelStore.identity(entry, instance) != choice.identity || !providerRepository.hasAnyCredential(instance) ||
+                !AutoModelStore.approved(context, choice.identity) ||
+                AutoModelRuntime.accountVersion(instance.id) != choice.accountVersion) {
+                throw LLMError.ProviderError(context.getString(R.string.nm_auto_disabled_during_turn))
+            }
+            val priorName = currentProvider.model.displayName
+            val priorEntryId = _activeEntryId.value
+            if (nmAutoIdentity != choice.identity || nmAutoClientAccountVersion != choice.accountVersion ||
+                currentProvider.model != choice.model || this@ChatViewModel.currentProvider !== currentProvider) {
+                var key = providerRepository.usableApiKey(instance).orEmpty()
+                if (instance.credentialType == ProviderCredential.oauth && instance.providerType == ProviderType.anthropic) {
+                    val fresh = com.openminis.app.auth.OAuthManager.forInstance(context, instance)?.validAccessToken()
+                    if (fresh != null) {
+                        key = fresh
+                        providerRepository.saveApiKey(instance.id, fresh, oauthRefresh = true)
+                    }
+                }
+                // The account may have changed while OAuth was refreshed.
+                if (!AutoModelStore.approved(context, choice.identity) ||
+                    AutoModelRuntime.accountVersion(instance.id) != choice.accountVersion) {
+                    throw LLMError.ProviderError(context.getString(R.string.nm_auto_disabled_during_turn))
+                }
+                val client = nmCreateProvider(instance, key, choice.model)
+                if (AutoModelRuntime.accountVersion(instance.id) != choice.accountVersion ||
+                    !AutoModelStore.approved(context, choice.identity)) {
+                    throw LLMError.ProviderError(context.getString(R.string.nm_auto_disabled_during_turn))
+                }
+                currentProvider = client
+                this@ChatViewModel.currentProvider = currentProvider
+                _activeEntryId.value = entry.id
+                currentModel = choice.model
+                _modelName.value = choice.model.displayName
+                _providerName.value = instance.label.ifEmpty { choice.model.provider }
+                nmAutoIdentity = choice.identity
+                nmAutoClientAccountVersion = choice.accountVersion
+                preparedMessages = null
+                if (priorEntryId != entry.id) {
+                    nmRoute = nmRoute.copy(profile = nmRoute.requestedProfile, budgetLimited = false)
+                    _fallbackTrigger.value++
+                    withContext(Dispatchers.Main) {
+                        val notice = if (entry.id == nmPreferredAutoEntryId)
+                            context.getString(R.string.nm_auto_return, choice.model.displayName)
+                        else context.getString(R.string.nm_auto_switch, priorName, choice.model.displayName)
+                        appendSystemInfo(notice, "info")
+                    }
+                }
+            }
+            nmAutoCandidate = choice.candidate
         }
 
         fun alignContextEstimate() {
@@ -8253,6 +8527,11 @@ class ChatViewModel(
         agentTurns@ for (turn in 0 until MAX_AGENT_TURNS) {
             // Sanitize history before each API call (mirrors iOS pre-API validation)
             sanitizeAgentHistory()
+            if (nmAutoTurn != null) {
+                val sticky = if (nmAutoNewUserTurn) nmPreferredAutoEntryId else _activeEntryId.value
+                nmAutoActivate(nmAutoSelect(sticky))
+                nmAutoNewUserTurn = false
+            }
 
             // nanoMuse: fit on the prospective request before the context guard. If the raw
             // history is too large even for LEAN, let the existing trimming guard run first;
@@ -8264,7 +8543,8 @@ class ChatViewModel(
             // nanoMuse: deterministic trimming runs first and never edits saved history.
             prepareContext()
             when (inLoopContextCheck(contextMaintenance, requestBudget,
-                ::measureContextTokens, ::measureProbeTokens, { prepareContext() })) {
+                ::measureContextTokens, ::measureProbeTokens, { prepareContext() },
+                allowAutomaticCompaction = nmAutoTurn == null)) {
                 ContextMaintenance.Action.PROCEED -> {}
                 ContextMaintenance.Action.COMPACTED -> {
                     resumeAfterCompaction()
@@ -8444,6 +8724,12 @@ class ChatViewModel(
             var rateRetried = false
             var lastRequestedOutput = 0
             while (!collectDone) {
+                var nmTicket: ModelHealth.Ticket? = null
+                var nmDispatchStarted = false
+                var nmMeasuredInput = 0
+                var nmMeasuredOutput = 0
+                var nmDispatchAt = 0L
+                var nmDispatchAccountVersion: Long? = null
                 try {
                     // nanoMuse: a failed partial stream cannot confirm the next attempt's cap
                     // or carry its finish reason, reasoning or usage into another provider.
@@ -8507,7 +8793,8 @@ class ChatViewModel(
                         prepareContext()
                         // nanoMuse: fallback to a smaller model must pass the same guard.
                         when (inLoopContextCheck(contextMaintenance, requestBudget,
-                            ::measureContextTokens, ::measureProbeTokens, { prepareContext() })) {
+                            ::measureContextTokens, ::measureProbeTokens, { prepareContext() },
+                            allowAutomaticCompaction = nmAutoTurn == null)) {
                             ContextMaintenance.Action.PROCEED -> Unit
                             ContextMaintenance.Action.COMPACTED -> {
                                 resumeAfterCompaction()
@@ -8571,6 +8858,51 @@ class ChatViewModel(
                     lastRequestedOutput = TurnRequestPlanner.outputLimit(
                         proposedOutput, requestBudgetLimit, maxOf(lastContextTokens, planned.inputEstimate),
                     ) ?: throw LLMError.ProviderError(context.getString(R.string.nm_router_budget_exhausted))
+                    val dispatchInput = maxOf(lastContextTokens, planned.inputEstimate, requestEstimate)
+                    if (nmAutoTurn != null) {
+                        if (!AutoModelStore.enabled(context)) throw LLMError.ProviderError(
+                            context.getString(R.string.nm_auto_disabled_during_turn))
+                        val candidate = checkNotNull(nmAutoCandidate)
+                        val identity = checkNotNull(nmAutoIdentity)
+                        val config = providerRepository.config.value
+                        val entry = config.modelEntries.find { it.id == candidate.entryId && it.model.id == currentProvider.model.id }
+                        val instance = entry?.let { e -> config.instances.find { it.id == e.providerInstanceId } }
+                        val valid = entry != null && instance != null && instance.isEnabled && !entry.isHidden &&
+                            AutoModelStore.identity(entry, instance) == identity && providerRepository.hasAnyCredential(instance) &&
+                            AutoModelStore.approved(context, identity) &&
+                            nmAutoClientAccountVersion == AutoModelRuntime.accountVersion(instance.id) &&
+                            nmRouteFingerprint(currentProvider) == AutoModelStore.historyFingerprint(context, instance) &&
+                            nmAutoCapabilities(entry, instance).containsAll(nmAutoNeeds(requestMessages))
+                        if (!valid) throw AutoDispatchBlocked(candidate.entryId, context.getString(R.string.nm_auto_reason_consent))
+                        if (Need.TOOLS in nmAutoNeeds(requestMessages) && planned.route.profile == Profile.LEAN)
+                            throw AutoDispatchBlocked(candidate.entryId, context.getString(R.string.nm_auto_reason_profile))
+                        if (candidate.contextLimit != null &&
+                            dispatchInput.toLong() + lastRequestedOutput.toLong() > candidate.contextLimit.toLong())
+                            throw AutoDispatchBlocked(candidate.entryId, context.getString(R.string.nm_auto_reason_context))
+                        when (val reserved = nmAutoTurn.reserve(candidate.copy(tokensPerMinute = requestBudgetLimit.tokensPerMinute),
+                            dispatchInput, lastRequestedOutput)) {
+                            is ModelHealth.Reservation.Granted -> nmTicket = reserved.ticket
+                            is ModelHealth.Reservation.Full -> throw AutoDispatchBlocked(candidate.entryId,
+                                "${context.getString(R.string.nm_auto_reason_minute)} · ${nmAutoWait(reserved.availableAtMillis)}")
+                            is ModelHealth.Reservation.Blocked -> throw AutoDispatchBlocked(candidate.entryId,
+                                "${context.getString(R.string.nm_auto_reason_cooldown)} · ${nmAutoWait(reserved.cooldown.untilMillis)}")
+                        }
+                    } else {
+                        // Count manual chat calls too so a later automatic turn sees their
+                        // local usage; a manually selected route is not blocked by auto mode.
+                        val config = providerRepository.config.value
+                        val entry = config.modelEntries.find { it.id == _activeEntryId.value &&
+                            it.model.id == currentProvider.model.id && this@ChatViewModel.currentProvider === currentProvider }
+                        if (entry != null) {
+                            nmTicket = (AutoModelRuntime.health.reserve(entry.providerInstanceId,
+                                dispatchInput.toLong() + lastRequestedOutput.toLong(), null) as ModelHealth.Reservation.Granted).ticket
+                        }
+                    }
+                    nmLastSentRoute = nmRouteFingerprint(currentProvider)
+                    nmDispatchAccountVersion = nmAutoCandidate?.providerId?.let { AutoModelRuntime.accountVersion(it) }
+                    nmDispatchAt = android.os.SystemClock.elapsedRealtime()
+                    // From here on a provider may have received the request, even on cancellation.
+                    nmDispatchStarted = true
                     currentProvider.streamMessage(
                         requestMessages,
                         nmSystemPrompt, lastRequestedOutput,
@@ -8890,6 +9222,10 @@ class ChatViewModel(
                     }
                     is LLMStreamChunk.Usage -> {
                         lastUsage = chunk.usage
+                        // Usage chunks may split input and output; retain the largest observed
+                        // values even if the stream is cancelled or later fails.
+                        nmMeasuredInput = maxOf(nmMeasuredInput, ContextEstimate.inputTokens(chunk.usage))
+                        nmMeasuredOutput = maxOf(nmMeasuredOutput, chunk.usage.outputTokens.coerceAtLeast(0))
                         // nanoMuse: retain the last nonempty input count and observe it once.
                         if (ContextEstimate.inputTokens(chunk.usage) > 0) requestUsage = chunk.usage
                         // Update context token count for next turn's dynamicMaxTokens()
@@ -8927,6 +9263,15 @@ class ChatViewModel(
                     }
                 }
                     }  // end collect
+                    if (nmTicket != null && turnFinishReason != null) {
+                        val config = providerRepository.config.value
+                        val entry = config.modelEntries.find { it.id == _activeEntryId.value && it.model.id == currentProvider.model.id }
+                        if (entry != null && (nmAutoTurn == null ||
+                                nmDispatchAccountVersion == AutoModelRuntime.accountVersion(entry.providerInstanceId))) {
+                            AutoModelRuntime.health.success(entry.id, entry.providerInstanceId,
+                                (android.os.SystemClock.elapsedRealtime() - nmDispatchAt).coerceAtLeast(0L))
+                        }
+                    }
                     // nanoMuse: only the actual cap of this completed response is confirmed;
                     // the context budget might have lowered it further during the wait.
                     pendingOutput?.takeIf {
@@ -9001,7 +9346,21 @@ class ChatViewModel(
                         kotlinx.coroutines.currentCoroutineContext().ensureActive()
                         if (e.cause == null) throw e
                     }
+                    if (e is AutoDispatchBlocked && nmAutoTurn != null) {
+                        // Nothing was sent in this attempt. A concurrent chat may have
+                        // consumed the budget or the person may have revoked consent.
+                        nmAutoLocalBlocks[e.entryId] = e.explanation
+                        nmAutoTurn.exclude(e.entryId)
+                        nmAutoActivate(nmAutoSelect(null))
+                        preparedMessages = null
+                        pendingOutput = null
+                        outputRetried = false
+                        rateRetried = false
+                        retryAttempt = 0
+                        continue
+                    }
                     val actual = unwrapFlowException(e)
+                    if (nmAutoTurn != null && !AutoModelStore.enabled(context)) throw actual
                     val isRateLimit = actual is com.openminis.app.data.model.LLMError.RateLimited
                     // nanoMuse: a token count such as 5000 in a 400 is not an HTTP 500.
                     val reach = (actual as? LLMError)?.nmProviderReach
@@ -9042,9 +9401,11 @@ class ChatViewModel(
                     // nanoMuse: a verified upper bound changes the next request; a short 429
                     // gets one bounded wait. Neither path repeats already executed tools.
                     val outputRetry = io.github.nanomuse.net.ProviderRecovery.outputRetry(reach, lastRequestedOutput, outputRetried)
-                    val rateDelay = if (isRateLimit) io.github.nanomuse.net.ProviderRecovery.rateDelay(reach, rateRetried) else null
+                    val rateDelay = if (isRateLimit && nmAutoTurn == null)
+                        io.github.nanomuse.net.ProviderRecovery.rateDelay(reach, rateRetried) else null
                     if (smallerProfile != null ||
-                        ((isTransient || recoveredContext || outputRetry != null || rateDelay != null) && retryAttempt < AUTO_RETRY_DELAYS_SEC.size)) {
+                        (((isTransient && nmAutoTurn == null) || recoveredContext || outputRetry != null || rateDelay != null) &&
+                            retryAttempt < AUTO_RETRY_DELAYS_SEC.size)) {
                         if (smallerProfile != null) {
                             nmInstall(smallerProfile)
                             preparedMessages = null // recalculate the context view for this smaller shape
@@ -9157,6 +9518,55 @@ class ChatViewModel(
                     // makes the intent explicit and avoids a one-frame
                     // flash of the stale banner.
                     withContext(Dispatchers.Main) { clearInlineError() }
+                    if (nmAutoTurn != null) {
+                        // A bug, malformed request, safety refusal or cancellation must not
+                        // silently trigger another potentially billable provider.
+                        val decision = io.github.nanomuse.router.AutoModelFailure.classify(actual, nmRequestTools.isNotEmpty())
+                            ?: throw actual
+                        val failed = checkNotNull(nmAutoCandidate)
+                        val expectedVersion = nmDispatchAccountVersion
+                        if (expectedVersion != null && expectedVersion == AutoModelRuntime.accountVersion(failed.providerId)) {
+                            when (decision) {
+                                is io.github.nanomuse.router.AutoModelFailure.Decision.Cooldown ->
+                                    nmAutoTurn.fail(failed.entryId, failed.providerId, decision.reason,
+                                        decision.retryAfterSeconds, decision.retryAfterPresent)
+                                io.github.nanomuse.router.AutoModelFailure.Decision.UnsupportedTools -> {
+                                    nmAutoIdentity?.let { AutoModelStore.noteUnsupportedTools(context, it) }
+                                    nmAutoLocalBlocks[failed.entryId] = context.getString(R.string.nm_auto_reason_capability)
+                                    nmAutoTurn.exclude(failed.entryId)
+                                }
+                            }
+                        } else {
+                            // Never transfer an old in-flight error to a replacement account.
+                            nmAutoLocalBlocks[failed.entryId] = context.getString(R.string.nm_auto_reason_consent)
+                            nmAutoTurn.exclude(failed.entryId)
+                        }
+                        // Only uncommitted stream fragments are discarded. Tool calls/results
+                        // from previous successful iterations remain in agentHistory.
+                        while (allToolBlocks.size > turnStartBlockIndex) allToolBlocks.removeAt(allToolBlocks.size - 1)
+                        withContext(Dispatchers.Main) {
+                            updateAssistantMessage(assistantId, accumulatedText + turnTextSb.toString(), true, allToolBlocks)
+                        }
+                        turnTextSb.setLength(0)
+                        currentTextBlockSb = null
+                        turnTextBlockIdx = -1
+                        turnThinking.clear()
+                        toolCalls.clear()
+                        toolCallSignatures.clear()
+                        pendingChunkSb.setLength(0)
+                        lastUiUpdateMs = 0L
+                        lastFlushedLen = 0
+                        lastFileToolInputMs = 0L
+                        lastOtherToolInputMs = 0L
+                        nmAutoActivate(nmAutoSelect(null))
+                        preparedMessages = null
+                        pendingOutput = null
+                        outputRetried = false
+                        rateRetried = false
+                        contextOverflowRetried = false
+                        retryAttempt = 0
+                        continue
+                    }
                     // nanoMuse: never forward an unchanged size/output rejection to a group
                     // model. Profile downgrade and an output-cap retry need their own guards.
                     val shouldFallback = !sizeRejection && (isRateLimit || is5xx ||
@@ -9280,6 +9690,11 @@ class ChatViewModel(
                         }
                         throw actual  // re-throw unwrapped, all fallbacks exhausted
                     }
+                } finally {
+                    nmTicket?.let { ticket ->
+                        if (nmDispatchStarted) AutoModelRuntime.health.finish(ticket, nmMeasuredInput, nmMeasuredOutput)
+                        else AutoModelRuntime.health.cancelBeforeDispatch(ticket)
+                    }
                 }
             }  // end while (!collectDone)
 
@@ -9323,6 +9738,7 @@ class ChatViewModel(
                     .find { it.id == _activeEntryId.value && it.model.id == currentProvider.model.id }
                     ?.takeIf { this@ChatViewModel.currentProvider === currentProvider }
                     ?.providerInstanceId,
+                originRouteFingerprint = nmLastSentRoute,
             ))
 
             // T321: empty-turn diagnostic — fires when GPT-5.5 (or any other
@@ -9348,7 +9764,7 @@ class ChatViewModel(
                 }
                 val turnParts = buildTurnParts(allToolBlocks, turnStartBlockIndex, toolInputMap)
                 val blockMeta = allToolBlocks.filter { it.kind == "tool_use" }.associateBy { it.id }
-                persistAssistantTurn(turnParts, lastUsage, turnReasoningContent, blockMeta)
+                persistAssistantTurn(turnParts, lastUsage, turnReasoningContent, blockMeta, nmLastSentRoute)
                 // [T-error-persist-android] Empty-response hint: the model ended a
                 // turn (finish=stop/end_turn) with no visible text anywhere in the
                 // reply and no tool blocks — the user just sees a blank bubble.
@@ -9811,7 +10227,7 @@ class ChatViewModel(
             // assistant entry — compact-marker boundary resolution depends on it.
             val turnParts = buildTurnParts(allToolBlocks, turnStartBlockIndex, toolInputMap)
             val blockMeta = allToolBlocks.filter { it.kind == "tool_use" }.associateBy { it.id }
-            val assistantDbId = persistAssistantTurn(turnParts, lastUsage, turnReasoningContent, blockMeta)
+            val assistantDbId = persistAssistantTurn(turnParts, lastUsage, turnReasoningContent, blockMeta, nmLastSentRoute)
             if (assistantDbId != null) {
                 val lastIdx = agentHistory.indexOfLast { it.role == LLMMessage.Role.ASSISTANT && it.dbMessageId == null }
                 if (lastIdx >= 0) {
@@ -9884,6 +10300,9 @@ class ChatViewModel(
                     nmCurrentInput = nmCapturePromptInput()
                     nmUsedTools = false
                     nmWarnedWithoutTools = false
+                    nmAutoTurn?.reset()
+                    nmAutoLocalBlocks.clear()
+                    nmAutoNewUserTurn = true
                     preparedMessages = null
                     // Switch loop-scope state to the new bubble. Subsequent
                     // iterations populate `handled.newAssistantId` and slice
@@ -10813,13 +11232,17 @@ class ChatViewModel(
     private fun buildAssistantPartsJson(
         parts: List<AgentContentPart>,
         toolBlockMeta: Map<String, AssistantBlock>,
+        routeFingerprint: String? = null,
     ): String = buildString {
+        val routeField = routeFingerprint
+            ?.takeIf { io.github.nanomuse.router.ModelRouteHistory.validFingerprint(it) }
+            ?.let { ",\"_tamaRoute\":${escapeJson(it)}" }.orEmpty()
         append("[")
         parts.forEachIndexed { index, part ->
             if (index > 0) append(",")
             when (part) {
                 is AgentContentPart.Text -> {
-                    append("""{"type":"text","value":${escapeJson(part.text)}}""")
+                    append("""{"type":"text","value":${escapeJson(part.text)}$routeField}""")
                 }
                 is AgentContentPart.ToolUse -> {
                     // Skip tool_use with blank name — upstream bug guard.
@@ -10834,7 +11257,7 @@ class ChatViewModel(
                     // signature (null-literal when absent) so it survives a session
                     // reload and can be replayed on the historical functionCall.
                     val sigJson = part.thoughtSignature?.let { escapeJson(it) } ?: "null"
-                    append("""{"type":"toolUse","value":{"toolUseId":${escapeJson(part.id)},"name":${escapeJson(name)},"input":${escapeJson(inputStr)},"description":${escapeJson(desc)},"pageURL":${escapeJson(pageURL)},"imageFilePath":${escapeJson(imgPath)},"thoughtSignature":$sigJson}}""")
+                    append("""{"type":"toolUse","value":{"toolUseId":${escapeJson(part.id)},"name":${escapeJson(name)},"input":${escapeJson(inputStr)},"description":${escapeJson(desc)},"pageURL":${escapeJson(pageURL)},"imageFilePath":${escapeJson(imgPath)},"thoughtSignature":$sigJson}$routeField}""")
                 }
                 else -> { /* tool_result is persisted via persistToolResultMessage */ }
             }
@@ -10847,9 +11270,10 @@ class ChatViewModel(
         usage: LLMUsage?,
         reasoningContent: String? = null,
         toolBlockMeta: Map<String, AssistantBlock> = emptyMap(),
+        routeFingerprint: String? = null,
     ): String? {
         if (parts.isEmpty()) return null
-        val partsJson = buildAssistantPartsJson(parts, toolBlockMeta)
+        val partsJson = buildAssistantPartsJson(parts, toolBlockMeta, routeFingerprint)
         val tokenJson = usage?.let {
             """{"inputTokens":${it.inputTokens},"outputTokens":${it.outputTokens},"cacheCreationTokens":${it.cacheCreationInputTokens ?: 0},"cacheReadTokens":${it.cacheReadInputTokens ?: 0},"latestContextTokens":${it.latestContextTokens}}"""
         }
@@ -12034,14 +12458,14 @@ class ChatViewModel(
                 val manager = com.openminis.app.auth.OAuthManager.forInstance(context, instance)
                 val freshToken = kotlinx.coroutines.runBlocking { manager?.validAccessToken() }
                 if (freshToken != null && freshToken != apiKey) {
-                    providerRepository.saveApiKey(instance.id, freshToken)
+                    providerRepository.saveApiKey(instance.id, freshToken, oauthRefresh = true)
                     apiKey = freshToken
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "TitleGen OAuth refresh failed: ${e.message}")
             }
         }
-        return ProviderFactory.create(instance, apiKey, entry.model, context)
+        return nmCreateProvider(instance, apiKey, entry.model)
     }
 
     /** Parse LLM response for title/category JSON. Multiple fallback strategies. */
@@ -12251,10 +12675,8 @@ class ChatViewModel(
                         if (freshToken != null) {
                             val storedKey = providerRepository.loadApiKey(instance.id)
                             if (freshToken != storedKey) {
-                                providerRepository.saveApiKey(instance.id, freshToken)
-                                provider = com.openminis.app.provider.ProviderFactory.create(
-                                    instance, freshToken, currentModel ?: provider.model, context
-                                )
+                                providerRepository.saveApiKey(instance.id, freshToken, oauthRefresh = true)
+                                provider = nmCreateProvider(instance, freshToken, currentModel ?: provider.model)
                                 currentProvider = provider
                             }
                         }
@@ -13162,6 +13584,8 @@ class ChatViewModel(
             reasoningContent = reasoningContent,
             originModelId = modelId,
             originProviderInstanceId = providerInstanceId,
+            originRouteFingerprint = if (r == LLMMessage.Role.ASSISTANT)
+                io.github.nanomuse.router.ModelRouteHistory.fingerprintFromPartsJson(partsJson) else null,
         )
     }
 

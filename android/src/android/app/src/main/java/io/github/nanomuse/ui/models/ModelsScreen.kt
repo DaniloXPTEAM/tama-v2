@@ -81,12 +81,15 @@ fun ModelsScreen(
     onPick: (Slot) -> Unit,
     onAddProvider: () -> Unit,
     onOpenMedia: () -> Unit,
+    onReviewModels: () -> Unit,
 ) {
     val context = LocalContext.current
     val repo = (context.applicationContext as? MinisApp)?.providerRepositoryOrNull
     val config = repo?.config?.collectAsState()?.value
     val changed by ModelSlots.lastChanged.collectAsState()
     var tick by remember { mutableIntStateOf(0) }
+    // nanoMuse: automatic selection is opt-in; each route needs separate cost consent.
+    var autoModels by remember { mutableStateOf(io.github.nanomuse.router.AutoModelStore.enabled(context)) }
 
     // The hands, image and video choices live in preferences, not in the config flow: re-read
     // when the picker pops back.
@@ -134,6 +137,21 @@ fun ModelsScreen(
                     )
                 }
             }
+        }
+        SettingsSection(footer = stringResource(R.string.nm_auto_models_help)) {
+            SettingsSwitchRow(
+                title = stringResource(R.string.nm_auto_models_title),
+                checked = autoModels,
+                onCheckedChange = { enabled ->
+                    autoModels = enabled
+                    io.github.nanomuse.router.AutoModelStore.setEnabled(context, enabled)
+                },
+            )
+            SettingsRow(
+                title = stringResource(R.string.nm_auto_review_models),
+                onClick = onReviewModels,
+                showDivider = false,
+            )
         }
         Slot.values().forEach { slot ->
             val value = remember(config, tick, changed) { ModelSlots.current(context, slot) }

@@ -657,6 +657,7 @@ fun AppNavigation(
                 onPick = { slot -> navController.safeNavigate(io.github.nanomuse.ui.models.modelPickRoute(slot)) },
                 onAddProvider = { navController.safeNavigate(Routes.ADD_PROVIDER) },
                 onOpenMedia = { navController.safeNavigate(io.github.nanomuse.ui.media.ROUTE_MEDIA_MODELS) },
+                onReviewModels = { navController.safeNavigate(Routes.PROVIDER_LIST) },
             )
         }
         composable(

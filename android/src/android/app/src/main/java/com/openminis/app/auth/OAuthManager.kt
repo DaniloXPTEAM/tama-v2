@@ -202,6 +202,8 @@ abstract class OAuthManager(
             }
 
             val json = JSONObject(responseBody)
+            // A new login can be a different account, unlike access-token refresh.
+            invalidateAutomaticConsent()
             saveTokens(json)
             onTokensReceived(json)
             true
@@ -297,7 +299,12 @@ abstract class OAuthManager(
         return stored.optString("access_token", "").isNotEmpty()
     }
 
+    protected fun invalidateAutomaticConsent() {
+        io.github.nanomuse.router.AutoModelStore.accountChanged(context, instanceId)
+    }
+
     fun logout() {
+        invalidateAutomaticConsent()
         getEncryptedPrefs().edit()
             .remove("oauth_tokens_$instanceId")
             .remove("oauth_${KEY_MANUAL_BEARER}_$instanceId")
@@ -336,12 +343,14 @@ abstract class OAuthManager(
      * normal OAuth flow but still expect a Bearer credential.
      */
     fun saveManualBearerToken(token: String) {
+        if (loadManualBearerToken() != token) invalidateAutomaticConsent()
         saveOAuthString(KEY_MANUAL_BEARER, token)
     }
 
     fun loadManualBearerToken(): String? = loadOAuthString(KEY_MANUAL_BEARER)
 
     fun deleteManualBearerToken() {
+        if (loadManualBearerToken() != null) invalidateAutomaticConsent()
         getEncryptedPrefs().edit()
             .remove("oauth_${KEY_MANUAL_BEARER}_$instanceId")
             .apply()
@@ -367,6 +376,7 @@ abstract class OAuthManager(
     fun importStoredTokensJson(json: String) {
         val obj = try { JSONObject(json) } catch (_: Exception) { return }
         val normalized = normalizeCamelToSnake(obj)
+        invalidateAutomaticConsent()
         getEncryptedPrefs().edit()
             .putString("oauth_tokens_$instanceId", normalized.toString())
             .apply()

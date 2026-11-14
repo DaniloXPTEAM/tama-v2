@@ -38,6 +38,38 @@ class AutoModelStoreTest {
         assertFalse(AutoModelStore.approved(context, AutoModelStore.identity(entry, changedAuth)))
     }
 
+    @Test fun aRouteChangeOrNewAccountCannotResurrectOldPermission() {
+        val context = PetPrefsContext()
+        val old = AutoModelStore.Identity("entry", "provider", "model", "route-a")
+        val moved = old.copy(route = "route-b")
+        AutoModelStore.setApproved(context, old, true)
+        AutoModelStore.setCapability(context, old, Need.TOOLS, true)
+        assertFalse(AutoModelStore.approved(context, moved))
+        assertFalse(AutoModelStore.approved(context, old)) // switching back does not resurrect consent
+        assertEquals(emptySet<Need>(), AutoModelStore.capabilities(context, old, emptySet()))
+        AutoModelStore.setApproved(context, old, true)
+        AutoModelStore.accountChanged(context, old.providerId)
+        assertFalse(AutoModelStore.approved(context, old))
+    }
+
+    @Test fun historyFingerprintChangesWithAccountAndEndpointEvenAfterReturning() {
+        val context = PetPrefsContext()
+        val original = ProviderInstance("account", "A", ProviderType.openAI, ProviderCredential.apiKey,
+            customBaseURL = "https://one.test/v1")
+        val entry = ModelEntry(original.id, LLMModel("model", "Model", "Example"))
+        val identity = AutoModelStore.identity(entry, original)
+        AutoModelStore.setApproved(context, identity, true)
+        val first = AutoModelStore.historyFingerprint(context, original)
+        assertEquals(first, AutoModelStore.historyFingerprint(context, original))
+        AutoModelStore.accountChanged(context, original.id)
+        val newAccount = AutoModelStore.historyFingerprint(context, original)
+        assertNotEquals(first, newAccount)
+        val other = original.copy(customBaseURL = "https://two.test/v1")
+        AutoModelStore.approved(context, AutoModelStore.identity(entry, other))
+        AutoModelStore.approved(context, identity)
+        assertNotEquals(newAccount, AutoModelStore.historyFingerprint(context, original))
+    }
+
     @Test fun learnedRefusalPersistsAndExplicitReconfirmationCanClearIt() {
         val context = PetPrefsContext()
         val id = AutoModelStore.Identity("entry", "account", "model", "route")

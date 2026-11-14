@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Bolt
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -18,6 +19,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -30,6 +32,8 @@ import com.openminis.app.ui.components.SectionTextField
 import com.openminis.app.R
 import com.openminis.app.ui.components.MinisButton
 import com.openminis.app.ui.components.MinisTextButton
+import io.github.nanomuse.router.AutoModelStore
+import io.github.nanomuse.router.Need
 
 /**
  * Detail / edit screen for a single ModelEntry. T210: brought to iOS
@@ -60,6 +64,23 @@ fun ModelEntryDetailScreen(
 
     val baseModel = entry.baseModel
     val overrides = entry.overrides
+    val context = LocalContext.current
+    val autoIdentity = instance?.let { AutoModelStore.identity(entry, it) }
+    val catalogueCapabilities = remember(autoIdentity) {
+        instance?.let {
+            io.github.nanomuse.cloud.ProviderCatalogue.match(
+                io.github.nanomuse.cloud.ProviderCatalogue.load(context), it,
+            )?.models?.get(entry.model.id)?.capabilities
+        }.orEmpty()
+    }
+    val knownCapabilities = remember(autoIdentity, catalogueCapabilities) {
+        autoIdentity?.let { AutoModelStore.capabilities(context, it, catalogueCapabilities) }.orEmpty()
+    }
+    var autoApproved by remember(autoIdentity) {
+        mutableStateOf(autoIdentity?.let { AutoModelStore.approved(context, it) } == true)
+    }
+    var autoEdits by remember(autoIdentity) { mutableStateOf<Map<Need, Boolean>>(emptyMap()) }
+    var confirmAuto by remember(autoIdentity) { mutableStateOf(false) }
 
     var modelId by remember { mutableStateOf(baseModel.id) }
     var displayName by remember { mutableStateOf(overrides.displayName ?: baseModel.displayName) }
@@ -142,6 +163,13 @@ fun ModelEntryDetailScreen(
                         entry.copy(overrides = newOverrides, isHidden = isHidden)
                     }
                     providerRepository.updateEntry(updated)
+                    // nanoMuse: editing the model id or route cannot transfer consent to a
+                    // different endpoint/model. The new identity must be reviewed separately.
+                    if (instance != null && autoIdentity != null &&
+                        AutoModelStore.identity(updated, instance) == autoIdentity) {
+                        AutoModelStore.setApproved(context, autoIdentity, autoApproved)
+                        autoEdits.forEach { (need, value) -> AutoModelStore.setCapability(context, autoIdentity, need, value) }
+                    }
                     onBack()
                 },
                 modifier = Modifier.padding(end = 8.dp),
@@ -222,6 +250,47 @@ fun ModelEntryDetailScreen(
                 checked = thinkingEnabled,
                 onCheckedChange = { thinkingEnabled = it },
                 showDivider = false,
+            )
+        }
+
+        // nanoMuse: capabilities are affirmative evidence, not guesses from a model name.
+        SettingsSection(
+            header = stringResource(R.string.nm_auto_model_section),
+            footer = stringResource(R.string.nm_auto_model_help),
+        ) {
+            SettingsSwitchRow(
+                title = stringResource(R.string.nm_auto_model_allow),
+                checked = autoApproved,
+                onCheckedChange = { enabled -> if (enabled) confirmAuto = true else autoApproved = false },
+            )
+            val abilities = listOf(
+                Need.CHAT to R.string.nm_auto_cap_chat,
+                Need.TOOLS to R.string.nm_auto_cap_tools,
+                Need.VISION to R.string.nm_auto_cap_vision,
+                Need.IMAGE_GENERATION to R.string.nm_auto_cap_image,
+            )
+            abilities.forEachIndexed { index, (need, label) ->
+                SettingsSwitchRow(
+                    title = stringResource(label),
+                    checked = autoEdits[need] ?: (need in knownCapabilities),
+                    onCheckedChange = { autoEdits = autoEdits + (need to it) },
+                    showDivider = index != abilities.lastIndex,
+                )
+            }
+        }
+        if (confirmAuto) {
+            AlertDialog(
+                onDismissRequest = { confirmAuto = false },
+                title = { Text(stringResource(R.string.nm_auto_consent_title)) },
+                text = { Text(stringResource(R.string.nm_auto_consent_body)) },
+                confirmButton = {
+                    MinisTextButton(onClick = { autoApproved = true; confirmAuto = false }) {
+                        Text(stringResource(R.string.nm_auto_consent_allow))
+                    }
+                },
+                dismissButton = {
+                    MinisTextButton(onClick = { confirmAuto = false }) { Text(stringResource(R.string.common_cancel)) }
+                },
             )
         }
 

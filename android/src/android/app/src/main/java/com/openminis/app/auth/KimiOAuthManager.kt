@@ -194,6 +194,7 @@ class KimiOAuthManager(
     }
 
     private fun persistLoginSuccess(result: KimiDeviceFlow.PollResult.Success) {
+        invalidateAutomaticConsent()
         val json = JSONObject().apply {
             put("access_token", result.accessToken)
             result.refreshToken?.let { put("refresh_token", it) }

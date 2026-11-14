@@ -214,6 +214,8 @@ class ClaudeOAuthManager(context: Context, instanceId: String) : OAuthManager(co
             throw Exception("No access_token in response")
         }
 
+        // A completed login may be a different billable account.
+        invalidateAutomaticConsent()
         // Save full token data (for refresh later)
         val expiresIn = json.optLong("expires_in", 0)
         if (expiresIn > 0) {
