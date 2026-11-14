@@ -1247,6 +1247,28 @@ class ChatViewModel(
     /** Unknown/one-off routes cannot assert compatibility of opaque history. */
     private fun nmRouteFingerprint(provider: LLMProvider): String? = nmProviderRoutes[provider]
 
+    /** A temporary auto failover must not become the person's fixed manual choice. */
+    private fun nmRestorePreferredForManualSend(): Boolean {
+        val preferredId = nmPreferredAutoEntryId ?: return true
+        if (_activeEntryId.value == preferredId) return true
+        val groupId = _selectedGroupId.value
+        if (groupId != null) return resolveProviderFromGroup(groupId, preferredId)
+        val config = providerRepository.config.value
+        val entry = config.modelEntries.find { it.id == preferredId } ?: return false
+        val instance = config.instances.find { it.id == entry.providerInstanceId } ?: return false
+        if (entry.isHidden || !instance.isEnabled || !instance.providerType.isUsable ||
+            !providerRepository.hasAnyCredential(instance)) return false
+        val client = runCatching {
+            nmCreateProvider(instance, providerRepository.usableApiKey(instance).orEmpty(), entry.model)
+        }.getOrNull() ?: return false
+        currentProvider = client
+        currentModel = entry.model
+        _activeEntryId.value = entry.id
+        _modelName.value = entry.model.displayName
+        _providerName.value = instance.label.ifEmpty { entry.model.provider }
+        return true
+    }
+
     // nanoMuse: model-scoped calibration survives Continue and process restart. The request
     // budget below is refreshed before each provider call, including model-group fallback.
     private val nmCalibrationStore by lazy { ContextCalibrationStore(context) }
@@ -7062,6 +7084,10 @@ class ChatViewModel(
                 text = "Wait for the current compact to finish before sending.",
                 iconKind = "compact",
             )
+            return
+        }
+        if (!AutoModelStore.enabled(context) && !nmRestorePreferredForManualSend()) {
+            _error.value = context.getString(R.string.nm_chat_no_model)
             return
         }
         // Context pressure check. Unlike before, needsCompact now HOLDS the

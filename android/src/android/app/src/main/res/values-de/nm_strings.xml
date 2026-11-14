@@ -1419,7 +1419,7 @@
     <string name="nm_router_lean_tool_notice">Tools are unavailable in this light-mode attempt.</string>
     <string name="nm_router_budget_exhausted">The estimated request exceeds the configured per-minute limit, even in light mode.</string>
     <string name="nm_auto_models_title">Automatic model selection</string>
-    <string name="nm_auto_models_help">Off keeps the selected model fixed. When on, only models individually approved for automatic use can be chosen; providers may charge.</string>
+    <string name="nm_auto_models_help">Off keeps the selected chat model. On chooses only approved chat models; providers may charge. Images and other tools follow their own settings.</string>
     <string name="nm_auto_model_section">Automatic use and confirmed capabilities</string>
     <string name="nm_auto_model_help">Mark only capabilities you have confirmed for this exact model and route. Unknown capabilities remain unavailable. Changing the model or endpoint clears automatic permission.</string>
     <string name="nm_auto_model_allow">Allow automatic use of this model</string>

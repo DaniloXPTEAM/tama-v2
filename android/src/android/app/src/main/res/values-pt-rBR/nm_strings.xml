@@ -1420,7 +1420,7 @@
     <string name="nm_router_lean_tool_notice">As ferramentas não estão disponíveis nesta tentativa em modo leve.</string>
     <string name="nm_router_budget_exhausted">O pedido estimado ultrapassa o limite por minuto configurado, mesmo no modo leve.</string>
     <string name="nm_auto_models_title">Seleção automática de modelos</string>
-    <string name="nm_auto_models_help">Desligado mantém o modelo selecionado. Ligado usa apenas modelos autorizados individualmente; provedores podem cobrar.</string>
+    <string name="nm_auto_models_help">Desligado mantém o modelo de chat selecionado. Ligado escolhe apenas modelos de chat autorizados; o provedor pode cobrar. Imagens e outras ferramentas seguem configurações próprias.</string>
     <string name="nm_auto_model_section">Uso automático e capacidades confirmadas</string>
     <string name="nm_auto_model_help">Marque apenas capacidades que você confirmou neste modelo e rota. Capacidades desconhecidas não são presumidas. Alterar o modelo ou endereço remove a autorização automática.</string>
     <string name="nm_auto_model_allow">Autorizar uso automático deste modelo</string>

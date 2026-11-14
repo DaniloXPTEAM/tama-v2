@@ -78,9 +78,12 @@ identidade do cliente construído e por uma geração local da conta, preservand
 resultados. A compactação automática é adiada no modo automático porque sua chamada ainda não
 passa pela mesma reserva.
 
-O exercício host com stubs passou para seleção, cota, cooldown, consentimento, classificação e
-identidade de histórico; a sintaxe Kotlin e os XMLs foram verificados. **Isso não é compilação do
-app nem teste do loop real.** Continuam pendentes a jornada e o wire de failover, o teste real de
+**32 testes JUnit host passaram** para seleção, cota, cooldown, consentimento, classificação,
+fila simulada e histórico, usando stubs Android e de tipos de provedor; a sintaxe Kotlin e os XMLs
+foram verificados. O [Android 43654646096](https://github.com/DaniloXPTEAM/tamaaiv2/actions/runs/43654646096)
+compilou o commit `a6f840f`, passou os unitários e montou o APK de instrumentação; o smoke estava
+em andamento na consulta. A restauração do modelo preferido ao desligar o automático é posterior e ainda
+não foi compilada. Isso **não comprova o loop real**. Continuam pendentes a jornada e o wire de failover, o teste real de
 logins/refresh e revogação concorrente, a seleção/contabilização do endpoint próprio de imagem,
 os avisos detalhados e a paridade de todos os provedores. Chamadas auxiliares fora do loop de chat
 não são cobertas pela janela. Não houve chamadas pagas nem teste no Poco.

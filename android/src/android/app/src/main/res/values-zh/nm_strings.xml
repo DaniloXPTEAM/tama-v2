@@ -1392,7 +1392,7 @@
     <string name="nm_router_lean_tool_notice">本次轻量模式不提供工具。</string>
     <string name="nm_router_budget_exhausted">预计请求超过已设置的每分钟限额，轻量模式也无法发送。</string>
     <string name="nm_auto_models_title">自动选择模型</string>
-    <string name="nm_auto_models_help">关闭时固定所选模型。开启后只使用单独授权的模型；供应商可能收费。</string>
+    <string name="nm_auto_models_help">关闭时固定聊天模型。开启后只选择已授权的聊天模型，供应商可能收费。图片和其他工具使用各自的设置。</string>
     <string name="nm_auto_model_section">自动使用与已确认能力</string>
     <string name="nm_auto_model_help">只标记你已确认的此模型及连接能力。未知能力不会被假定为支持。更改模型或端点会清除自动使用授权。</string>
     <string name="nm_auto_model_allow">允许自动使用此模型</string>
