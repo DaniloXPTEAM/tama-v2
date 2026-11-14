@@ -23,8 +23,8 @@ depois T5, T6, T8 e T7; T9 aguarda o Poco e T12 fica na leitura estática já fe
 | T1: erros e recuperação | PARCIAL | `43626037252`: 413 terminal e painel com status/modelo/mensagem foram observados; após o toque em retry, a espera pelo contador expirou. | 400 → 429 → 200, teto e espera não verificados no emulador; não repetir investigação agora. |
 | T2: detalhes tocáveis | PARCIAL | `43626037252`: cinco testes Compose instrumentados passaram isoladamente; a jornada abriu os detalhes de 413, mas não comprovou a recuperação após o retry. | Jornada não verificada no emulador; paridade dos outros provedores continua pendente. |
 | T3: metas medidas | PARCIAL | Metas recalibradas pela fixture host e limiares de regressão abaixo; compilação e unitários no CI Android pendentes. | Integrar em T4 e usar orçamento real por chamada, sem tratar estimativas como contagem faturada. |
-| T4: roteador e perfis | PARCIAL | Envio, fila, continuidade, limites editáveis e queda 413 ligados no código; testes puros do planejador/roteador e de paridade passaram no host. Build/CI Android e jornada adaptada **não executados** nesta alteração. | Validar compilação e o wire no CI; confirmar no Poco sem apagar dados. A falta de ferramentas após redução é avisada, não considerada uma tarefa concluída. |
-| T4b: auto-combo | PENDENTE | Failover existente limitado a grupos não comprova a seleção pedida. | Selecionar modelos elegíveis, avisar e testar recuperação com provedores falsos. |
+| T4: roteador e perfis | PARCIAL | O job Android de `e94734e` compilou o APK, passou unitários e montou o APK instrumentado; os previews sintéticos passaram, mas o smoke de dispositivo falhou. O wire e o Poco continuam não comprovados. | Manter a investigação do emulador pausada; validar no dispositivo quando autorizado. A falta de ferramentas após redução é avisada, não considerada uma tarefa concluída. |
+| T4b: auto-combo | PARCIAL — NÚCLEO | Política pura de seleção, estado por conta, autorização por rota, aprendizado de recusa e filtragem de raciocínio foram iniciados; **seleção, consentimento e janela móvel ainda não estão ligados ao envio**. | Integrar seleção e reservas ao loop real, telas e avisos; exercitar failover e fila sem repetir tools. |
 | T12: subagentes | PARCIAL | `84436db`: investigação estática em [TAMA_V2_SUBAGENTES.md](TAMA_V2_SUBAGENTES.md): não foi encontrada no Android examinado uma orquestração conversa/executor independente; `minis-model-use`, fila e slots não bastam. Há um plano de implementação e testes. | Primeiro concluir T4b sequencial; não declarar execução paralela sem teste dinâmico. |
 | T5: atalhos sem modelo | PENDENTE | Nenhum atalho novo foi adicionado nesta etapa. | Reusar handlers e preservar `RiskGate` e `OffloadGate`. |
 | T6: tools sob demanda | PENDENTE | Sem `load_tools` nesta alteração. | Carregar grupos sem alterar o prefixo estável. |
@@ -55,14 +55,36 @@ orçamento do provedor atual; isso por si só **não implementa** o auto-combo T
 um segundo modelo seja capaz. A continuidade de perfil é local à sessão em memória, não uma
 persistência comprovada após reinício.
 
-No host, seis testes JUnit do roteador/planejador passaram, incluindo tabela PT/EN, orçamento com
+No host, os testes JUnit do roteador/planejador passaram, incluindo tabela PT/EN, orçamento com
 histórico sintético e um provedor falso 413 → 413 → 200; o falso usa os componentes compartilhados,
 mas não exercita `ChatViewModel` Android. Mais sete testes de medição, três de catálogo/entrada com
 stubs Android e seis de paridade de strings passaram; 28 testes Python direcionados passaram e o
-validador do catálogo e suas quatro cópias concordam. A jornada instrumentada foi **adaptada, não
-executada**: conserva o gate do 413 terminal em LEAN, verifica uma segunda sequência FULL → BASIC →
-LEAN no wire e mantém a medição FULL/dieta. Não há build Android, CI novo, API real ou Poco aprovado
-por estes resultados. Os rascunhos locais dos clientes de provedores permanecem separados.
+validador do catálogo e suas quatro cópias concordam. No CI `43637928693` de `e94734e`, o APK e
+unitários Android passaram e o APK instrumentado foi montado; os três previews sintéticos passaram,
+mas o smoke de dispositivo falhou. A jornada adaptada **não foi comprovada**: conserva o gate do 413
+terminal em LEAN, prevê uma segunda sequência FULL → BASIC → LEAN no wire e mantém a medição
+FULL/dieta. Nenhuma API real ou Poco foi validado. Os rascunhos locais dos clientes de provedores
+permanecem separados.
+
+## T4b: núcleo de seleção, ainda não integrado
+
+O `ModelRouter` filtra identidade duplicada, modelo oculto/desativado, falta de credencial,
+autorização, capacidades, perfil, contexto, orçamento e cooldown; mantém o modelo atual quando
+adequado. `ModelHealth` reserva por conta de forma atômica, preserva a estimativa mesmo após erro e
+mantém uso por pelo menos 60 segundos após a conclusão. Cotas, preços, outras instalações e
+contagens reais do fornecedor seguem desconhecidos: isto é um limitador conservador, não uma
+promessa de faturamento. O armazenamento local separa consentimento e evidências pelo modelo,
+instância, endpoint e autenticação, por padrão em modo manual; uma recusa explícita de ferramentas
+pode ser lembrada. Esses componentes **ainda não decidem nem bloqueiam chamadas reais**.
+
+A vista de histórico no loop agora retira raciocínio e assinaturas opacas de outra rota ou de
+origem desconhecida, preservando as mensagens salvas, chamadas de ferramenta e resultados; o
+serializador Gemini pode representar chamadas sem assinatura como texto. Um teste host de seleção
+simula 429 → segundo modelo sem repetir a ferramenta, mas não substitui teste do `ChatViewModel`, do
+wire, de cobranças ou da geração de imagem, que usa um endpoint separado. Em host passaram 21 testes
+JUnit de seleção, janela, persistência fake, histórico e classificação, mais quatro do planejador;
+foram usados stubs para Android e algumas classes, não um build Android desta alteração. A seleção
+automática, o acionamento da reserva, as telas e o retorno ao modelo preferido permanecem pendentes.
 
 ## T0b/T3: fixture host por perfil, antes da integração no envio
 

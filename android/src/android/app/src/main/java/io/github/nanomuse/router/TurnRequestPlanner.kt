@@ -57,7 +57,13 @@ object TurnRequestPlanner {
         val views = Profile.entries.associateWith { profile ->
             make(input, originals, route.copy(profile = profile), providerPrefix, estimate)
         }
-        val fitted = TurnRouter.fit(route, budget, views.mapValues { it.value.inputEstimate }) ?: return null
+        // The three-call estimate must leave at least one output token per call. Without
+        // this, a profile exactly on the input threshold is selected, then outputLimit
+        // rejects it even when a smaller profile would have room for the response.
+        val withMinimumOutput = views.mapValues { (_, attempt) ->
+            (attempt.inputEstimate.toLong() + 1L).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+        }
+        val fitted = TurnRouter.fit(route, budget, withMinimumOutput) ?: return null
         return views.getValue(fitted.profile).copy(route = fitted)
     }
 

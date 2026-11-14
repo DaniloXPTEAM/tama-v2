@@ -8007,6 +8007,18 @@ class ChatViewModel(
         val trimStore = ContextTrimStore(java.io.File(context.filesDir,
             "minis-sessions/${realSessionId.ifEmpty { sessionId }}/offloads/tools"))
 
+        // nanoMuse: opaque reasoning and thought signatures never cross a model/instance
+        // boundary. The saved history, tool calls and completed results remain untouched.
+        fun nmRequestHistory(): List<LLMMessage> {
+            val instanceId = providerRepository.config.value.modelEntries
+                .find { it.id == _activeEntryId.value && it.model.id == currentProvider.model.id }
+                ?.takeIf { this@ChatViewModel.currentProvider === currentProvider }
+                ?.providerInstanceId
+            return io.github.nanomuse.router.ModelRouteHistory.forProvider(
+                effectiveAgentHistory(), instanceId, currentProvider.model.id,
+            )
+        }
+
         // nanoMuse: this state belongs to the user turn, not the provider. A fallback
         // rebuilds prefix, tools, limits and estimates for its own actual request.
         var nmRoute = nmRouteLatest()
@@ -8065,14 +8077,14 @@ class ChatViewModel(
             messages, nmSystemPrompt, nmRequestTools, imageTokens = BPETokenizer::countImageTokens,
         )
         fun measureRawTokens(): Int = rawTokens(preparedMessages ?:
-            applyRequestImageBudget(effectiveAgentHistory(), preview = true))
+            applyRequestImageBudget(nmRequestHistory(), preview = true))
         fun usageSnapshot(messages: List<LLMMessage>) = usageMeter.snapshot(
             calibrationKey.orEmpty(), currentProvider.model.id, messages, nmSystemPrompt, nmRequestTools,
             requestVariant = "${currentProvider.javaClass.name}|${_thinkingLevel.value}",
         )
         fun measureContextTokens(): Int {
             alignContextEstimate()
-            val messages = preparedMessages ?: applyRequestImageBudget(effectiveAgentHistory(), preview = true)
+            val messages = preparedMessages ?: applyRequestImageBudget(nmRequestHistory(), preview = true)
             return usageMeter.estimate(usageSnapshot(messages), rawTokens(messages), contextEstimate)
                 .also { lastContextTokens = it }
         }
@@ -8082,7 +8094,7 @@ class ChatViewModel(
         } else measureRawTokens()
         suspend fun prepareContext(force: Boolean = false) {
             alignContextEstimate()
-            val source = if (force) preparedMessages ?: effectiveAgentHistory() else effectiveAgentHistory()
+            val source = if (force) preparedMessages ?: nmRequestHistory() else nmRequestHistory()
             val messages = applyRequestImageBudget(source)
             preparedMessages = messages
             // nanoMuse: trial/pre-trim views must not invalidate known usage. Only the final
@@ -8246,7 +8258,7 @@ class ChatViewModel(
             // history is too large even for LEAN, let the existing trimming guard run first;
             // the actual prepared request must still fit before it is sent.
             alignContextEstimate()
-            val nmPreview = applyRequestImageBudget(effectiveAgentHistory(), preview = true)
+            val nmPreview = applyRequestImageBudget(nmRequestHistory(), preview = true)
             nmInstall(nmPlan(nmPreview, nmBudgetFor(currentProvider))
                 ?: checkNotNull(nmPlan(nmPreview, ProviderBudget())))
             // nanoMuse: deterministic trimming runs first and never edits saved history.
@@ -8489,7 +8501,7 @@ class ChatViewModel(
                     alignContextEstimate()
                     if (preparedMessages == null) {
                         // nanoMuse: fallback may change provider, model vision and OAuth prefix.
-                        val preview = applyRequestImageBudget(effectiveAgentHistory(), preview = true)
+                        val preview = applyRequestImageBudget(nmRequestHistory(), preview = true)
                         nmInstall(nmPlan(preview, nmBudgetFor(currentProvider))
                             ?: checkNotNull(nmPlan(preview, ProviderBudget())))
                         prepareContext()
@@ -9009,7 +9021,7 @@ class ChatViewModel(
                     val smallerProfile = if (reach?.httpStatus == 413 &&
                         reach.kind == io.github.nanomuse.net.ProviderReach.Kind.REQUEST_TOO_LARGE) {
                         nmAttempt?.let { rejected ->
-                            val history = preparedMessages ?: applyRequestImageBudget(effectiveAgentHistory(), preview = true)
+                            val history = preparedMessages ?: applyRequestImageBudget(nmRequestHistory(), preview = true)
                             TurnRequestPlanner.smallerAfter413(
                                 rejected, nmCurrentInput, originalAgentTools(), nmProviderPrefix(),
                             ) { prompt, tools ->
@@ -9306,6 +9318,11 @@ class ChatViewModel(
                 content = turnText,
                 contentParts = assistantParts,
                 reasoningContent = turnReasoningContent,
+                originModelId = currentProvider.model.id,
+                originProviderInstanceId = providerRepository.config.value.modelEntries
+                    .find { it.id == _activeEntryId.value && it.model.id == currentProvider.model.id }
+                    ?.takeIf { this@ChatViewModel.currentProvider === currentProvider }
+                    ?.providerInstanceId,
             ))
 
             // T321: empty-turn diagnostic — fires when GPT-5.5 (or any other
@@ -9488,7 +9505,6 @@ class ChatViewModel(
                     toolInputChunkRings.remove(id)
                     continue
                 }
-                nmUsedTools = true
                 // [T-android-overlay-tool-title] Pull tool_title uniformly
                 // from args for ALL tools — without this browser_use's
                 // tool_title never reached the overlay (only shell_execute
@@ -9669,6 +9685,8 @@ class ChatViewModel(
                 }
 
                 android.util.Log.d("ToolChain[VM]", "[turn=$turn] executeTool START name=$name args=${argsStr.take(200)}")
+                // nanoMuse: rejected/unoffered/preflight-blocked calls must not create tool continuity.
+                nmUsedTools = true
                 val result = executeTool(name, argsStr, id, allToolBlocks, assistantId, accumulatedText)
                 // nanoMuse: only confirmed, intact writes advance the Pet bound to this tracker run.
                 if (result.success && truncationRepairTag == null) {
@@ -13142,6 +13160,8 @@ class ChatViewModel(
             contentParts = contentParts,
             dbMessageId = id,
             reasoningContent = reasoningContent,
+            originModelId = modelId,
+            originProviderInstanceId = providerInstanceId,
         )
     }
 

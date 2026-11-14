@@ -38,6 +38,17 @@ class TurnRequestPlannerTest {
         assertNotNull(TurnRequestPlanner.prepare(input, tools, route, ProviderBudget(), estimate = estimate("x".repeat(30_000))))
     }
 
+    @Test fun `an exact input threshold falls back to a profile with output room`() {
+        val route = TurnRouter.route("pesquise um site")
+        val measured: (String, List<com.openminis.app.data.model.AgentToolDefinition>) -> Int = { _, schemas ->
+            if (schemas.isEmpty()) 100 else 1_000
+        }
+        val attempt = TurnRequestPlanner.prepare(input, tools, route, ProviderBudget(3_000), estimate = measured)!!
+        assertEquals(Profile.LEAN, attempt.route.profile)
+        assertEquals(100, attempt.inputEstimate)
+        assertEquals(900, TurnRequestPlanner.outputLimit(4_096, ProviderBudget(3_000), attempt.inputEstimate))
+    }
+
     @Test fun `fake provider 413 retries strictly smaller and preserves completed tool history`() {
         val route = TurnRouter.route("pesquise e faça login no site")
         val seen = mutableListOf<TurnRequestPlanner.Attempt>()
