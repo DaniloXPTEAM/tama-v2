@@ -24,7 +24,7 @@ depois T5, T6, T8 e T7; T9 aguarda o Poco e T12 fica na leitura estática já fe
 | T2: detalhes tocáveis | PARCIAL | `43626037252`: cinco testes Compose instrumentados passaram isoladamente; a jornada abriu os detalhes de 413, mas não comprovou a recuperação após o retry. | Jornada não verificada no emulador; paridade dos outros provedores continua pendente. |
 | T3: metas medidas | PARCIAL | Metas recalibradas pela fixture host e limiares de regressão abaixo; compilação e unitários no CI Android pendentes. | Integrar em T4 e usar orçamento real por chamada, sem tratar estimativas como contagem faturada. |
 | T4: roteador e perfis | PARCIAL | O job Android de `e94734e` compilou o APK, passou unitários e montou o APK instrumentado; os previews sintéticos passaram, mas o smoke de dispositivo falhou. O wire e o Poco continuam não comprovados. | Manter a investigação do emulador pausada; validar no dispositivo quando autorizado. A falta de ferramentas após redução é avisada, não considerada uma tarefa concluída. |
-| T4b: auto-combo | PARCIAL — INTEGRAÇÃO EM VALIDAÇÃO | Seleção e reserva foram ligadas ao loop de chat, com consentimento e classificação conservadora; o exercício local usa stubs e **não comprova o envio Android**. | Compilar e testar o loop real, inclusive failover, fila, logins, ferramentas e imagem; não considerar concluído sem prova. |
+| T4b: auto-combo | PARCIAL — INTEGRAÇÃO EM VALIDAÇÃO | Seleção e reserva estão ligadas ao chat; imagens do agente têm seleção e autorização separadas, com testes locais descritos abaixo. **Não comprovam o envio Android.** | Validar o loop real, failover, fila, logins, ferramentas e imagem; não considerar concluído sem prova. |
 | T12: subagentes | PARCIAL | `84436db`: investigação estática em [TAMA_V2_SUBAGENTES.md](TAMA_V2_SUBAGENTES.md): não foi encontrada no Android examinado uma orquestração conversa/executor independente; `minis-model-use`, fila e slots não bastam. Há um plano de implementação e testes. | Primeiro concluir T4b sequencial; não declarar execução paralela sem teste dinâmico. |
 | T5: atalhos sem modelo | PENDENTE | Nenhum atalho novo foi adicionado nesta etapa. | Reusar handlers e preservar `RiskGate` e `OffloadGate`. |
 | T6: tools sob demanda | PENDENTE | Sem `load_tools` nesta alteração. | Carregar grupos sem alterar o prefixo estável. |
@@ -33,6 +33,46 @@ depois T5, T6, T8 e T7; T9 aguarda o Poco e T12 fica na leitura estática já fe
 | T9: segundo plano | PARCIAL / BLOQUEADA | [Investigação](TAMA_V2_SEGUNDO_PLANO.md) distingue chat local e remoto; tracker e aviso sintético passaram no build e emulação `43608695720`. Isso não prova um turno em segundo plano nem o Poco. `mediaPlayback` permanece inalterado. | Testar turno lento e investigar o Poco com autorização. |
 | T10: tradução e resíduos | PARCIAL / BLOQUEADA | `0e55075`: avisos em 17 locales e WebView sintética passou em `43593761942`. Após a correção de terminologia, Linux e macOS passaram na matriz Python de `20b44fa`; Windows experimental falhou. Arte e keystore dependem do dono. | Investigar Windows experimental e continuar por erros, provedores, onboarding e permissões; preservar dados do Pet. |
 | T11: fechamento | BLOQUEADA | Depende das tarefas anteriores e dos testes físicos. | Consolidar as provas sem promover gates antecipadamente. |
+
+## T4b: imagens do agente e último CI conhecido
+
+A seleção automática de imagens é separada do modelo de conversa e exige uma entrada cadastrada,
+ativa, visível, sem identidade duplicada, com credencial utilizável, transporte compatível,
+capacidade confirmada e autorização específica para aquela imagem. Uma preferência só vale se
+continuar elegível. Não se presume preço gratuito, nem se usa a reserva de tokens do chat para
+prometer limite por imagem. A edição com referência e `minis-model-use run` ficam bloqueados no
+modo automático; o modo manual mantém seu caminho anterior. O aviso de imagem é efêmero, associado
+à sessão e não entra no histórico do modelo. A fila tem limite de 64 avisos e pode descartar o mais
+antigo. Ela drena tanto numa publicação quanto na promoção do rascunho; um recarregamento preserva
+os avisos já exibidos nesta instância da tela.
+
+Antes do envio são verificados novamente modo, rota, conta, capacidade e permissão, mas essas
+verificações e a rede não são atômicas. Falha automática não provoca segunda tentativa dentro do
+despacho; o resultado avisa que uma falha pode ser cobrada e orienta a não tentar de novo sem novo
+pedido. Isso **não prova** que um modelo não emitirá outra chamada de ferramenta. O corpo do POST
+é marcado como de uso único, sem retry de conexão nem redirecionamento. O autenticador de proxy é
+permitido só para CONNECT; um 407 após um POST HTTP não é autenticado nem repetido. Não foi
+comprovada a operação com proxy autenticado HTTPS nem o cancelamento depois do envio.
+
+No host, sete testes de integração passaram com serviços Android/provedor simulados, abrangendo
+seleção, consentimento, revogação, rota, conta, bloqueio de edição, falha e entrada keyless; três
+testes da fila passaram. Outros cinco testes locais cobrem 503/408, redirects, 401, proxy 407 e a
+política de autenticação CONNECT, com OkHttp 4.12 e MockWebServer recompilados das fontes oficiais
+para JVM: os adaptadores de
+plataforma foram reduzidos ao JDK e os construtores `expect` do Okio ajustados para compilação host.
+Não são o build Android nem uma API paga. Os testes novos dos clientes e dos handlers com
+MockWebServer/Mockito ainda aguardam o CI Android; UI, streaming, aparelho físico e uma geração real
+continuam não comprovados. O arquivo de saída gerado usa nome único por padrão e não substitui uma
+imagem existente; uma falha após o envio ainda pode ter sido cobrada.
+
+No commit `03e0198`, anterior a esta integração de imagem, [Android 43657367412](https://github.com/DaniloXPTEAM/tamaaiv2/actions/runs/43657367412)
+passou build, unitários, APK instrumentado e previews sintéticos, mas falhou o smoke de emulador,
+cuja investigação permanece suspensa. O APK publicado tem SHA-256
+`36cb0148ced55604ef93fe728a545fb0a026f888f0a5465783a9d3f3323541c2` e certificado
+`765dbf5d5a8584c471e97ae36a531511e41e421653a410ebb38ed7f35624120d`, diferente do anterior;
+**não desinstalar nem limpar dados** do telefone. [Test Suite 43657367386](https://github.com/DaniloXPTEAM/tamaaiv2/actions/runs/43657367386)
+terminou com status agregado `success`, mas o job experimental Windows/Python 3.12 falhou. iOS,
+harness e Commits passaram. Nenhuma dessas execuções cobre a integração de imagem descrita aqui.
 
 ## T4: integração de perfis e limites, ainda sem prova Android
 
