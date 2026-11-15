@@ -58,6 +58,7 @@ internal object DiagnosticCapture {
         versionCode = BuildConfig.VERSION_CODE,
         variant = DiagnosticReport.variant(BuildConfig.APPLICATION_ID, BuildConfig.BUILD_TYPE),
         androidApi = Build.VERSION.SDK_INT,
-        architecture = DiagnosticReport.architecture(Build.SUPPORTED_ABIS.toList()),
+        // Android's JVM test stubs may return null; an unknown ABI must never crash a report.
+        architecture = DiagnosticReport.architecture(Build.SUPPORTED_ABIS?.toList().orEmpty()),
     )
 }

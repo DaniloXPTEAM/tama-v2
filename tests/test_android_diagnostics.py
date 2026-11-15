@@ -35,7 +35,7 @@ def test_report_has_no_data_access_or_open_ended_text_fields() -> None:
     assert "val lastFailure: Failure?" in snapshot
     assert "BuildConfig.APPLICATION_ID" in capture
     assert "BuildConfig.VERSION_NAME" in capture
-    assert "Build.SUPPORTED_ABIS" in capture
+    assert "Build.SUPPORTED_ABIS?.toList().orEmpty()" in capture
 
 
 def test_slash_command_opens_preview_before_any_send_path() -> None:
