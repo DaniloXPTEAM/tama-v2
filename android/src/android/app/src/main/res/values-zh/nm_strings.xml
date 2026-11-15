@@ -1404,7 +1404,7 @@
     <string name="nm_auto_consent_body">应用可能不再逐次询问，自动向此模型发送请求。供应商可能收费，即使价格未知也是如此。仅在你同意这些费用时开启。</string>
     <string name="nm_auto_consent_allow">允许自动使用</string>
     <string name="nm_auto_switch">已从 %1$s 切换到 %2$s 继续。</string>
-    <string name="nm_auto_switch_reason">%1$s：%2$s — 继续使用 %3$s。</string>
+    <string name="nm_auto_switch_reason">%1$s：%2$s; 继续使用 %3$s。</string>
     <string name="nm_auto_return">已切回首选模型 %1$s。</string>
     <string name="nm_auto_none">没有已授权的模型能安全处理此请求。请在设置中检查模型和能力。</string>
     <string name="nm_auto_disabled_during_turn">自动选择已关闭或授权已更改。没有发送后续请求。</string>
