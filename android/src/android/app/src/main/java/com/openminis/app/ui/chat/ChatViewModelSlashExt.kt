@@ -130,6 +130,7 @@ internal fun ChatViewModel.filteredSlashCommands(): List<SlashCommand> {
             "leve" -> cmd.copy(subtitle = context.getString(R.string.nm_router_profile_lean))
             "agente" -> cmd.copy(subtitle = context.getString(R.string.nm_router_profile_basic))
             "auto" -> cmd.copy(subtitle = context.getString(R.string.nm_router_profile_auto))
+            "diagnostico" -> cmd.copy(subtitle = context.getString(R.string.nm_diagnostic_slash_subtitle))
             "prompt-size" -> cmd.copy(subtitle = context.getString(R.string.nm_prompt_size_subtitle))
             else -> cmd
         }

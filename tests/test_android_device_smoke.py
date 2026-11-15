@@ -142,6 +142,7 @@ elif args[:3] == ["shell", "am", "instrument"]:
     is_restart = "io.github.nanomuse.isolated.AfterProcessStopInstrumentedTest" in args
     is_sandbox = "io.github.nanomuse.isolated.StrictSandboxInstrumentedTest" in args
     is_prompt_detail = "io.github.nanomuse.isolated.PromptSizeDetailInstrumentedTest" in args
+    is_diagnostic = "io.github.nanomuse.isolated.DiagnosticDialogInstrumentedTest" in args
     is_provider_detail = "io.github.nanomuse.isolated.ProviderErrorDetailInstrumentedTest" in args
     is_background_warning = "io.github.nanomuse.isolated.BackgroundServiceWarningInstrumentedTest" in args
     is_browser = "io.github.nanomuse.isolated.BrowserGuardInstrumentedTest" in args
@@ -158,12 +159,14 @@ elif args[:3] == ["shell", "am", "instrument"]:
             or (mode == "restart-failure" and is_restart)
             or (mode.startswith("sandbox-") and mode != "sandbox-skipped" and is_sandbox)
             or (mode == "prompt-detail-failure" and is_prompt_detail)
+            or (mode == "diagnostic-failure" and is_diagnostic)
             or (mode == "provider-detail-failure" and is_provider_detail)
             or (mode == "background-warning-failure" and is_background_warning)
             or (mode == "browser-failure" and is_browser) or (mode == "anr-policy-failure" and is_anr_policy)):
         print("FAILURES!!!")
     elif ((mode == "journey-skipped" and is_journey) or (mode == "sandbox-skipped" and is_sandbox)
             or (mode == "prompt-detail-skipped" and is_prompt_detail)
+            or (mode == "diagnostic-skipped" and is_diagnostic)
             or (mode == "provider-detail-skipped" and is_provider_detail)
             or (mode == "background-warning-skipped" and is_background_warning)
             or (mode == "browser-skipped" and is_browser) or (mode == "anr-policy-skipped" and is_anr_policy)):
@@ -244,7 +247,13 @@ def test_smoke_runs_app_and_nonempty_instrumentation_in_one_shell(smoke) -> None
     invocations = [
         args for name, args in calls if name == "adb" and args[:3] == ["shell", "am", "instrument"]
     ]
-    assert len(invocations) == 10
+    assert len(invocations) == 11
+    assert any(
+        "io.github.nanomuse.isolated.DiagnosticDialogInstrumentedTest" in args
+        for args in invocations
+    )
+    assert "::notice title=diagnostic dialog instrumentation::OK (1 test);" in result.stdout
+    assert (checkout / "diagnostic-instrumentation.log").read_text().strip() == "OK (1 test)"
     assert any(
         "io.github.nanomuse.pet.PetPersistenceInstrumentedTest" in args for args in invocations
     )
@@ -323,6 +332,8 @@ def test_smoke_runs_app_and_nonempty_instrumentation_in_one_shell(smoke) -> None
         ("screen-command", "title=pet screen instrumentation"),
         ("no-screen-tests", "title=pet screen instrumentation"),
         ("few-screen-tests", "title=pet screen instrumentation"),
+        ("diagnostic-failure", "title=diagnostic dialog instrumentation"),
+        ("diagnostic-skipped", "title=diagnostic dialog instrumentation"),
         ("journey-empty", "title=app journey instrumentation"),
         ("journey-failure", "title=app journey instrumentation"),
         ("journey-skipped", "title=app journey instrumentation"),

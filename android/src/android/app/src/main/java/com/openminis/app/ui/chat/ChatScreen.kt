@@ -574,6 +574,18 @@ fun ChatScreen(
     val messages by viewModel.uiMessages.collectAsState()
     val hasOlderMessages by viewModel.hasOlderMessages.collectAsState()
     val isStreaming by viewModel.isStreaming.collectAsState()
+    // nanoMuse: a local diagnostic preview is not a chat message or a model request.
+    val nmDiagnosticOpen by viewModel.nmDiagnosticOpen.collectAsState()
+    if (nmDiagnosticOpen) {
+        val selected by viewModel.nmProfileOverride.collectAsState()
+        val last by viewModel.nmActiveProfile.collectAsState()
+        val compacting by viewModel.isCompacting.collectAsState()
+        val failure by viewModel.nmDiagnosticFailure.collectAsState()
+        ai.tama.diagnostics.DiagnosticDialog(
+            snapshot = ai.tama.diagnostics.DiagnosticCapture.chat(selected, last, isStreaming, compacting, failure),
+            onDismiss = viewModel::nmDismissDiagnostic,
+        )
+    }
     // nanoMuse: a rejected Android service request needs a persistent, actionable warning.
     val nmServiceIssue by com.openminis.app.service.SessionActivityTracker.serviceRequestIssue.collectAsState()
     // nanoMuse: the screen stays on while the agent drives the browser or another app's screen.

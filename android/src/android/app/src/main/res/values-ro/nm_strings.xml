@@ -1473,4 +1473,12 @@
     <string name="nm_auto_failure_network">connection error</string>
     <string name="nm_auto_failure_size">request too large</string>
     <string name="nm_auto_review_models">Review model permissions</string>
+    <!-- nanoMuse: local, allowlisted diagnostic, never sent automatically. -->
+    <string name="nm_diagnostic_title">Diagnostic</string>
+    <string name="nm_diagnostic_subtitle">Vezi și copiază datele aplicației</string>
+    <string name="nm_diagnostic_slash_subtitle">Deschide raportul local fără a apela modelul</string>
+    <string name="nm_diagnostic_privacy">Conține versiunea aplicației, API-ul Android, arhitectura, profilul conversației și tipul sau codul HTTP al ultimei erori, dacă sunt disponibile. Nu conține conversații, chei, nume de modele, adrese sau jurnale. Nu se trimite nimic automat.</string>
+    <string name="nm_diagnostic_copy">Copiază diagnosticul</string>
+    <string name="nm_diagnostic_copied">Copiat în clipboard.</string>
+    <string name="nm_diagnostic_copy_failed">Nu s-a putut copia. Încearcă din nou.</string>
 </resources>

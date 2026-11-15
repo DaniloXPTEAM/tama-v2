@@ -1469,4 +1469,12 @@
     <string name="nm_auto_failure_network">connection error</string>
     <string name="nm_auto_failure_size">request too large</string>
     <string name="nm_auto_review_models">Review model permissions</string>
+    <!-- nanoMuse: local, allowlisted diagnostic, never sent automatically. -->
+    <string name="nm_diagnostic_title">Tanılama</string>
+    <string name="nm_diagnostic_subtitle">Uygulama bilgilerini görüntüle ve kopyala</string>
+    <string name="nm_diagnostic_slash_subtitle">Model çağırmadan yerel raporu aç</string>
+    <string name="nm_diagnostic_privacy">Uygulama sürümü, Android API, mimari, sohbet profili ve varsa son hatanın türü veya HTTP durumu yer alır. Sohbet, anahtar, model adı, adres veya günlük içermez. Hiçbir şey otomatik gönderilmez.</string>
+    <string name="nm_diagnostic_copy">Tanılamayı kopyala</string>
+    <string name="nm_diagnostic_copied">Panoya kopyalandı.</string>
+    <string name="nm_diagnostic_copy_failed">Kopyalanamadı. Tekrar deneyin.</string>
 </resources>

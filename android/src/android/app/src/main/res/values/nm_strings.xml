@@ -1449,4 +1449,12 @@
     <string name="nm_auto_failure_network">connection error</string>
     <string name="nm_auto_failure_size">request too large</string>
     <string name="nm_auto_review_models">Review model permissions</string>
+    <!-- nanoMuse: local, allowlisted diagnostic, never sent automatically. -->
+    <string name="nm_diagnostic_title">Diagnostic</string>
+    <string name="nm_diagnostic_subtitle">Preview and copy app details</string>
+    <string name="nm_diagnostic_slash_subtitle">Open a local report without calling a model</string>
+    <string name="nm_diagnostic_privacy">Contains the app build, Android API, device architecture, chat profile and last error category or HTTP status when available. No chats, keys, model names, addresses or logs. Nothing is sent automatically.</string>
+    <string name="nm_diagnostic_copy">Copy diagnostic</string>
+    <string name="nm_diagnostic_copied">Copied to clipboard.</string>
+    <string name="nm_diagnostic_copy_failed">Could not copy. Try again.</string>
 </resources>

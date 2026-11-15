@@ -276,6 +276,47 @@ jobs:
           retention-days: 14
           if-no-files-found: error
 
+      # CI has no project release key. This build is evidence only, never a release artifact.
+      # Run after publishing the test APK: a separate release-check failure must not hide it.
+      - name: Assemble normal release for identity inspection
+        id: normal-release
+        continue-on-error: true
+        working-directory: android/src/android
+        shell: bash
+        run: |
+          set -o pipefail
+          export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/$NDK_VERSION"
+          if ! ./gradlew :app:assembleRelease --console=plain --no-daemon 2>&1 | tee /tmp/gradle-release.log; then
+            grep -E '^e: |^> Task .*FAILED|error: |Execution failed for task|Could not find |Could not resolve ' /tmp/gradle-release.log \
+              | head -30 | while IFS= read -r line; do echo "::warning title=release check::$line"; done || true
+            exit 1
+          fi
+
+      - name: Verify normal debug and release APK identity
+        id: normal-identity
+        if: steps.normal-release.outcome == 'success'
+        continue-on-error: true
+        run: |
+          python3 scripts/android/verify-normal-builds.py \
+            --aapt "$ANDROID_HOME/build-tools/35.0.0/aapt" \
+            --apksigner "$ANDROID_HOME/build-tools/35.0.0/apksigner" \
+            --debug android/src/android/app/build/outputs/apk/debug/app-debug.apk \
+            --release android/src/android/app/build/outputs/apk/release/app-release.apk \
+            --output android/src/android/app/build/outputs/apk/debug/normal-identity.txt
+
+      - name: Report incomplete normal release verification
+        if: always() && (steps.normal-release.outcome != 'success' || steps.normal-identity.outcome != 'success')
+        run: echo '::warning title=normal release identity::Build or inspection failed; release APK identity is unverified.'
+
+      - name: Upload normal identity evidence
+        if: steps.normal-identity.outcome == 'success'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: tama-normal-identity-evidence
+          path: android/src/android/app/build/outputs/apk/debug/normal-identity.txt
+          retention-days: 14
+          if-no-files-found: error
+
   # A fresh Google APIs x86_64 emulator with an ARM native bridge installs the *same*
   # arm64 APK uploaded above. A successful translation is evidence about that runtime,
   # not a substitute for testing an actual ARM phone or its existing signing key.
@@ -369,6 +410,7 @@ jobs:
             pet-install.log
             pet-instrumentation.log
             pet-screen-instrumentation.log
+            diagnostic-instrumentation.log
             journey-instrumentation.log
             restart-instrumentation.log
             sandbox-instrumentation.log

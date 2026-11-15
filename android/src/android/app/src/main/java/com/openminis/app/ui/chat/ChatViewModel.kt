@@ -1200,6 +1200,12 @@ class ChatViewModel(
     val nmProfileOverride: StateFlow<Profile?> = _nmProfileOverride.asStateFlow()
     private val _nmActiveProfile = MutableStateFlow<Profile?>(null)
     val nmActiveProfile: StateFlow<Profile?> = _nmActiveProfile.asStateFlow()
+    // nanoMuse: ephemeral diagnostic state contains only a classified error and HTTP number.
+    private val _nmDiagnosticOpen = MutableStateFlow(false)
+    val nmDiagnosticOpen: StateFlow<Boolean> = _nmDiagnosticOpen.asStateFlow()
+    private val _nmDiagnosticFailure = MutableStateFlow<ai.tama.diagnostics.DiagnosticReport.Failure?>(null)
+    internal val nmDiagnosticFailure = _nmDiagnosticFailure.asStateFlow()
+    fun nmDismissDiagnostic() { _nmDiagnosticOpen.value = false }
     @Volatile private var nmPreviousRoute = SessionState()
     // The person's preferred entry survives a temporary automatic switch in this session.
     @Volatile private var nmPreferredAutoEntryId: String? = null
@@ -1944,6 +1950,8 @@ class ChatViewModel(
         SlashCommand(id = "leve", icon = Icons.Outlined.Build, title = "leve", subtitle = ""),
         SlashCommand(id = "agente", icon = Icons.Outlined.Build, title = "agente", subtitle = ""),
         SlashCommand(id = "auto", icon = Icons.Outlined.Build, title = "auto", subtitle = ""),
+        // nanoMuse: this opens a local preview, it never sends a chat turn.
+        SlashCommand(id = "diagnostico", icon = Icons.Outlined.Build, title = "diagnostico", subtitle = ""),
         // nanoMuse: a local, zero-request measurement of the current prompt and tools.
         SlashCommand(
             id = "prompt-size",
@@ -2015,6 +2023,7 @@ class ChatViewModel(
             "leve" -> nmSetProfileOverride(Profile.LEAN) // nanoMuse: local, no model request
             "agente" -> nmSetProfileOverride(Profile.BASIC)
             "auto" -> nmSetProfileOverride(null)
+            "diagnostico" -> _nmDiagnosticOpen.value = true // nanoMuse: preview only, no model call.
             "prompt-size" -> nmShowPromptSize() // nanoMuse: no model call, private text stays local.
             else -> AppLogger.info(TAG, "[Slash] unrecognized id=${cmd.id} — no dispatch")
         }
@@ -2111,6 +2120,11 @@ class ChatViewModel(
      * `/` while a CJK keyboard layout is active. We treat them identically.
      */
     fun tryExecuteInputAsSlashCommand(text: String): Boolean {
+        // nanoMuse: the exact local diagnostic command never enters the normal send path.
+        if (ai.tama.diagnostics.DiagnosticCommand.matches(text)) {
+            executeSlashCommand(availableSlashCommands.first { it.id == "diagnostico" })
+            return true
+        }
         val trimmed = text.trim()
         if (trimmed.isEmpty()) return false
         val first = trimmed[0]
@@ -5234,6 +5248,8 @@ class ChatViewModel(
         agentHistory.clear()
         nmPreviousRoute = SessionState() // nanoMuse: a cleared chat has no prior tool turn
         _nmActiveProfile.value = null
+        _nmDiagnosticFailure.value = null // nanoMuse: forget the classified failure with the chat.
+        _nmDiagnosticOpen.value = false
         _error.value = null
         _cachedLatestMarker = null
         toolLoopDetector.reset()
@@ -7676,6 +7692,8 @@ class ChatViewModel(
         reach: io.github.nanomuse.net.ProviderReach.Reach? = null,
         relayError: io.github.nanomuse.cloud.AllowanceSignal.HttpError? = null,
     ) {
+        // nanoMuse: retain only the error enum and bounded HTTP number, never its text or route.
+        _nmDiagnosticFailure.value = ai.tama.diagnostics.DiagnosticCapture.failure(reach?.kind, reach?.httpStatus)
         // [T-error-persist-android] Never let an empty/blank error string reach
         // the banner. The UI gate is `message.error?.let { … }` — a non-null ""
         // would render an EMPTY error banner, and (now that errors persist) it

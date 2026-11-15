@@ -1465,4 +1465,12 @@
     <string name="nm_auto_failure_network">connection error</string>
     <string name="nm_auto_failure_size">request too large</string>
     <string name="nm_auto_review_models">Review model permissions</string>
+    <!-- nanoMuse: local, allowlisted diagnostic, never sent automatically. -->
+    <string name="nm_diagnostic_title">Diagnostik</string>
+    <string name="nm_diagnostic_subtitle">Lihat dan salin butiran aplikasi</string>
+    <string name="nm_diagnostic_slash_subtitle">Buka laporan setempat tanpa memanggil model</string>
+    <string name="nm_diagnostic_privacy">Mengandungi versi aplikasi, API Android, seni bina, profil chat dan jenis atau status HTTP ralat terakhir jika tersedia. Tiada perbualan, kunci, nama model, alamat atau log. Tiada apa yang dihantar secara automatik.</string>
+    <string name="nm_diagnostic_copy">Salin diagnostik</string>
+    <string name="nm_diagnostic_copied">Disalin ke papan keratan.</string>
+    <string name="nm_diagnostic_copy_failed">Tidak dapat menyalin. Cuba lagi.</string>
 </resources>

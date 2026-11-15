@@ -14,6 +14,7 @@ from pathlib import Path
 CHECKS = (
     ("pet-instrumentation.log", "Pet persistence", 8),
     ("pet-screen-instrumentation.log", "Pet screen", 2),
+    ("diagnostic-instrumentation.log", "Diagnostic dialog", 1),
     ("journey-instrumentation.log", "Real app journey", 1),
     ("restart-instrumentation.log", "Process restart", 1),
     ("sandbox-instrumentation.log", "Packaged sandbox", 2),

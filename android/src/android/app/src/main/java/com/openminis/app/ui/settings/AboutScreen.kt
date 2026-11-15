@@ -17,7 +17,10 @@ import androidx.compose.material.icons.outlined.Code
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -38,6 +41,8 @@ import com.openminis.app.ui.components.openExternalUrl
 fun AboutScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val tileBlue = Color(0xFF015CFB)
+    // nanoMuse: the report is previewed locally before the person chooses to copy it.
+    var nmDiagnosticOpen by remember { mutableStateOf(false) }
 
     SettingsScaffold(title = stringResource(R.string.about_title), onBack = onBack) {
         Column(
@@ -86,6 +91,18 @@ fun AboutScreen(onBack: () -> Unit) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(horizontal = 24.dp),
+            )
+        }
+
+        // nanoMuse: no provider, account or conversation data is read for this report.
+        SettingsSection {
+            SettingsRow(
+                icon = Icons.Outlined.Code,
+                title = stringResource(R.string.nm_diagnostic_title),
+                subtitle = stringResource(R.string.nm_diagnostic_subtitle),
+                onClick = { nmDiagnosticOpen = true },
+                showDivider = false,
+                minHeight = 72.dp,
             )
         }
 
@@ -142,6 +159,13 @@ fun AboutScreen(onBack: () -> Unit) {
         CheckUpdateSection()
 
         Spacer(Modifier.height(24.dp))
+    }
+    // nanoMuse: the About entry is independent of any chat and uses no chat snapshot.
+    if (nmDiagnosticOpen) {
+        ai.tama.diagnostics.DiagnosticDialog(
+            snapshot = ai.tama.diagnostics.DiagnosticCapture.settings(),
+            onDismiss = { nmDiagnosticOpen = false },
+        )
     }
 }
 

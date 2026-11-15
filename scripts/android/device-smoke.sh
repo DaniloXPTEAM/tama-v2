@@ -181,6 +181,9 @@ run_instrumentation io.github.nanomuse.pet.PetPersistenceInstrumentedTest pet-in
   'pet instrumentation' 8 'Android SharedPreferences and tracker' || failed=1
 run_instrumentation io.github.nanomuse.pet.PetScreenInstrumentedTest pet-screen-instrumentation.log \
   'pet screen instrumentation' 2 'Android Compose Pet screen' || failed=1
+# Synthetic snapshot and clipboard on the disposable emulator; no personal data.
+run_instrumentation io.github.nanomuse.isolated.DiagnosticDialogInstrumentedTest diagnostic-instrumentation.log \
+  'diagnostic dialog instrumentation' 1 'Preview and user-initiated clipboard copy' || failed=1
 journey_ok=false
 if run_instrumentation io.github.nanomuse.isolated.RealAppJourneyInstrumentedTest journey-instrumentation.log \
   'app journey instrumentation' 1 'First run, five tabs, Pet and local fake chat'; then

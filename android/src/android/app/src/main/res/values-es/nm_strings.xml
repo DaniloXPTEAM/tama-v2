@@ -1469,4 +1469,12 @@
     <string name="nm_auto_failure_network">connection error</string>
     <string name="nm_auto_failure_size">request too large</string>
     <string name="nm_auto_review_models">Review model permissions</string>
+    <!-- nanoMuse: local, allowlisted diagnostic, never sent automatically. -->
+    <string name="nm_diagnostic_title">Diagnóstico</string>
+    <string name="nm_diagnostic_subtitle">Ver y copiar datos de la app</string>
+    <string name="nm_diagnostic_slash_subtitle">Abrir informe local sin llamar al modelo</string>
+    <string name="nm_diagnostic_privacy">Incluye versión de la app, API de Android, arquitectura, perfil del chat y tipo o código HTTP del último error, si está disponible. No incluye conversaciones, claves, nombres de modelos, direcciones ni registros. No se envía nada automáticamente.</string>
+    <string name="nm_diagnostic_copy">Copiar diagnóstico</string>
+    <string name="nm_diagnostic_copied">Copiado al portapapeles.</string>
+    <string name="nm_diagnostic_copy_failed">No se pudo copiar. Inténtalo de nuevo.</string>
 </resources>

@@ -4,6 +4,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+- Added an Android diagnostic preview in About and through `/diagnostico`; it copies only allowlisted build, device and classified chat-state fields after a tap, without conversations, credentials, addresses or logs.
+
 - Shortened the Android FULL agent prompt while keeping its tools and safety gates, and added a separately named debug build for side-by-side phone testing.
 
 - Kept Android image session approvals bound to the displayed model, route and account, and withdrew outstanding permission requests when a chat is cleared or deleted.

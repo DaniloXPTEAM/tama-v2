@@ -1435,4 +1435,12 @@
     <string name="nm_auto_failure_network">connection error</string>
     <string name="nm_auto_failure_size">request too large</string>
     <string name="nm_auto_review_models">Review model permissions</string>
+    <!-- nanoMuse: local, allowlisted diagnostic, never sent automatically. -->
+    <string name="nm_diagnostic_title">診斷</string>
+    <string name="nm_diagnostic_subtitle">檢視並複製應用程式資訊</string>
+    <string name="nm_diagnostic_slash_subtitle">開啟本機報告，不呼叫模型</string>
+    <string name="nm_diagnostic_privacy">包含應用程式版本、Android API、架構、聊天設定，以及可用時的最近錯誤類型或 HTTP 狀態。不含聊天內容、金鑰、模型名稱、位址或紀錄。不會自動傳送。</string>
+    <string name="nm_diagnostic_copy">複製診斷</string>
+    <string name="nm_diagnostic_copied">已複製到剪貼簿。</string>
+    <string name="nm_diagnostic_copy_failed">無法複製，請再試一次。</string>
 </resources>

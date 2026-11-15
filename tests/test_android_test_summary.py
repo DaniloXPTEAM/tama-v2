@@ -19,6 +19,7 @@ def test_summary_distinguishes_pass_fail_skip_and_missing(tmp_path, monkeypatch,
     monkeypatch.chdir(tmp_path)
     (tmp_path / "pet-instrumentation.log").write_text("OK (8 tests)\r\n")
     (tmp_path / "pet-screen-instrumentation.log").write_text("OK (2 tests)\n")
+    (tmp_path / "diagnostic-instrumentation.log").write_text("OK (1 test)\n")
     (tmp_path / "journey-instrumentation.log").write_text("FAILURES!!!\nReason: a % problem\n")
     (tmp_path / "sandbox-instrumentation.log").write_text(
         "INSTRUMENTATION_STATUS_CODE: -4\nOK (1 test)\n"
@@ -31,6 +32,7 @@ def test_summary_distinguishes_pass_fail_skip_and_missing(tmp_path, monkeypatch,
     output = capsys.readouterr().out
     assert "::notice title=Pet persistence::OK (8 tests)" in output
     assert "::notice title=Pet screen::OK (2 tests)" in output
+    assert "::notice title=Diagnostic dialog::OK (1 test)" in output
     assert "::error title=Real app journey::a %25 problem" in output
     assert "::warning title=Process restart::Not run" in output
     assert "::error title=Packaged sandbox::Failed, skipped, or no tests reported" in output

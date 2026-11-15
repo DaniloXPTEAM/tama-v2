@@ -4,6 +4,28 @@ Este registro acompanha o plano completo fornecido pelo dono. O trabalho está s
 `arena/4f0fb56f-tamaaiv2`; não houve sincronização com nanoMuse nem OpenMinis. Estados possíveis:
 **PENDENTE**, **EM ANDAMENTO**, **PARCIAL**, **BLOQUEADA** e **CONCLUÍDA COM PROVA**.
 
+## Incremento: diagnóstico local
+
+Há uma prévia em **Configurações → Sobre → Diagnóstico** e no comando exato `/diagnostico`
+(também aceita `/diagnóstico`). Copiar é uma ação separada; nenhum envio é automático. O relatório
+usa uma lista fechada de campos de build, API Android, arquitetura e, no chat, estado de perfil e
+categoria/código HTTP da última falha disponível. Não inclui conversa, chaves, nomes de modelos,
+contas, endereços, texto de erro ou logs. A entrada Sobre não lê o chat; a ausência de dados é
+marcada `UNAVAILABLE`. Os oito passos para baixar e testar estão em
+[TAMA_V2_DIAGNOSTICO.md](TAMA_V2_DIAGNOSTICO.md).
+
+Os testes locais cobrem o formatador, a interpretação exata do comando e os limites de entrada;
+checagens estruturais cobrem os dois caminhos de envio e os recursos de todos os idiomas. O CI
+compila os unitários Android e um teste Compose sintético para o diálogo e a área de transferência;
+o resultado do emulador e a jornada completa devem ser informados separadamente. Até teste real,
+a abertura pelo comando, a navegação na tela e a cópia no Poco continuam não comprovadas.
+
+A identidade normal é comparada à referência TAMA `d2ed0d5`, anterior a `tamaTest`. A branch já
+havia alterado ID, nome, versão, deep link e ícone em relação ao `main` original `154f076f`;
+não se deve descrever o normal como idêntico àquele commit. O CI inspeciona os metadados do
+paralelo contra debug e tenta inspecionar separadamente um release normal assinado pela chave
+debug temporária, não distribuído como release de produção.
+
 ## Incremento: FULL compacto e APK paralelo
 
 O perfil FULL agora resume **somente** o template fixo do app, mantendo as mesmas tools dietadas,
