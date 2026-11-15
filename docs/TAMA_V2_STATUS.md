@@ -112,6 +112,12 @@ ficou `success` no agregado, mas Windows/Python 3.12 falhou; Commits, iOS, harne
 Esse CI não cobre os novos arquivos ou alterações T5/T8 acima. Não houve geração paga, teste no Poco
 ou prova do loop/Stop/zero chamadas no Android. O plano de continuidade não rastreado foi preservado.
 
+Após o envio de `fe104ef`, só o workflow de Labels apareceu automaticamente. O pedido manual de
+`android.yml` na branch recebeu **HTTP 403: Resource not accessible by integration**; a integração
+GitHub precisa de permissão para Actions, ou o dono pode iniciar o workflow pela interface. Portanto,
+**nenhum build ou teste Android desse incremento está comprovado** enquanto esse CI não for executado.
+A restrição de não voltar a investigar o smoke continua válida.
+
 ## T4b: imagens do agente e último CI conhecido
 
 A seleção automática de imagens é separada do modelo de conversa e exige uma entrada cadastrada,
