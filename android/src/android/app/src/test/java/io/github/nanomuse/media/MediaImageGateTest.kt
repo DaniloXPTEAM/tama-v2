@@ -9,6 +9,7 @@ import com.openminis.app.offload.OffloadPermissionManager
 import io.github.nanomuse.avatar.ImageGen
 import io.github.nanomuse.guard.GateOutcome
 import io.github.nanomuse.pet.PetPrefsContext
+import io.github.nanomuse.router.AutoModelRuntime
 import java.util.UUID
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
@@ -70,6 +71,50 @@ class MediaImageGateTest {
         assertTrue(fresh.oneTimeOnly)
         manager.respondToRequest(fresh.requestId, OffloadPermissionManager.Response.DENY_SESSION)
         assertFalse(cli.await())
+        manager.clearSessionGrants(session)
+    }
+
+    @Test fun `session approval is restricted to the displayed model route and account`() = runBlocking {
+        manager.init(PetPrefsContext())
+        manager.setLevel("image_generation", OffloadPermissionManager.PermissionLevel.ASK_ONCE)
+        val session = UUID.randomUUID().toString()
+        val original = endpoint.copy(instance = endpoint.instance.copy(id = UUID.randomUUID().toString()))
+        val gate = AndroidMediaImageGate(context(), checkRisk = { _, _ -> GateOutcome.Allowed() })
+
+        suspend fun approveOnce(candidate: ImageGen.Endpoint, response: OffloadPermissionManager.Response) {
+            val request = async(start = CoroutineStart.UNDISPATCHED) {
+                gate.allow(candidate, "bird", "1024x1024", session, false)
+            }
+            assertFalse("a different model, route or account must prompt", request.isCompleted)
+            val pending = requireNotNull(manager.pendingRequest.value)
+            manager.respondToRequest(pending.requestId, response)
+            assertTrue(request.await())
+        }
+
+        approveOnce(original, OffloadPermissionManager.Response.ALLOW_SESSION)
+        assertTrue(gate.allow(original, "cat", "1024x1024", session, false))
+        assertNull(manager.pendingRequest.value)
+        approveOnce(original.copy(model = "another-model"), OffloadPermissionManager.Response.ALLOW_ONCE)
+        approveOnce(original.copy(instance = original.instance.copy(customBaseURL = "https://example.test/v1")),
+            OffloadPermissionManager.Response.ALLOW_ONCE)
+        AutoModelRuntime.invalidateAccount(original.instanceId)
+        approveOnce(original, OffloadPermissionManager.Response.ALLOW_ONCE)
+        manager.clearSessionGrants(session)
+    }
+
+    @Test fun `account change while approval is pending invalidates the answer`() = runBlocking {
+        manager.init(PetPrefsContext())
+        manager.setLevel("image_generation", OffloadPermissionManager.PermissionLevel.ASK_ONCE)
+        val session = UUID.randomUUID().toString()
+        val original = endpoint.copy(instance = endpoint.instance.copy(id = UUID.randomUUID().toString()))
+        val gate = AndroidMediaImageGate(context(), checkRisk = { _, _ -> GateOutcome.Allowed() })
+        val request = async(start = CoroutineStart.UNDISPATCHED) {
+            gate.allow(original, "bird", "1024x1024", session, false)
+        }
+        val pending = requireNotNull(manager.pendingRequest.value)
+        AutoModelRuntime.invalidateAccount(original.instanceId)
+        manager.respondToRequest(pending.requestId, OffloadPermissionManager.Response.ALLOW_SESSION)
+        assertFalse(request.await())
         manager.clearSessionGrants(session)
     }
 

@@ -7,6 +7,9 @@ import io.github.nanomuse.avatar.ImageGen
 import io.github.nanomuse.guard.GateOutcome
 import io.github.nanomuse.guard.RiskGate
 import io.github.nanomuse.net.ProviderReach
+import io.github.nanomuse.router.AutoModelRuntime
+import io.github.nanomuse.router.AutoModelStore
+import java.security.MessageDigest
 import kotlinx.coroutines.withTimeoutOrNull
 
 /** The same permission and risk checks apply to the CLI, the native tool and shortcuts. */
@@ -28,10 +31,25 @@ internal class AndroidMediaImageGate(
         val model = ProviderReach.redactedText(endpoint.model, listOf(endpoint.apiKey), 128)
         val provider = ProviderReach.redactedText(endpoint.label, listOf(endpoint.apiKey), 128)
         val title = context.getString(R.string.nm_models_image_title) + ": $model ($provider)"
+        // A session grant applies only to the shown model, provider, transport and
+        // account generation, not to another potentially more expensive route.
+        // The fingerprint contains no credential or raw endpoint and is kept in memory.
+        val accountVersion = AutoModelRuntime.accountVersion(endpoint.instanceId)
+        val identity = listOf(
+            endpoint.instanceId, endpoint.model, AutoModelStore.routeFingerprint(endpoint.instance),
+            endpoint.instance.imageEndpointResolved?.name.orEmpty(), accountVersion.toString(),
+        ).joinToString("") { "${it.length}:$it" }
+        val scope = MessageDigest.getInstance("SHA-256").digest(identity.toByteArray(Charsets.UTF_8))
+            .joinToString("") { "%02x".format(it.toInt() and 0xff) }
         // The permission manager queues dialogs; a timeout is a refusal, not consent.
-        return withTimeoutOrNull(permissionTimeoutMs) {
-            OffloadPermissionManager.checkPermission(IMAGE_PERMISSION, title, sid, requireFreshApproval = freshApproval)
+        val approved = withTimeoutOrNull(permissionTimeoutMs) {
+            OffloadPermissionManager.checkPermission(
+                IMAGE_PERMISSION, title, sid, requireFreshApproval = freshApproval, grantScope = scope,
+            )
         } ?: false
+        // A credential or route can change while a dialog is visible. An answer
+        // to the previous account does not authorize the new one.
+        return approved && accountVersion == AutoModelRuntime.accountVersion(endpoint.instanceId)
     }
 
     private fun quote(value: String) = "'" + value.replace("'", "'\\''") + "'"

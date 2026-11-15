@@ -1396,7 +1396,7 @@
     <string name="nm_auto_image_allow">Allow automatic image generation with this model</string>
     <string name="nm_auto_image_consent_title">Allow automatic image generation?</string>
     <string name="nm_auto_image_consent_body">Image generation uses a separate endpoint and may charge per picture, including when the price is unknown. Chat permission does not authorize images. Enable only if you accept these charges for this model.</string>
-    <string name="nm_image_provider_missing">尚未設定圖片供應商：開啟設定 → 圖片與影片模型</string>
+    <string name="nm_image_provider_missing">尚未設定圖片服務商：開啟設定 → 圖片與影片模型</string>
     <string name="nm_image_call_consent">圖片生成可能按每次請求收費，即使價格未知也是如此。只有接受所顯示模型的費用時才允許。</string>
     <string name="nm_image_permission_denied">圖片權限被拒絕或已逾期，未送出圖片請求。</string>
     <string name="nm_image_request_failed">無法完成圖片。請求可能已收費；沒有新請求時不會重試。</string>

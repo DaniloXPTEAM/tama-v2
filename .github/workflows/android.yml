@@ -149,15 +149,16 @@ jobs:
           fi
 
       # Our unit tests (io.github.nanomuse.*: the guards, the hub client, the sandbox paths, the
-      # strings' parity), plus the upstream provider and sandbox tests, the two OpenMinis packages
-      # our edits touch (#333, #334, #335). Same Gradle invocation as AGENTS.md; the compiled
-      # classes are warm.
+      # strings' parity), the upstream provider and sandbox tests, and the image tool and
+      # permission queue tests added under com.openminis.app. The compiled classes are warm.
       - name: Unit tests
         working-directory: android/src/android
         run: |
           export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/$NDK_VERSION"
           ./gradlew :app:testDebugUnitTest --tests 'io.github.nanomuse.*' \
             --tests 'com.openminis.app.provider.*' --tests 'com.openminis.app.sandbox.*' \
+            --tests 'com.openminis.app.offload.OffloadPermissionQueueTest' \
+            --tests 'com.openminis.app.tools.ImageGenerationToolTest' \
             --console=plain --no-daemon 2>&1 | tee /tmp/gradle-unit.log
           exit "${PIPESTATUS[0]}"
 

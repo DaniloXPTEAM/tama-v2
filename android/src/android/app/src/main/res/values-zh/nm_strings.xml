@@ -1403,7 +1403,7 @@
     <string name="nm_auto_image_allow">允许此模型自动生成图片</string>
     <string name="nm_auto_image_consent_title">允许自动生成图片？</string>
     <string name="nm_auto_image_consent_body">图片使用独立接口，可能按张收费，包括价格未知的情况。聊天授权不适用于图片。仅在接受此模型的费用时开启。</string>
-    <string name="nm_image_provider_missing">尚未配置图像提供商：打开设置 → 图像和视频模型</string>
+    <string name="nm_image_provider_missing">尚未配置图像服务商：打开设置 → 图像和视频模型</string>
     <string name="nm_image_call_consent">图像生成可能按每次请求收费，即使价格未知也是如此。只有接受所示模型的费用时才允许。</string>
     <string name="nm_image_permission_denied">图像权限被拒绝或已过期，未发送图像请求。</string>
     <string name="nm_image_request_failed">无法完成图像。请求可能已收费；没有新请求时不会重试。</string>

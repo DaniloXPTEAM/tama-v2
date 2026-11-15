@@ -134,6 +134,66 @@ class OffloadPermissionQueueTest {
         manager.clearSessionGrants(session)
     }
 
+    @Test fun `scoped session grants do not leak and settings invalidate every scope`() = runBlocking {
+        manager.init(PetPrefsContext())
+        manager.setLevel("image_generation", OffloadPermissionManager.PermissionLevel.ASK_ONCE)
+        val session = UUID.randomUUID().toString()
+        suspend fun ask(scope: String, answer: OffloadPermissionManager.Response) {
+            val request = async(start = CoroutineStart.UNDISPATCHED) {
+                manager.checkPermission("image_generation", "Image", session, grantScope = scope)
+            }
+            assertFalse(request.isCompleted)
+            respond(answer)
+            assertTrue(request.await())
+        }
+        ask("model-a", OffloadPermissionManager.Response.ALLOW_SESSION)
+        assertTrue(manager.checkPermission("image_generation", "Image", session, grantScope = "model-a"))
+        ask("model-b", OffloadPermissionManager.Response.ALLOW_SESSION)
+        manager.setLevel("image_generation", OffloadPermissionManager.PermissionLevel.ASK_ONCE)
+        ask("model-a", OffloadPermissionManager.Response.ALLOW_ONCE)
+        ask("model-b", OffloadPermissionManager.Response.ALLOW_ONCE)
+        val denied = async(start = CoroutineStart.UNDISPATCHED) {
+            manager.checkPermission("image_generation", "Image", session, grantScope = "model-c")
+        }
+        respond(OffloadPermissionManager.Response.DENY_SESSION)
+        assertFalse(denied.await())
+        assertFalse(manager.checkPermission("image_generation", "Image", session, grantScope = "model-a"))
+        manager.clearSessionGrants(session)
+    }
+
+    @Test fun `ending a session withdraws its active and queued requests only`() = runBlocking {
+        manager.init(PetPrefsContext())
+        manager.setLevel("calendar", OffloadPermissionManager.PermissionLevel.ASK_ONCE)
+        manager.setLevel("image_generation", OffloadPermissionManager.PermissionLevel.ASK_ONCE)
+        val oldSession = UUID.randomUUID().toString()
+        val otherSession = UUID.randomUUID().toString()
+        val first = async(start = CoroutineStart.UNDISPATCHED) {
+            manager.checkPermission("image_generation", "Image", oldSession)
+        }
+        val oldId = requireNotNull(manager.pendingRequest.value).requestId
+        val queued = async(start = CoroutineStart.UNDISPATCHED) {
+            manager.checkPermission("calendar", "Calendar", oldSession)
+        }
+        val other = async(start = CoroutineStart.UNDISPATCHED) {
+            manager.checkPermission("calendar", "Other", otherSession)
+        }
+        manager.clearSessionGrants(oldSession)
+        assertFalse(withTimeout(2_000) { first.await() })
+        assertFalse(withTimeout(2_000) { queued.await() })
+        val current = withTimeout(2_000) { manager.pendingRequest.first { it?.toolTitle == "Other" } }!!
+        manager.respondToRequest(oldId, OffloadPermissionManager.Response.ALLOW_SESSION)
+        assertEquals(current.requestId, manager.pendingRequest.value?.requestId)
+        manager.respondToRequest(current.requestId, OffloadPermissionManager.Response.ALLOW_ONCE)
+        assertTrue(other.await())
+        val fresh = async(start = CoroutineStart.UNDISPATCHED) {
+            manager.checkPermission("image_generation", "Fresh", oldSession)
+        }
+        respond(OffloadPermissionManager.Response.ALLOW_ONCE)
+        assertTrue(fresh.await())
+        manager.clearSessionGrants(otherSession)
+        manager.clearSessionGrants(oldSession)
+    }
+
     @Test fun `cancellation withdraws only its own dialog and a settings denial wins`() = runBlocking {
         manager.init(PetPrefsContext())
         manager.setLevel("calendar", OffloadPermissionManager.PermissionLevel.ASK_ONCE)

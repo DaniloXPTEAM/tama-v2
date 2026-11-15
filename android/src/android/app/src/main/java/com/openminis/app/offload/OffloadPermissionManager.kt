@@ -106,12 +106,11 @@ object OffloadPermissionManager {
 
     private lateinit var prefs: SharedPreferences
 
-    /** Session-scoped grants for ASK_ONCE tools. Populated by the
-     *  "Allow in this session" dialog response. Cleared when the
-     *  hosting session ends (or process death — see
-     *  OFFLOAD_GLOBAL_SESSION_ID for offload-CLI-backed tools, which
-     *  share one process-lifetime slot). */
-    private val sessionGrants = mutableMapOf<String, MutableSet<String>>() // sessionId -> set of toolNames
+    /** Optional scope keeps a paid model's session grant bound to the route shown in its dialog. */
+    private data class SessionGrant(val toolName: String, val scope: String?)
+
+    /** Session-scoped grants for ASK_ONCE tools, kept only in process memory. */
+    private val sessionGrants = mutableMapOf<String, MutableSet<SessionGrant>>()
 
     /** T338: session-scoped denials. Populated by the "Deny in this
      *  session" dialog response. Once a tool is in here for a given
@@ -132,6 +131,9 @@ object OffloadPermissionManager {
     private val permissionStateLock = Any()
     // Any settings change invalidates an answer to an older, still-open dialog.
     private val permissionVersions = mutableMapOf<String, Long>()
+    // Kept only while checks are active, so ending many sessions cannot leak epochs.
+    private data class SessionEpoch(var version: Long = 0, var checks: Int = 0)
+    private val activeSessionEpochs = mutableMapOf<String, SessionEpoch>()
     // Incremented under permissionStateLock; never reused while this process lives.
     private var nextPermissionRequestId = 0L
     private var pendingContinuation: kotlin.coroutines.Continuation<Response>? = null
@@ -353,7 +355,7 @@ object OffloadPermissionManager {
     /** Caller holds [permissionStateLock]. */
     private fun invalidateToolGrants(toolName: String) {
         permissionVersions[toolName] = (permissionVersions[toolName] ?: 0L) + 1L
-        sessionGrants.values.forEach { it.remove(toolName) }
+        sessionGrants.values.forEach { grants -> grants.removeAll { it.toolName == toolName } }
         sessionDenials.values.forEach { it.remove(toolName) }
     }
 
@@ -374,7 +376,9 @@ object OffloadPermissionManager {
 
     /**
      * Check permission for a tool in the given session.
-     * For ASK_ONCE, suspends until user responds via the dialog.
+     * For ASK_ONCE, suspends until user responds via the dialog. A non-null
+     * grantScope limits a remembered approval to that exact scope; denials
+     * remain tool-wide for the session. The scope is never persisted or shown.
      * Returns true if allowed.
      */
     suspend fun checkPermission(
@@ -382,64 +386,84 @@ object OffloadPermissionManager {
         toolTitle: String,
         sessionId: String,
         requireFreshApproval: Boolean = false,
+        grantScope: String? = null,
     ): Boolean {
-        when (getLevel(toolName)) {
-            PermissionLevel.BYPASS -> if (!requireFreshApproval) return true
-            PermissionLevel.NOT_ALLOWED -> return false
-            PermissionLevel.ASK_ONCE -> Unit
+        val grant = SessionGrant(toolName, grantScope)
+        val (epoch, sessionVersion) = synchronized(permissionStateLock) {
+            val current = activeSessionEpochs.getOrPut(sessionId) { SessionEpoch() }
+            current.checks++
+            current to current.version
         }
-        return permissionQueue.withLock {
-            // The setting may have changed while this request was queued.
+        try {
             when (getLevel(toolName)) {
-                PermissionLevel.BYPASS -> if (!requireFreshApproval) return@withLock true
-                PermissionLevel.NOT_ALLOWED -> return@withLock false
+                PermissionLevel.BYPASS -> if (!requireFreshApproval) return true
+                PermissionLevel.NOT_ALLOWED -> return false
                 PermissionLevel.ASK_ONCE -> Unit
             }
-            val version = synchronized(permissionStateLock) {
-                if (getLevel(toolName) == PermissionLevel.NOT_ALLOWED) return@withLock false
-                if (toolName in sessionDenials[sessionId].orEmpty()) return@withLock false
-                if (!requireFreshApproval && toolName in sessionGrants[sessionId].orEmpty()) return@withLock true
-                permissionVersions[toolName] ?: 0L
-            }
-
-            val info = toolRegistry.find { it.toolName == toolName }
-            val response = suspendCancellableCoroutine<Response> { cont ->
-                synchronized(permissionStateLock) {
-                    pendingContinuation = cont
-                    _pendingRequest.value = PermissionRequest(
-                        requestId = nextPermissionRequestId++,
-                        toolName = toolName,
-                        toolTitle = toolTitle,
-                        description = "Allow ${info?.displayName ?: toolName} access?",
-                        sessionId = sessionId,
-                        oneTimeOnly = requireFreshApproval,
-                    )
+            return permissionQueue.withLock {
+                // The session or setting may have changed while this request was queued.
+                val version = synchronized(permissionStateLock) {
+                    if (epoch.version != sessionVersion) return@withLock false
+                    when (getLevel(toolName)) {
+                        PermissionLevel.BYPASS -> if (!requireFreshApproval) return@withLock true
+                        PermissionLevel.NOT_ALLOWED -> return@withLock false
+                        PermissionLevel.ASK_ONCE -> Unit
+                    }
+                    if (toolName in sessionDenials[sessionId].orEmpty()) return@withLock false
+                    if (!requireFreshApproval && grant in sessionGrants[sessionId].orEmpty()) return@withLock true
+                    permissionVersions[toolName] ?: 0L
                 }
-                cont.invokeOnCancellation {
-                    synchronized(permissionStateLock) {
-                        if (pendingContinuation === cont) {
-                            _pendingRequest.value = null
-                            pendingContinuation = null
+
+                val info = toolRegistry.find { it.toolName == toolName }
+                val response = suspendCancellableCoroutine<Response> { cont ->
+                    val published = synchronized(permissionStateLock) {
+                        if (epoch.version != sessionVersion ||
+                            (permissionVersions[toolName] ?: 0L) != version) false
+                        else {
+                            pendingContinuation = cont
+                            _pendingRequest.value = PermissionRequest(
+                                requestId = nextPermissionRequestId++,
+                                toolName = toolName,
+                                toolTitle = toolTitle,
+                                description = "Allow ${info?.displayName ?: toolName} access?",
+                                sessionId = sessionId,
+                                oneTimeOnly = requireFreshApproval,
+                            )
+                            true
+                        }
+                    }
+                    if (!published) cont.resume(Response.DENY_SESSION)
+                    else cont.invokeOnCancellation {
+                        synchronized(permissionStateLock) {
+                            if (pendingContinuation === cont) {
+                                _pendingRequest.value = null
+                                pendingContinuation = null
+                            }
+                        }
+                    }
+                }
+                // A settings or session change while the dialog was open
+                // invalidates its answer, including an ABA settings change.
+                synchronized(permissionStateLock) {
+                    if (epoch.version != sessionVersion || getLevel(toolName) == PermissionLevel.NOT_ALLOWED ||
+                        (permissionVersions[toolName] ?: 0L) != version) return@withLock false
+                    when (response) {
+                        Response.ALLOW_SESSION -> {
+                            if (!requireFreshApproval) sessionGrants.getOrPut(sessionId) { mutableSetOf() }.add(grant)
+                            true
+                        }
+                        Response.ALLOW_ONCE -> true
+                        Response.DENY_SESSION -> {
+                            sessionDenials.getOrPut(sessionId) { mutableSetOf() }.add(toolName)
+                            false
                         }
                     }
                 }
             }
-            // A Settings change while the dialog was open invalidates its answer,
-            // including NOT_ALLOWED → ASK_ONCE (an ABA change).
+        } finally {
             synchronized(permissionStateLock) {
-                if (getLevel(toolName) == PermissionLevel.NOT_ALLOWED ||
-                    (permissionVersions[toolName] ?: 0L) != version) return@withLock false
-                when (response) {
-                    Response.ALLOW_SESSION -> {
-                        if (!requireFreshApproval) sessionGrants.getOrPut(sessionId) { mutableSetOf() }.add(toolName)
-                        true
-                    }
-                    Response.ALLOW_ONCE -> true
-                    Response.DENY_SESSION -> {
-                        sessionDenials.getOrPut(sessionId) { mutableSetOf() }.add(toolName)
-                        false
-                    }
-                }
+                epoch.checks--
+                if (epoch.checks == 0 && activeSessionEpochs[sessionId] === epoch) activeSessionEpochs.remove(sessionId)
             }
         }
     }
@@ -456,10 +480,21 @@ object OffloadPermissionManager {
         continuation?.resume(response)
     }
 
-    /** Clear session grants AND denials (call when a session ends). */
-    fun clearSessionGrants(sessionId: String) = synchronized(permissionStateLock) {
-        sessionGrants.remove(sessionId)
-        sessionDenials.remove(sessionId)
-        Unit
+    /** Clear grants and denials and withdraw this session's outstanding requests. */
+    fun clearSessionGrants(sessionId: String) {
+        val continuation = synchronized(permissionStateLock) {
+            sessionGrants.remove(sessionId)
+            sessionDenials.remove(sessionId)
+            activeSessionEpochs[sessionId]?.let { it.version++ }
+            if (_pendingRequest.value?.sessionId == sessionId) {
+                pendingContinuation.also {
+                    pendingContinuation = null
+                    _pendingRequest.value = null
+                }
+            } else null
+        }
+        // Resume outside the lock. The changed epoch makes this a refusal, not
+        // a new cached denial, and advances the queue for other sessions.
+        continuation?.resume(Response.DENY_SESSION)
     }
 }
