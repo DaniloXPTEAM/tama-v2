@@ -10,7 +10,7 @@ Há uma prévia em **Configurações → Sobre → Diagnóstico** e no comando e
 (também aceita `/diagnóstico`). Copiar é uma ação separada; nenhum envio é automático. O relatório
 usa uma lista fechada de campos de build, API Android, arquitetura e, no chat, estado de perfil e
 categoria/código HTTP da última falha disponível. Não inclui conversa, chaves, nomes de modelos,
-contas, endereços, texto de erro ou logs. A entrada Sobre não lê o chat; a ausência de dados é
+identificadores de conta, endereços, texto de erro ou logs. A entrada Sobre não lê o chat; a ausência de dados é
 marcada `UNAVAILABLE`. Os oito passos para baixar e testar estão em
 [TAMA_V2_DIAGNOSTICO.md](TAMA_V2_DIAGNOSTICO.md).
 
@@ -25,6 +25,25 @@ havia alterado ID, nome, versão, deep link e ícone em relação ao `main` orig
 não se deve descrever o normal como idêntico àquele commit. O CI inspeciona os metadados do
 paralelo contra debug e tenta inspecionar separadamente um release normal assinado pela chave
 debug temporária, não distribuído como release de produção.
+
+### APK com diagnóstico e resultados observados
+
+O [artefato `tama-v2-parallel-test-apk`](https://github.com/DaniloXPTEAM/tamaaiv2/actions/runs/43712635223/artifacts/14161802281)
+da [execução 43712635223](https://github.com/DaniloXPTEAM/tamaaiv2/actions/runs/43712635223) foi
+compilado de `3b469dd` **com o diagnóstico**. O verificador do CI confirmou pacote paralelo,
+rótulos, ABI, permissões, authorities disjuntas e assinatura; registrou SHA-256 do APK
+`38cace68c978a8591bd9ccfe44b8dddbb3f5dbe043f4784f41850a9cd09b41b4`, 70.285.157 bytes e
+certificado debug SHA-256 `8b46674aadfb2a0174f87cecb32010d8daf5544445fe782e099dedb368c71d96`.
+O ZIP também contém o arquivo de hash e a evidência de assinatura. Não presumir que ele atualize
+uma instalação existente; certificados debug de outros runs podem ser diferentes.
+
+Nessa execução: build debug e paralelo, unitários Android e compilação da instrumentação passaram;
+o teste Compose sintético do diálogo e da cópia passou no emulador (**1 teste**); o smoke completo
+falhou na jornada e no sandbox. O teste usa o debug normal, não instala a variante paralela. O Poco
+não foi testado. O release normal compilou, porém a inspeção binária adicional falhou sem detalhe
+útil na anotação; não tratar essa inspeção como aprovada. A comparação de fonte com `d2ed0d5` é
+uma evidência separada. A ferramenta de inspeção foi ajustada para resolver o recurso de ícone pelo
+manifesto e publicar detalhes caso falhe; seu resultado deve ser conferido em uma execução posterior.
 
 ## Incremento: FULL compacto e APK paralelo
 
@@ -75,8 +94,8 @@ novo do incremento foi para `ai.tama.*`; Pet e código Android legado, namespace
 identificadores persistidos não foram renomeados. O smoke e o uso real no Poco seguem não comprovados.
 
 Na [execução Android 43707369954](https://github.com/DaniloXPTEAM/tamaaiv2/actions/runs/43707369954),
-o job `debug APK · arm64-v8a` compilou as duas variantes, passou nos unitários e na verificação,
-compilou a instrumentação e publicou o APK paralelo. Seu SHA-256 é
+anterior ao diagnóstico local, o job `debug APK · arm64-v8a` compilou as duas variantes, passou nos
+unitários e na verificação, compilou a instrumentação e publicou o APK paralelo antigo. Seu SHA-256 é
 `6f4e14b39d8c68c85c21548c9c625f1bfb149283584859d464e03f9d2f9bfa96`, com 70.251.717 bytes;
 o certificado debug tem SHA-256
 `00503c73710b4b8f90faff704a54288cb4a047cd552462a5a9bcad883b5b7dde`. O arquivo recuperado foi

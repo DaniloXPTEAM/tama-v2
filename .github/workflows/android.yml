@@ -281,6 +281,7 @@ jobs:
       - name: Assemble normal release for identity inspection
         id: normal-release
         continue-on-error: true
+        timeout-minutes: 25
         working-directory: android/src/android
         shell: bash
         run: |
@@ -296,12 +297,19 @@ jobs:
         id: normal-identity
         if: steps.normal-release.outcome == 'success'
         continue-on-error: true
+        shell: bash
         run: |
+          shopt -s nullglob
+          releases=(android/src/android/app/build/outputs/apk/release/*.apk)
+          if [ "${#releases[@]}" -ne 1 ]; then
+            echo '::warning title=normal identity failure::Expected exactly one release APK to inspect.'
+            exit 1
+          fi
           python3 scripts/android/verify-normal-builds.py \
             --aapt "$ANDROID_HOME/build-tools/35.0.0/aapt" \
             --apksigner "$ANDROID_HOME/build-tools/35.0.0/apksigner" \
             --debug android/src/android/app/build/outputs/apk/debug/app-debug.apk \
-            --release android/src/android/app/build/outputs/apk/release/app-release.apk \
+            --release "${releases[0]}" \
             --output android/src/android/app/build/outputs/apk/debug/normal-identity.txt
 
       - name: Report incomplete normal release verification
