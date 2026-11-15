@@ -40,14 +40,27 @@ não é uma janela de contexto nem garante que caiba em qualquer TPM.
 
 Esses números vêm de seis testes JVM locais com stubs de Android e JSON-java, não do Poco nem de
 faturamento. O teste publica somente rótulos fixos e números; o conteúdo da conversa sintética não
-vai aos logs. O CI Android e o APK paralelo ainda precisam ser conferidos após esta alteração.
+vai aos logs. O job Android de `2c9af98` também passou nos unitários JVM e na publicação da fixture;
+isso não é uma medição de provedor nem um teste em aparelho.
 
 A variante `tamaTest` usa `ai.tama.assistant.tamav2test`, rótulo `Tama V2 Test`, assinatura debug
-e arm64-v8a; debug/release normais conservam seus IDs. É uma instalação e um armazenamento próprios,
-não uma migração dos dados existentes. O verificador do CI confere rótulos de todos os ícones,
-autoridades de providers disjuntas, permissão, ABI e assinatura, sem instalar nenhum APK. O código
+e arm64-v8a; debug/release normais conservam seus IDs. É uma instalação e um armazenamento **privado**
+próprios, não uma migração dos dados existentes; mídia exportada para pastas públicas pode ser
+compartilhada. Ambas as variantes registram `tama://`, então o Android pode pedir qual delas abrir em
+um link externo. O verificador do CI confere o alias ativo e os rótulos de todos os ícones, autoridades
+de providers e permissões declaradas disjuntas, ABI e assinatura, sem instalar nenhum APK. O código
 novo do incremento foi para `ai.tama.*`; Pet e código Android legado, namespace Gradle, caminhos e
 identificadores persistidos não foram renomeados. O smoke e o uso real no Poco seguem não comprovados.
+
+Na [execução Android 43707369954](https://github.com/DaniloXPTEAM/tamaaiv2/actions/runs/43707369954),
+o job `debug APK · arm64-v8a` compilou as duas variantes, passou nos unitários e na verificação,
+compilou a instrumentação e publicou o APK paralelo. Seu SHA-256 é
+`6f4e14b39d8c68c85c21548c9c625f1bfb149283584859d464e03f9d2f9bfa96`, com 70.251.717 bytes;
+o certificado debug tem SHA-256
+`00503c73710b4b8f90faff704a54288cb4a047cd552462a5a9bcad883b5b7dde`. O arquivo recuperado foi
+conferido localmente pelo mesmo hash, pelo manifesto, ABI e assinatura v2. Esses resultados não
+provam instalação ou funcionamento no Poco. A chave debug do CI pode mudar entre builds; não se deve
+presumir compatibilidade de atualizações futuras nem desinstalar ou limpar o aplicativo atual.
 
 ## Prioridade atual
 
