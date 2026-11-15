@@ -34,8 +34,70 @@ def package(badging: str) -> str:
 
 
 def authorities(tree: str) -> set[str]:
-    matches = re.findall(r'android:authorities\([^)]*\)="([^"]+)"', tree)
-    return {value for match in matches for value in match.split(";") if value}
+    lines = re.findall(r"(?m)^[ \t]*A: android:authorities\([^)]*\)=(.*)$", tree)
+    values = set()
+    for line in lines:
+        match = re.match(r'"([^"]+)"', line)
+        if not match:
+            raise ValueError("A provider authority could not be read from the manifest")
+        values.update(value for value in match.group(1).split(";") if value)
+    return values
+
+
+def element_blocks(tree: str, tag: str) -> list[str]:
+    """Return each AAPT element and its descendants, bounded by indentation."""
+    lines = tree.splitlines()
+    element = re.compile(r"^([ \t]*)E: ([\w-]+)\b")
+    blocks = []
+    for start, line in enumerate(lines):
+        match = element.match(line)
+        if not match or match.group(2) != tag:
+            continue
+        indent = len(match.group(1))
+        end = start + 1
+        while end < len(lines):
+            sibling = element.match(lines[end])
+            if sibling and len(sibling.group(1)) <= indent:
+                break
+            end += 1
+        blocks.append("\n".join(lines[start:end]))
+    return blocks
+
+
+def direct_attributes(block: str) -> str:
+    lines = block.splitlines()[1:]
+    return "\n".join(
+        line
+        for line in lines[
+            : next(
+                (index for index, line in enumerate(lines) if re.match(r"^[ \t]*E: ", line)),
+                len(lines),
+            )
+        ]
+    )
+
+
+def string_attribute(attrs: str, name: str) -> str | None:
+    pattern = rf'(?m)^[ \t]*A: android:{re.escape(name)}\([^)]*\)="([^"]*)"'
+    match = re.search(pattern, attrs)
+    return match.group(1) if match else None
+
+
+def numeric_attribute(attrs: str, name: str) -> int | None:
+    pattern = rf"(?m)^[ \t]*A: android:{re.escape(name)}\([^)]*\)=\(type 0x1[12]\)(0x[0-9a-fA-F]+)"
+    match = re.search(pattern, attrs)
+    return int(match.group(1), 16) if match else None
+
+
+def declared_permissions(tree: str) -> dict[str, str]:
+    result = {}
+    for block in element_blocks(tree, "permission"):
+        attrs = direct_attributes(block)
+        name = string_attribute(attrs, "name")
+        if not name or name in result:
+            raise ValueError("A declared permission could not be read uniquely")
+        result[name] = attrs
+    return result
 
 
 def validate(test_badging: str, normal_badging: str, test_tree: str, normal_tree: str) -> None:
@@ -43,8 +105,6 @@ def validate(test_badging: str, normal_badging: str, test_tree: str, normal_tree
         raise ValueError("Unexpected APK package IDs")
     if f"application-label:'{TEST_LABEL}'" not in test_badging:
         raise ValueError("The parallel APK application label is not distinct")
-    if not re.search(r"^launchable-activity: .*label='Tama V2 Test'", test_badging, re.MULTILINE):
-        raise ValueError("The default launcher alias does not have the test label")
     if "application-debuggable" not in test_badging:
         raise ValueError("Parallel APK is not debuggable")
     native = re.search(r"^native-code: (.+)$", test_badging, re.MULTILINE)
@@ -56,21 +116,53 @@ def validate(test_badging: str, normal_badging: str, test_tree: str, normal_tree
         raise ValueError("A required provider authority is missing")
     if test_authorities & normal_authorities:
         raise ValueError("The two APKs have conflicting provider authorities")
-    # Every selectable icon uses a distinct label, not just the default alias.
-    blocks = re.split(r"(?m)^\s*E: activity-alias\b[^\n]*\n", test_tree)[1:]
-    found = set()
-    for block in blocks:
-        attrs = re.split(r"(?m)^\s*E: ", block, maxsplit=1)[0]
-        name = re.search(r'android:name\([^)]*\)="([^"]+)"', attrs)
-        label = re.search(r'android:label\([^)]*\)="([^"]+)"', attrs)
-        if name and name.group(1).split(".")[-1] in ALIASES:
-            if not label or label.group(1) != TEST_LABEL:
-                raise ValueError("A launcher alias lacks the distinct test label")
-            found.add(name.group(1).split(".")[-1])
-    if found != ALIASES:
+
+    # AAPT badging can omit launchable-activity for an activity-alias. Check the
+    # merged manifest itself instead, including the default alias's MAIN/LAUNCHER filter.
+    found = {}
+    for block in element_blocks(test_tree, "activity-alias"):
+        attrs = direct_attributes(block)
+        name = string_attribute(attrs, "name")
+        short = name.rsplit(".", 1)[-1] if name else ""
+        if short not in ALIASES:
+            continue
+        if name != f"com.openminis.app.{short}" or short in found:
+            raise ValueError("A launcher alias has an unexpected or duplicate name")
+        if string_attribute(attrs, "label") != TEST_LABEL:
+            raise ValueError("A launcher alias lacks the distinct test label")
+        if string_attribute(attrs, "targetActivity") != "com.openminis.app.MainActivity":
+            raise ValueError("A launcher alias has an unexpected target")
+        found[short] = (attrs, block)
+    if set(found) != ALIASES:
         raise ValueError("Not all launcher aliases were found")
-    if f"{TEST_ID}.permission.ALARM" not in test_tree:
-        raise ValueError("The parallel signature permission is missing")
+    attrs, block = found["MainActivityIconAuto"]
+    if not numeric_attribute(attrs, "enabled") or not numeric_attribute(attrs, "exported"):
+        raise ValueError("The default launcher alias is not enabled and exported")
+    filters = element_blocks(block, "intent-filter")
+    if not any(
+        "android.intent.action.MAIN"
+        in {
+            string_attribute(direct_attributes(action), "name")
+            for action in element_blocks(item, "action")
+        }
+        and "android.intent.category.LAUNCHER"
+        in {
+            string_attribute(direct_attributes(category), "name")
+            for category in element_blocks(item, "category")
+        }
+        for item in filters
+    ):
+        raise ValueError("The default alias has no MAIN/LAUNCHER intent filter")
+
+    test_permissions, normal_permissions = (
+        declared_permissions(test_tree),
+        declared_permissions(normal_tree),
+    )
+    alarm = test_permissions.get(f"{TEST_ID}.permission.ALARM")
+    if not alarm or (numeric_attribute(alarm, "protectionLevel") or 0) & 0xF != 2:
+        raise ValueError("The parallel signature permission is missing or not signature-protected")
+    if set(test_permissions) & set(normal_permissions):
+        raise ValueError("The two APKs declare conflicting permissions")
 
 
 def main() -> None:
