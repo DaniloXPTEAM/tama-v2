@@ -81,6 +81,26 @@ class TurnRequestPlannerTest {
         assertEquals("synthetic answer", reply)
     }
 
+    @Test fun `remaining request space refits profiles and output without weakening tool needs`() {
+        val route = TurnRouter.route("pesquise e faça login no site")
+        val measure = estimate("histórico sintético")
+        val full = TurnRequestPlanner.prepare(input, tools, route, ProviderBudget(), estimate = measure)!!
+        val basic = TurnRequestPlanner.prepare(input, tools, route.copy(profile = Profile.BASIC), ProviderBudget(), estimate = measure)!!
+        val lean = TurnRequestPlanner.prepare(input, tools, route.copy(profile = Profile.LEAN), ProviderBudget(), estimate = measure)!!
+        assertTrue(full.inputEstimate > basic.inputEstimate)
+        assertTrue(basic.inputEstimate > lean.inputEstimate)
+        val available = basic.inputEstimate.toLong() + 10L
+        val fitted = TurnRequestPlanner.prepare(input, tools, route, ProviderBudget(), requestLimit = available,
+            minimumProfile = Profile.BASIC, estimate = measure)!!
+        assertEquals(Profile.BASIC, fitted.route.profile)
+        assertEquals(10, TurnRequestPlanner.outputLimit(1_000, ProviderBudget(), fitted.inputEstimate, available))
+        assertNull(TurnRequestPlanner.prepare(input, tools, route, ProviderBudget(),
+            requestLimit = lean.inputEstimate.toLong() + 1, minimumProfile = Profile.BASIC, estimate = measure))
+        assertEquals(100L, TurnRequestPlanner.requestLimit(ProviderBudget(1_000), 900, 4_000))
+        assertEquals(200L, TurnRequestPlanner.requestLimit(ProviderBudget(), 900, 200))
+        assertNull(TurnRequestPlanner.requestLimit(ProviderBudget(), 900, null))
+    }
+
     @Test fun `output reserve and provider prefix are part of actual attempt`() {
         val route = TurnRouter.route("oi")
         val attempt = TurnRequestPlanner.prepare(input, tools, route, ProviderBudget(), providerPrefix = "synthetic-prefix", estimate = estimate("oi"))!!

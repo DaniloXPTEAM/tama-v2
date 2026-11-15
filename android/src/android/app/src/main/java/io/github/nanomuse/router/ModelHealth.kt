@@ -20,7 +20,8 @@ class ModelHealth(private val clockMillis: () -> Long) {
     )
     class Ticket internal constructor(internal val owner: ModelHealth, internal val id: Long)
     sealed interface Reservation {
-        data class Granted(val ticket: Ticket) : Reservation
+        /** outputTokens is set when a flexible-output reservation caps the response. */
+        data class Granted(val ticket: Ticket, val outputTokens: Int? = null) : Reservation
         /** Null deadline means an in-flight request or an unknown waiting time. */
         data class Full(val used: Long, val availableAtMillis: Long?) : Reservation
         /** A cooldown appeared after selection and before the reservation. */
@@ -73,6 +74,38 @@ class ModelHealth(private val clockMillis: () -> Long) {
         prune(now())
         (providers[providerId] ?: entries[entryId])?.let { return Reservation.Blocked(it) }
         return reserve(providerId, estimatedTokens, tokensPerMinute)
+    }
+
+    /**
+     * Atomically reserve the input and as much output as still fits. If even one output
+     * token cannot fit, the caller can try a smaller measured profile before switching.
+     * This closes the race between inspecting the window and reserving the request.
+     */
+    @Synchronized
+    fun reserveForWithOutputCap(
+        entryId: String,
+        providerId: String,
+        inputTokens: Int,
+        desiredOutputTokens: Int,
+        tokensPerMinute: Int?,
+    ): Reservation {
+        require(entryId.isNotBlank() && providerId.isNotBlank() && inputTokens >= 0 && desiredOutputTokens > 0)
+        prune(now())
+        (providers[providerId] ?: entries[entryId])?.let { return Reservation.Blocked(it) }
+        val used = used(providerId)
+        if (tokensPerMinute != null && tokensPerMinute <= 0) return Reservation.Full(used, null)
+        val output = if (tokensPerMinute == null) desiredOutputTokens else {
+            val remaining = tokensPerMinute.toLong() - used
+            if (remaining <= inputTokens.toLong()) {
+                // Ask the normal ledger for the first deadline at which input + 1 can fit.
+                return reserve(providerId, inputTokens.toLong() + 1L, tokensPerMinute)
+            }
+            minOf(desiredOutputTokens.toLong(), remaining - inputTokens.toLong()).toInt()
+        }
+        return when (val result = reserve(providerId, inputTokens.toLong() + output.toLong(), tokensPerMinute)) {
+            is Reservation.Granted -> result.copy(outputTokens = output)
+            else -> result
+        }
     }
 
     /** Unknown TPM permits a reservation but remains unknown; it is never declared unlimited. */

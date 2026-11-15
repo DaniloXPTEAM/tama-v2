@@ -1432,6 +1432,7 @@
     <string name="nm_auto_consent_body">O aplicativo poderá enviar pedidos a este modelo sem perguntar a cada vez. O provedor pode cobrar, mesmo quando o preço for desconhecido. Ative somente se você autorizar esses custos.</string>
     <string name="nm_auto_consent_allow">Autorizar uso automático</string>
     <string name="nm_auto_switch">Continuei com %2$s no lugar de %1$s.</string>
+    <string name="nm_auto_switch_reason">%1$s: %2$s — continuei com %3$s.</string>
     <string name="nm_auto_return">Voltei para o modelo preferido %1$s.</string>
     <string name="nm_auto_none">Nenhum modelo autorizado atende com segurança a este pedido. Confira os modelos e capacidades nas Configurações.</string>
     <string name="nm_auto_disabled_during_turn">A seleção automática foi desligada ou a autorização mudou. Nenhum outro pedido foi enviado.</string>

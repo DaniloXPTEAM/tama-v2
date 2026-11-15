@@ -98,16 +98,26 @@ object TurnRouter {
      * Plan for up to three calls. A null limit is unknown, not a claim of unlimited quota.
      * A known budget that cannot fit even LEAN returns null; it never silently drops history.
      */
-    fun fit(route: Route.Chat, budget: ProviderBudget, estimatedTokens: Map<Profile, Int>): Route.Chat? {
-        val limit = budget.tokensPerMinute ?: return route
-        if (limit <= 0) return null
+    fun fit(
+        route: Route.Chat,
+        budget: ProviderBudget,
+        estimatedTokens: Map<Profile, Int>,
+        /** Maximum for this one request, e.g. remaining account window or model context. */
+        requestLimit: Long? = null,
+        /** Automatic tool use cannot silently become a tool-less LEAN request. */
+        minimumProfile: Profile = Profile.LEAN,
+    ): Route.Chat? {
+        val limit = budget.tokensPerMinute
+        if (limit != null && limit <= 0) return null
         // Do not assume profile sizes are monotonic: user-provided fragments or
         // hints can make BASIC larger than FULL. Only choose an actually measured
-        // profile at or below the one requested.
+        // profile at or below the one requested. The three-call rule uses the
+        // configured TPM; a depleted window only needs to fit this one request.
         val profile = Profile.entries.filter { candidate ->
-            if (candidate > route.profile) return@filter false
+            if (candidate > route.profile || candidate < minimumProfile) return@filter false
             val estimate = estimatedTokens[candidate] ?: return@filter false
-            estimate >= 0 && estimate.toLong() * 3 <= limit.toLong()
+            estimate >= 0 && (limit == null || estimate.toLong() * 3 <= limit.toLong()) &&
+                (requestLimit == null || estimate.toLong() <= requestLimit)
         }.maxOrNull() ?: return null
         return route.copy(profile = profile, requestedProfile = route.requestedProfile,
             budgetLimited = route.budgetLimited || profile != route.profile)

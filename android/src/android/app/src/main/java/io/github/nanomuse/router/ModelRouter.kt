@@ -15,6 +15,8 @@ object ModelRouter {
         val profile: Profile,
         val inputTokens: Int?,
         val outputTokens: Int?,
+        /** Why a measured request could not be planned for this candidate, if known. */
+        val fitFailure: Reason? = null,
         val contextLimit: Int? = null,
         val tokensPerMinute: Int? = null,
         val usedThisMinute: Long = 0,
@@ -100,8 +102,9 @@ object ModelRouter {
         if (!candidate.automaticApproved) return rejected(Reason.NOT_APPROVED)
         val missing = needs - candidate.capabilities
         if (missing.isNotEmpty()) return rejected(Reason.MISSING_CAPABILITY, missing)
-        if (Need.TOOLS in needs && candidate.profile == Profile.LEAN) return rejected(Reason.PROFILE_TOO_SMALL)
         candidate.unavailable?.let { return rejected(Reason.COOLDOWN, until = it.untilMillis) }
+        candidate.fitFailure?.let { return rejected(it) }
+        if (Need.TOOLS in needs && candidate.profile == Profile.LEAN) return rejected(Reason.PROFILE_TOO_SMALL)
         val input = candidate.inputTokens?.takeIf { it >= 0 } ?: return rejected(Reason.UNKNOWN_REQUEST_SIZE)
         val output = candidate.outputTokens?.takeIf { it > 0 } ?: return rejected(Reason.UNKNOWN_REQUEST_SIZE)
         val request = input.toLong() + output.toLong()

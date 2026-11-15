@@ -125,6 +125,44 @@ class ModelHealthTest {
         assertEquals(10, a.snapshot("e", "p").usedThisMinute)
     }
 
+    @Test fun flexibleOutputReservationUsesTheLiveWindowWithoutOverbooking() {
+        val health = ModelHealth { 0L }
+        val inFlight = (health.reserve("p", 700, 1_000) as ModelHealth.Reservation.Granted).ticket
+        val capped = health.reserveForWithOutputCap("entry", "p", 200, 500, 1_000) as ModelHealth.Reservation.Granted
+        assertEquals(100, capped.outputTokens)
+        assertEquals(1_000L, health.snapshot("entry", "p").usedThisMinute)
+        assertTrue(health.reserveForWithOutputCap("entry", "p", 10, 1, 1_000) is ModelHealth.Reservation.Full)
+        health.cancelBeforeDispatch(capped.ticket)
+        assertTrue(health.reserveForWithOutputCap("entry", "p", 300, 1, 1_000) is ModelHealth.Reservation.Full)
+        val justFits = health.reserveForWithOutputCap("entry", "p", 299, 100, 1_000) as ModelHealth.Reservation.Granted
+        assertEquals(1, justFits.outputTokens)
+        health.cancelBeforeDispatch(justFits.ticket)
+        health.failure("other", "p", ModelHealth.Failure.RATE_LIMIT, 3)
+        assertTrue(health.reserveForWithOutputCap("entry", "p", 10, 1, 1_000) is ModelHealth.Reservation.Blocked)
+        health.cancelBeforeDispatch(inFlight)
+    }
+
+    @Test fun concurrentFlexibleReservationsNeverExceedTheSharedWindow() {
+        val health = ModelHealth { 0L }
+        val workers = Executors.newFixedThreadPool(12)
+        val start = CountDownLatch(1)
+        try {
+            val tasks = (0 until 30).map {
+                workers.submit<ModelHealth.Reservation> {
+                    start.await()
+                    health.reserveForWithOutputCap("entry-$it", "account", 90, 100, 1_000)
+                }
+            }
+            start.countDown()
+            val results = tasks.map { it.get(5, TimeUnit.SECONDS) }
+            assertTrue(results.any { it is ModelHealth.Reservation.Granted })
+            assertTrue(results.any { it is ModelHealth.Reservation.Full })
+            assertTrue(health.snapshot("any", "account").usedThisMinute <= 1_000L)
+        } finally {
+            workers.shutdownNow()
+        }
+    }
+
     @Test fun reservationsAreAtomicAcrossConcurrentTurns() {
         val health = ModelHealth { 0L }
         val workers = Executors.newFixedThreadPool(16)

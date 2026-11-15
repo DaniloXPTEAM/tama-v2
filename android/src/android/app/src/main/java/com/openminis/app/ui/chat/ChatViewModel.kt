@@ -8112,8 +8112,12 @@ class ChatViewModel(
         fun nmProviderPrefix(): String =
             if ((currentProvider as? com.openminis.app.provider.anthropic.AnthropicProvider)?.isOAuth == true)
                 io.github.nanomuse.cloud.ClaudeSignIn.identifier else ""
-        fun nmPlan(messages: List<LLMMessage>, budget: ProviderBudget): TurnRequestPlanner.Attempt? =
-            TurnRequestPlanner.prepare(nmCurrentInput, originalAgentTools(), nmRoute, budget, nmProviderPrefix()) { prompt, tools ->
+        fun nmPlan(
+            messages: List<LLMMessage>, budget: ProviderBudget,
+            requestLimit: Long? = null, minimumProfile: Profile = Profile.LEAN,
+        ): TurnRequestPlanner.Attempt? =
+            TurnRequestPlanner.prepare(nmCurrentInput, originalAgentTools(), nmRoute, budget,
+                nmProviderPrefix(), requestLimit, minimumProfile) { prompt, tools ->
                 val raw = ContextEstimate.request(messages, prompt, tools, imageTokens = BPETokenizer::countImageTokens)
                 // Calibration can raise the estimate; never use a downward calibration as quota evidence.
                 maxOf(raw, contextEstimate.estimate(raw))
@@ -8145,6 +8149,7 @@ class ChatViewModel(
             val identity: AutoModelStore.Identity,
             val model: LLMModel,
             val accountVersion: Long,
+            val switchReason: String? = null,
         )
         fun nmAutoNeeds(messages: List<LLMMessage>): Set<Need> = buildSet {
             // Image generation is a separate endpoint, not a property required of
@@ -8178,18 +8183,14 @@ class ChatViewModel(
             return model.copy(inputModalities = (inputs + if (Need.VISION in caps) listOf("image") else emptyList())
                 .ifEmpty { listOf("text") })
         }
-        fun nmAutoCandidates(messages: List<LLMMessage>): List<AutoChoice> {
+        fun nmAutoCandidates(): List<AutoChoice> {
             val config = providerRepository.config.value
             val catalogue = io.github.nanomuse.cloud.ProviderCatalogue.load(context)
-            val needs = nmAutoNeeds(messages)
-            // A different model retries the intended profile, not the final 413 downgrade.
-            val intended = nmRoute.copy(profile = nmRoute.requestedProfile, budgetLimited = false)
             return config.modelEntries.toList().mapNotNull { entry ->
                 val instance = config.instances.find { it.id == entry.providerInstanceId } ?: return@mapNotNull null
                 val identity = AutoModelStore.identity(entry, instance)
-                val approved = AutoModelStore.approved(context, identity)
                 val caps = nmAutoCapabilities(entry, instance)
-                val effectiveModel = nmAutoModel(entry, caps)
+                val model = nmAutoModel(entry, caps)
                 val credentialed = providerRepository.hasAnyCredential(instance) &&
                     instance.providerType !in setOf(ProviderType.antigravity, ProviderType.unsupported)
                 val budget = nmBudgetForEntry(entry.id, entry.model.id)
@@ -8198,39 +8199,64 @@ class ChatViewModel(
                 val groupWindow = _selectedGroupId.value?.let { id ->
                     config.modelGroups.find { it.id == id }?.contextLimitTokens?.takeIf { it > 0 }
                 }
-                val contextLimit = listOfNotNull(knownWindow, groupWindow).minOrNull()
-                val history = io.github.nanomuse.router.ModelRouteHistory.forProvider(
-                    messages, instance.id, entry.model.id, AutoModelStore.historyFingerprint(context, instance),
-                )
-                val prefix = if (instance.providerType == ProviderType.anthropic &&
-                    instance.credentialType == ProviderCredential.oauth) io.github.nanomuse.cloud.ClaudeSignIn.identifier else ""
-                // Avoid building three prompt shapes for disabled/unapproved entries.
-                val attempt = if (instance.isEnabled && !entry.isHidden && credentialed && approved && caps.containsAll(needs)) {
-                    val calibrationRoute = "${instance.id}|${instance.providerType}|${instance.customBaseURL.orEmpty()}|" +
-                        "${instance.appendV1Suffix}|${instance.useResponsesAPI}"
-                    val calibration = nmCalibrationStore.load(calibrationRoute, entry.model.id)
-                    TurnRequestPlanner.prepare(nmCurrentInput, originalAgentTools(effectiveModel), intended, budget, prefix) { system, tools ->
-                        val raw = ContextEstimate.request(history, system, tools, imageTokens = BPETokenizer::countImageTokens)
-                        maxOf(raw, calibration.estimate(raw))
-                    }
-                } else null
-                val output = attempt?.let { planned ->
-                    val defaultOutput = if (instance.providerType == ProviderType.anthropic) 64_000 else 16_384
-                    val ceiling = minOf(GLOBAL_MAX_TOKENS_CEILING, effectiveModel.maxOutputTokens ?: defaultOutput)
-                    val remaining = contextLimit?.let { it.toLong() - planned.inputEstimate.toLong() }
-                    val preferred = if (remaining == null) ceiling else minOf(ceiling.toLong(), remaining).coerceAtLeast(0).toInt()
-                    TurnRequestPlanner.outputLimit(preferred, budget, planned.inputEstimate)
-                }
                 val candidate = ModelRouter.Candidate(
                     entryId = entry.id, providerId = instance.id, capabilities = caps,
-                    profile = attempt?.route?.profile ?: intended.profile,
-                    inputTokens = attempt?.inputEstimate, outputTokens = output,
-                    contextLimit = contextLimit, tokensPerMinute = budget.tokensPerMinute,
-                    enabled = instance.isEnabled, visible = !entry.isHidden, credentialed = credentialed,
-                    automaticApproved = approved,
+                    profile = nmRoute.requestedProfile, inputTokens = null, outputTokens = null,
+                    contextLimit = listOfNotNull(knownWindow, groupWindow).minOrNull(),
+                    tokensPerMinute = budget.tokensPerMinute, enabled = instance.isEnabled,
+                    visible = !entry.isHidden, credentialed = credentialed,
+                    automaticApproved = AutoModelStore.approved(context, identity),
                 )
-                AutoChoice(candidate, entry, instance, identity, effectiveModel, AutoModelRuntime.accountVersion(instance.id))
+                AutoChoice(candidate, entry, instance, identity, model, AutoModelRuntime.accountVersion(instance.id))
             }
+        }
+
+        // Fit against the very same account snapshot the selector uses. A partial minute
+        // lowers the profile (or output) on the sticky model before considering another.
+        fun nmAutoFit(choice: AutoChoice, messages: List<LLMMessage>, snapshot: ModelHealth.Snapshot): ModelRouter.Candidate {
+            val candidate = choice.candidate
+            val needs = nmAutoNeeds(messages)
+            if (!candidate.enabled || !candidate.visible || !candidate.credentialed || !candidate.automaticApproved ||
+                !candidate.capabilities.containsAll(needs) || snapshot.cooldown != null) return candidate
+            val entry = choice.entry
+            val instance = choice.instance
+            val budget = nmBudgetForEntry(entry.id, entry.model.id)
+            // Another model starts with the requested profile. On the same model retain
+            // a prior 413 downgrade instead of resending the rejected larger request.
+            val intended = if (nmAutoCandidate?.entryId == entry.id) nmRoute
+                else nmRoute.copy(profile = nmRoute.requestedProfile, budgetLimited = false)
+            val minimum = if (Need.TOOLS in needs) Profile.BASIC else Profile.LEAN
+            if (intended.profile < minimum) return candidate.copy(fitFailure = ModelRouter.Reason.PROFILE_TOO_SMALL)
+            val history = io.github.nanomuse.router.ModelRouteHistory.forProvider(
+                messages, instance.id, entry.model.id, AutoModelStore.historyFingerprint(context, instance),
+            )
+            val prefix = if (instance.providerType == ProviderType.anthropic &&
+                instance.credentialType == ProviderCredential.oauth) io.github.nanomuse.cloud.ClaudeSignIn.identifier else ""
+            val calibrationRoute = "${instance.id}|${instance.providerType}|${instance.customBaseURL.orEmpty()}|" +
+                "${instance.appendV1Suffix}|${instance.useResponsesAPI}"
+            val calibration = nmCalibrationStore.load(calibrationRoute, entry.model.id)
+            val tools = originalAgentTools(choice.model)
+            fun plan(limit: Long?): TurnRequestPlanner.Attempt? = TurnRequestPlanner.prepare(
+                nmCurrentInput, tools, intended, budget, prefix, limit, minimum,
+            ) { system, definitions ->
+                val raw = ContextEstimate.request(history, system, definitions, imageTokens = BPETokenizer::countImageTokens)
+                maxOf(raw, calibration.estimate(raw))
+            }
+            val available = TurnRequestPlanner.requestLimit(budget, snapshot.usedThisMinute, candidate.contextLimit)
+            val attempt = plan(available)
+            if (attempt == null) {
+                val failure = when {
+                    plan(null) == null -> ModelRouter.Reason.UNKNOWN_REQUEST_SIZE
+                    candidate.contextLimit != null && plan(candidate.contextLimit.toLong()) == null -> ModelRouter.Reason.CONTEXT_LIMIT
+                    else -> ModelRouter.Reason.MINUTE_LIMIT
+                }
+                return candidate.copy(profile = intended.profile, fitFailure = failure)
+            }
+            val defaultOutput = if (instance.providerType == ProviderType.anthropic) 64_000 else 16_384
+            val ceiling = minOf(GLOBAL_MAX_TOKENS_CEILING, choice.model.maxOutputTokens ?: defaultOutput)
+            val output = TurnRequestPlanner.outputLimit(ceiling, budget, attempt.inputEstimate, available)
+            return candidate.copy(profile = attempt.route.profile, inputTokens = attempt.inputEstimate,
+                outputTokens = output, fitFailure = null, tokensPerMinute = budget.tokensPerMinute)
         }
         fun nmAutoReason(reason: ModelRouter.Reason): String = context.getString(when (reason) {
             ModelRouter.Reason.DISABLED -> R.string.nm_auto_reason_disabled
@@ -8278,14 +8304,24 @@ class ChatViewModel(
             while (true) {
                 if (!AutoModelStore.enabled(context)) throw LLMError.ProviderError(context.getString(R.string.nm_auto_disabled_during_turn))
                 val messages = applyRequestImageBudget(effectiveAgentHistory(), preview = true)
-                val choices = nmAutoCandidates(messages)
-                when (val selection = turnState.pick(choices.map { it.candidate }, nmAutoNeeds(messages), stickyEntryId)) {
+                val choices = nmAutoCandidates()
+                when (val selection = turnState.pick(choices.map { it.candidate }, nmAutoNeeds(messages), stickyEntryId) { candidate, snapshot ->
+                    nmAutoFit(choices.first { it.candidate === candidate }, messages, snapshot)
+                }) {
                     is ModelRouter.Choice.None -> throw nmAutoNoCandidate(choices, selection)
                     is ModelRouter.Choice.Selected -> {
                         val selected = choices.first { it.entry.id == selection.candidate.entryId }
-                        // Copy the health snapshot used by pick. The actual reservation below
-                        // still checks the ledger atomically immediately before dispatch.
-                        return selected.copy(candidate = selection.candidate)
+                        val why = when (val cause = io.github.nanomuse.router.AutoSwitchReason.forSwitch(
+                            _activeEntryId.value, selection.candidate.entryId, turnState.failureRecords(),
+                            nmAutoLocalBlocks, selection.rejected,
+                        )) {
+                            is io.github.nanomuse.router.AutoSwitchReason.Cause.Failure -> nmAutoFailureReason(cause.reason)
+                            is io.github.nanomuse.router.AutoSwitchReason.Cause.Local -> cause.explanation
+                            is io.github.nanomuse.router.AutoSwitchReason.Cause.Rejected -> nmAutoReason(cause.reason)
+                            null -> null
+                        }
+                        // The actual reservation below checks the live ledger again atomically.
+                        return selected.copy(candidate = selection.candidate, switchReason = why)
                     }
                 }
             }
@@ -8335,9 +8371,12 @@ class ChatViewModel(
                     nmRoute = nmRoute.copy(profile = nmRoute.requestedProfile, budgetLimited = false)
                     _fallbackTrigger.value++
                     withContext(Dispatchers.Main) {
-                        val notice = if (entry.id == nmPreferredAutoEntryId)
-                            context.getString(R.string.nm_auto_return, choice.model.displayName)
-                        else context.getString(R.string.nm_auto_switch, priorName, choice.model.displayName)
+                        val notice = when {
+                            choice.switchReason != null -> context.getString(
+                                R.string.nm_auto_switch_reason, priorName, choice.switchReason, choice.model.displayName)
+                            entry.id == nmPreferredAutoEntryId -> context.getString(R.string.nm_auto_return, choice.model.displayName)
+                            else -> context.getString(R.string.nm_auto_switch, priorName, choice.model.displayName)
+                        }
                         appendSystemInfo(notice, "info")
                     }
                 }
@@ -8831,13 +8870,123 @@ class ChatViewModel(
                         }
                     }
                     val requestMessages = checkNotNull(preparedMessages)
-                    // nanoMuse: include the prepared history and images in this call's estimate.
-                    // A known limit that cannot fit LEAN is a stop, not permission to drop history.
+                    // Estimate the prepared history for each profile, including the account's
+                    // live window. A tool request may not silently fall to tool-less LEAN.
                     val requestBudgetLimit = nmBudgetFor(currentProvider)
-                    val planned = nmPlan(requestMessages, requestBudgetLimit)
-                        ?: throw LLMError.ProviderError(context.getString(R.string.nm_router_budget_exhausted))
-                    nmInstall(planned)
-                    alignContextEstimate()
+                    val autoCandidate = if (nmAutoTurn != null) checkNotNull(nmAutoCandidate) else null
+                    val minimumProfile = if (autoCandidate != null && Need.TOOLS in nmAutoNeeds(requestMessages))
+                        Profile.BASIC else Profile.LEAN
+                    data class DispatchPlan(
+                        val attempt: TurnRequestPlanner.Attempt,
+                        val tools: List<AgentToolDefinition>,
+                        val snapshot: ContextUsageMeter.Request,
+                        val estimate: Int,
+                    )
+                    fun lowerForBudget(attempt: TurnRequestPlanner.Attempt): Boolean {
+                        val lower = TurnRouter.lower(attempt.route.profile) ?: return false
+                        if (lower < minimumProfile) return false
+                        nmRoute = attempt.route.copy(profile = lower, budgetLimited = true)
+                        return true
+                    }
+                    var dispatch: DispatchPlan? = null
+                    while (dispatch == null) {
+                        val health = autoCandidate?.let { AutoModelRuntime.health.snapshot(it.entryId, it.providerId) }
+                        if (health?.cooldown != null) throw AutoDispatchBlocked(checkNotNull(autoCandidate).entryId,
+                            "${context.getString(R.string.nm_auto_reason_cooldown)} · ${nmAutoWait(health.cooldown.untilMillis)}")
+                        val available = if (autoCandidate != null && health != null)
+                            TurnRequestPlanner.requestLimit(requestBudgetLimit, health.usedThisMinute, autoCandidate.contextLimit)
+                            else null
+                        val planned = nmPlan(requestMessages, requestBudgetLimit, available, minimumProfile)
+                        if (planned == null) {
+                            if (autoCandidate != null) {
+                                val withoutWindow = nmPlan(requestMessages, requestBudgetLimit,
+                                    autoCandidate.contextLimit?.toLong(), minimumProfile)
+                                val reason = when {
+                                    withoutWindow != null -> R.string.nm_auto_reason_minute
+                                    autoCandidate.contextLimit != null &&
+                                        nmPlan(requestMessages, requestBudgetLimit, null, minimumProfile) != null -> R.string.nm_auto_reason_context
+                                    else -> R.string.nm_auto_reason_size
+                                }
+                                throw AutoDispatchBlocked(autoCandidate.entryId, context.getString(reason))
+                            }
+                            throw LLMError.ProviderError(context.getString(R.string.nm_router_budget_exhausted))
+                        }
+                        nmInstall(planned)
+                        alignContextEstimate()
+                        val tools = nmRequestTools
+                        val snapshot = usageSnapshot(requestMessages)
+                        val estimate = ContextEstimate.request(requestMessages, nmSystemPrompt, tools,
+                            imageTokens = BPETokenizer::countImageTokens)
+                        // A calibration-only probe can use the raw estimate, but a live window
+                        // never treats a downward calibration as evidence of spare quota.
+                        lastContextTokens = if (contextMaintenance.calibrationProbeGranted) estimate
+                            else usageMeter.estimate(snapshot, estimate, contextEstimate)
+                        val dispatchInput = maxOf(lastContextTokens, planned.inputEstimate, estimate)
+                        val learnedLimit = durableOutputKey?.let { key ->
+                            runCatching { nmOutputLimitStore.load(key, currentProvider.model.id) }.getOrNull()
+                        }
+                        val pendingLimit = pendingOutput?.takeIf {
+                            it.provider === currentProvider && it.model == currentProvider.model.id && it.route == durableOutputKey
+                        }?.limit
+                        val proposedOutput = io.github.nanomuse.net.ProviderRecovery.clamp(
+                            io.github.nanomuse.net.ProviderRecovery.clamp(dynamicMaxTokens(currentProvider, lastContextTokens), learnedLimit),
+                            pendingLimit,
+                        )
+                        val output = TurnRequestPlanner.outputLimit(proposedOutput, requestBudgetLimit, dispatchInput, available)
+                        if (output == null) {
+                            if (autoCandidate != null && lowerForBudget(planned)) continue
+                            if (autoCandidate != null) throw AutoDispatchBlocked(autoCandidate.entryId,
+                                context.getString(R.string.nm_auto_reason_size))
+                            throw LLMError.ProviderError(context.getString(R.string.nm_router_budget_exhausted))
+                        }
+                        lastRequestedOutput = output
+                        if (autoCandidate != null && nmAutoTurn != null) {
+                            if (!AutoModelStore.enabled(context)) throw LLMError.ProviderError(
+                                context.getString(R.string.nm_auto_disabled_during_turn))
+                            val identity = checkNotNull(nmAutoIdentity)
+                            val config = providerRepository.config.value
+                            val entry = config.modelEntries.find { it.id == autoCandidate.entryId && it.model.id == currentProvider.model.id }
+                            val instance = entry?.let { e -> config.instances.find { it.id == e.providerInstanceId } }
+                            val valid = entry != null && instance != null && instance.isEnabled && !entry.isHidden &&
+                                AutoModelStore.identity(entry, instance) == identity && providerRepository.hasAnyCredential(instance) &&
+                                AutoModelStore.approved(context, identity) &&
+                                nmAutoClientAccountVersion == AutoModelRuntime.accountVersion(instance.id) &&
+                                nmRouteFingerprint(currentProvider) == AutoModelStore.historyFingerprint(context, instance) &&
+                                nmAutoCapabilities(entry, instance).containsAll(nmAutoNeeds(requestMessages))
+                            if (!valid) throw AutoDispatchBlocked(autoCandidate.entryId, context.getString(R.string.nm_auto_reason_consent))
+                            when (val reserved = nmAutoTurn.reserveWithOutputCap(
+                                autoCandidate.copy(tokensPerMinute = requestBudgetLimit.tokensPerMinute), dispatchInput, output)) {
+                                is ModelHealth.Reservation.Granted -> {
+                                    nmTicket = reserved.ticket
+                                    lastRequestedOutput = checkNotNull(reserved.outputTokens)
+                                }
+                                is ModelHealth.Reservation.Full -> {
+                                    // Another request consumed the remaining window after the snapshot.
+                                    // Try a genuinely lower profile before excluding this entry.
+                                    if (lowerForBudget(planned)) continue
+                                    throw AutoDispatchBlocked(autoCandidate.entryId,
+                                        "${context.getString(R.string.nm_auto_reason_minute)} · ${nmAutoWait(reserved.availableAtMillis)}")
+                                }
+                                is ModelHealth.Reservation.Blocked -> throw AutoDispatchBlocked(autoCandidate.entryId,
+                                    "${context.getString(R.string.nm_auto_reason_cooldown)} · ${nmAutoWait(reserved.cooldown.untilMillis)}")
+                            }
+                        } else {
+                            // Count manual calls too, without applying automatic-mode gates.
+                            val config = providerRepository.config.value
+                            val entry = config.modelEntries.find { it.id == _activeEntryId.value &&
+                                it.model.id == currentProvider.model.id && this@ChatViewModel.currentProvider === currentProvider }
+                            if (entry != null) {
+                                nmTicket = (AutoModelRuntime.health.reserve(entry.providerInstanceId,
+                                    dispatchInput.toLong() + output.toLong(), null) as ModelHealth.Reservation.Granted).ticket
+                            }
+                        }
+                        dispatch = DispatchPlan(planned, tools, snapshot, estimate)
+                    }
+                    val outbound = checkNotNull(dispatch)
+                    val planned = outbound.attempt
+                    val requestTools = outbound.tools
+                    val requestSnapshot = outbound.snapshot
+                    val requestEstimate = outbound.estimate
                     if (!nmWarnedWithoutTools && Need.TOOLS in planned.route.needs && planned.route.profile == Profile.LEAN) {
                         nmWarnedWithoutTools = true
                         withContext(Dispatchers.Main) {
@@ -8847,8 +8996,7 @@ class ChatViewModel(
                             ), "info")
                         }
                     }
-                    val requestTools = nmRequestTools
-                    // nanoMuse: the debug observer sees only counts for the exact outbound view.
+                    // The debug observer sees only counts for the exact outbound view.
                     val sizeObserver = if (com.openminis.app.BuildConfig.DEBUG) io.github.nanomuse.chat.PromptSizeTrace.observer else null
                     if (sizeObserver != null) runCatching {
                         val imageReady = runCatching { io.github.nanomuse.media.MediaModels.imageEndpoint(context) != null }.getOrNull()
@@ -8859,71 +9007,6 @@ class ChatViewModel(
                         sizeObserver(io.github.nanomuse.chat.PromptSizeTrace.Event.Request(planned.system.length))
                     }
                     var requestUsage: LLMUsage? = null
-                    val requestSnapshot = usageSnapshot(requestMessages)
-                    val requestEstimate = io.github.nanomuse.chat.ContextEstimate.request(
-                        requestMessages, nmSystemPrompt, requestTools,
-                        imageTokens = BPETokenizer::countImageTokens,
-                    )
-                    alignContextEstimate()
-                    // nanoMuse: a calibration-only probe uses the raw input estimate so a
-                    // false high ratio cannot squeeze the answer to a single output token.
-                    lastContextTokens = if (contextMaintenance.calibrationProbeGranted) requestEstimate
-                        else usageMeter.estimate(requestSnapshot, requestEstimate, contextEstimate)
-                    // nanoMuse: a learned ceiling is route/model-specific; a newly proposed cap
-                    // is used only on the bounded retry until the provider accepts it.
-                    val learnedLimit = durableOutputKey?.let { key ->
-                        runCatching { nmOutputLimitStore.load(key, currentProvider.model.id) }.getOrNull()
-                    }
-                    val pendingLimit = pendingOutput?.takeIf {
-                        it.provider === currentProvider && it.model == currentProvider.model.id && it.route == durableOutputKey
-                    }?.limit
-                    val proposedOutput = io.github.nanomuse.net.ProviderRecovery.clamp(
-                        io.github.nanomuse.net.ProviderRecovery.clamp(dynamicMaxTokens(currentProvider, lastContextTokens), learnedLimit),
-                        pendingLimit,
-                    )
-                    lastRequestedOutput = TurnRequestPlanner.outputLimit(
-                        proposedOutput, requestBudgetLimit, maxOf(lastContextTokens, planned.inputEstimate),
-                    ) ?: throw LLMError.ProviderError(context.getString(R.string.nm_router_budget_exhausted))
-                    val dispatchInput = maxOf(lastContextTokens, planned.inputEstimate, requestEstimate)
-                    if (nmAutoTurn != null) {
-                        if (!AutoModelStore.enabled(context)) throw LLMError.ProviderError(
-                            context.getString(R.string.nm_auto_disabled_during_turn))
-                        val candidate = checkNotNull(nmAutoCandidate)
-                        val identity = checkNotNull(nmAutoIdentity)
-                        val config = providerRepository.config.value
-                        val entry = config.modelEntries.find { it.id == candidate.entryId && it.model.id == currentProvider.model.id }
-                        val instance = entry?.let { e -> config.instances.find { it.id == e.providerInstanceId } }
-                        val valid = entry != null && instance != null && instance.isEnabled && !entry.isHidden &&
-                            AutoModelStore.identity(entry, instance) == identity && providerRepository.hasAnyCredential(instance) &&
-                            AutoModelStore.approved(context, identity) &&
-                            nmAutoClientAccountVersion == AutoModelRuntime.accountVersion(instance.id) &&
-                            nmRouteFingerprint(currentProvider) == AutoModelStore.historyFingerprint(context, instance) &&
-                            nmAutoCapabilities(entry, instance).containsAll(nmAutoNeeds(requestMessages))
-                        if (!valid) throw AutoDispatchBlocked(candidate.entryId, context.getString(R.string.nm_auto_reason_consent))
-                        if (Need.TOOLS in nmAutoNeeds(requestMessages) && planned.route.profile == Profile.LEAN)
-                            throw AutoDispatchBlocked(candidate.entryId, context.getString(R.string.nm_auto_reason_profile))
-                        if (candidate.contextLimit != null &&
-                            dispatchInput.toLong() + lastRequestedOutput.toLong() > candidate.contextLimit.toLong())
-                            throw AutoDispatchBlocked(candidate.entryId, context.getString(R.string.nm_auto_reason_context))
-                        when (val reserved = nmAutoTurn.reserve(candidate.copy(tokensPerMinute = requestBudgetLimit.tokensPerMinute),
-                            dispatchInput, lastRequestedOutput)) {
-                            is ModelHealth.Reservation.Granted -> nmTicket = reserved.ticket
-                            is ModelHealth.Reservation.Full -> throw AutoDispatchBlocked(candidate.entryId,
-                                "${context.getString(R.string.nm_auto_reason_minute)} · ${nmAutoWait(reserved.availableAtMillis)}")
-                            is ModelHealth.Reservation.Blocked -> throw AutoDispatchBlocked(candidate.entryId,
-                                "${context.getString(R.string.nm_auto_reason_cooldown)} · ${nmAutoWait(reserved.cooldown.untilMillis)}")
-                        }
-                    } else {
-                        // Count manual chat calls too so a later automatic turn sees their
-                        // local usage; a manually selected route is not blocked by auto mode.
-                        val config = providerRepository.config.value
-                        val entry = config.modelEntries.find { it.id == _activeEntryId.value &&
-                            it.model.id == currentProvider.model.id && this@ChatViewModel.currentProvider === currentProvider }
-                        if (entry != null) {
-                            nmTicket = (AutoModelRuntime.health.reserve(entry.providerInstanceId,
-                                dispatchInput.toLong() + lastRequestedOutput.toLong(), null) as ModelHealth.Reservation.Granted).ticket
-                        }
-                    }
                     nmLastSentRoute = nmRouteFingerprint(currentProvider)
                     nmDispatchAccountVersion = nmAutoCandidate?.providerId?.let { AutoModelRuntime.accountVersion(it) }
                     nmDispatchAt = android.os.SystemClock.elapsedRealtime()

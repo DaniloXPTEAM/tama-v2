@@ -1397,6 +1397,7 @@
     <string name="nm_auto_consent_body">The app may send requests to this model without asking each time. Its provider may charge money, including when its price is unknown. Enable this only if you authorize those charges.</string>
     <string name="nm_auto_consent_allow">Allow automatic use</string>
     <string name="nm_auto_switch">Continuing with %2$s instead of %1$s.</string>
+    <string name="nm_auto_switch_reason">%1$s：%2$s — 繼續使用 %3$s。</string>
     <string name="nm_auto_return">Returned to the preferred model %1$s.</string>
     <string name="nm_auto_none">No approved model can safely handle this request. Review the models and capabilities in Settings.</string>
     <string name="nm_auto_disabled_during_turn">Automatic selection was turned off or authorization changed. No further request was sent.</string>

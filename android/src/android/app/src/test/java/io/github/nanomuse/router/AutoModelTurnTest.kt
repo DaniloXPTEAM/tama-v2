@@ -50,11 +50,47 @@ class AutoModelTurnTest {
         health.success(second.entryId, second.providerId, 25)
         assertEquals(1, executions)
         assertEquals(listOf("a"), turn.failureRecords().map { it.entryId })
+        val cause = AutoSwitchReason.forSwitch("a", second.entryId, turn.failureRecords(), emptyMap(), emptyList())
+        assertEquals(AutoSwitchReason.Cause.Failure(ModelHealth.Failure.RATE_LIMIT), cause)
+        assertNull(AutoSwitchReason.forSwitch("b", "b", turn.failureRecords(), emptyMap(), emptyList()))
         now = 3_000
         // In this turn a failed model is still excluded, even after its deadline.
         assertEquals("b", (turn.pick(listOf(a, b), needs, "a") as ModelRouter.Choice.Selected).candidate.entryId)
         turn.reset()
         assertEquals("a", (turn.pick(listOf(a, b), needs, "a") as ModelRouter.Choice.Selected).candidate.entryId)
+    }
+
+    @Test fun `spent window lowers sticky profile then switches only when none fits`() {
+        val health = ModelHealth { 0L }
+        val turn = AutoModelTurn(health)
+        val a = candidate("a", "account-a").copy(tokensPerMinute = 10_000, contextLimit = 10_000)
+        val b = candidate("b", "account-b").copy(tokensPerMinute = 10_000, contextLimit = 10_000)
+        health.reserve("account-a", 8_800, 10_000)
+        val needs = setOf(Need.CHAT, Need.TOOLS)
+        val route = TurnRouter.route("pesquise e faça login no site")
+        val costs = mapOf(Profile.FULL to 2_500, Profile.BASIC to 1_000, Profile.LEAN to 100)
+        fun pick() = turn.pick(listOf(a, b), needs, "a") { candidate, snapshot ->
+            val remaining = 10_000L - snapshot.usedThisMinute
+            val fit = TurnRouter.fit(route, ProviderBudget(10_000), costs,
+                requestLimit = remaining, minimumProfile = Profile.BASIC)
+            if (fit == null) candidate.copy(fitFailure = ModelRouter.Reason.MINUTE_LIMIT)
+            else candidate.copy(profile = fit.profile, inputTokens = costs.getValue(fit.profile) - 1, outputTokens = 1)
+        }
+        val first = (pick() as ModelRouter.Choice.Selected).candidate
+        assertEquals("a", first.entryId)
+        assertEquals(Profile.BASIC, first.profile)
+        val reserved = turn.reserveWithOutputCap(first, 1_000, 300) as ModelHealth.Reservation.Granted
+        assertEquals(200, reserved.outputTokens)
+        val second = pick() as ModelRouter.Choice.Selected
+        assertEquals("b", second.candidate.entryId)
+        assertEquals(ModelRouter.Reason.MINUTE_LIMIT, second.rejected.single().reason)
+        assertEquals(AutoSwitchReason.Cause.Rejected(ModelRouter.Reason.MINUTE_LIMIT),
+            AutoSwitchReason.forSwitch("a", "b", turn.failureRecords(), emptyMap(), second.rejected))
+        // No fallback can use an unapproved route, even if it would fit.
+        val none = turn.pick(listOf(a.copy(fitFailure = ModelRouter.Reason.MINUTE_LIMIT),
+            b.copy(automaticApproved = false)), needs, "a") as ModelRouter.Choice.None
+        assertEquals(setOf(ModelRouter.Reason.MINUTE_LIMIT, ModelRouter.Reason.NOT_APPROVED),
+            none.rejected.map { it.reason }.toSet())
     }
 
     @Test fun `no consent or exhausted candidates never dispatch a request`() {

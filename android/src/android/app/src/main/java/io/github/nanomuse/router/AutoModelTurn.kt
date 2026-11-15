@@ -20,10 +20,16 @@ class AutoModelTurn(private val health: ModelHealth) {
     private val failures = mutableListOf<FailureRecord>()
     fun failureRecords(): List<FailureRecord> = failures.toList()
 
-    fun pick(candidates: List<ModelRouter.Candidate>, needs: Set<Need>, stickyEntryId: String?): ModelRouter.Choice {
+    fun pick(
+        candidates: List<ModelRouter.Candidate>,
+        needs: Set<Need>,
+        stickyEntryId: String?,
+        /** Refit each candidate against the same health snapshot used to select it. */
+        fit: (ModelRouter.Candidate, ModelHealth.Snapshot) -> ModelRouter.Candidate = { candidate, _ -> candidate },
+    ): ModelRouter.Choice {
         val withHealth = candidates.map { candidate ->
             val snapshot = health.snapshot(candidate.entryId, candidate.providerId)
-            candidate.copy(
+            fit(candidate, snapshot).copy(
                 usedThisMinute = snapshot.usedThisMinute,
                 unavailable = snapshot.cooldown,
                 failures = snapshot.failures,
@@ -39,6 +45,11 @@ class AutoModelTurn(private val health: ModelHealth) {
         return health.reserveFor(candidate.entryId, candidate.providerId,
             inputTokens.toLong() + outputTokens.toLong(), candidate.tokensPerMinute)
     }
+
+    /** Atomically cap output to the live window before trying a smaller profile. */
+    fun reserveWithOutputCap(candidate: ModelRouter.Candidate, inputTokens: Int, desiredOutputTokens: Int): ModelHealth.Reservation =
+        health.reserveForWithOutputCap(candidate.entryId, candidate.providerId,
+            inputTokens, desiredOutputTokens, candidate.tokensPerMinute)
 
     /** Exclude the route after a local race or an explicitly unsupported capability. */
     fun exclude(entryId: String) { if (entryId.isNotBlank()) excluded += entryId }

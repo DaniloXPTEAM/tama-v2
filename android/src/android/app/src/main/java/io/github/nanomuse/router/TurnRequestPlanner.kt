@@ -52,6 +52,8 @@ object TurnRequestPlanner {
         route: Route.Chat,
         budget: ProviderBudget,
         providerPrefix: String = "",
+        requestLimit: Long? = null,
+        minimumProfile: Profile = Profile.LEAN,
         estimate: (String, List<AgentToolDefinition>) -> Int,
     ): Attempt? {
         val views = Profile.entries.associateWith { profile ->
@@ -63,7 +65,7 @@ object TurnRequestPlanner {
         val withMinimumOutput = views.mapValues { (_, attempt) ->
             (attempt.inputEstimate.toLong() + 1L).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
         }
-        val fitted = TurnRouter.fit(route, budget, withMinimumOutput) ?: return null
+        val fitted = TurnRouter.fit(route, budget, withMinimumOutput, requestLimit, minimumProfile) ?: return null
         return views.getValue(fitted.profile).copy(route = fitted)
     }
 
@@ -91,8 +93,16 @@ object TurnRequestPlanner {
         return null
     }
 
-    /** Reserve some room for output within each of the three planned calls when TPM is known. */
-    fun outputLimit(preferred: Int, budget: ProviderBudget, inputEstimate: Int): Int? {
+    /** The smaller of the model context and the unspent local account window, if known. */
+    fun requestLimit(budget: ProviderBudget, usedThisMinute: Long, contextLimit: Int?): Long? {
+        val remaining = budget.tokensPerMinute?.let { limit ->
+            (limit.toLong() - usedThisMinute.coerceAtLeast(0L)).coerceAtLeast(0L)
+        }
+        return listOfNotNull(remaining, contextLimit?.toLong()?.coerceAtLeast(0L)).minOrNull()
+    }
+
+    /** Reserve output within the three-call budget and this request's available space. */
+    fun outputLimit(preferred: Int, budget: ProviderBudget, inputEstimate: Int, requestLimit: Long? = null): Int? {
         if (preferred <= 0 || inputEstimate < 0) return null
         var max = budget.maxOutputTokens?.takeIf { it > 0 }?.let { minOf(preferred, it) } ?: preferred
         budget.tokensPerMinute?.let { tpm ->
@@ -100,6 +110,11 @@ object TurnRequestPlanner {
             val remaining = tpm / 3 - inputEstimate
             if (remaining <= 0) return null
             max = minOf(max, remaining)
+        }
+        requestLimit?.let { limit ->
+            val remaining = limit - inputEstimate.toLong()
+            if (remaining <= 0L) return null
+            max = minOf(max.toLong(), remaining).toInt()
         }
         return max.takeIf { it > 0 }
     }

@@ -95,6 +95,22 @@ class TurnRouterTest {
         assertEquals(Profile.FULL, TurnRouter.route("oi", override = Profile.FULL).profile)
     }
 
+    @Test fun `spent minute lowers the profile before rejecting an account`() {
+        val route = TurnRouter.route("faça login e pesquise no site")
+        assertEquals(Profile.FULL, route.profile)
+        // These are measured input-plus-one-output sizes. The total TPM still allows
+        // three FULL calls; the remaining window must only fit this particular call.
+        val sizes = mapOf(Profile.FULL to 3_000, Profile.BASIC to 1_000, Profile.LEAN to 100)
+        val budget = ProviderBudget(12_000)
+        assertEquals(Profile.BASIC, TurnRouter.fit(route, budget, sizes, requestLimit = 1_200)!!.profile)
+        assertEquals(Profile.LEAN, TurnRouter.fit(route, budget, sizes, requestLimit = 200)!!.profile)
+        assertNull(TurnRouter.fit(route, budget, sizes, requestLimit = 99))
+        // A required tool cannot be pretended to have run in a tool-less LEAN request.
+        assertNull(TurnRouter.fit(route, budget, sizes, requestLimit = 200, minimumProfile = Profile.BASIC))
+        assertEquals(Profile.BASIC, TurnRouter.fit(route, ProviderBudget(), sizes, requestLimit = 1_200)!!.profile)
+        assertNull(TurnRouter.fit(route, budget, sizes, requestLimit = 0))
+    }
+
     @Test fun `budget uses three calls and preserves original needs`() {
         val costs = mapOf(Profile.LEAN to 400, Profile.BASIC to 3_400, Profile.FULL to 11_500)
         val requested = TurnRouter.route("pesquise um site")
