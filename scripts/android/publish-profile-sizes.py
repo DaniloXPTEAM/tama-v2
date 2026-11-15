@@ -6,7 +6,7 @@ import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-PROFILES = {"LEAN", "BASIC", "BASIC_WEB", "BASIC_ANDROID", "FULL"}
+PROFILES = {"LEAN", "BASIC", "BASIC_WEB", "BASIC_ANDROID", "BASIC_IMAGE", "FULL"}
 SYSTEM_LABELS = {
     "IDENTITY",
     "INTRODUCTION",

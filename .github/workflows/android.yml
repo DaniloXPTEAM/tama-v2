@@ -224,13 +224,27 @@ jobs:
             > android/src/android/app/build/outputs/apk/debug/phone-apk-signature.txt
 
       - name: Verify side-by-side package and signature
+        shell: bash
         run: |
-          python3 scripts/android/verify-parallel-apk.py \
+          set -euo pipefail
+          apk=android/src/android/app/build/outputs/apk/tamaTest/app-tamaTest.apk
+          if python3 scripts/android/verify-parallel-apk.py \
             --aapt "$ANDROID_HOME/build-tools/35.0.0/aapt" \
             --apksigner "$ANDROID_HOME/build-tools/35.0.0/apksigner" \
-            --apk android/src/android/app/build/outputs/apk/tamaTest/app-tamaTest.apk \
+            --apk "$apk" \
             --normal-apk android/src/android/app/build/outputs/apk/debug/app-debug.apk \
-            --out-dir android/src/android/app/build/outputs/apk/tamaTest
+            --out-dir android/src/android/app/build/outputs/apk/tamaTest > /tmp/tama-verify.log 2>&1; then
+            cat /tmp/tama-verify.log
+          else
+            cat /tmp/tama-verify.log
+            message="$(tail -1 /tmp/tama-verify.log | cut -c1-900)"
+            message="${message//'%'/'%25'}"
+            echo "::error title=TAMA_PARALLEL_VERIFY::$message"
+            "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" \
+              | grep -E '^package:|^application-label:|^application-debuggable|^launchable-activity:|^native-code:' \
+              | while IFS= read -r line; do echo "::notice title=TAMA_PARALLEL_BADGING::$line"; done || true
+            exit 1
+          fi
 
       - name: Upload side-by-side test APK
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -262,12 +276,23 @@ jobs:
           retention-days: 14
           if-no-files-found: error
 
+      # The diagnostic artifact is explicitly NOT approved for installation. It is retained
+      # briefly to make a verifier failure inspectable without changing the pass/fail gate.
+      - name: Upload unverified parallel APK for diagnostics
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: tama-v2-parallel-diagnostic
+          path: android/src/android/app/build/outputs/apk/tamaTest/app-tamaTest.apk
+          retention-days: 1
+          if-no-files-found: ignore
+
   # TAMA: one-time encrypted transfer for this internal test branch. Git blob objects
   # are not committed to any branch and can be garbage-collected after recovery.
   parallel-transfer:
-    name: transfer verified parallel APK
+    name: transfer parallel APK for inspection
     needs: debug-apk
-    if: github.event_name == 'pull_request' && github.head_ref == 'arena/4f0fb56f-tamaaiv2' && github.event.pull_request.head.repo.full_name == github.repository
+    if: always() && github.event_name == 'pull_request' && github.head_ref == 'arena/4f0fb56f-tamaaiv2' && github.event.pull_request.head.repo.full_name == github.repository && (needs.debug-apk.result == 'success' || needs.debug-apk.result == 'failure')
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
@@ -276,21 +301,24 @@ jobs:
     steps:
       - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
         with:
-          name: tama-v2-parallel-test-apk
+          name: ${{ needs.debug-apk.result == 'success' && 'tama-v2-parallel-test-apk' || 'tama-v2-parallel-diagnostic' }}
           path: /tmp/tama-parallel
       - name: Transfer temporary chunks through the Git data API
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DEBUG_APK_RESULT: ${{ needs.debug-apk.result }}
         shell: bash
         run: |
           python3 - <<'PY'
           import base64, hashlib, json, os, pathlib, subprocess, urllib.request
           apk = pathlib.Path('/tmp/tama-parallel/app-tamaTest.apk')
-          metadata = json.loads(pathlib.Path('/tmp/tama-parallel/tama-test-metadata.json').read_text())
           payload = apk.read_bytes()
           digest = hashlib.sha256(payload).hexdigest()
-          if digest != metadata['sha256'] or len(payload) != metadata['sizeBytes']:
-              raise SystemExit('Downloaded APK differs from the verified build')
+          verified = os.environ['DEBUG_APK_RESULT'] == 'success'
+          if verified:
+              metadata = json.loads(pathlib.Path('/tmp/tama-parallel/tama-test-metadata.json').read_text())
+              if digest != metadata['sha256'] or len(payload) != metadata['sizeBytes']:
+                  raise SystemExit('Downloaded APK differs from the verified build')
           public_key = pathlib.Path('/tmp/tama-parallel/transfer-public.pem')
           public_key.write_text('''-----BEGIN PUBLIC KEY-----
           MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwRQ4ndhJp8wdRbGrRJtU
@@ -322,7 +350,7 @@ jobs:
               with urllib.request.urlopen(request, timeout=120) as response:
                   hashes.append(json.load(response)['sha'])
           envelope = base64.b64encode(wrapped).decode('ascii')
-          print(f"::notice title=TAMA_APK_TRANSFER::sha256={digest};size={len(payload)};iv={iv.hex()};key={envelope};blobs={','.join(hashes)}")
+          print(f"::notice title=TAMA_APK_TRANSFER::sha256={digest};size={len(payload)};verified={str(verified).lower()};iv={iv.hex()};key={envelope};blobs={','.join(hashes)}")
           PY
 
   # A fresh Google APIs x86_64 emulator with an ARM native bridge installs the *same*

@@ -19,6 +19,10 @@ def write_xml(path: Path, text: str) -> None:
     ET.ElementTree(root).write(path, encoding="unicode")
 
 
+def test_all_synthetic_profiles_are_published() -> None:
+    assert MODULE.PROFILES == {"LEAN", "BASIC", "BASIC_WEB", "BASIC_ANDROID", "BASIC_IMAGE", "FULL"}
+
+
 def test_publishes_only_whitelisted_count_rows(tmp_path: Path) -> None:
     rows = [
         f"TAMA_PROFILE {profile} {scope} TOTAL 1 2 3 4"

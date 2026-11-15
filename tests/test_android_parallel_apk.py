@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -42,6 +43,15 @@ def fixture() -> tuple[str, str, str, str]:
 
 def test_accepts_only_disjoint_parallel_identity() -> None:
     verify.validate(*fixture())
+
+
+def test_failed_tool_exposes_error_without_hiding_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fail(*args, **kwargs):
+        raise subprocess.CalledProcessError(2, args[0], stderr="bad APK\nmissing manifest")
+
+    monkeypatch.setattr(verify.subprocess, "run", fail)
+    with pytest.raises(ValueError, match="aapt failed with exit 2: bad APK missing manifest"):
+        verify.run("/sdk/aapt", "dump")
 
 
 @pytest.mark.parametrize(

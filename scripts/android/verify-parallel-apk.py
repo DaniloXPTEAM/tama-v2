@@ -17,7 +17,13 @@ ALIASES = {"MainActivityIconAuto", "MainActivityIconLight", "MainActivityIconDar
 
 
 def run(*args: str) -> str:
-    return subprocess.run(args, check=True, capture_output=True, text=True).stdout
+    try:
+        return subprocess.run(args, check=True, capture_output=True, text=True).stdout
+    except subprocess.CalledProcessError as exc:
+        detail = " ".join((exc.stderr or exc.stdout or "").split())[:700]
+        raise ValueError(
+            f"{Path(args[0]).name} failed with exit {exc.returncode}: {detail}"
+        ) from exc
 
 
 def package(badging: str) -> str:
