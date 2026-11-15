@@ -17,6 +17,8 @@ import com.openminis.app.provider.gemini.GeminiProvider
 import com.openminis.app.provider.openai.OpenAIProvider
 import io.github.nanomuse.cloud.NanoMuseCloud
 import io.github.nanomuse.media.RelayMediaPolicy
+import io.github.nanomuse.net.singleUseImageBody
+import io.github.nanomuse.net.singleUseImageClient
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -64,6 +66,9 @@ object ImageGen {
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(180, TimeUnit.SECONDS)
             .writeTimeout(60, TimeUnit.SECONDS)
+            // Preserve the configured proxy's CONNECT authentication before a
+            // billable POST; the one-shot client still refuses body replay.
+            .proxyAuthenticator(io.github.nanomuse.net.OwnProviderProxy.authenticator)
             .build()
     }
 
@@ -262,13 +267,15 @@ object ImageGen {
             ?: throw ImageGenException(context.getString(com.openminis.app.R.string.nm_avatar_no_model))
     }
 
-    suspend fun generate(context: Context, ep: Endpoint, prompt: String, size: String = "1024x1024"): Bitmap = withContext(Dispatchers.IO) {
+    suspend fun generate(
+        context: Context, ep: Endpoint, prompt: String, size: String = "1024x1024", allowFormatRetry: Boolean = true,
+    ): Bitmap = withContext(Dispatchers.IO) {
         if (ep.model.isBlank()) throw ImageGenException("No image model set")
         // Model Studio's OpenAI-compatible host has no `images/generations` (the public one
         // answers 404 to every model); its native endpoint draws with the same key.
-        if (ep.isDashScope) return@withContext generateDashScope(ep, prompt, size)
+        if (ep.isDashScope) return@withContext generateDashScope(ep, prompt, size, singleAttempt = !allowFormatRetry)
         val response = try {
-            ImageModelRequests.request(provider(context, ep, ep.model), prompt, size)
+            ImageModelRequests.request(provider(context, ep, ep.model), prompt, size, allowFormatRetry = allowFormatRetry)
         } catch (e: ImageGenException) {
             throw e
         } catch (e: CancellationException) {
@@ -307,11 +314,11 @@ object ImageGen {
      * (2.x, 3.x, plus, max) and wan-image all take `size` as `W*H`; prompt extension stays off
      * so the avatar prompts are drawn as written.
      */
-    private fun generateDashScope(ep: Endpoint, prompt: String, size: String): Bitmap {
+    private fun generateDashScope(ep: Endpoint, prompt: String, size: String, singleAttempt: Boolean): Bitmap {
         val parameters = JSONObject().put("size", size.replace('x', '*')).put("watermark", false)
         if (ep.model.startsWith("qwen-image")) parameters.put("prompt_extend", false)
         val content = JSONArray().put(JSONObject().put("text", prompt))
-        return callDashScope(ep, ep.model, content, parameters, what = "generation")
+        return callDashScope(ep, ep.model, content, parameters, what = "generation", singleAttempt = singleAttempt)
     }
 
     /** DashScope image editing: same host and key, native path, data-URI input. */
@@ -329,24 +336,32 @@ object ImageGen {
     }
 
     /** One call to `multimodal-generation/generation`; returns the first image of the reply. */
-    private fun callDashScope(ep: Endpoint, model: String, content: JSONArray, parameters: JSONObject, what: String): Bitmap {
+    private fun callDashScope(
+        ep: Endpoint, model: String, content: JSONArray, parameters: JSONObject, what: String, singleAttempt: Boolean = false,
+    ): Bitmap {
         val host = ep.baseUrl.substringBefore("/compatible-mode").substringBefore("/api/v1").trimEnd('/')
         val body = JSONObject()
             .put("model", model)
             .put("input", JSONObject().put("messages", JSONArray().put(JSONObject().put("role", "user").put("content", content))))
             .put("parameters", parameters)
+        val requestBody = body.toString().toRequestBody("application/json".toMediaType())
         val req = Request.Builder()
             .url("$host/api/v1/services/aigc/multimodal-generation/generation")
             .header("Authorization", "Bearer ${ep.apiKey}")
             .header("Content-Type", "application/json")
-            .post(body.toString().toRequestBody("application/json".toMediaType()))
+            .post(if (singleAttempt) requestBody.singleUseImageBody() else requestBody)
             .build()
-        val json = http.newCall(req).execute().use { resp ->
+        val submitClient = if (singleAttempt) http.singleUseImageClient() else http
+        val json = submitClient.newCall(req).execute().use { resp ->
             val text = resp.body?.string().orEmpty()
             if (!resp.isSuccessful) {
-                val msg = runCatching { JSONObject(text).optString("message") }.getOrNull()
-                AppLogger.warning(TAG, "DashScope $what HTTP ${resp.code}: ${text.take(300)}")
-                throw ImageGenException("HTTP ${resp.code}" + (msg?.takeIf { it.isNotBlank() }?.let { ": $it" } ?: ""))
+                // Provider replies may echo prompts or credentials. Never log the body;
+                // retain only a bounded, decoded message with this request's key removed.
+                val msg = io.github.nanomuse.net.ProviderReach.diagnosticMessage(
+                    text, maxChars = 300, credentials = listOf(ep.apiKey),
+                )
+                AppLogger.warning(TAG, "DashScope $what HTTP ${resp.code}")
+                throw ImageGenException("HTTP ${resp.code}" + (msg.takeIf { it.isNotBlank() }?.let { ": $it" } ?: ""))
             }
             runCatching { JSONObject(text) }.getOrElse { throw ImageGenException("Unreadable $what response") }
         }

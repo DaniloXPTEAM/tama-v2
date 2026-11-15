@@ -15,6 +15,8 @@ import com.openminis.app.data.model.LLMUsage
 import com.openminis.app.data.model.ThinkingLevel
 import com.openminis.app.provider.LLMProvider
 import com.openminis.app.provider.safeOptString
+import io.github.nanomuse.net.singleUseImageBody
+import io.github.nanomuse.net.singleUseImageClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.awaitClose
@@ -40,6 +42,9 @@ class GeminiProvider(
 ) : LLMProvider {
     override val name = "Google"
 
+    // Set only on the freshly constructed provider used by an automatic picture.
+    internal var singleUseImageRequest: Boolean = false
+
     private val client = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(10, TimeUnit.MINUTES)
@@ -63,9 +68,10 @@ class GeminiProvider(
         // nanoMuse: this URL, not a later model selection, identifies the failed request.
         val requestModel = model.id
         val url = "$basePath/models/$requestModel:generateContent?key=$apiKey"
+        val requestBody = body.toString().toRequestBody("application/json".toMediaType())
         val request = Request.Builder()
             .url(url)
-            .post(body.toString().toRequestBody("application/json".toMediaType()))
+            .post(if (singleUseImageRequest) requestBody.singleUseImageBody() else requestBody)
             // [T-android-default-ua] Brand the outbound UA so server logs
             // can trace the request back to the Minis build. Gemini has no
             // SDK-specific UA requirement, so the helper's default kicks in.
@@ -74,7 +80,8 @@ class GeminiProvider(
 
         // nanoMuse: redact both the configured key and the one actually present in the URL.
         val credentials = requestCredentials(request)
-        val response = client.newCall(request).execute()
+        val requestClient = if (singleUseImageRequest) client.singleUseImageClient() else client
+        val response = requestClient.newCall(request).execute()
         val responseBody = response.body?.string() ?: ""
 
         if (!response.isSuccessful) {

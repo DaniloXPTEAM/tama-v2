@@ -17,6 +17,8 @@ import com.openminis.app.provider.thinking.ThinkingRuleResolver
 import com.openminis.app.provider.LLMProvider
 import com.openminis.app.provider.applyUserAgentOverride
 import com.openminis.app.provider.safeOptString
+import io.github.nanomuse.net.singleUseImageBody
+import io.github.nanomuse.net.singleUseImageClient
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
@@ -1635,6 +1637,7 @@ class OpenAIProvider private constructor(
         n: Int = 1,
         size: String? = null,
         quality: String? = null,
+        allowFormatRetry: Boolean = true,
     ): LLMResponse = withContext(Dispatchers.IO) {
         val token = getToken()
         // [T-android-model-use-image-passthrough GH#62] Honor an explicit
@@ -1684,7 +1687,7 @@ class OpenAIProvider private constructor(
             }
             val builder = Request.Builder()
                 .url(url)
-                .post(requestBody)
+                .post(if (allowFormatRetry) requestBody else requestBody.singleUseImageBody())
                 .applyKeyAuth(token)
                 .header("Content-Type", "application/json")
             for ((key, value) in extraHeaders) {
@@ -1698,19 +1701,23 @@ class OpenAIProvider private constructor(
             builder.applyUserAgentOverride(customUserAgent)
             val request = builder.build()
 
+            // Do not log the URL: a custom base may contain credentials or private query parameters.
             com.openminis.app.logging.AppLogger.info(
                 "OpenAIProvider",
-                "[ModelUseRoute] → images/generations url=$url model=${model.id} n=$n " +
-                    "size=$size quality=$quality respFormat=${if (triedWithoutFormat) "<none>" else "b64_json"}",
+                "[ModelUseRoute] images/generations model=" +
+                    io.github.nanomuse.net.ProviderReach.redactedText(requestModelId, requestCredentials(request), 128) +
+                    " n=$n size=$size quality=$quality respFormat=${if (triedWithoutFormat) "<none>" else "b64_json"}",
             )
 
-            val response = client.newCall(request).execute()
+            val imageClient = if (allowFormatRetry) client else client.singleUseImageClient()
+            val response = imageClient.newCall(request).execute()
             val statusCode = response.code
             val responseBody = response.body?.string() ?: ""
             response.close()
 
-            // Some providers (xAI) don't support b64_json — retry without it once.
-            if (!triedWithoutFormat && statusCode == 400 &&
+            // Some providers (xAI) don't support b64_json. Automatic media calls
+            // decline even this same-model retry, since a failed request may be billed.
+            if (allowFormatRetry && !triedWithoutFormat && statusCode == 400 &&
                 (responseBody.lowercase().contains("response_format") || responseBody.contains("b64_json"))
             ) {
                 com.openminis.app.logging.AppLogger.info(
@@ -1921,9 +1928,9 @@ class OpenAIProvider private constructor(
                             attachments.add(LLMMediaAttachment(LLMMediaAttachment.MediaType.IMAGE, mime, dlBytes))
                         }
                     } catch (e: Exception) {
+                        // Download URLs can contain signed query parameters; never log them.
                         com.openminis.app.logging.AppLogger.warning(
-                            "OpenAIProvider",
-                            "[ModelUseRoute] failed to download image from $urlStr: ${e.message}",
+                            "OpenAIProvider", "[ModelUseRoute] image download failed",
                         )
                     }
                 }
