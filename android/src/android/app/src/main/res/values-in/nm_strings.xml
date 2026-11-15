@@ -1426,6 +1426,10 @@
     <string name="nm_auto_image_allow">Allow automatic image generation with this model</string>
     <string name="nm_auto_image_consent_title">Allow automatic image generation?</string>
     <string name="nm_auto_image_consent_body">Image generation uses a separate endpoint and may charge per picture, including when the price is unknown. Chat permission does not authorize images. Enable only if you accept these charges for this model.</string>
+    <string name="nm_image_provider_missing">Tidak ada penyedia gambar yang dikonfigurasi: buka Pengaturan → Model gambar dan video</string>
+    <string name="nm_image_call_consent">Pembuatan gambar dapat dikenai biaya per permintaan meskipun harganya tidak diketahui. Izinkan hanya jika Anda menerima biaya model yang ditampilkan.</string>
+    <string name="nm_image_permission_denied">Izin gambar ditolak atau kedaluwarsa. Tidak ada permintaan gambar yang dikirim.</string>
+    <string name="nm_image_request_failed">Gambar tidak dapat diselesaikan. Permintaan mungkin dikenai biaya; saya tidak akan mengulanginya tanpa permintaan baru.</string>
     <string name="nm_auto_image_missing">No registered image model currently meets all requirements: enabled and visible, a unique provider and model identity, usable credentials, a supported image route, confirmed generation capability, and separate automatic image permission. Open Settings → Models → Review model permissions and choose the provider and model.</string>
     <string name="nm_auto_image_changed">Image permission, account or configuration changed. No image request was sent; review the model permissions and try again.</string>
     <string name="nm_auto_image_edit_blocked">Automatic image editing is not yet authorized separately. Switch automatic selection off to use the configured image model manually.</string>

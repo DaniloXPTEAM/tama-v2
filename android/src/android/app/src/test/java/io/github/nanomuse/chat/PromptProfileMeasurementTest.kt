@@ -71,6 +71,7 @@ Reusable instruction sets stored at /var/minis/skills/<name>/SKILL.md. Read the 
             Triple("BASIC", Profile.BASIC, setOf(ToolGroup.FILES)),
             Triple("BASIC_WEB", Profile.BASIC, setOf(ToolGroup.WEB)),
             Triple("BASIC_ANDROID", Profile.BASIC, setOf(ToolGroup.ANDROID)),
+            Triple("BASIC_IMAGE", Profile.BASIC, setOf(ToolGroup.IMAGE)),
             Triple("FULL", Profile.FULL, emptySet()),
         )
         for ((caseName, profile, hints) in cases) {
@@ -106,7 +107,7 @@ Reusable instruction sets stored at /var/minis/skills/<name>/SKILL.md. Read the 
             // Regression ceilings for this fixture, not a promise about a real account or turn.
             val ceiling = mapOf(
                 "LEAN" to 400, "BASIC" to 3_400, "BASIC_WEB" to 4_800,
-                "BASIC_ANDROID" to 3_700, "FULL" to 11_500,
+                "BASIC_ANDROID" to 3_700, "BASIC_IMAGE" to 4_500, "FULL" to 11_500,
             ).getValue(caseName)
             val estimate = PromptSize.estimateTokens(systemTotal.afterChars + toolTotal.afterChars)
             assertTrue("$caseName synthetic fixed prompt + tools: $estimate exceeds $ceiling", estimate <= ceiling)
@@ -122,5 +123,13 @@ Reusable instruction sets stored at /var/minis/skills/<name>/SKILL.md. Read the 
         assertTrue(browser.description.contains("call hand_over"))
         assertTrue(browser.parameters.getValue("action").enumValues!!.contains("hand_over"))
         assertEquals(emptyList<Any>(), PromptProfiles.tools(Profile.LEAN, original))
+    }
+
+    @Test fun `image schema is exposed in basic only for the image group`() {
+        val original = AgentTools.makeAgentTools(supportsImageInput = false, memoryEnabled = false)
+        assertTrue(PromptProfiles.tools(Profile.BASIC, original, setOf(ToolGroup.IMAGE)).any { it.name == "generate_image" })
+        assertTrue(PromptProfiles.tools(Profile.BASIC, original, setOf(ToolGroup.FILES)).none { it.name == "generate_image" })
+        assertTrue(PromptProfiles.tools(Profile.LEAN, original, setOf(ToolGroup.IMAGE)).none { it.name == "generate_image" })
+        assertTrue(PromptProfiles.tools(Profile.FULL, original).any { it.name == "generate_image" })
     }
 }

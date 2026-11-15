@@ -11,6 +11,7 @@ import io.github.nanomuse.avatar.ImageGen
 import io.github.nanomuse.router.AutoModelStore
 import java.util.UUID
 import org.json.JSONObject
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
@@ -20,6 +21,7 @@ import org.mockito.Mockito
 /** Exercises the actual offload handler with an in-process image service, never a paid API. */
 class MediaOffloadImageTest {
     @get:Rule val temp = TemporaryFolder()
+    private val allow = MediaImageGate { _, _, _, _, _ -> true }
 
     private val selection = AutoImageSelection.Selection(
         "image-entry", "provider", "image-model", AutoModelStore.Identity("image-entry", "provider", "image-model", "route"), 0,
@@ -35,6 +37,9 @@ class MediaOffloadImageTest {
         Mockito.`when`(context.getString(R.string.nm_auto_image_missing)).thenReturn("Image permission or capability missing")
         Mockito.`when`(context.getString(R.string.nm_auto_image_changed)).thenReturn("Image authorization changed")
         Mockito.`when`(context.getString(R.string.nm_auto_image_edit_blocked)).thenReturn("Automatic edit unavailable")
+        Mockito.`when`(context.getString(R.string.nm_image_permission_denied)).thenReturn("Permission denied")
+        Mockito.`when`(context.getString(R.string.nm_image_provider_missing)).thenReturn(
+            "Nenhum provedor de imagem configurado — abra Configurações → Modelos de imagem e vídeo")
         Mockito.`when`(context.getString(R.string.nm_auto_image_used, "image-model", "Image provider"))
             .thenReturn("Used image-model (Image provider)")
         return context
@@ -47,6 +52,8 @@ class MediaOffloadImageTest {
     private inner class FakeImages : MediaImageServices {
         var mode = true
         var chosen: AutoImageSelection.Selection? = selection
+        var manual: ImageGen.Endpoint? = endpoint
+        var registered = false
         var validates = 0
         var revokedOnValidation: Int? = null
         var selects = 0
@@ -62,8 +69,9 @@ class MediaOffloadImageTest {
             validates++
             return if (validates == revokedOnValidation) null else endpoint
         }
-        override fun manualEndpoint(): ImageGen.Endpoint { manualCalls++; return endpoint }
+        override fun manualEndpoint(): ImageGen.Endpoint? { manualCalls++; return manual }
         override fun agentEndpoint(): ImageGen.Endpoint? = if (!mode || chosen != null) endpoint else null
+        override fun hasConfiguredImage(): Boolean = registered || manualEndpoint() != null
         override suspend fun generate(endpoint: ImageGen.Endpoint, prompt: String, size: String, allowFormatRetry: Boolean): MediaPicture {
             generateCalls++
             lastFormatRetry = allowFormatRetry
@@ -81,7 +89,7 @@ class MediaOffloadImageTest {
 
     @Test fun `missing authorization and automatic editing never invoke the image service`() {
         val fake = FakeImages().apply { chosen = null }
-        val handler = MediaOffloadHandler(context(), fake)
+        val handler = MediaOffloadHandler(context(), fake, allow)
         val sid = UUID.randomUUID().toString()
         val missing = handler.handle(request(sid, "--prompt", "Draw a bird"))
         assertEquals(3, missing.exitCode)
@@ -100,7 +108,7 @@ class MediaOffloadImageTest {
     @Test fun `revocation during validation stops without falling back or sending`() {
         val fake = FakeImages().apply { revokedOnValidation = 2 }
         val sid = UUID.randomUUID().toString()
-        val result = MediaOffloadHandler(context(), fake).handle(request(sid, "--prompt", "Draw a bird"))
+        val result = MediaOffloadHandler(context(), fake, allow).handle(request(sid, "--prompt", "Draw a bird"))
         assertEquals(3, result.exitCode)
         assertEquals("image_authorization_changed", JSONObject(result.output).getString("error"))
         assertEquals(2, fake.validates)
@@ -112,7 +120,7 @@ class MediaOffloadImageTest {
     @Test fun `successful automatic request saves the selected result and queues session attribution`() {
         val fake = FakeImages()
         val sid = UUID.randomUUID().toString()
-        val result = MediaOffloadHandler(context(), fake).handle(request(sid, "--prompt", "Draw a bird", "--name", "bird.png"))
+        val result = MediaOffloadHandler(context(), fake, allow).handle(request(sid, "--prompt", "Draw a bird", "--name", "bird.png"))
         assertEquals(0, result.exitCode)
         val json = JSONObject(result.output)
         assertEquals("image-model", json.getString("model"))
@@ -132,12 +140,12 @@ class MediaOffloadImageTest {
     @Test fun `manual mode keeps the configured route without adding automatic attribution`() {
         val fake = FakeImages().apply { mode = false }
         val sid = UUID.randomUUID().toString()
-        val result = MediaOffloadHandler(context(), fake).handle(request(sid, "--prompt", "Draw a bird"))
+        val result = MediaOffloadHandler(context(), fake, allow).handle(request(sid, "--prompt", "Draw a bird"))
         assertEquals(0, result.exitCode)
-        assertEquals(1, fake.manualCalls)
+        assertEquals(2, fake.manualCalls) // re-read after the permission dialog
         assertEquals(0, fake.selects)
         assertEquals(0, fake.validates)
-        assertEquals(true, fake.lastFormatRetry)
+        assertEquals(false, fake.lastFormatRetry)
         assertFalse(JSONObject(result.output).has("tell_user"))
         assertTrue(AutoImageNotices.takeFor(sid).isEmpty())
     }
@@ -145,7 +153,7 @@ class MediaOffloadImageTest {
     @Test fun `a failed operation is redacted and never retried or attributed as success`() {
         val fake = FakeImages().apply { failure = IllegalStateException("provider echoed fixture-key") }
         val sid = UUID.randomUUID().toString()
-        val result = MediaOffloadHandler(context(), fake).handle(request(sid, "--prompt", "Draw a bird"))
+        val result = MediaOffloadHandler(context(), fake, allow).handle(request(sid, "--prompt", "Draw a bird"))
         assertEquals(1, result.exitCode)
         assertEquals(1, fake.generateCalls)
         assertEquals(0, fake.manualCalls)
@@ -158,11 +166,70 @@ class MediaOffloadImageTest {
     @Test fun `failed image encoding is not reported as a successful picture`() {
         val fake = FakeImages().apply { writeSucceeds = false }
         val sid = UUID.randomUUID().toString()
-        val result = MediaOffloadHandler(context(), fake).handle(request(sid, "--prompt", "Draw a bird", "--name", "failed.png"))
+        val result = MediaOffloadHandler(context(), fake, allow).handle(request(sid, "--prompt", "Draw a bird", "--name", "failed.png"))
         assertEquals(1, result.exitCode)
         assertEquals("image_failed", JSONObject(result.output).getString("error"))
         assertFalse(temp.root.resolve("minis-sessions/$sid/attachments/failed.png").exists())
         assertTrue(AutoImageNotices.takeFor(sid).isEmpty())
+    }
+
+    @Test fun `missing image provider has the required message without asking or sending`() = runBlocking {
+        val fake = FakeImages().apply { mode = false; manual = null }
+        var gateCalls = 0
+        val gate = MediaImageGate { _, _, _, _, _ -> gateCalls++; true }
+        val result = MediaOffloadHandler(context(), fake, gate).generateImage("Draw", null, UUID.randomUUID().toString())
+        val body = JSONObject(result.output)
+        assertEquals("no_image_model", body.getString("error"))
+        assertEquals("Nenhum provedor de imagem configurado — abra Configurações → Modelos de imagem e vídeo", body.getString("message"))
+        assertEquals("minis://settings/media", body.getString("settings"))
+        assertEquals(0, gateCalls)
+        assertEquals(0, fake.generateCalls)
+    }
+
+    @Test fun `automatic route distinguishes absent and unapproved registered images`() = runBlocking {
+        val fake = FakeImages().apply { chosen = null; manual = null }
+        val handler = MediaOffloadHandler(context(), fake, allow)
+        val absent = handler.generateImage("Draw", null, UUID.randomUUID().toString())
+        assertEquals("no_image_model", JSONObject(absent.output).getString("error"))
+        fake.registered = true
+        val unapproved = handler.generateImage("Draw", null, UUID.randomUUID().toString())
+        assertEquals("no_approved_image_model", JSONObject(unapproved.output).getString("error"))
+        assertEquals(0, fake.generateCalls)
+    }
+
+    @Test fun `the CLI and native entry share permission and never send after denial`() = runBlocking {
+        val fake = FakeImages()
+        val sid = UUID.randomUUID().toString()
+        val freshRequests = mutableListOf<Boolean>()
+        val deny = MediaImageGate { _, _, _, gateSid, fresh ->
+            freshRequests += fresh
+            assertEquals(sid, gateSid)
+            false
+        }
+        val handler = MediaOffloadHandler(context(), fake, deny)
+        val native = handler.generateImage("Draw a bird", null, sid)
+        val cli = handler.handle(request(sid, "--prompt", "Draw a bird"))
+        assertEquals("permission_denied", JSONObject(native.output).getString("error"))
+        assertEquals("permission_denied", JSONObject(cli.output).getString("error"))
+        assertEquals(listOf(false, true), freshRequests)
+        assertEquals(0, fake.generateCalls)
+    }
+
+    @Test fun `native and CLI reject invalid inputs before permission and never retry`() = runBlocking {
+        val fake = FakeImages().apply { mode = false }
+        val sid = UUID.randomUUID().toString()
+        var approvals = 0
+        val handler = MediaOffloadHandler(context(), fake, MediaImageGate { _, _, _, _, _ -> approvals++; true })
+        assertEquals(2, handler.generateImage("Draw", "auto", sid).exitCode)
+        assertEquals(2, handler.generateImage("x".repeat(4_001), null, sid).exitCode)
+        assertEquals(2, handler.handle(request(sid, "--prompt", "Draw", "--size", "auto")).exitCode)
+        assertEquals(2, handler.handle(request(sid, "--prompt", "x".repeat(4_001))).exitCode)
+        assertEquals(0, approvals)
+        assertEquals(0, fake.generateCalls)
+        assertEquals(0, handler.generateImage("--draw a bird", "1024x1024", sid).exitCode)
+        assertEquals(1, approvals)
+        assertEquals(1, fake.generateCalls)
+        assertEquals(false, fake.lastFormatRetry)
     }
 
     @Test fun `an existing attachment is never truncated by image output`() {
@@ -171,7 +238,7 @@ class MediaOffloadImageTest {
         val file = temp.root.resolve("minis-sessions/$sid/attachments/keep.png")
         file.parentFile!!.mkdirs()
         file.writeText("original")
-        val result = MediaOffloadHandler(context(), fake).handle(request(sid, "--prompt", "Draw", "--name", "keep.png"))
+        val result = MediaOffloadHandler(context(), fake, allow).handle(request(sid, "--prompt", "Draw", "--name", "keep.png"))
         assertEquals(1, result.exitCode)
         assertEquals("original", file.readText())
         assertTrue(JSONObject(result.output).getString("tell_user").contains("may have been charged"))

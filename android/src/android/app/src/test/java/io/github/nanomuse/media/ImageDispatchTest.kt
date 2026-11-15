@@ -25,6 +25,7 @@ class ImageDispatchTest {
             },
             revalidate = { events += "validate"; Endpoint(it.providerId, it.modelId) },
             manualEndpoint = { error("manual route must not run") },
+            authorize = { true }, // fake approval
             send = { endpoint -> events += "send"; "rendered ${endpoint.model}" },
         ) as ImageDispatch.Outcome.Sent
         assertEquals(Endpoint("gemini", "image-model"), result.endpoint)
@@ -39,6 +40,7 @@ class ImageDispatchTest {
             select = { work++; null },
             revalidate = { work++; Endpoint("p", it) },
             manualEndpoint = { work++; Endpoint("p", "m") },
+            authorize = { true }, // fake approval
             send = { work++; "sent" },
         )
         val edit = attempt(true) as ImageDispatch.Outcome.Blocked
@@ -57,6 +59,7 @@ class ImageDispatchTest {
             select = { "approved" },
             revalidate = { if (++validations == 1) Endpoint("p", it) else null },
             manualEndpoint = { error("no fallback") },
+            authorize = { true }, // fake approval
             send = { requests++; "sent" },
         ) as ImageDispatch.Outcome.Blocked
         assertEquals(ImageDispatch.Block.AUTHORIZATION_CHANGED, revoked.reason)
@@ -67,9 +70,62 @@ class ImageDispatchTest {
             select = { "approved" },
             revalidate = { automatic = false; Endpoint("p", it) },
             manualEndpoint = { error("no fallback") },
+            authorize = { true }, // fake approval
             send = { requests++; "sent" },
         ) as ImageDispatch.Outcome.Blocked
         assertEquals(ImageDispatch.Block.AUTHORIZATION_CHANGED, changed.reason)
+        assertEquals(0, requests)
+    }
+
+    @Test fun `permission denial never sends and revocation while waiting is checked again`() = runBlocking {
+        var requests = 0
+        var approved = true
+        val denied = ImageDispatch.run<String, Endpoint, String>(
+            automatic = true, hasReference = false, automaticNow = { true },
+            select = { "approved" },
+            revalidate = { if (approved) Endpoint("p", it) else null },
+            manualEndpoint = { error("no fallback") },
+            authorize = { false },
+            send = { requests++; "sent" },
+        ) as ImageDispatch.Outcome.Blocked
+        assertEquals(ImageDispatch.Block.PERMISSION_DENIED, denied.reason)
+        val revoked = ImageDispatch.run<String, Endpoint, String>(
+            automatic = true, hasReference = false, automaticNow = { true },
+            select = { "approved" },
+            revalidate = { if (approved) Endpoint("p", it) else null },
+            manualEndpoint = { error("no fallback") },
+            authorize = { approved = false; true },
+            send = { requests++; "sent" },
+        ) as ImageDispatch.Outcome.Blocked
+        assertEquals(ImageDispatch.Block.AUTHORIZATION_CHANGED, revoked.reason)
+        assertEquals(0, requests)
+    }
+
+    @Test fun `a changed automatic endpoint while waiting is not sent`() = runBlocking {
+        var endpoint = Endpoint("provider", "model-one")
+        var requests = 0
+        val result = ImageDispatch.run<String, Endpoint, String>(
+            automatic = true, hasReference = false, automaticNow = { true },
+            select = { "selection" }, revalidate = { endpoint },
+            manualEndpoint = { error("not manual") },
+            authorize = { endpoint = Endpoint("provider", "model-two"); true },
+            send = { requests++; "sent" },
+        ) as ImageDispatch.Outcome.Blocked
+        assertEquals(ImageDispatch.Block.AUTHORIZATION_CHANGED, result.reason)
+        assertEquals(0, requests)
+    }
+
+    @Test fun `a changed manual model or key while waiting is not sent`() = runBlocking {
+        var endpoint = Endpoint("provider", "model-one")
+        var requests = 0
+        val result = ImageDispatch.run<String, Endpoint, String>(
+            automatic = false, hasReference = false, automaticNow = { false },
+            select = { error("not automatic") }, revalidate = { error("not automatic") },
+            manualEndpoint = { endpoint },
+            authorize = { endpoint = Endpoint("provider", "model-two"); true },
+            send = { requests++; "sent" },
+        ) as ImageDispatch.Outcome.Blocked
+        assertEquals(ImageDispatch.Block.AUTHORIZATION_CHANGED, result.reason)
         assertEquals(0, requests)
     }
 
@@ -81,6 +137,7 @@ class ImageDispatchTest {
             select = { error("automatic selection must not run") },
             revalidate = { error("automatic approval must not run") },
             manualEndpoint = { expected },
+            authorize = { true }, // fake approval
             send = { endpoint -> requests++; assertEquals(expected, endpoint); "manual edit" },
         ) as ImageDispatch.Outcome.Sent
         assertEquals("manual edit", result.picture)
@@ -95,6 +152,7 @@ class ImageDispatchTest {
                 select = { "image-model" },
                 revalidate = { Endpoint("provider", it) },
                 manualEndpoint = { error("no manual fallback") },
+                authorize = { true }, // fake approval
                 send = { requests++; throw IllegalStateException("provider failed") },
             )
         }.exceptionOrNull()

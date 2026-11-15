@@ -34,6 +34,7 @@ import java.util.UUID
 class MediaOffloadHandler internal constructor(
     private val context: Context,
     private val images: MediaImageServices,
+    private val imageGate: MediaImageGate = AndroidMediaImageGate(context),
 ) : NativeOffloadHandler {
     constructor(context: Context) : this(context, AndroidMediaImageServices(context))
 
@@ -42,7 +43,8 @@ class MediaOffloadHandler internal constructor(
         return when (args.positional.firstOrNull()) {
             null, "help", "--help", "-h" -> NativeOffloadResult(0, HELP)
             "status" -> ok(status())
-            "image" -> image(args, request.sessionId)
+            // NativeOffloadServer calls the synchronous handler on a worker thread.
+            "image" -> runBlocking { image(args, request.sessionId) }
             "video" -> video(args, request.sessionId)
             else -> NativeOffloadResult(2, "nanomuse-media: unknown subcommand '${args.positional.first()}'\n$HELP")
         }
@@ -65,36 +67,56 @@ class MediaOffloadHandler internal constructor(
 
     private class ImageAuthorizationChanged : Exception()
     private class ImageReferenceUnavailable(val path: String) : Exception()
+    private enum class ImageOrigin { CLI, NATIVE }
 
-    private fun image(args: Args, sessionId: String?): NativeOffloadResult {
-        val prompt = args.get("prompt")?.trim().orEmpty()
-        if (prompt.isEmpty()) return NativeOffloadResult(2, "nanomuse-media image: --prompt is required\n")
+    private suspend fun image(args: Args, sessionId: String?): NativeOffloadResult = image(
+        promptValue = args.get("prompt"), referencePath = args.get("from"), requestedSize = args.get("size"),
+        requestedName = args.get("name"), sessionId = sessionId, origin = ImageOrigin.CLI,
+    )
+
+    /** Shared by the native tool and direct shortcut; neither enters a shell or blocks the UI. */
+    internal suspend fun generateImage(prompt: String, size: String?, sessionId: String?): NativeOffloadResult = image(
+        promptValue = prompt, referencePath = null, requestedSize = size,
+        requestedName = null, sessionId = sessionId, origin = ImageOrigin.NATIVE,
+    )
+
+    private suspend fun image(
+        promptValue: String?, referencePath: String?, requestedSize: String?, requestedName: String?,
+        sessionId: String?, origin: ImageOrigin,
+    ): NativeOffloadResult {
+        val prompt = promptValue?.trim().orEmpty()
+        if (prompt.isEmpty() || prompt.length > 4_000) {
+            return NativeOffloadResult(2, "nanomuse-media image: --prompt is required and may not exceed 4000 characters\n")
+        }
+        if (requestedSize != null && !ImageDispatch.validSize(requestedSize)) {
+            return NativeOffloadResult(2, "nanomuse-media image: size must be WIDTHxHEIGHT, each from 128 to 4096\n")
+        }
         val automatic = images.automatic()
-        val referencePath = args.get("from")
-        val size = args.get("size")?.takeIf { Regex("\\d{3,4}x\\d{3,4}").matches(it) } ?: "1024x1024"
+        val size = requestedSize ?: "1024x1024"
         var sentEndpoint: ImageGen.Endpoint? = null
         val outcome = try {
-            runBlocking {
-                ImageDispatch.run(
-                    automatic = automatic,
-                    hasReference = referencePath != null,
-                    automaticNow = images::automatic,
-                    select = images::choose,
-                    revalidate = images::revalidate,
-                    manualEndpoint = images::manualEndpoint,
-                    send = { endpoint ->
-                        // Only manual editing may read a private reference. DashScope can
-                        // substitute an edit model, so it is blocked for automatic use.
-                        val reference = referencePath?.let { path ->
-                            loadPicture(path, sessionId) ?: throw ImageReferenceUnavailable(path)
-                        }
-                        if (automatic != images.automatic()) throw ImageAuthorizationChanged()
-                        sentEndpoint = endpoint
-                        if (reference != null) images.edit(endpoint, reference, prompt)
-                        else images.generate(endpoint, prompt, size, allowFormatRetry = !automatic)
-                    },
-                )
-            }
+            ImageDispatch.run(
+                automatic = automatic,
+                hasReference = referencePath != null,
+                automaticNow = images::automatic,
+                select = images::choose,
+                revalidate = images::revalidate,
+                manualEndpoint = images::manualEndpoint,
+                // The legacy CLI can be invoked by scripts or automated turns, so
+                // a remembered native-tool grant is not sufficient for this call.
+                authorize = { endpoint -> imageGate.allow(endpoint, prompt, size, sessionId, freshApproval = origin == ImageOrigin.CLI) },
+                send = { endpoint ->
+                    // Only manual editing may read a private reference. DashScope can
+                    // substitute an edit model, so it is blocked for automatic use.
+                    val reference = referencePath?.let { path ->
+                        loadPicture(path, sessionId) ?: throw ImageReferenceUnavailable(path)
+                    }
+                    if (automatic != images.automatic()) throw ImageAuthorizationChanged()
+                    sentEndpoint = endpoint
+                    if (reference != null) images.edit(endpoint, reference, prompt)
+                    else images.generate(endpoint, prompt, size, allowFormatRetry = false)
+                },
+            )
         } catch (e: ImageReferenceUnavailable) {
             return NativeOffloadResult(2, "nanomuse-media: cannot read picture '${e.path}'\n")
         } catch (_: ImageAuthorizationChanged) {
@@ -107,25 +129,32 @@ class MediaOffloadHandler internal constructor(
             val safe = io.github.nanomuse.net.ProviderReach.redactedText(e.message ?: "failed", secrets, 500)
             // The provider may echo the prompt even when the key was redacted.
             AppLogger.warning(TAG, "image request failed")
-            return failed("image", safe, noRetry = automatic)
+            return failed("image", safe, noRetry = true)
         }
         val sent = when (outcome) {
             is ImageDispatch.Outcome.Sent -> outcome
             is ImageDispatch.Outcome.Blocked -> return when (outcome.reason) {
                 ImageDispatch.Block.AUTO_EDIT_UNAVAILABLE -> automaticImageError(
                     "automatic_image_edit_unavailable", com.openminis.app.R.string.nm_auto_image_edit_blocked)
-                ImageDispatch.Block.NO_APPROVED_IMAGE -> automaticImageError(
+                ImageDispatch.Block.NO_APPROVED_IMAGE -> if (!images.hasConfiguredImage()) missing("image") else automaticImageError(
                     "no_approved_image_model", com.openminis.app.R.string.nm_auto_image_missing)
                 ImageDispatch.Block.AUTHORIZATION_CHANGED -> automaticImageError(
                     "image_authorization_changed", com.openminis.app.R.string.nm_auto_image_changed)
                 ImageDispatch.Block.NO_MANUAL_IMAGE -> missing("image")
+                ImageDispatch.Block.PERMISSION_DENIED -> NativeOffloadResult(
+                    126, JSONObject().put("ok", false).put("error", "permission_denied")
+                        .put("message", context.getString(com.openminis.app.R.string.nm_image_permission_denied))
+                        .put("settings", "minis://settings/permissions")
+                        .put("tell_user", "Permission was denied or expired. Explain this and do not retry.")
+                        .toString(2) + "\n",
+                )
             }
         }
         val ep = sent.endpoint
         val picture = sent.picture
-        val name = fileName(args.get("name"), "png")
+        val name = fileName(requestedName, "png")
         val file = save(sessionId, name) { out -> check(picture.writeTo(out)) }
-            ?: return failed("image", "cannot write to /var/minis/attachments without replacing an existing file", noRetry = automatic)
+            ?: return failed("image", "cannot write to /var/minis/attachments without replacing an existing file", noRetry = true)
         val model = if (automatic) safeAttribution(ep.model, ep.apiKey) else ep.model
         val provider = if (automatic) safeAttribution(ep.label, ep.apiKey) else ep.label
         if (automatic) AutoImageNotices.published(sessionId, model, provider)
@@ -185,9 +214,11 @@ class MediaOffloadHandler internal constructor(
         JSONObject()
             .put("ok", false)
             .put("error", "no_${kind}_model")
-            .put("message", "No $kind model is configured. TAMA AI uses the user's own providers for this (Muse has it built in). " +
-                (if (kind == "image") "Alibaba Cloud Model Studio's qwen-image-3.0 or any OpenAI-compatible images endpoint works." else "Alibaba Cloud Model Studio's wan2.2-i2v-flash or MiniMax/MiniMax-H3 works (activated in their console)."))
-            .put("tell_user", "Explain this in a sentence and give the link [Image & video models](${MediaModels.DEEP_LINK}); do not invent a result.")
+            .put("message", if (kind == "image") context.getString(com.openminis.app.R.string.nm_image_provider_missing) else
+                "No video model is configured. TAMA AI uses the user's own providers for this (Muse has it built in). " +
+                    "Alibaba Cloud Model Studio's wan2.2-i2v-flash or MiniMax/MiniMax-H3 works (activated in their console).")
+            .put("settings", MediaModels.DEEP_LINK)
+            .put("tell_user", "Give this message and the link [Image & video models](${MediaModels.DEEP_LINK}); do not invent a result or retry.")
             .toString(2) + "\n",
     )
 

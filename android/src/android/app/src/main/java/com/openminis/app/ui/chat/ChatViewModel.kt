@@ -1173,6 +1173,13 @@ class ChatViewModel(
     // streaming, hiding the Stop button while the new turn was live).
     @Volatile
     private var streamJob: Job? = null
+    // Identifies the direct-image lifecycle for Stop/queue handling; it never owns another turn.
+    @Volatile
+    private var nmImageShortcutJob: Job? = null
+    @Volatile
+    private var nmImageShortcutPlaceholderId: String? = null
+    @Volatile
+    private var nmActiveImageShortcutCall: Job? = null
     // nanoMuse: Stop must only retire the tracker run owned by the job it cancels.
     private val nmTrackedLocalRuns = io.github.nanomuse.pet.PetRunBindings<Job>()
     private var currentProvider: LLMProvider? = null
@@ -5893,13 +5900,18 @@ class ChatViewModel(
                     }
                     val fallbackProviders = buildFallbackProviders(launchedProvider)
                     AppLogger.info(TAG_STREAM, "$label runAgentLoop CALL")
-                    runAgentLoop(
+                    val completedImageShortcut = runAgentLoop(
                         provider = launchedProvider,
                         promptInput = nmPromptInput,
                         fallbackProviders = fallbackProviders,
                         fallbackStrategy = activeFallbackStrategy,
                         onTerminalFailure = { SessionActivityTracker.markStreamError(trackedSessionId, trackedTurnId) },
                     )
+                    // A prompt may have arrived while the queued shortcut waited
+                    // for approval. Do not leave it stranded after a rerun.
+                    if (completedImageShortcut) drainQueuedPrompts(launchedProvider, activeFallbackStrategy) {
+                        SessionActivityTracker.markStreamError(trackedSessionId, trackedTurnId)
+                    }
                     AppLogger.info(TAG_STREAM, "$label runAgentLoop RETURN normal")
                 } catch (e: CancellationException) {
                     SessionActivityTracker.markReplyIncomplete(trackedSessionId, trackedTurnId) // nanoMuse
@@ -6246,7 +6258,11 @@ class ChatViewModel(
      * entry — its sole purpose is to break up the consecutive-user run for
      * the next API call; chat history reconstruction would just hide it.
      */
-    private data class InjectedTurn(val newAssistantId: String)
+    private data class InjectedTurn(
+        val newAssistantId: String,
+        val explicitImageRequest: Boolean,
+        val imageShortcut: io.github.nanomuse.router.Shortcut.Image?,
+    )
 
     private suspend fun injectQueuedPromptsAsNewTurn(
         finishedAssistantId: String,
@@ -6418,7 +6434,19 @@ class ChatViewModel(
             "injectQueuedPromptsAsNewTurn: injected ${queued.size} queued prompt(s) as new turn, " +
                 "finishedId=$finishedAssistantId newId=$newAssistantId",
         )
-        return InjectedTurn(newAssistantId)
+        val person = queued.singleOrNull()
+        val personWithoutMedia = person != null && person.petGeneration != null && person.attachments.isEmpty() && queuedPaste == null
+        val explicitImageRequest = personWithoutMedia && io.github.nanomuse.router.ImageRequestIntent.explicit(person!!.text)
+        val imageShortcut = person?.let {
+            io.github.nanomuse.router.ImageShortcutEligibility.select(
+                it.text, io.github.nanomuse.router.ImageShortcutContext(
+                    person = it.petGeneration != null, batchSize = queued.size,
+                    hasAttachments = it.attachments.isNotEmpty(), hasPastedContent = queuedPaste != null,
+                    editing = _editingMessageId.value != null, sharedContent = _hasInjectedShareContent.value,
+                ),
+            )
+        }
+        return InjectedTurn(newAssistantId, explicitImageRequest, imageShortcut)
     }
 
     /**
@@ -6435,7 +6463,7 @@ class ChatViewModel(
             val queued = _promptQueue.value
             _promptQueue.value = emptyList()
             Log.i(TAG, "📨[DRAIN] Draining ${queued.size} queued prompt(s): " +
-                queued.joinToString(", ") { "${it.id}=\"${it.text.take(20)}...\"" })
+                queued.joinToString(", ") { "${it.id}=${it.text.length}ch" })
 
             // Flip isQueued=false on corresponding chat messages so they render as sent.
             // T189: also clear queuedPromptId so a later retry of this bubble
@@ -6504,17 +6532,46 @@ class ChatViewModel(
                     val bodyCount = combinedParts.takeWhile { it is AgentContentPart.Text }.size
                     listOf(AgentContentPart.Text(p.modelText)) + combinedParts.drop(bodyCount)
                 } ?: combinedParts,
+                dbMessageId = queuedRow.id,
             ))
 
             try {
-                runAgentLoop(
-                    provider = this@ChatViewModel.currentProvider ?: provider,
-                    promptInput = nmCapturePromptInput(),
-                    fallbackProviders = buildFallbackProviders(this@ChatViewModel.currentProvider ?: provider),
-                    fallbackStrategy = fallbackStrategy,
-                    onTerminalFailure = onTerminalFailure,
-                )
-                nmAfterTurn() // nanoMuse: queued prompts complete turns too
+                val person = queued.singleOrNull()
+                val personWithoutMedia = person != null && person.petGeneration != null &&
+                    person.attachments.isEmpty() && drainPaste == null
+                val shortcut = person?.let {
+                    io.github.nanomuse.router.ImageShortcutEligibility.select(
+                        it.text, io.github.nanomuse.router.ImageShortcutContext(
+                            person = it.petGeneration != null, batchSize = queued.size,
+                            hasAttachments = it.attachments.isNotEmpty(), hasPastedContent = drainPaste != null,
+                            editing = _editingMessageId.value != null, sharedContent = _hasInjectedShareContent.value,
+                        ),
+                    )
+                }
+                if (shortcut != null) {
+                    // One standalone person request remains a zero-chat-model shortcut,
+                    // even when it waited behind another turn. Replace its temporary UI
+                    // id with the persisted id so later edits/retries address the right row.
+                    val queuedUiId = "queued_msg_${person!!.id}"
+                    withContext(Dispatchers.Main) {
+                        _messages.value = _messages.value.map { if (it.id == queuedUiId) it.copy(id = queuedRow.id) else it }
+                    }
+                    nmRunImageShortcut(sid, shortcut) { reply ->
+                        if (!reply.success) onTerminalFailure()
+                        withContext(Dispatchers.Main) { nmAppendAssistantLine(sid, reply.text) }
+                    }
+                } else {
+                    val imageRequested = personWithoutMedia && io.github.nanomuse.router.ImageRequestIntent.explicit(person!!.text)
+                    val completedImageShortcut = runAgentLoop(
+                        provider = this@ChatViewModel.currentProvider ?: provider,
+                        promptInput = nmCapturePromptInput(),
+                        fallbackProviders = buildFallbackProviders(this@ChatViewModel.currentProvider ?: provider),
+                        fallbackStrategy = fallbackStrategy,
+                        explicitImageRequest = imageRequested,
+                        onTerminalFailure = onTerminalFailure,
+                    )
+                    if (!completedImageShortcut) nmAfterTurn() // model turns only
+                }
             } catch (e: CancellationException) {
                 Log.d(TAG, "Agent loop (queued-drain) cancelled")
                 // Cancel mid-drain: cancelStream() will check _promptQueue
@@ -6581,7 +6638,132 @@ class ChatViewModel(
         if (_isStreaming.value) { nmEnqueuePrompt(text, petGeneration); return }
         // nanoMuse: an automated prompt must not trigger a paid avatar request on its own.
         if (petGeneration != null && nmInterceptAvatar(text, petGeneration)) { nmCountableTurn = false; return }
-        sendMessage(text, skipContextCheck = false, petGeneration = petGeneration) // nanoMuse: carry the submitting Pet through the guard.
+        // Both branches are explicit so the same decision can be tested with a
+        // fake chat client; automated, busy or media-bearing turns fall through.
+        io.github.nanomuse.router.ImageShortcutEligibility.dispatch(
+            text, io.github.nanomuse.router.ImageShortcutContext(
+                person = petGeneration != null, hasAttachments = _attachments.value.isNotEmpty(),
+                hasPastedContent = _pastedTexts.value.isNotEmpty(), editing = _editingMessageId.value != null,
+                sharedContent = _hasInjectedShareContent.value, busy = _isStreaming.value || _isCompacting.value,
+            ),
+            image = { image -> nmStartImageShortcut(text, requireNotNull(petGeneration), image) },
+            chat = { sendMessage(text, skipContextCheck = false, petGeneration = petGeneration) },
+        )
+    }
+
+    /** Runs the native tool and retains Stop ownership until its reply is saved. */
+    private suspend fun nmRunImageShortcut(
+        sid: String,
+        image: io.github.nanomuse.router.Shortcut.Image,
+        commit: suspend (io.github.nanomuse.media.ImageShortcutRunner.Reply) -> Unit,
+    ) {
+        val owner = kotlin.coroutines.coroutineContext[Job]
+        nmActiveImageShortcutCall = owner
+        try {
+            val reply = io.github.nanomuse.media.ImageShortcutRunner.run(
+                prompt = image.prompt,
+                failureMessage = context.getString(R.string.nm_image_request_failed),
+                settingsLabel = context.getString(R.string.nm_drawer_settings),
+            ) { prompt ->
+                com.openminis.app.tools.ImageGenerationTool.execute(
+                    JSONObject().put("prompt", prompt).toString(), sid, context,
+                )
+            }
+            kotlin.coroutines.coroutineContext.ensureActive()
+            commit(reply)
+        } finally {
+            if (nmActiveImageShortcutCall === owner) nmActiveImageShortcutCall = null
+        }
+    }
+
+    /** Starts a classified standalone person request without a chat-model call. */
+    private fun nmStartImageShortcut(text: String, petGeneration: Long, image: io.github.nanomuse.router.Shortcut.Image) {
+        _error.value = null
+        _canResume.value = false
+        _nmContinueAsk.value = null
+        nmHeadlessReceipt = null
+        _isStreaming.value = true // claim synchronously; later sends enter the queue
+        val placeholderId = "assistant_image_${java.util.UUID.randomUUID()}"
+        val job = viewModelScope.launch(start = kotlinx.coroutines.CoroutineStart.LAZY) {
+            val ownJob = requireNotNull(coroutineContext[Job])
+            var userRowSaved = false
+            var finished = false
+            try {
+                // Do not race a pending reload or draft promotion.
+                sessionLoaded.first { it }
+                val sid = ensureSession()
+                val rowId = nmAppendUserLine(sid, text.trim(), petGeneration)
+                userRowSaved = true
+                io.github.nanomuse.sync.ConversationSync.sent(sid)
+                io.github.nanomuse.chat.RoutineWakes.claim(sid, rowId)
+                _messages.value = _messages.value + ChatMessage(
+                    id = placeholderId, role = "assistant", content = "",
+                    isStreaming = true, isAwaitingModelResponse = true,
+                )
+                val slot = SessionConcurrencyManager.acquireSlot(sid)
+                val turnId = try {
+                    beginTrackedReply(sid, ownJob)
+                } catch (e: Throwable) {
+                    SessionConcurrencyManager.releaseSlot(slot)
+                    throw e
+                }
+                try {
+                    nmRunImageShortcut(sid, image) { reply ->
+                        if (!reply.success) SessionActivityTracker.markStreamError(sid, turnId)
+                        _messages.value = _messages.value.filterNot { it.id == placeholderId }
+                        nmAppendAssistantLine(sid, reply.text)
+                        finished = true
+                    }
+                } catch (e: CancellationException) {
+                    SessionActivityTracker.markReplyIncomplete(sid, turnId)
+                    throw e
+                } catch (e: Exception) {
+                    SessionActivityTracker.markStreamError(sid, turnId)
+                    throw e
+                } finally {
+                    try { finishTrackedReply(sid, turnId) } finally { SessionConcurrencyManager.releaseSlot(slot) }
+                }
+            } catch (e: CancellationException) {
+                if (!userRowSaved && _inputText.value.isEmpty()) _inputText.value = text
+                throw e
+            } catch (e: Exception) {
+                // No provider detail or image prompt is written to the log.
+                AppLogger.warning(TAG, "Image shortcut failed before it could be completed")
+                if (!userRowSaved && _inputText.value.isEmpty()) _inputText.value = text
+                if (streamJob === ownJob) _error.value = context.getString(R.string.nm_image_request_failed)
+            } finally {
+                if (!finished) _messages.value = _messages.value.filterNot { it.id == placeholderId }
+                if (nmImageShortcutJob === ownJob) {
+                    nmImageShortcutJob = null
+                    nmImageShortcutPlaceholderId = null
+                }
+                if (streamJob === ownJob) {
+                    _isStreaming.value = false
+                    // Stop owns the delayed queue restart; starting a new job inside
+                    // cancellation could let Stop's remaining cleanup target it.
+                    if (ownJob.isActive) nmContinueShortcutQueue()
+                }
+            }
+        }
+        nmImageShortcutJob = job
+        nmImageShortcutPlaceholderId = placeholderId
+        streamJob = job
+        job.start()
+    }
+
+    /** Do not discard queued text when a local image turn has no chat provider. */
+    private fun nmContinueShortcutQueue() {
+        if (_isStreaming.value || _isCompacting.value) return
+        val next = _promptQueue.value.firstOrNull() ?: return
+        val localImage = io.github.nanomuse.router.ImageShortcutEligibility.select(
+            next.text, io.github.nanomuse.router.ImageShortcutContext(
+                person = next.petGeneration != null, hasAttachments = next.attachments.isNotEmpty(),
+                hasPastedContent = _pastedTexts.value.isNotEmpty(), editing = _editingMessageId.value != null,
+                sharedContent = _hasInjectedShareContent.value,
+            ),
+        ) != null
+        if (localImage || currentProvider != null || AutoModelStore.enabled(context)) nmSendNextQueued()
+        else _error.value = context.getString(R.string.nm_chat_no_model)
     }
 
     // nanoMuse: only the adapter touches upstream state; the lifecycle lives in RemoteChatBridge.
@@ -6950,7 +7132,7 @@ class ChatViewModel(
         val partsJson = """[{"type":"text","value":${escapeJson(text)}}]"""
         val entity = chatRepository.appendMessage(sid, "user", partsJson)
         petGeneration?.let { io.github.nanomuse.pet.PetEvents.chat(context, entity.id, it) }
-        agentHistory.add(LLMMessage(role = LLMMessage.Role.USER, content = text))
+        agentHistory.add(LLMMessage(role = LLMMessage.Role.USER, content = text, dbMessageId = entity.id))
         _messages.value = _messages.value + ChatMessage(id = entity.id, role = "user", content = text)
         return entity.id
     }
@@ -6958,7 +7140,7 @@ class ChatViewModel(
     private suspend fun nmAppendAssistantLine(sid: String, text: String) {
         val parts = listOf<AgentContentPart>(AgentContentPart.Text(text))
         val entity = chatRepository.appendMessage(sid, "assistant", buildAssistantPartsJson(parts))
-        agentHistory.add(LLMMessage(role = LLMMessage.Role.ASSISTANT, content = text, contentParts = parts))
+        agentHistory.add(LLMMessage(role = LLMMessage.Role.ASSISTANT, content = text, contentParts = parts, dbMessageId = entity.id))
         // The transcript now ends on a reply, so a stale "interrupted" banner no longer applies.
         _canResume.value = false
         _messages.value = _messages.value + ChatMessage(
@@ -7381,11 +7563,16 @@ class ChatViewModel(
                         val fallbackProviders = buildFallbackProviders(provider)
 
                         AppLogger.info(TAG_STREAM, "send runAgentLoop CALL")
-                        runAgentLoop(
+                        val completedImageShortcut = runAgentLoop(
                             provider = provider,
                             promptInput = nmPromptInput,
                             fallbackProviders = fallbackProviders,
                             fallbackStrategy = activeFallbackStrategy,
+                            explicitImageRequest = petChatGeneration != null && headless == null &&
+                                currentAttachments.isEmpty() && pasted == null &&
+                                io.github.nanomuse.router.ImageRequestIntent.explicit(trimmed),
+                            // A headless receipt must finish its own turn before local queued messages.
+                            allowQueuedInterruption = headless == null,
                             onTerminalFailure = { SessionActivityTracker.markStreamError(trackedSessionId, trackedTurnId) },
                         )
                         AppLogger.info(TAG_STREAM, "send runAgentLoop RETURN normal")
@@ -7394,7 +7581,7 @@ class ChatViewModel(
                             if (_canResume.value || !_messages.value.lastOrNull { it.role == "assistant" }?.error.isNullOrBlank()) headless.fail()
                             else headless.complete(chatRepository.dao.loadMessages(activeSessionId))
                         }
-                        nmAfterTurn() // nanoMuse: the first conversation steps forward when a turn completes
+                        if (!completedImageShortcut) nmAfterTurn() // model-specific completion hooks
                         // Drain any prompts the user queued while this loop was running.
                         // Skipped on cancel: cancelled job won't reach here.
                         drainQueuedPrompts(provider, activeFallbackStrategy) {
@@ -7776,7 +7963,7 @@ class ChatViewModel(
                         }
                         val fallbackProviders = buildFallbackProviders(provider)
                         AppLogger.info(TAG_STREAM, "retryLast runAgentLoop CALL")
-                        runAgentLoop(
+                        val completedImageShortcut = runAgentLoop(
                             provider = provider,
                             promptInput = nmPromptInput,
                             fallbackProviders = fallbackProviders,
@@ -7784,7 +7971,7 @@ class ChatViewModel(
                             onTerminalFailure = { SessionActivityTracker.markStreamError(trackedSessionId, trackedTurnId) },
                         )
                         AppLogger.info(TAG_STREAM, "retryLast runAgentLoop RETURN normal")
-                        nmAfterTurn() // nanoMuse
+                        if (!completedImageShortcut) nmAfterTurn() // model turns only
                         drainQueuedPrompts(provider, activeFallbackStrategy) {
                             SessionActivityTracker.markStreamError(trackedSessionId, trackedTurnId)
                         }
@@ -7971,8 +8158,13 @@ class ChatViewModel(
         promptInput: PromptProfiles.Input,
         fallbackProviders: List<FallbackCandidate> = emptyList(),
         fallbackStrategy: com.openminis.app.data.model.FallbackStrategy = com.openminis.app.data.model.FallbackStrategy.default,
+        explicitImageRequest: Boolean = false,
+        allowQueuedInterruption: Boolean = true,
         onTerminalFailure: () -> Unit,
-    ) {
+    ): Boolean {
+        // The caller skips model-specific completion hooks when a queued shortcut
+        // itself produced the final answer.
+        var completedImageShortcut = false
         // nanoMuse: every write in this loop belongs to the Pet present when its tracker run began.
         val petRunGeneration = nmPetGenerationForJob(kotlin.coroutines.coroutineContext[Job])
         AppLogger.info(TAG_STREAM, "runAgentLoop ENTER provider=${provider.javaClass.simpleName} historySize=${agentHistory.size}")
@@ -8123,6 +8315,9 @@ class ChatViewModel(
         var nmRoute = nmRouteLatest()
         var nmCurrentInput = promptInput
         var nmUsedTools = false
+        // At most one native image call per explicit person turn. A failure can
+        // still have been charged, so a model's retry must not dispatch again.
+        val nmImageGuard = io.github.nanomuse.router.ImageTurnGuard(explicitImageRequest)
         var nmWarnedWithoutTools = false
         var nmAttempt: TurnRequestPlanner.Attempt? = null
         // Captured at dispatch, not looked up later after a settings change.
@@ -9322,7 +9517,8 @@ class ChatViewModel(
                         // the downstream tool-result join all key on the
                         // same value (matches the rename applied at start).
                         val toolCompleteId = dedupeToolCompleteId(chunk.id)
-                        android.util.Log.d("ToolChain[VM]", "[turn=$turn] ToolCallComplete id=$toolCompleteId name=${chunk.name} args=${chunk.args.toString().take(300)}")
+                        val loggedToolArgs = if (chunk.name == com.openminis.app.tools.ImageGenerationTool.NAME) "<omitted>" else chunk.args.toString().take(300)
+                        android.util.Log.d("ToolChain[VM]", "[turn=$turn] ToolCallComplete id=$toolCompleteId name=${chunk.name} args=$loggedToolArgs")
                         toolCalls.add(Triple(toolCompleteId, chunk.name, chunk.args))
                         // [T-android-gemini3-thoughtsig / #179] Stash the Gemini
                         // 3.x thought signature keyed by the (deduped) tool call id.
@@ -10078,7 +10274,7 @@ class ChatViewModel(
                         "ToolPreflight",
                         "[ToolRepair] REPAIRED tool=$name id=$id strategies=[${repairs.joinToString(", ")}] " +
                             "argsKeys=[${args.keys().asSequence().toList().sorted().joinToString(",")}] " +
-                            "rawTail=<<<${toolInputChunkRings[id]?.lastOrNull()?.take(500) ?: ""}>>>"
+                            "rawTail=<<<${if (name == com.openminis.app.tools.ImageGenerationTool.NAME) "<omitted>" else toolInputChunkRings[id]?.lastOrNull()?.take(500) ?: ""}>>>"
                     )
                 }
                 // [T-truncated-args-visibility #119] Non-null when THIS call's
@@ -10087,6 +10283,19 @@ class ChatViewModel(
                 // and fuzzy-name repairs fix the shape of a complete argument.
                 // Mirrors iOS truncationRepairTag.
                 val truncationRepairTag: String? = repairs.firstOrNull { it.startsWith("truncation+") }
+
+                // Repaired image arguments must not cause a billable request for
+                // a description or size the person or model did not provide intact.
+                if (repairs.isNotEmpty() && name == com.openminis.app.tools.ImageGenerationTool.NAME) {
+                    nmImageGuard.consume(truncated = true)
+                    val reason = "Image request was not sent because its arguments needed repair. Ask the user before trying again."
+                    val idx = allToolBlocks.indexOfFirst { it.id == id }
+                    if (idx >= 0) allToolBlocks[idx] = allToolBlocks[idx].copy(toolStatus = ToolBlockStatus.FAILED, content = reason)
+                    toolLoopDetector.record(name, parseToolParams(args.toString()), result = null, errorMessage = reason, toolCallId = id)
+                    resultParts.add(AgentContentPart.ToolResult(id = id, name = name, content = reason, isError = true))
+                    toolInputChunkRings.remove(id)
+                    continue
+                }
 
                 // [T-truncated-args-visibility #119] Refuse truncated WRITES.
                 // Auto-closing an unterminated JSON string is indistinguishable
@@ -10191,9 +10400,9 @@ class ChatViewModel(
                         "BLOCKED tool=$name id=$id reason=\"$preflightError\" " +
                             "argsKeys=[${args.keys().asSequence().toList().sorted().joinToString(",")}] " +
                             "chunkCount=${chunkRing.size} " +
-                            "lastChunk=<<<${chunkRing.lastOrNull()?.take(500) ?: ""}>>>"
+                            "lastChunk=<<<${if (name == com.openminis.app.tools.ImageGenerationTool.NAME) "<omitted>" else chunkRing.lastOrNull()?.take(500) ?: ""}>>>"
                     )
-                    chunkRing.forEachIndexed { i, snap ->
+                    if (name != com.openminis.app.tools.ImageGenerationTool.NAME) chunkRing.forEachIndexed { i, snap ->
                         AppLogger.warning(
                             "ToolPreflight",
                             "  chunk[$i] bytes=${snap.toByteArray(Charsets.UTF_8).size} raw=<<<${snap.take(500)}>>>"
@@ -10229,7 +10438,22 @@ class ChatViewModel(
                     continue
                 }
 
-                android.util.Log.d("ToolChain[VM]", "[turn=$turn] executeTool START name=$name args=${argsStr.take(200)}")
+                if (name == com.openminis.app.tools.ImageGenerationTool.NAME) {
+                    val decision = nmImageGuard.consume()
+                    if (decision != io.github.nanomuse.router.ImageTurnGuard.Decision.ALLOW) {
+                        val reason = if (decision == io.github.nanomuse.router.ImageTurnGuard.Decision.NOT_REQUESTED)
+                            "Image generation was not requested explicitly by the person in this turn. Do not generate or retry."
+                        else "An image was already attempted in this turn and may have been charged. Do not retry without a new user request."
+                        val idx = allToolBlocks.indexOfFirst { it.id == id }
+                        if (idx >= 0) allToolBlocks[idx] = allToolBlocks[idx].copy(toolStatus = ToolBlockStatus.FAILED, content = reason)
+                        toolLoopDetector.record(name, paramsMap, result = null, errorMessage = reason, toolCallId = id)
+                        resultParts.add(AgentContentPart.ToolResult(id = id, name = name, content = reason, isError = true))
+                        toolInputChunkRings.remove(id)
+                        continue
+                    }
+                }
+                val loggedArgs = if (name == com.openminis.app.tools.ImageGenerationTool.NAME) "<omitted>" else argsStr.take(200)
+                android.util.Log.d("ToolChain[VM]", "[turn=$turn] executeTool START name=$name args=$loggedArgs")
                 // nanoMuse: rejected/unoffered/preflight-blocked calls must not create tool continuity.
                 nmUsedTools = true
                 val result = executeTool(name, argsStr, id, allToolBlocks, assistantId, accumulatedText)
@@ -10237,7 +10461,8 @@ class ChatViewModel(
                 if (result.success && truncationRepairTag == null) {
                     io.github.nanomuse.pet.PetEvents.tool(context, realSessionId.ifEmpty { sessionId }, id, name, petRunGeneration)
                 }
-                android.util.Log.d("ToolChain[VM]", "[turn=$turn] executeTool END name=$name success=${result.success} title=${result.toolTitle} outputLen=${result.output.length} output=${result.output.take(200)}")
+                val loggedOutput = if (name == com.openminis.app.tools.ImageGenerationTool.NAME) "<omitted>" else result.output.take(200)
+                android.util.Log.d("ToolChain[VM]", "[turn=$turn] executeTool END name=$name success=${result.success} title=${result.toolTitle} outputLen=${result.output.length} output=$loggedOutput")
 
                 // Record post-execution. WARNING text is appended to the tool
                 // result so the model sees it on its next turn. No block here —
@@ -10406,7 +10631,7 @@ class ChatViewModel(
             //   …assistant(responds-to-queued).
             // The bridge lives in agentHistory only (NOT persisted) —
             // it's purely a wire-format spacer for the API call.
-            if (_promptQueue.value.isNotEmpty()) {
+            if (allowQueuedInterruption && _promptQueue.value.isNotEmpty()) {
                 AppLogger.info(
                     TAG_STREAM,
                     "📨[QueueInterrupt] turn=$turn ${_promptQueue.value.size} queued prompt(s) — interrupting after current tool call to start a standalone turn",
@@ -10417,17 +10642,35 @@ class ChatViewModel(
                         finishedAccumulatedText = accumulatedText,
                         finishedAllToolBlocks = allToolBlocks,
                     )
+                } catch (e: CancellationException) {
+                    throw e
                 } catch (e: Exception) {
                     Log.e(TAG, "injectQueuedPromptsAsNewTurn failed", e)
                     null
                 }
                 if (handled != null) {
+                    val imageShortcut = handled.imageShortcut
+                    if (imageShortcut != null) {
+                        // The queued user row is already saved and credited. Finish it
+                        // locally rather than issuing a model request for that row.
+                        nmRunImageShortcut(activeSessionId, imageShortcut) { reply ->
+                            if (!reply.success) onTerminalFailure()
+                            withContext(Dispatchers.Main) {
+                                _messages.value = _messages.value.filterNot { it.id == handled.newAssistantId }
+                                nmAppendAssistantLine(activeSessionId, reply.text)
+                            }
+                        }
+                        completedImageShortcut = true
+                        loopExitedNormally = true
+                        break
+                    }
                     // nanoMuse: a queued interruption is a new user turn, not the old
                     // prompt under a new bubble. Keep continuity and classify its content.
                     nmPreviousRoute = SessionState(nmRoute.profile, nmRoute.hints, nmUsedTools)
                     nmRoute = nmRouteLatest()
                     nmCurrentInput = nmCapturePromptInput()
                     nmUsedTools = false
+                    nmImageGuard.newTurn(handled.explicitImageRequest)
                     nmWarnedWithoutTools = false
                     nmAutoTurn?.reset()
                     nmAutoLocalBlocks.clear()
@@ -10473,6 +10716,7 @@ class ChatViewModel(
         } else {
             AppLogger.info(TAG_STREAM, "runAgentLoop EXIT (loop body ended naturally)")
         }
+        return completedImageShortcut
     }
 
     /**
@@ -10574,6 +10818,8 @@ class ChatViewModel(
             // bindMounts map and would surface another session's
             // /var/minis/{workspace,attachments,offloads,browser} files.
             ReadImageTool.NAME -> executeReadImageTool(argsJson)
+            com.openminis.app.tools.ImageGenerationTool.NAME ->
+                com.openminis.app.tools.ImageGenerationTool.execute(argsJson, activeSessionId, context)
             "shell_execute" -> executeShellCommand(argsJson, toolId, toolBlocks, assistantId, currentText)
             "browser_use" -> executeBrowserUseTool(argsJson)
             "memory_write" -> executeMemoryWriteTool(argsJson)
@@ -12716,6 +12962,9 @@ class ChatViewModel(
         if (_isStreaming.value) io.github.nanomuse.ui.feedback.TurnFeedback.stopped(activeSessionId) // nanoMuse: the record hears the Stop; the chat asks why, once (relay 0.31)
         // nanoMuse: snapshot the stopped job and its own run under the registration lock.
         val stoppedJob = streamJob
+        val stoppedImageShortcut = stoppedJob != null && stoppedJob === nmImageShortcutJob
+        val stoppedImageCall = stoppedJob != null && stoppedJob === nmActiveImageShortcutCall
+        val stoppedImagePlaceholder = if (stoppedImageShortcut) nmImageShortcutPlaceholderId else null
         val stoppedBinding = stoppedJob?.let { job -> nmTrackedLocalRuns.stop(job) { job.cancel() } }
         _isStreaming.value = false
         // T-streaming-side-channel: flush any in-flight delta back into the
@@ -12734,16 +12983,27 @@ class ChatViewModel(
         // Cancelled so the overlay's glyph reflects the actual end
         // state (⊘) instead of carrying over the prior tool's outcome.
         // nanoMuse: never tear down another job's tracker run, even after draft promotion.
-        finishStoppedReply(stoppedBinding, publishReply = true)
-        // Stop whichever shell the agent loop is actually dispatching against.
-        // Before `ensureSession()` that is the draft id; after, the real id.
-        // Stopping the wrong one leaves a runaway yt-dlp/ffmpeg alive.
-        ExecutionCoordinator.stopCurrentCommand(activeSessionId)
-        if (isDraft && realSessionId.isNotEmpty() && activeSessionId != sessionId) {
-            // Mid-turn rename: sweep any lingering draft shell too.
-            ExecutionCoordinator.stopCurrentCommand(sessionId)
+        finishStoppedReply(stoppedBinding, publishReply = !stoppedImageShortcut && !stoppedImageCall)
+        if (stoppedImageShortcut) {
+            // There may not yet be a placeholder. Generic model cleanup would
+            // otherwise mistake the previous reply for this interrupted turn.
+            if (stoppedImagePlaceholder != null) {
+                _messages.value = _messages.value.filterNot { it.id == stoppedImagePlaceholder }
+            }
+            _canResume.value = false
+        } else {
+            // Stop whichever shell the agent loop is actually dispatching against.
+            // Before `ensureSession()` that is the draft id; after, the real id.
+            ExecutionCoordinator.stopCurrentCommand(activeSessionId)
+            if (isDraft && realSessionId.isNotEmpty() && activeSessionId != sessionId) {
+                ExecutionCoordinator.stopCurrentCommand(sessionId)
+            }
+            handleUserCancelledCleanup()
         }
-        handleUserCancelledCleanup()
+        if (stoppedImageShortcut || stoppedImageCall) {
+            // The remote service may already have received the request, even when Stop wins locally.
+            appendSystemInfo(context.getString(R.string.nm_image_request_failed), "info")
+        }
 
         // T189: iOS parity (AIChatViewModel.swift L2592-2610). If the user
         // enqueued prompts during the cancelled stream, auto-resume the drain
@@ -12752,7 +13012,10 @@ class ChatViewModel(
         val pending = _promptQueue.value
         if (pending.isNotEmpty()) {
             AppLogger.info(TAG_STREAM, "cancel — ${pending.size} queued prompt(s) remain, restarting drain")
-            resumeQueueAfterCancel()
+            if (stoppedImageShortcut) viewModelScope.launch {
+                kotlinx.coroutines.delay(200)
+                nmContinueShortcutQueue()
+            } else resumeQueueAfterCancel()
         }
     }
 
@@ -13131,7 +13394,7 @@ class ChatViewModel(
                         }
                         val fallbackProviders = buildFallbackProviders(provider)
                         AppLogger.info(TAG_STREAM, "resume runAgentLoop CALL")
-                        runAgentLoop(
+                        val completedImageShortcut = runAgentLoop(
                             provider = provider,
                             promptInput = nmPromptInput,
                             fallbackProviders = fallbackProviders,
@@ -13139,7 +13402,7 @@ class ChatViewModel(
                             onTerminalFailure = { SessionActivityTracker.markStreamError(trackedSessionId, trackedTurnId) },
                         )
                         AppLogger.info(TAG_STREAM, "resume runAgentLoop RETURN normal")
-                        nmAfterTurn() // nanoMuse
+                        if (!completedImageShortcut) nmAfterTurn() // model turns only
                         drainQueuedPrompts(provider, activeFallbackStrategy) {
                             SessionActivityTracker.markStreamError(trackedSessionId, trackedTurnId)
                         }

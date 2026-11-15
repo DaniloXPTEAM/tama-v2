@@ -7,6 +7,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.coroutines.resume
 
@@ -25,10 +27,14 @@ object OffloadPermissionManager {
     }
 
     data class PermissionRequest(
+        /** Unique for this process; a stale dialog must not answer the next request. */
+        val requestId: Long,
         val toolName: String,
         val toolTitle: String,
         val description: String,
         val sessionId: String,
+        /** A legacy shell image call has no trustworthy person-turn provenance. */
+        val oneTimeOnly: Boolean = false,
     )
 
     enum class PermissionCategory(val displayName: String) {
@@ -57,13 +63,10 @@ object OffloadPermissionManager {
     )
 
     /**
-     * Registry of all tools and their permission categories. Defaults are
-     * BYPASS across the board to mirror iOS — the user opted into running an
-     * agent app, so background access is permitted unless they explicitly
-     * downgrade an entry to ASK_ONCE / NOT_ALLOWED. Tools omitted from this
-     * registry (e.g. the former `open_url` and `model_use` entries) fall
-     * through to BYPASS via [getLevel]'s unknown-tool branch — no separate
-     * "always permit" carve-out needed.
+     * Registry of tools and their permission categories. Most defaults mirror
+     * iOS BYPASS; paid image generation asks first, and privileged integrations
+     * default to NOT_ALLOWED. Unknown tool names still fall through to BYPASS,
+     * so new sensitive actions must be explicitly registered and gated.
      */
     val toolRegistry: List<ToolPermissionInfo> = listOf(
         // Privacy — user-configurable, visible in Settings.
@@ -72,7 +75,10 @@ object OffloadPermissionManager {
         ToolPermissionInfo("clipboard", "Clipboard", PermissionCategory.PRIVACY, PermissionLevel.BYPASS),
         ToolPermissionInfo("contacts", "Contacts", PermissionCategory.PRIVACY, PermissionLevel.BYPASS),
         ToolPermissionInfo("photos", "Photos", PermissionCategory.PRIVACY, PermissionLevel.BYPASS),
-        // Media — no personal data, hidden from Settings.
+        // Images can incur a per-picture charge and therefore need a visible,
+        // explicit permission instead of unknown-tool BYPASS.
+        ToolPermissionInfo("image_generation", "Image generation", PermissionCategory.MEDIA, PermissionLevel.ASK_ONCE),
+        // Other media tools carry no personal data and stay hidden from Settings.
         ToolPermissionInfo("speak", "Text-to-Speech", PermissionCategory.MEDIA, PermissionLevel.BYPASS, showInSettings = false),
         ToolPermissionInfo("media_player", "Media Player", PermissionCategory.MEDIA, PermissionLevel.BYPASS, showInSettings = false),
         ToolPermissionInfo("speech_recognition", "Speech Recognition", PermissionCategory.MEDIA, PermissionLevel.BYPASS, showInSettings = false),
@@ -119,6 +125,15 @@ object OffloadPermissionManager {
     private val _pendingRequest = MutableStateFlow<PermissionRequest?>(null)
     val pendingRequest: StateFlow<PermissionRequest?> = _pendingRequest.asStateFlow()
 
+    // Only one dialog/continuation may be active, even if two sessions invoke
+    // different tools concurrently. A waiting request must never replace the
+    // continuation for the dialog already shown to the person.
+    private val permissionQueue = Mutex()
+    private val permissionStateLock = Any()
+    // Any settings change invalidates an answer to an older, still-open dialog.
+    private val permissionVersions = mutableMapOf<String, Long>()
+    // Incremented under permissionStateLock; never reused while this process lives.
+    private var nextPermissionRequestId = 0L
     private var pendingContinuation: kotlin.coroutines.Continuation<Response>? = null
 
     // ── Android system runtime permission request (for location etc.) ──────────
@@ -321,16 +336,25 @@ object OffloadPermissionManager {
         }
     }
 
-    fun setLevel(toolName: String, level: PermissionLevel) {
+    fun setLevel(toolName: String, level: PermissionLevel) = synchronized(permissionStateLock) {
         prefs.edit().putString("level_$toolName", level.name).apply()
+        invalidateToolGrants(toolName)
     }
 
-    fun resetAll() {
+    fun resetAll() = synchronized(permissionStateLock) {
         val editor = prefs.edit()
         for (tool in toolRegistry) {
             editor.remove("level_${tool.toolName}")
+            invalidateToolGrants(tool.toolName)
         }
         editor.apply()
+    }
+
+    /** Caller holds [permissionStateLock]. */
+    private fun invalidateToolGrants(toolName: String) {
+        permissionVersions[toolName] = (permissionVersions[toolName] ?: 0L) + 1L
+        sessionGrants.values.forEach { it.remove(toolName) }
+        sessionDenials.values.forEach { it.remove(toolName) }
     }
 
     /**
@@ -353,45 +377,66 @@ object OffloadPermissionManager {
      * For ASK_ONCE, suspends until user responds via the dialog.
      * Returns true if allowed.
      */
-    suspend fun checkPermission(toolName: String, toolTitle: String, sessionId: String): Boolean {
-        val level = getLevel(toolName)
-        return when (level) {
-            PermissionLevel.BYPASS -> true
-            PermissionLevel.NOT_ALLOWED -> false
-            PermissionLevel.ASK_ONCE -> {
-                // T338: a prior "Deny in this session" short-circuits
-                // before any grants check or dialog so the agent can't
-                // spam the user.
-                val denials = sessionDenials.getOrPut(sessionId) { mutableSetOf() }
-                if (toolName in denials) return false
+    suspend fun checkPermission(
+        toolName: String,
+        toolTitle: String,
+        sessionId: String,
+        requireFreshApproval: Boolean = false,
+    ): Boolean {
+        when (getLevel(toolName)) {
+            PermissionLevel.BYPASS -> if (!requireFreshApproval) return true
+            PermissionLevel.NOT_ALLOWED -> return false
+            PermissionLevel.ASK_ONCE -> Unit
+        }
+        return permissionQueue.withLock {
+            // The setting may have changed while this request was queued.
+            when (getLevel(toolName)) {
+                PermissionLevel.BYPASS -> if (!requireFreshApproval) return@withLock true
+                PermissionLevel.NOT_ALLOWED -> return@withLock false
+                PermissionLevel.ASK_ONCE -> Unit
+            }
+            val version = synchronized(permissionStateLock) {
+                if (getLevel(toolName) == PermissionLevel.NOT_ALLOWED) return@withLock false
+                if (toolName in sessionDenials[sessionId].orEmpty()) return@withLock false
+                if (!requireFreshApproval && toolName in sessionGrants[sessionId].orEmpty()) return@withLock true
+                permissionVersions[toolName] ?: 0L
+            }
 
-                val grants = sessionGrants.getOrPut(sessionId) { mutableSetOf() }
-                if (toolName in grants) return true
-
-                // Show dialog and wait for response.
-                val info = toolRegistry.find { it.toolName == toolName }
-                val response = suspendCancellableCoroutine<Response> { cont ->
+            val info = toolRegistry.find { it.toolName == toolName }
+            val response = suspendCancellableCoroutine<Response> { cont ->
+                synchronized(permissionStateLock) {
                     pendingContinuation = cont
                     _pendingRequest.value = PermissionRequest(
+                        requestId = nextPermissionRequestId++,
                         toolName = toolName,
                         toolTitle = toolTitle,
                         description = "Allow ${info?.displayName ?: toolName} access?",
                         sessionId = sessionId,
+                        oneTimeOnly = requireFreshApproval,
                     )
-                    cont.invokeOnCancellation {
-                        _pendingRequest.value = null
-                        pendingContinuation = null
+                }
+                cont.invokeOnCancellation {
+                    synchronized(permissionStateLock) {
+                        if (pendingContinuation === cont) {
+                            _pendingRequest.value = null
+                            pendingContinuation = null
+                        }
                     }
                 }
-
+            }
+            // A Settings change while the dialog was open invalidates its answer,
+            // including NOT_ALLOWED → ASK_ONCE (an ABA change).
+            synchronized(permissionStateLock) {
+                if (getLevel(toolName) == PermissionLevel.NOT_ALLOWED ||
+                    (permissionVersions[toolName] ?: 0L) != version) return@withLock false
                 when (response) {
                     Response.ALLOW_SESSION -> {
-                        grants.add(toolName)
+                        if (!requireFreshApproval) sessionGrants.getOrPut(sessionId) { mutableSetOf() }.add(toolName)
                         true
                     }
-                    Response.ALLOW_ONCE -> true  // no caching; next call re-prompts
+                    Response.ALLOW_ONCE -> true
                     Response.DENY_SESSION -> {
-                        denials.add(toolName)
+                        sessionDenials.getOrPut(sessionId) { mutableSetOf() }.add(toolName)
                         false
                     }
                 }
@@ -399,16 +444,22 @@ object OffloadPermissionManager {
         }
     }
 
-    /** Called from UI when user responds to the permission dialog. */
-    fun respondToRequest(response: Response) {
-        _pendingRequest.value = null
-        pendingContinuation?.resume(response)
-        pendingContinuation = null
+    /** Only the dialog that was actually shown may answer its own request. */
+    fun respondToRequest(requestId: Long, response: Response) {
+        val continuation = synchronized(permissionStateLock) {
+            if (_pendingRequest.value?.requestId != requestId) return
+            pendingContinuation.also {
+                pendingContinuation = null
+                _pendingRequest.value = null
+            }
+        }
+        continuation?.resume(response)
     }
 
     /** Clear session grants AND denials (call when a session ends). */
-    fun clearSessionGrants(sessionId: String) {
+    fun clearSessionGrants(sessionId: String) = synchronized(permissionStateLock) {
         sessionGrants.remove(sessionId)
         sessionDenials.remove(sessionId)
+        Unit
     }
 }

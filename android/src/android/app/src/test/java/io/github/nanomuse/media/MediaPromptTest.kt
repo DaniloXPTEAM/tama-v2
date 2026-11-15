@@ -15,10 +15,10 @@ class MediaPromptTest {
         assertFalse(text.contains("No image model is set"))
     }
 
-    @Test fun `automatic image prompt recommends its own command and forbids reference edits`() {
+    @Test fun `automatic image prompt recommends the native tool and forbids reference edits`() {
         val text = MediaPrompt.build("image model via provider", "video model", "minis://settings/media", true)
-        val imageCommand = text.substringAfter("run `nanomuse-media image").substringBefore('`')
-        assertFalse(imageCommand.contains("--from"))
+        assertTrue(text.contains("call `generate_image`"))
+        assertTrue(text.contains("do not retry after a failed image request"))
         assertTrue(text.contains("Image editing with --from is unavailable"))
         assertTrue(text.contains("minis-model-use run` is unavailable"))
         assertTrue(text.contains("Image model: image model via provider"))

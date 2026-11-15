@@ -13,6 +13,7 @@ internal interface MediaImageServices {
     fun revalidate(selection: AutoImageSelection.Selection): ImageGen.Endpoint?
     fun manualEndpoint(): ImageGen.Endpoint?
     fun agentEndpoint(): ImageGen.Endpoint?
+    fun hasConfiguredImage(): Boolean = manualEndpoint() != null
     suspend fun generate(endpoint: ImageGen.Endpoint, prompt: String, size: String, allowFormatRetry: Boolean): MediaPicture
     suspend fun edit(endpoint: ImageGen.Endpoint, reference: Bitmap, prompt: String): MediaPicture
 }
@@ -25,8 +26,12 @@ internal class AndroidMediaImageServices(private val context: Context) : MediaIm
     override fun automatic() = AutoModelStore.enabled(context)
     override fun choose() = AutoImageSelection.choose(context)
     override fun revalidate(selection: AutoImageSelection.Selection) = AutoImageSelection.endpointIfStillAllowed(context, selection)
-    override fun manualEndpoint() = MediaModels.imageEndpoint(context)
+    // ProviderInstance is mutable. Snapshot it so a route changed during a
+    // permission dialog cannot compare equal merely because both endpoints
+    // reference the same object.
+    override fun manualEndpoint() = MediaModels.imageEndpoint(context)?.let { it.copy(instance = it.instance.copy()) }
     override fun agentEndpoint() = MediaModels.agentImageEndpoint(context)
+    override fun hasConfiguredImage() = manualEndpoint() != null || AutoImageSelection.hasRegisteredImage(context)
 
     override suspend fun generate(endpoint: ImageGen.Endpoint, prompt: String, size: String, allowFormatRetry: Boolean): MediaPicture =
         picture(ImageGen.generate(context, endpoint, prompt, size, allowFormatRetry))

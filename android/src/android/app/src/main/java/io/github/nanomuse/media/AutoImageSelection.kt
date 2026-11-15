@@ -65,6 +65,16 @@ internal object AutoImageSelection {
         }
     }
 
+    /** Distinguish no configured image model from a configured but unapproved one. */
+    fun hasRegisteredImage(context: Context): Boolean {
+        val app = context.applicationContext as? MinisApp ?: return false
+        val repo = app.providerRepositoryOrNull ?: return false
+        return entries(context, repo).any {
+            it.candidate.confirmedImageGeneration || "image" in it.model.model.outputModalities.orEmpty() ||
+                ImageGen.looksLikeImageModel(it.model.model.id)
+        }
+    }
+
     /** Does not make a network call or retain credentials. */
     fun choose(context: Context): Selection? {
         if (!AutoModelStore.enabled(context)) return null
@@ -95,6 +105,8 @@ internal object AutoImageSelection {
         val key = repo.usableApiKey(current.instance) ?: return null
         if (!AutoModelStore.enabled(context) || !AutoModelStore.imageApproved(context, current.identity) ||
             AutoModelRuntime.accountVersion(selection.providerId) != selection.accountVersion) return null
-        return ImageGen.Endpoint(current.instance, key, selection.modelId)
+        // The repository instance is mutable. Dispatch uses this snapshot rather
+        // than following later UI edits to a route that was not approved.
+        return ImageGen.Endpoint(current.instance.copy(), key, selection.modelId)
     }
 }

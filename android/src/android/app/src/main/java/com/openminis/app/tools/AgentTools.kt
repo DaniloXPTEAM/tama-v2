@@ -35,6 +35,7 @@ object AgentTools {
         if (supportsImageInput || visionGroupConfigured) {
             add(ReadImageTool.definition())
         }
+        add(ImageGenerationTool.definition())
         add(browserUseDefinition())
         if (memoryEnabled) {
             add(memoryWriteDefinition())

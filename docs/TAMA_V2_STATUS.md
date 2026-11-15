@@ -26,13 +26,91 @@ depois T5, T6, T8 e T7; T9 aguarda o Poco e T12 fica na leitura estática já fe
 | T4: roteador e perfis | PARCIAL | O job Android de `e94734e` compilou o APK, passou unitários e montou o APK instrumentado; os previews sintéticos passaram, mas o smoke de dispositivo falhou. O wire e o Poco continuam não comprovados. | Manter a investigação do emulador pausada; validar no dispositivo quando autorizado. A falta de ferramentas após redução é avisada, não considerada uma tarefa concluída. |
 | T4b: auto-combo | PARCIAL — INTEGRAÇÃO EM VALIDAÇÃO | Seleção e reserva estão ligadas ao chat; imagens do agente têm seleção e autorização separadas, com testes locais descritos abaixo. **Não comprovam o envio Android.** | Validar o loop real, failover, fila, logins, ferramentas e imagem; não considerar concluído sem prova. |
 | T12: subagentes | PARCIAL | `84436db`: investigação estática em [TAMA_V2_SUBAGENTES.md](TAMA_V2_SUBAGENTES.md): não foi encontrada no Android examinado uma orquestração conversa/executor independente; `minis-model-use`, fila e slots não bastam. Há um plano de implementação e testes. | Primeiro concluir T4b sequencial; não declarar execução paralela sem teste dinâmico. |
-| T5: atalhos sem modelo | PENDENTE | Nenhum atalho novo foi adicionado nesta etapa. | Reusar handlers e preservar `RiskGate` e `OffloadGate`. |
+| T5: atalhos sem modelo | PARCIAL — EM VALIDAÇÃO | Atalho restrito de imagem conectado ao envio e à fila; a ramificação usada no envio passou teste host com ações falsas. Isso **não** comprova zero requisições no ViewModel Android. | Validar envio/Stop/fila no Android; implementar e testar abrir app, clima, alarme e lembrete pelos handlers e gates existentes. |
 | T6: tools sob demanda | PENDENTE | Sem `load_tools` nesta alteração. | Carregar grupos sem alterar o prefixo estável. |
 | T7: onboarding | PENDENTE | As jornadas anteriores não validam o fluxo novo do plano. | Presets, explicações e teste de conexão seguro. |
-| T8: imagem | PENDENTE | Consultar a configuração não equivale a gerar imagem. | Tool e mensagem de configuração ausente. |
+| T8: imagem | PARCIAL — EM VALIDAÇÃO | `generate_image(prompt, size?)`, seleção e permissão compartilhadas e mensagem pt-BR exigida implementadas; testes host com stubs, detalhados abaixo. | Compilar/testar no Android, comprovar mensagem no envio e uma geração autorizada real; consultar configuração ou simular serviço não equivale a gerar imagem. |
 | T9: segundo plano | PARCIAL / BLOQUEADA | [Investigação](TAMA_V2_SEGUNDO_PLANO.md) distingue chat local e remoto; tracker e aviso sintético passaram no build e emulação `43608695720`. Isso não prova um turno em segundo plano nem o Poco. `mediaPlayback` permanece inalterado. | Testar turno lento e investigar o Poco com autorização. |
 | T10: tradução e resíduos | PARCIAL / BLOQUEADA | `0e55075`: avisos em 17 locales e WebView sintética passou em `43593761942`. Após a correção de terminologia, Linux e macOS passaram na matriz Python de `20b44fa`; Windows experimental falhou. Arte e keystore dependem do dono. | Investigar Windows experimental e continuar por erros, provedores, onboarding e permissões; preservar dados do Pet. |
 | T11: fechamento | BLOQUEADA | Depende das tarefas anteriores e dos testes físicos. | Consolidar as provas sem promover gates antecipadamente. |
+
+## T5/T8: imagem e permissão, incremento em validação
+
+A tool nativa `generate_image(prompt, size?)` foi adicionada ao grupo IMAGE em BASIC e a FULL;
+LEAN continua sem tools. A validação rejeita argumentos desconhecidos, descrição vazia ou maior
+que 4.000 caracteres e tamanho fora de `WIDTHxHEIGHT` com cada dimensão de 128 a 4096. O atalho
+local PT/EN aceita somente um pedido humano simples de imagem, sem anexos, colagem, edição ou
+conteúdo compartilhado; solicitações ambíguas, condicionais ou com outras ações caem no chat.
+Pedidos automatizados não recebem o atalho. O mesmo handler de imagem é usado pela tool, pelo
+atalho e pelo CLI, sem shell para a tool/atalho. O envio direto e o caso isolado na fila preservam
+a origem humana e a geração do Pet; lotes da fila continuam no caminho normal. Abrir app, clima,
+alarme e lembrete **não** foram implementados neste incremento.
+
+A frase de ausência, literal em `values-pt-rBR`, é **“Nenhum provedor de imagem configurado —
+abra Configurações → Modelos de imagem e vídeo”**, com link para `minis://settings/media`.
+No modo automático, uma imagem registrada mas não aprovada recebe o aviso de autorização/capacidade,
+não o de ausência. A classificação de imagem registrada usa capacidade e identificação heurística;
+não é uma verificação de que o serviço está operacional.
+
+O dispatch exige gate explícito: `RiskGate` mais `image_generation` visível, ASK_ONCE por padrão,
+e revalida seleção, modo e endpoint após a resposta. CLI pede aprovação nova mesmo com BYPASS ou
+concessão de sessão; o diálogo mostra modelo/provedor e alerta para custo desconhecido. A fila de
+permissões agora serializa ferramentas e identifica cada diálogo: resposta atrasada ou duplicada
+não responde ao próximo. Alterar a configuração invalida grants e respostas anteriores. Isso muda
+o comportamento de fila de **todas** as tools ASK_ONCE e precisa de regressão de interface. Timeout
+ou recusa bloqueiam o envio; revalidação e rede ainda **não são atômicas**.
+
+A tool do modelo exige uma intenção explícita, bloqueia argumentos reparados e limita a uma tentativa
+nativa por turno. A heurística pode recusar pedidos válidos ou interpretar alguma frase errada; não é
+um classificador sem falhas. A garantia não cobre o CLI, avatar, edição manual ou outros caminhos.
+A geração nativa e pelo CLI não tentam outro formato após falha; um POST cancelado ou falho pode já
+ter sido cobrado. `--size` inválido no CLI agora gera erro em vez de usar o tamanho padrão; descrições
+acima de 4.000 caracteres também são recusadas. Isso é mudança de compatibilidade. Um nome de arquivo
+já existente não é sobrescrito, mas a colisão pode ser percebida depois da cobrança; a proteção de
+arquivo também se aplica ao vídeo. Edição manual de imagem permanece separada e não foi comprovada
+como POST único.
+
+O Stop do atalho direto usa o job e o placeholder próprios, evita limpar uma resposta anterior e
+reabre a fila de forma adiada. A resposta local não executa os hooks que interpretam texto produzido
+pelo modelo (`FirstConversation`, Goal e Feed). A promoção do rascunho, cancelamento durante a
+persistência, callbacks, restauração do compositor, anexos, múltiplos itens na fila e interação com o
+Pet **ainda precisam de prova de ponta a ponta**; em particular, não se promete restauração atômica
+se Stop ocorrer durante a gravação da linha do usuário. O tratamento de headless evita que uma fila
+local interrompa o turno antes de fechar seu recibo, mas também precisa de teste Android.
+
+### Verificações locais deste incremento
+
+- **29 testes host** de parser, decisão de envio, seleção, dispatch, guard, avisos e resultado. A
+  decisão que o envio humano chama executou a ação de imagem falsa uma vez e o cliente de chat falso
+  zero vezes; não instancia o ViewModel nem observa uma requisição Android real.
+- **7 testes host** da fila de permissões com contexto/preferências simulados, incluindo cancelamento,
+  versão de configuração, resposta atrasada e resposta duplicada. **14 testes** adicionais de tool,
+  seleção/handler e gate usam stubs Android/provedor; o gate foi testado com `RiskGate` falso. Outros
+  **11 testes** do handler são uma adaptação host que substitui Mockito por contexto stub; o teste
+  Android original com Mockito ainda aguarda o CI. Nenhum deles chama um serviço pago.
+- **12 testes host** de perfis/dieta/medição, **6** de paridade de strings, sintaxe PSI de **31**
+  arquivos Kotlin, XML dos **17** locales e `git diff --check` passaram. PSI não verifica tipos nem
+  substitui compilação Android. O teste de paridade permite apenas a frase pt-BR exata com travessão.
+
+Na mesma fixture sintética histórica (tokens estimados, não faturados), o acréscimo do schema e da
+orientação de mídia produz os totais abaixo. `GENERATE_IMAGE` ocupa **473 caracteres / ~128 tokens**;
+o teto BASIC_IMAGE é 4.500 para esta fixture, não um limite de conta.
+
+| Perfil | Sistema chars / ~tokens | Tools chars / ~tokens | Soma chars / ~tokens | 3 × soma |
+|---|---:|---:|---:|---:|
+| LEAN | 1.214 / ~329 | 0 / ~0 | 1.214 / ~329 | ~987 |
+| BASIC | 4.967 / ~1.343 | 6.795 / ~1.837 | 11.762 / ~3.179 | ~9.537 |
+| BASIC_WEB | 4.967 / ~1.343 | 12.074 / ~3.264 | 17.041 / ~4.606 | ~13.818 |
+| BASIC_ANDROID | 6.072 / ~1.642 | 6.795 / ~1.837 | 12.867 / ~3.478 | ~10.434 |
+| BASIC_IMAGE | 7.088 / ~1.916 | 8.886 / ~2.402 | 15.974 / ~4.318 | ~12.954 |
+| FULL | 27.464 / ~7.423 | 14.165 / ~3.829 | 41.629 / ~11.252 | ~33.756 |
+
+O último CI concluído **anterior a este incremento** foi o de `df76c3b`: [Android 43660125749](https://github.com/DaniloXPTEAM/tamaaiv2/actions/runs/43660125749)
+passou build, unitários, APK instrumentado e previews sintéticos; o smoke falhou e continua fora de
+investigação por decisão do dono. [Test Suite 43660125733](https://github.com/DaniloXPTEAM/tamaaiv2/actions/runs/43660125733)
+ficou `success` no agregado, mas Windows/Python 3.12 falhou; Commits, iOS, harness e Labels passaram.
+Esse CI não cobre os novos arquivos ou alterações T5/T8 acima. Não houve geração paga, teste no Poco
+ou prova do loop/Stop/zero chamadas no Android. O plano de continuidade não rastreado foi preservado.
 
 ## T4b: imagens do agente e último CI conhecido
 

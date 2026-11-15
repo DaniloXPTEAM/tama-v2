@@ -166,6 +166,7 @@ class ImageModelRequestsTest {
                 select = { (AutoImageRouter.pick(candidates, "groq", "groq-chat") as AutoImageRouter.Choice.Selected).candidate },
                 revalidate = { selected -> candidates.singleOrNull { it == selected && it.imageApproved } },
                 manualEndpoint = { error("manual fallback must not run") },
+                authorize = { true }, // fake approval for this wire fixture
                 send = { selected ->
                     val base = if (selected.providerId == "gemini") gemini else groq
                     val model = ImageModelRequests.modelFor(ProviderType.gemini,

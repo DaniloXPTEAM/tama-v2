@@ -1410,6 +1410,10 @@
     <string name="nm_auto_image_allow">Allow automatic image generation with this model</string>
     <string name="nm_auto_image_consent_title">Allow automatic image generation?</string>
     <string name="nm_auto_image_consent_body">Image generation uses a separate endpoint and may charge per picture, including when the price is unknown. Chat permission does not authorize images. Enable only if you accept these charges for this model.</string>
+    <string name="nm_image_provider_missing">No image provider configured: open Settings → Image and video models</string>
+    <string name="nm_image_call_consent">Image generation may incur a charge per request, even when the price is unknown. Allow only if you accept the cost for the model shown.</string>
+    <string name="nm_image_permission_denied">Image permission was denied or expired. No image request was sent.</string>
+    <string name="nm_image_request_failed">The image could not be completed. The request may have been charged; I will not retry without a new request.</string>
     <string name="nm_auto_image_missing">No registered image model currently meets all requirements: enabled and visible, a unique provider and model identity, usable credentials, a supported image route, confirmed generation capability, and separate automatic image permission. Open Settings → Models → Review model permissions and choose the provider and model.</string>
     <string name="nm_auto_image_changed">Image permission, account or configuration changed. No image request was sent; review the model permissions and try again.</string>
     <string name="nm_auto_image_edit_blocked">Automatic image editing is not yet authorized separately. Switch automatic selection off to use the configured image model manually.</string>

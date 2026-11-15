@@ -1431,6 +1431,10 @@
     <string name="nm_auto_image_allow">Allow automatic image generation with this model</string>
     <string name="nm_auto_image_consent_title">Allow automatic image generation?</string>
     <string name="nm_auto_image_consent_body">Image generation uses a separate endpoint and may charge per picture, including when the price is unknown. Chat permission does not authorize images. Enable only if you accept these charges for this model.</string>
+    <string name="nm_image_provider_missing">Aucun fournisseur d’images configuré : ouvrez Paramètres → Modèles d’image et de vidéo</string>
+    <string name="nm_image_call_consent">La génération peut être facturée par demande, même si le prix est inconnu. Autorisez-la seulement si vous acceptez le coût du modèle affiché.</string>
+    <string name="nm_image_permission_denied">La permission pour les images a été refusée ou a expiré. Aucune demande d’image n’a été envoyée.</string>
+    <string name="nm_image_request_failed">L’image n’a pas pu être terminée. La demande peut avoir été facturée ; je ne la répéterai pas sans nouvelle demande.</string>
     <string name="nm_auto_image_missing">No registered image model currently meets all requirements: enabled and visible, a unique provider and model identity, usable credentials, a supported image route, confirmed generation capability, and separate automatic image permission. Open Settings → Models → Review model permissions and choose the provider and model.</string>
     <string name="nm_auto_image_changed">Image permission, account or configuration changed. No image request was sent; review the model permissions and try again.</string>
     <string name="nm_auto_image_edit_blocked">Automatic image editing is not yet authorized separately. Switch automatic selection off to use the configured image model manually.</string>

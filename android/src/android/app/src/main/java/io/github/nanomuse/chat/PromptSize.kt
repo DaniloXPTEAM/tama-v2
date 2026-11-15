@@ -17,7 +17,7 @@ object PromptSize {
     }
 
     enum class Tool {
-        SHELL_EXECUTE, FILE_READ, FILE_WRITE, FILE_EDIT, READ_IMAGE, BROWSER_USE,
+        SHELL_EXECUTE, FILE_READ, FILE_WRITE, FILE_EDIT, READ_IMAGE, GENERATE_IMAGE, BROWSER_USE,
         MEMORY_WRITE, MEMORY_GET, OTHER, ARRAY_SEPARATORS, TOTAL,
     }
 
@@ -136,6 +136,7 @@ object PromptSize {
         "file_write" -> Tool.FILE_WRITE
         "file_edit" -> Tool.FILE_EDIT
         "read_image" -> Tool.READ_IMAGE
+        "generate_image" -> Tool.GENERATE_IMAGE
         "browser_use" -> Tool.BROWSER_USE
         "memory_write" -> Tool.MEMORY_WRITE
         "memory_get" -> Tool.MEMORY_GET

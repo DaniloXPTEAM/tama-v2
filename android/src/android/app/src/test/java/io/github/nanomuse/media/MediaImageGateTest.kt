@@ -1,0 +1,85 @@
+package io.github.nanomuse.media
+
+import android.content.Context
+import com.openminis.app.R
+import com.openminis.app.data.model.ProviderCredential
+import com.openminis.app.data.model.ProviderInstance
+import com.openminis.app.data.model.ProviderType
+import com.openminis.app.offload.OffloadPermissionManager
+import io.github.nanomuse.avatar.ImageGen
+import io.github.nanomuse.guard.GateOutcome
+import io.github.nanomuse.pet.PetPrefsContext
+import java.util.UUID
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.async
+import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+import org.mockito.Mockito
+
+/** Real permission manager and gate, with the risk decision and Android context faked. */
+class MediaImageGateTest {
+    private val manager = OffloadPermissionManager
+    private val endpoint = ImageGen.Endpoint(
+        ProviderInstance("provider", "Provider fixture-secret", ProviderType.openAI, ProviderCredential.apiKey),
+        "fixture-secret", "model-fixture-secret",
+    )
+
+    private fun context(): Context = Mockito.mock(Context::class.java).also {
+        Mockito.`when`(it.getString(R.string.nm_models_image_title)).thenReturn("Image")
+    }
+
+    @Test fun `risk denial stops before the permission dialog`() = runBlocking {
+        manager.init(PetPrefsContext())
+        val session = UUID.randomUUID().toString()
+        var command = ""
+        val gate = AndroidMediaImageGate(context(), checkRisk = { sid, preview ->
+            assertEquals(session, sid)
+            command = preview
+            GateOutcome.Denied("not allowed")
+        })
+        assertFalse(gate.allow(endpoint, "bird's wings; no shell", "1024x1024", session, false))
+        assertTrue(command.contains("'bird'\\''s wings; no shell'"))
+        assertNull(manager.pendingRequest.value)
+    }
+
+    @Test fun `permission names the redacted model and fresh CLI approval ignores a session grant`() = runBlocking {
+        manager.init(PetPrefsContext())
+        manager.setLevel("image_generation", OffloadPermissionManager.PermissionLevel.ASK_ONCE)
+        val session = UUID.randomUUID().toString()
+        val gate = AndroidMediaImageGate(context(), checkRisk = { _, _ -> GateOutcome.Allowed() })
+        val first = async(start = CoroutineStart.UNDISPATCHED) {
+            gate.allow(endpoint, "bird", "1024x1024", session, false)
+        }
+        val prompt = requireNotNull(manager.pendingRequest.value)
+        assertEquals("image_generation", prompt.toolName)
+        assertFalse(prompt.oneTimeOnly)
+        assertFalse(prompt.toolTitle.contains("fixture-secret"))
+        assertTrue(prompt.toolTitle.contains("[redacted]"))
+        manager.respondToRequest(prompt.requestId, OffloadPermissionManager.Response.ALLOW_SESSION)
+        assertTrue(first.await())
+        assertTrue(gate.allow(endpoint, "bird", "1024x1024", session, false))
+        assertNull(manager.pendingRequest.value)
+        val cli = async(start = CoroutineStart.UNDISPATCHED) {
+            gate.allow(endpoint, "bird", "1024x1024", session, true)
+        }
+        val fresh = requireNotNull(manager.pendingRequest.value)
+        assertTrue(fresh.oneTimeOnly)
+        manager.respondToRequest(fresh.requestId, OffloadPermissionManager.Response.DENY_SESSION)
+        assertFalse(cli.await())
+        manager.clearSessionGrants(session)
+    }
+
+    @Test fun `a timeout withdraws the dialog and is a refusal`() = runBlocking {
+        manager.init(PetPrefsContext())
+        manager.setLevel("image_generation", OffloadPermissionManager.PermissionLevel.ASK_ONCE)
+        val session = UUID.randomUUID().toString()
+        val gate = AndroidMediaImageGate(context(), checkRisk = { _, _ -> GateOutcome.Allowed() }, permissionTimeoutMs = 20)
+        assertFalse(gate.allow(endpoint, "bird", "1024x1024", session, false))
+        assertNull(manager.pendingRequest.value)
+        manager.clearSessionGrants(session)
+    }
+}

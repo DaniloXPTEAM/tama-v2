@@ -8,10 +8,10 @@ object MediaPrompt {
             append("the chat model (you), an image model (avatar changes, pictures the user asks for) and a video model (the animated avatar, short clips). ")
             append("Image model: ").append(image ?: "NOT SET").append(". ")
             append("Video model: ").append(video ?: "NOT SET").append(".\n")
-            append("- To make a picture the user asks for, run `nanomuse-media image --prompt \"...\"")
-            if (!automaticImages) append(" [--from <image path>]")
-            append("`; for a short clip, `nanomuse-media video --prompt \"...\" [--from <image path>] [--seconds 4-15]` (takes 1-5 minutes; say so first). ")
-            append("Both print JSON with a `markdown` field — put that line in your reply so the file shows inline. `nanomuse-media status` prints what is configured.\n")
+            append("- To make one new picture the user asks for, call `generate_image` with a prompt and optional size; do not retry after a failed image request. ")
+            if (!automaticImages) append("For a manual edit of a reference use `nanomuse-media image --prompt \"...\" [--from <image path>]`; ")
+            append("for a short clip use `nanomuse-media video --prompt \"...\" [--from <image path>] [--seconds 4-15]` (takes 1-5 minutes; say so first). ")
+            append("The result has a `markdown` field — put that line in your reply so the file shows inline. `nanomuse-media status` prints what is configured.\n")
             append("- Avatar changes are handled by the app itself when the user writes \"change your avatar to ...\"; you only need to explain when it cannot work.\n")
             if (image == null) {
                 if (automaticImages) {
@@ -26,7 +26,7 @@ object MediaPrompt {
             }
             if (automaticImages) {
                 append("- Automatic pictures need separate permission for the exact image model. Image editing with --from is unavailable in automatic mode; ")
-                append("explain this instead of retrying. `minis-model-use run` is unavailable in automatic mode; use `nanomuse-media image` for pictures.\n")
+                append("explain this instead of retrying. `minis-model-use run` is unavailable in automatic mode; use `generate_image` for pictures.\n")
             }
             if (video == null) {
                 append("- No video model is set: the avatar stays as still pictures, and clips cannot be made. If asked, explain that clips need a provider with video models ")

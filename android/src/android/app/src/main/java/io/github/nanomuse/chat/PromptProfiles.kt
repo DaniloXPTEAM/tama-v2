@@ -48,7 +48,7 @@ object PromptProfiles {
             Profile.BASIC -> originals.filter { tool ->
                 tool.name in BASIC_TOOLS ||
                     (tool.name == "browser_use" && (ToolGroup.WEB in hints || ToolGroup.WEB_ADVANCED in hints)) ||
-                    (tool.name == "read_image" && ToolGroup.IMAGE in hints)
+                    (tool.name in setOf("read_image", "generate_image") && ToolGroup.IMAGE in hints)
             }
         }
         return PromptDiet.tools(chosen)

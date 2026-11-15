@@ -1431,6 +1431,10 @@
     <string name="nm_auto_image_allow">Autorizar geração automática de imagens neste modelo</string>
     <string name="nm_auto_image_consent_title">Autorizar geração automática de imagens?</string>
     <string name="nm_auto_image_consent_body">A geração usa um serviço separado e pode cobrar por imagem, mesmo com preço desconhecido. A autorização do chat não vale para imagens. Ative somente se aceitar esses custos para este modelo.</string>
+    <string name="nm_image_provider_missing">Nenhum provedor de imagem configurado — abra Configurações → Modelos de imagem e vídeo</string>
+    <string name="nm_image_call_consent">A geração de imagem pode cobrar por pedido, mesmo quando o preço é desconhecido. Autorize somente se aceitar o custo do modelo mostrado.</string>
+    <string name="nm_image_permission_denied">A permissão para gerar imagem foi negada ou expirou. Nenhum pedido de imagem foi enviado.</string>
+    <string name="nm_image_request_failed">Não consegui concluir a imagem. O pedido pode ter sido cobrado; não vou repetir sem um novo pedido.</string>
     <string name="nm_auto_image_missing">Nenhum modelo de imagem cadastrado reúne todos os requisitos: estar ativo e visível, ter identidade de modelo e provedor sem duplicidade, credencial utilizável, rota de imagem compatível, capacidade de geração confirmada e autorização separada para imagens automáticas. Abra Configurações → Modelos → Revisar autorização dos modelos e escolha o provedor e o modelo.</string>
     <string name="nm_auto_image_changed">A autorização de imagem, a conta ou a configuração mudou. Nenhum pedido de imagem foi enviado; revise as permissões e tente novamente.</string>
     <string name="nm_auto_image_edit_blocked">A edição automática de imagens ainda não tem autorização separada. Desligue a seleção automática para usar manualmente o modelo de imagem configurado.</string>

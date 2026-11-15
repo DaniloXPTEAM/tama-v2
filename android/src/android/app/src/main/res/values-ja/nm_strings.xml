@@ -1426,6 +1426,10 @@
     <string name="nm_auto_image_allow">Allow automatic image generation with this model</string>
     <string name="nm_auto_image_consent_title">Allow automatic image generation?</string>
     <string name="nm_auto_image_consent_body">Image generation uses a separate endpoint and may charge per picture, including when the price is unknown. Chat permission does not authorize images. Enable only if you accept these charges for this model.</string>
+    <string name="nm_image_provider_missing">画像プロバイダーが設定されていません。設定 → 画像と動画のモデルを開いてください</string>
+    <string name="nm_image_call_consent">画像生成は、料金が不明な場合もリクエストごとに課金されることがあります。表示されたモデルの費用に同意する場合のみ許可してください。</string>
+    <string name="nm_image_permission_denied">画像の権限が拒否されたか期限切れです。画像リクエストは送信されていません。</string>
+    <string name="nm_image_request_failed">画像を完成できませんでした。リクエストが課金された可能性があります。新たな依頼なしに再試行しません。</string>
     <string name="nm_auto_image_missing">No registered image model currently meets all requirements: enabled and visible, a unique provider and model identity, usable credentials, a supported image route, confirmed generation capability, and separate automatic image permission. Open Settings → Models → Review model permissions and choose the provider and model.</string>
     <string name="nm_auto_image_changed">Image permission, account or configuration changed. No image request was sent; review the model permissions and try again.</string>
     <string name="nm_auto_image_edit_blocked">Automatic image editing is not yet authorized separately. Switch automatic selection off to use the configured image model manually.</string>
