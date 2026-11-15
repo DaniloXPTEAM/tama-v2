@@ -262,8 +262,8 @@ jobs:
           retention-days: 14
           if-no-files-found: error
 
-  # TAMA: one-time transfer for this internal test branch. Git blob objects are not
-  # committed to any branch, and can be garbage-collected after the APK is recovered.
+  # TAMA: one-time encrypted transfer for this internal test branch. Git blob objects
+  # are not committed to any branch and can be garbage-collected after recovery.
   parallel-transfer:
     name: transfer verified parallel APK
     needs: debug-apk
@@ -284,13 +284,31 @@ jobs:
         shell: bash
         run: |
           python3 - <<'PY'
-          import base64, hashlib, json, os, pathlib, urllib.request
+          import base64, hashlib, json, os, pathlib, subprocess, urllib.request
           apk = pathlib.Path('/tmp/tama-parallel/app-tamaTest.apk')
           metadata = json.loads(pathlib.Path('/tmp/tama-parallel/tama-test-metadata.json').read_text())
           payload = apk.read_bytes()
           digest = hashlib.sha256(payload).hexdigest()
           if digest != metadata['sha256'] or len(payload) != metadata['sizeBytes']:
               raise SystemExit('Downloaded APK differs from the verified build')
+          public_key = pathlib.Path('/tmp/tama-parallel/transfer-public.pem')
+          public_key.write_text('''-----BEGIN PUBLIC KEY-----
+          MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwRQ4ndhJp8wdRbGrRJtU
+          SyVztYdymt9BWHvnXh2vVQp8PymPZPN6GkrSG6JBfM3mCd98cC1/sTw+xqcBwmjW
+          e0SjBRary6iS/wQQDAoOQSy0EPt6f0E99I40kHNWVdqgtBTB3v6YzgnB5roUr2Vj
+          K+tO91nvE7Yvngm7aGG8pHJ/PnYLzoeSqHnY7aIKFDyusfRoyma5Vnd6N4zA8D3G
+          e0kabNFgxUENdmxJ/mhhTWpVc987zzHFHnD2oBxzKax/Dy7SwH3zSVIyOquDJjpQ
+          nij2E6nWYM6uVAasvpVLspbNg/hUTuk0jLioaazJ04DkYgNq19NbyFp+aSVMkiTb
+          sQIDAQAB
+          -----END PUBLIC KEY-----\n''')
+          key, iv = os.urandom(32), os.urandom(16)
+          wrapped = subprocess.run([
+              'openssl', 'pkeyutl', '-encrypt', '-pubin', '-inkey', str(public_key),
+              '-pkeyopt', 'rsa_padding_mode:oaep', '-pkeyopt', 'rsa_oaep_md:sha256',
+          ], input=key, stdout=subprocess.PIPE, check=True).stdout
+          payload = subprocess.run([
+              'openssl', 'enc', '-aes-256-ctr', '-K', key.hex(), '-iv', iv.hex(),
+          ], input=payload, stdout=subprocess.PIPE, check=True).stdout
           token = os.environ['GH_TOKEN']
           url = f"https://api.github.com/repos/{os.environ['GITHUB_REPOSITORY']}/git/blobs"
           hashes = []
@@ -303,7 +321,8 @@ jobs:
               })
               with urllib.request.urlopen(request, timeout=120) as response:
                   hashes.append(json.load(response)['sha'])
-          print(f"::notice title=TAMA_APK_TRANSFER::sha256={digest};size={len(payload)};blobs={','.join(hashes)}")
+          envelope = base64.b64encode(wrapped).decode('ascii')
+          print(f"::notice title=TAMA_APK_TRANSFER::sha256={digest};size={len(payload)};iv={iv.hex()};key={envelope};blobs={','.join(hashes)}")
           PY
 
   # A fresh Google APIs x86_64 emulator with an ARM native bridge installs the *same*
