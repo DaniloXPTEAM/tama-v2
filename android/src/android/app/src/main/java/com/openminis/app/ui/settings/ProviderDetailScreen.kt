@@ -145,7 +145,7 @@ fun ProviderDetailScreen(
         )?.limits?.freeTpm
     }
     var nmTpmText by remember(instance.id, nmObservedTpm) {
-        mutableStateOf(io.github.nanomuse.router.ProviderBudgetStore.read(exportContext, instance.id, nmObservedTpm)?.toString().orEmpty())
+        mutableStateOf(ai.tama.router.ProviderBudgetStore.read(exportContext, instance.id, nmObservedTpm)?.toString().orEmpty())
     }
     var nmTpmInvalid by remember(instance.id) { mutableStateOf(false) }
 
@@ -203,13 +203,13 @@ fun ProviderDetailScreen(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     MinisSmallButton(onClick = {
-                        when (val parsed = io.github.nanomuse.router.ProviderBudgetStore.parse(nmTpmText)) {
-                            is io.github.nanomuse.router.ProviderBudgetStore.Input.Valid -> {
-                                io.github.nanomuse.router.ProviderBudgetStore.save(exportContext, instance.id, parsed.value)
+                        when (val parsed = ai.tama.router.ProviderBudgetStore.parse(nmTpmText)) {
+                            is ai.tama.router.ProviderBudgetStore.Input.Valid -> {
+                                ai.tama.router.ProviderBudgetStore.save(exportContext, instance.id, parsed.value)
                                 nmTpmText = parsed.value?.toString().orEmpty()
                                 nmTpmInvalid = false
                             }
-                            io.github.nanomuse.router.ProviderBudgetStore.Input.Invalid -> nmTpmInvalid = true
+                            ai.tama.router.ProviderBudgetStore.Input.Invalid -> nmTpmInvalid = true
                         }
                     }) { Text(stringResource(R.string.common_save)) }
                 }

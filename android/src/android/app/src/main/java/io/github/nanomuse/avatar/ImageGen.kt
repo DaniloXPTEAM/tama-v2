@@ -17,8 +17,8 @@ import com.openminis.app.provider.gemini.GeminiProvider
 import com.openminis.app.provider.openai.OpenAIProvider
 import io.github.nanomuse.cloud.NanoMuseCloud
 import io.github.nanomuse.media.RelayMediaPolicy
-import io.github.nanomuse.net.singleUseImageBody
-import io.github.nanomuse.net.singleUseImageClient
+import ai.tama.net.singleUseImageBody
+import ai.tama.net.singleUseImageClient
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext

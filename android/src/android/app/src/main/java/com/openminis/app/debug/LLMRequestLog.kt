@@ -43,7 +43,7 @@ object LLMRequestLog {
     private fun maskHeaders(headers: Map<String, String>): Map<String, String> {
         val copy = LinkedHashMap<String, String>(headers.size)
         for ((name, value) in headers) {
-            copy[name] = if (io.github.nanomuse.net.ProviderCredentials.isSensitiveHeader(name)) "***" else value
+            copy[name] = if (ai.tama.net.ProviderCredentials.isSensitiveHeader(name)) "***" else value
         }
         return copy
     }

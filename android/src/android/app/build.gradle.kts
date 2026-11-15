@@ -92,6 +92,15 @@ android {
     }
 
     buildTypes {
+        // nanoMuse: an explicitly requested, side-by-side phone test. Normal debug and
+        // release keep their original identity and data. This variant is debuggable and
+        // uses the debug signer, but it is a separate Android package.
+        create("tamaTest") {
+            initWith(getByName("debug"))
+            applicationIdSuffix = ".tamav2test"
+            signingConfig = signingConfigs.getByName("debug")
+            matchingFallbacks += listOf("debug")
+        }
         release {
             isMinifyEnabled = true
             proguardFiles(

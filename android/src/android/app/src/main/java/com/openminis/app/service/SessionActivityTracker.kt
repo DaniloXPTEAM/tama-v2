@@ -223,7 +223,7 @@ object SessionActivityTracker {
 
     private var appContext: Context? = null
     // nanoMuse: a rejected Android request is visible; success is not proof of service survival.
-    private val serviceRequests = io.github.nanomuse.service.ServiceRequestState()
+    private val serviceRequests = ai.tama.service.ServiceRequestState()
     internal val serviceRequestIssue = serviceRequests.issue
 
     /**
@@ -648,7 +648,7 @@ object SessionActivityTracker {
     private fun updateService() = requestServiceStart()
 
     private fun requestServiceStart() {
-        val accepted = serviceRequests.attempt(io.github.nanomuse.service.ServiceRequestIssue.START) {
+        val accepted = serviceRequests.attempt(ai.tama.service.ServiceRequestIssue.START) {
             val context = checkNotNull(appContext) { "Service context not initialized" }
             check(AgentForegroundService.startService(context, sessionCountForNotification(), statusForNotification())) {
                 "Android did not identify a service component"
@@ -712,7 +712,7 @@ object SessionActivityTracker {
 
     private fun stopService() {
         // nanoMuse: an Android refusal must not prevent completion listeners or Pet accounting.
-        val accepted = serviceRequests.attempt(io.github.nanomuse.service.ServiceRequestIssue.STOP) {
+        val accepted = serviceRequests.attempt(ai.tama.service.ServiceRequestIssue.STOP) {
             val context = checkNotNull(appContext) { "Service context not initialized" }
             AgentForegroundService.stopService(context)
         }

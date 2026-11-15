@@ -15,8 +15,8 @@ import com.openminis.app.data.model.ThinkingLevel
 import com.openminis.app.provider.LLMProvider
 import com.openminis.app.provider.gemini.GeminiProvider
 import com.openminis.app.provider.openai.OpenAIProvider
-import io.github.nanomuse.media.ImageDispatch
-import io.github.nanomuse.router.AutoImageRouter
+import ai.tama.media.ImageDispatch
+import ai.tama.router.AutoImageRouter
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CancellationException

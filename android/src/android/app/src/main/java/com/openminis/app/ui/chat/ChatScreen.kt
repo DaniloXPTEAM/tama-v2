@@ -2425,13 +2425,13 @@ fun ChatScreen(
         LocalMarkdownSessionId provides sessionId,
     ) {
     // nanoMuse: keep both detail sheets outside the measured footer and recycled rows.
-    io.github.nanomuse.ui.chat.ProviderErrorDetailHost(
+    ai.tama.ui.chat.ProviderErrorDetailHost(
         // nanoMuse: draft promotion changes the displayed identity without changing the route.
         sessionId = nmDisplayedSessionId,
         onChangeModel = { showModelPicker = true },
         onOpenProviderSettings = { ChatLinkResolver.dispatchDeepLink(context, "minis://settings/providers") },
     ) { openProviderErrorDetail ->
-    io.github.nanomuse.ui.chat.PromptSizeDetailHost(sessionId) { openPromptSizeDetail ->
+    ai.tama.ui.chat.PromptSizeDetailHost(sessionId) { openPromptSizeDetail ->
     Scaffold(
         containerColor = nmChatBackground, // nanoMuse: chat-only canvas
         contentWindowInsets = WindowInsets(0),
@@ -4307,8 +4307,8 @@ fun ChatScreen(
                                 // nanoMuse: open this report from the stable chat owner, not the lazy row.
                                 onOpenDetail = if (item.block.toolName == "prompt_size") {
                                     {
-                                        io.github.nanomuse.ui.chat.PromptSizeDetailTrace.record(
-                                            io.github.nanomuse.ui.chat.PromptSizeDetailTrace.Event.CHAT_CALLBACK,
+                                        ai.tama.ui.chat.PromptSizeDetailTrace.record(
+                                            ai.tama.ui.chat.PromptSizeDetailTrace.Event.CHAT_CALLBACK,
                                         )
                                         keyboardController?.hide()
                                         focusManager.clearFocus()
@@ -4391,11 +4391,11 @@ fun ChatScreen(
                                     val snapshot = viewModel.messages.value.singleOrNull {
                                         it.id == item.sourceMessageId && it.error == item.error
                                     }
-                                    io.github.nanomuse.ui.chat.ProviderErrorRetryTarget(
+                                    ai.tama.ui.chat.ProviderErrorRetryTarget(
                                         rowSession, item.sourceMessageId, item.error, snapshot,
                                     )
                                 }
-                                val retryIfCurrent: (io.github.nanomuse.ui.chat.ProviderErrorRetryTarget, () -> Unit) -> Unit = { target, action ->
+                                val retryIfCurrent: (ai.tama.ui.chat.ProviderErrorRetryTarget, () -> Unit) -> Unit = { target, action ->
                                     val current = viewModel.messages.value
                                     val last = current.lastOrNull { it.role == "assistant" || it.role == "user" }
                                     if (target.matches(
@@ -4833,7 +4833,7 @@ fun ChatScreen(
             // nanoMuse: accepted requests still do not guarantee background survival; show only
             // known rejections, and retry the service request without repeating the user's task.
             nmServiceIssue?.let { issue ->
-                io.github.nanomuse.ui.chat.BackgroundServiceWarning(
+                ai.tama.ui.chat.BackgroundServiceWarning(
                     issue = issue,
                     onRetry = { com.openminis.app.service.SessionActivityTracker.retryServiceRequest() },
                     modifier = Modifier.widthIn(max = CHAT_MAX_CONTENT_WIDTH).fillMaxWidth()
@@ -4872,7 +4872,7 @@ fun ChatScreen(
             // nanoMuse: exposes the actual profile and the reversible next-turn override.
             val nmRouteOverride by viewModel.nmProfileOverride.collectAsState()
             val nmRouteActive by viewModel.nmActiveProfile.collectAsState()
-            io.github.nanomuse.ui.chat.RouteProfileChip(
+            ai.tama.ui.chat.RouteProfileChip(
                 active = nmRouteActive,
                 override = nmRouteOverride,
                 streaming = isStreaming,

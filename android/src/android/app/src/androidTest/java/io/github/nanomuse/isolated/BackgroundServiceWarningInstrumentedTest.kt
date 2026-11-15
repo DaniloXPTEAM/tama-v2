@@ -12,8 +12,8 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.openminis.app.R
 import com.openminis.app.ui.theme.MinisTheme
-import io.github.nanomuse.service.ServiceRequestIssue
-import io.github.nanomuse.ui.chat.BackgroundServiceWarning
+import ai.tama.service.ServiceRequestIssue
+import ai.tama.ui.chat.BackgroundServiceWarning
 import org.junit.Assert.assertEquals
 import org.junit.BeforeClass
 import org.junit.Rule

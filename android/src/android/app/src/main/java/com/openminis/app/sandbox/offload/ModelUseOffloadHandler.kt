@@ -49,7 +49,7 @@ class ModelUseOffloadHandler(
                 "search" -> cmdSearch(args)
                 // This escape hatch can address arbitrary endpoints and bypasses the
                 // automatic chat/image permissions. Leave it available in manual mode.
-                "run" -> if (io.github.nanomuse.router.AutoModelStore.enabled(context)) automaticRunBlocked()
+                "run" -> if (ai.tama.router.AutoModelStore.enabled(context)) automaticRunBlocked()
                     else cmdRun(args, request)
                 else -> NativeOffloadResult(2, "minis-model-use: unknown subcommand '$sub'\n$HELP")
             }
@@ -273,7 +273,7 @@ class ModelUseOffloadHandler(
 
         // The mode may have changed while input was being read. Fail closed before
         // creating a client or entering any of the raw, image or chat transports.
-        if (io.github.nanomuse.router.AutoModelStore.enabled(context)) return automaticRunBlocked()
+        if (ai.tama.router.AutoModelStore.enabled(context)) return automaticRunBlocked()
 
         // Build provider + call — runBlocking is acceptable here: this handler
         // is invoked off the main thread by the offload server.

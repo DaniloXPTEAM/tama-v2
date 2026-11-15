@@ -32,8 +32,8 @@ import com.openminis.app.MinisApp
 import com.openminis.app.R
 import com.openminis.app.tools.AgentTools
 import io.github.nanomuse.chat.PromptDiet
-import io.github.nanomuse.chat.PromptSize
-import io.github.nanomuse.chat.PromptSizeTrace
+import ai.tama.chat.PromptSize
+import ai.tama.chat.PromptSizeTrace
 import com.openminis.app.ui.settings.KEY_THEME_MODE
 import com.openminis.app.ui.settings.PREF_APPEARANCE
 import io.github.nanomuse.home.MainChat
@@ -41,7 +41,7 @@ import io.github.nanomuse.pet.PetCareAction
 import io.github.nanomuse.pet.PetMission
 import io.github.nanomuse.pet.PetStore
 import io.github.nanomuse.ui.chat.ChatBackground
-import io.github.nanomuse.ui.chat.PromptSizeDetailTrace
+import ai.tama.ui.chat.PromptSizeDetailTrace
 import io.github.nanomuse.ui.onboarding.FirstRunSetup
 import java.io.File
 import java.util.Collections

@@ -32,8 +32,8 @@ import com.openminis.app.ui.components.SectionTextField
 import com.openminis.app.R
 import com.openminis.app.ui.components.MinisButton
 import com.openminis.app.ui.components.MinisTextButton
-import io.github.nanomuse.router.AutoModelStore
-import io.github.nanomuse.router.Need
+import ai.tama.router.AutoModelStore
+import ai.tama.router.Need
 
 /**
  * Detail / edit screen for a single ModelEntry. T210: brought to iOS

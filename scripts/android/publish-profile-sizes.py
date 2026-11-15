@@ -45,6 +45,7 @@ TOOL_LABELS = {
     "FILE_WRITE",
     "FILE_EDIT",
     "READ_IMAGE",
+    "GENERATE_IMAGE",
     "BROWSER_USE",
     "MEMORY_WRITE",
     "MEMORY_GET",
@@ -53,15 +54,26 @@ TOOL_LABELS = {
     "TOTAL",
 }
 ROW = re.compile(r"TAMA_PROFILE ([A-Z_]+) (SYSTEM|TOOL) ([A-Z_]+) (\d+) (\d+) (\d+) (\d+)")
+SCENARIO = re.compile(r"TAMA_SCENARIO (OLD|COMPACT)((?: \d+){7})")
 
 
 def extract(xml_path: Path) -> list[str]:
     root = ET.parse(xml_path).getroot()
     rows = []
     totals = set()
+    scenarios = set()
     for output in root.iter("system-out"):
         for line in (output.text or "").splitlines():
-            match = ROW.fullmatch(line.strip())
+            text = line.strip()
+            scenario = SCENARIO.fullmatch(text)
+            if scenario:
+                values = [int(value) for value in scenario.group(2).split()]
+                if sum(values[:6]) != values[6] or scenario.group(1) in scenarios:
+                    raise ValueError("The synthetic scenario report is inconsistent.")
+                scenarios.add(scenario.group(1))
+                rows.append(text)
+                continue
+            match = ROW.fullmatch(text)
             if not match:
                 continue
             profile, scope, label = match.group(1, 2, 3)
@@ -72,7 +84,7 @@ def extract(xml_path: Path) -> list[str]:
             if label == "TOTAL":
                 totals.add((profile, scope))
     expected = {(profile, scope) for profile in PROFILES for scope in ("SYSTEM", "TOOL")}
-    if totals != expected:
+    if totals != expected or scenarios != {"OLD", "COMPACT"}:
         raise ValueError(
             "The host profile report is incomplete; no unvalidated output was published."
         )

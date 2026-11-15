@@ -21,8 +21,8 @@ import com.openminis.app.R
 import com.openminis.app.ui.theme.MinisTheme
 import io.github.nanomuse.net.ProviderReach
 import io.github.nanomuse.ui.chat.NmProviderErrorOrBanner
-import io.github.nanomuse.ui.chat.ProviderErrorDetailHost
-import io.github.nanomuse.ui.chat.ProviderErrorRetryTarget
+import ai.tama.ui.chat.ProviderErrorDetailHost
+import ai.tama.ui.chat.ProviderErrorRetryTarget
 import io.github.nanomuse.ui.chat.ProviderReachCard
 import java.util.concurrent.atomic.AtomicInteger
 import org.junit.After

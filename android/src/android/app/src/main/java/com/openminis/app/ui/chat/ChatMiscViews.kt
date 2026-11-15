@@ -12,7 +12,7 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import android.provider.OpenableColumns
 import java.io.File
-import io.github.nanomuse.ui.chat.tracePromptSizePointer
+import ai.tama.ui.chat.tracePromptSizePointer
 import androidx.core.content.ContextCompat
 import androidx.compose.foundation.Image
 import androidx.compose.ui.graphics.asAndroidBitmap
@@ -596,8 +596,8 @@ internal fun FallbackInfoBlock(
                 if (hasDetail) {
                     val open = {
                         if (block.toolName == "prompt_size") {
-                            io.github.nanomuse.ui.chat.PromptSizeDetailTrace.record(
-                                io.github.nanomuse.ui.chat.PromptSizeDetailTrace.Event.ROW_CLICK,
+                            ai.tama.ui.chat.PromptSizeDetailTrace.record(
+                                ai.tama.ui.chat.PromptSizeDetailTrace.Event.ROW_CLICK,
                             )
                         }
                         if (onOpenDetail != null) onOpenDetail() else showDetail = true

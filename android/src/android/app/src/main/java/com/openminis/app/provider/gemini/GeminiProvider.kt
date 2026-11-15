@@ -15,8 +15,8 @@ import com.openminis.app.data.model.LLMUsage
 import com.openminis.app.data.model.ThinkingLevel
 import com.openminis.app.provider.LLMProvider
 import com.openminis.app.provider.safeOptString
-import io.github.nanomuse.net.singleUseImageBody
-import io.github.nanomuse.net.singleUseImageClient
+import ai.tama.net.singleUseImageBody
+import ai.tama.net.singleUseImageClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.awaitClose
@@ -534,7 +534,7 @@ class GeminiProvider(
 
     // nanoMuse: Gemini sends its key in the query, so it must be redacted as well as headers.
     private fun requestCredentials(request: Request): List<String> =
-        io.github.nanomuse.net.ProviderCredentials.fromHeaders(
+        ai.tama.net.ProviderCredentials.fromHeaders(
             request.headers.names().associateWith { request.headers.values(it) }, apiKey,
         ) + listOfNotNull(request.url.queryParameter("key"))
 
@@ -542,7 +542,7 @@ class GeminiProvider(
         statusCode: Int, body: String, retryAfter: String?, requestModel: String?,
         credentials: Collection<String>, hasHttpStatus: Boolean = true, transientStream: Boolean = false,
     ): LLMError {
-        val captured = io.github.nanomuse.net.ProviderErrorDiagnostics.capture(
+        val captured = ai.tama.net.ProviderErrorDiagnostics.capture(
             code = statusCode, body = body, host = io.github.nanomuse.net.OwnProviderProxy.hostOf(basePath),
             oauth = false, requestModel = requestModel, credentials = credentials,
             retryAfter = retryAfter, fromRelay = io.github.nanomuse.net.OwnProviderProxy.isRelay(basePath),

@@ -113,9 +113,9 @@ def test_mismatched_or_incomplete_evidence_is_not_accepted(change) -> None:
 
 
 def test_each_locale_has_a_label_for_every_fixed_system_section() -> None:
-    source = (
-        ROOT / "android/src/android/app/src/main/java/io/github/nanomuse/chat/PromptSize.kt"
-    ).read_text(encoding="utf-8")
+    source = (ROOT / "android/src/android/app/src/main/java/ai/tama/chat/PromptSize.kt").read_text(
+        encoding="utf-8"
+    )
     section = re.search(r"enum class Section \{(.*?)\n    }", source, re.DOTALL)
     assert section
     count = len([label for label in section.group(1).split(",") if label.strip()])

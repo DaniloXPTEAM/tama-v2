@@ -89,7 +89,7 @@ fun ModelsScreen(
     val changed by ModelSlots.lastChanged.collectAsState()
     var tick by remember { mutableIntStateOf(0) }
     // nanoMuse: automatic selection is opt-in; each route needs separate cost consent.
-    var autoModels by remember { mutableStateOf(io.github.nanomuse.router.AutoModelStore.enabled(context)) }
+    var autoModels by remember { mutableStateOf(ai.tama.router.AutoModelStore.enabled(context)) }
 
     // The hands, image and video choices live in preferences, not in the config flow: re-read
     // when the picker pops back.
@@ -144,7 +144,7 @@ fun ModelsScreen(
                 checked = autoModels,
                 onCheckedChange = { enabled ->
                     autoModels = enabled
-                    io.github.nanomuse.router.AutoModelStore.setEnabled(context, enabled)
+                    ai.tama.router.AutoModelStore.setEnabled(context, enabled)
                 },
             )
             SettingsRow(

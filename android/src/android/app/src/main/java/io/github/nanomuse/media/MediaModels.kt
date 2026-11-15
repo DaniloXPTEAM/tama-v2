@@ -1,5 +1,7 @@
 package io.github.nanomuse.media
 
+import ai.tama.media.*
+
 import android.content.Context
 import android.content.SharedPreferences
 import com.openminis.app.MinisApp
@@ -63,7 +65,7 @@ object MediaModels {
 
     /** Agent image requests in automatic mode need their own exact-model consent. */
     internal fun agentImageEndpoint(context: Context): ImageGen.Endpoint? {
-        if (!io.github.nanomuse.router.AutoModelStore.enabled(context)) return imageEndpoint(context)
+        if (!ai.tama.router.AutoModelStore.enabled(context)) return imageEndpoint(context)
         val selected = AutoImageSelection.choose(context) ?: return null
         return AutoImageSelection.endpointIfStillAllowed(context, selected)
     }
@@ -268,7 +270,7 @@ object MediaModels {
      */
     // nanoMuse: share the exact paragraph with a synthetic host measurement.
     fun promptParagraph(context: Context): String {
-        val automatic = io.github.nanomuse.router.AutoModelStore.enabled(context)
+        val automatic = ai.tama.router.AutoModelStore.enabled(context)
         val image = agentImageEndpoint(context)
         val video = videoEndpoint(context)
         val imageStatus = image?.let {

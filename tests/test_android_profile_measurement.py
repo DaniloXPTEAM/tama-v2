@@ -25,6 +25,7 @@ def test_publishes_only_whitelisted_count_rows(tmp_path: Path) -> None:
         for profile in sorted(MODULE.PROFILES)
         for scope in ("SYSTEM", "TOOL")
     ]
+    rows += ["TAMA_SCENARIO OLD 1 2 3 4 5 6 21", "TAMA_SCENARIO COMPACT 1 2 3 4 5 6 21"]
     xml = tmp_path / "results.xml"
     write_xml(
         xml,

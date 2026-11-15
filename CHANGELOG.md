@@ -4,6 +4,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+- Shortened the Android FULL agent prompt while keeping its tools and safety gates, and added a separately named debug build for side-by-side phone testing.
+
 - Kept Android image session approvals bound to the displayed model, route and account, and withdrew outstanding permission requests when a chat is cleared or deleted.
 
 - Added a tappable Android provider-error detail sheet with the failed request's model, redacted message and guarded retry. Stream error codes are not labelled as HTTP statuses.

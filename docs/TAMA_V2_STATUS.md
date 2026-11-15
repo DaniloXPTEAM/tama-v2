@@ -4,6 +4,51 @@ Este registro acompanha o plano completo fornecido pelo dono. O trabalho está s
 `arena/4f0fb56f-tamaaiv2`; não houve sincronização com nanoMuse nem OpenMinis. Estados possíveis:
 **PENDENTE**, **EM ANDAMENTO**, **PARCIAL**, **BLOQUEADA** e **CONCLUÍDA COM PROVA**.
 
+## Incremento: FULL compacto e APK paralelo
+
+O perfil FULL agora resume **somente** o template fixo do app, mantendo as mesmas tools dietadas,
+`RiskPolicy`, Hands, identidade e fragmentos dinâmicos. Uma impressão SHA-256 do template fixo
+impede que uma alteração futura silencie instruções novas: se o template mudar, usa-se a dieta
+anterior até a revisão. A contagem `/prompt-size` passa a refletir o prompt realmente montado.
+Isso não comprova a qualidade das respostas nem substitui os gates nativos.
+
+Na fixture host sem dados privados, os caracteres e estimativas `ceil(chars / 3,7)` foram:
+
+| FULL | Sistema chars / ~tokens | Tools chars / ~tokens | Total chars / ~tokens | 3 × total |
+|---|---:|---:|---:|---:|
+| Antes, dietado | 27.464 / ~7.423 | 14.165 / ~3.829 | 41.629 / ~11.252 | ~33.756 |
+| Compacto | 13.004 / ~3.515 | 14.165 / ~3.829 | 27.169 / ~7.343 | ~22.029 |
+
+A redução de ~3.909 tokens é estimativa da fixture, não medição do provedor; SOUL, memória,
+MCP, histórico, anexos e formato real podem ampliar o pedido. O teto de regressão dessa fixture
+passou de 11.500 para 8.000. Foram mantidos nomes, campos, obrigatoriedades e enums dos schemas;
+a dieta de `browser_use` e o hand-over permanecem iguais à versão anterior.
+
+### Cenário sintético com contexto e três chamadas
+
+Uma conversa inventada inclui uma troca anterior, pedido de relatório, memória de exemplo,
+duas chamadas shell com resultados e resposta final, sem imagem ou rede. A tabela utiliza o
+`ContextEstimate` do app sem calibração (heurística diferente da tabela de caracteres acima):
+cada coluna de entrada inclui sistema, tools e histórico já acumulado. Saídas são estimativas do
+conteúdo sintético, não reservas nem consumo medido. A soma contempla três entradas e três saídas;
+não é uma janela de contexto nem garante que caiba em qualquer TPM.
+
+| FULL | Entrada 1 | Entrada 2 | Entrada 3 | Saídas 1 / 2 / 3 | Soma aproximada |
+|---|---:|---:|---:|---:|---:|
+| Antes, dietado | ~10.962 | ~11.008 | ~11.065 | ~29 / ~34 / ~22 | ~33.120 |
+| Compacto | ~6.976 | ~7.022 | ~7.079 | ~29 / ~34 / ~22 | ~21.162 |
+
+Esses números vêm de seis testes JVM locais com stubs de Android e JSON-java, não do Poco nem de
+faturamento. O teste publica somente rótulos fixos e números; o conteúdo da conversa sintética não
+vai aos logs. O CI Android e o APK paralelo ainda precisam ser conferidos após esta alteração.
+
+A variante `tamaTest` usa `ai.tama.assistant.tamav2test`, rótulo `Tama V2 Test`, assinatura debug
+e arm64-v8a; debug/release normais conservam seus IDs. É uma instalação e um armazenamento próprios,
+não uma migração dos dados existentes. O verificador do CI confere rótulos de todos os ícones,
+autoridades de providers disjuntas, permissão, ABI e assinatura, sem instalar nenhum APK. O código
+novo do incremento foi para `ai.tama.*`; Pet e código Android legado, namespace Gradle, caminhos e
+identificadores persistidos não foram renomeados. O smoke e o uso real no Poco seguem não comprovados.
+
 ## Prioridade atual
 
 O dono pediu para parar a investigação do emulador. O primeiro toque não entregue, timeout de

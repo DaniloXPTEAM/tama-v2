@@ -21,21 +21,21 @@ import io.github.nanomuse.chat.CompactSummaryIdleTimeoutException // nanoMuse
 import io.github.nanomuse.chat.CompactSummaryOutputException // nanoMuse
 import io.github.nanomuse.chat.ContextBudget // nanoMuse
 import io.github.nanomuse.chat.ContextEstimate // nanoMuse
-import io.github.nanomuse.chat.PromptSize // nanoMuse: count-only prompt diagnostics
-import io.github.nanomuse.chat.PromptProfiles // nanoMuse: one snapshot for the actual outbound profile
-import io.github.nanomuse.router.AutoModelStore
-import io.github.nanomuse.router.AutoModelRuntime
-import io.github.nanomuse.router.AutoModelTurn
-import io.github.nanomuse.router.ModelHealth
-import io.github.nanomuse.router.ModelRouter
-import io.github.nanomuse.router.Need
-import io.github.nanomuse.router.Profile
-import io.github.nanomuse.router.ProviderBudget
-import io.github.nanomuse.router.ProviderBudgetStore
-import io.github.nanomuse.router.Route
-import io.github.nanomuse.router.SessionState
-import io.github.nanomuse.router.TurnRequestPlanner
-import io.github.nanomuse.router.TurnRouter
+import ai.tama.chat.PromptSize // nanoMuse: count-only prompt diagnostics
+import ai.tama.chat.PromptProfiles // nanoMuse: one snapshot for the actual outbound profile
+import ai.tama.router.AutoModelStore
+import ai.tama.router.AutoModelRuntime
+import ai.tama.router.AutoModelTurn
+import ai.tama.router.ModelHealth
+import ai.tama.router.ModelRouter
+import ai.tama.router.Need
+import ai.tama.router.Profile
+import ai.tama.router.ProviderBudget
+import ai.tama.router.ProviderBudgetStore
+import ai.tama.router.Route
+import ai.tama.router.SessionState
+import ai.tama.router.TurnRequestPlanner
+import ai.tama.router.TurnRouter
 import io.github.nanomuse.chat.ContextCalibrationStore // nanoMuse
 import io.github.nanomuse.chat.ContextTrimming // nanoMuse
 import io.github.nanomuse.chat.ContextTrimStore // nanoMuse
@@ -1280,7 +1280,7 @@ class ChatViewModel(
     // budget below is refreshed before each provider call, including model-group fallback.
     private val nmCalibrationStore by lazy { ContextCalibrationStore(context) }
     // nanoMuse: remember a provider's confirmed smaller output cap by route and model.
-    private val nmOutputLimitStore by lazy { io.github.nanomuse.net.OutputLimitStore(context) }
+    private val nmOutputLimitStore by lazy { ai.tama.net.OutputLimitStore(context) }
     private var nmHistoryBudget: ContextBudget.Plan? = null
     private var nmHistoryCalibration = ContextEstimate.Calibration()
 
@@ -3678,7 +3678,7 @@ class ChatViewModel(
         // draft promotion. These local notices never enter the model's history.
         viewModelScope.launch {
             sessionLoaded.first { it }
-            io.github.nanomuse.media.AutoImageNotices.forSessions(nmDisplayedSessionId).collect { notices ->
+            ai.tama.media.AutoImageNotices.forSessions(nmDisplayedSessionId).collect { notices ->
                 notices.forEach { notice ->
                     val id = "nm_auto_image_${java.util.UUID.randomUUID()}"
                     val block = AssistantBlock(
@@ -6263,7 +6263,7 @@ class ChatViewModel(
     private data class InjectedTurn(
         val newAssistantId: String,
         val explicitImageRequest: Boolean,
-        val imageShortcut: io.github.nanomuse.router.Shortcut.Image?,
+        val imageShortcut: ai.tama.router.Shortcut.Image?,
     )
 
     private suspend fun injectQueuedPromptsAsNewTurn(
@@ -6438,10 +6438,10 @@ class ChatViewModel(
         )
         val person = queued.singleOrNull()
         val personWithoutMedia = person != null && person.petGeneration != null && person.attachments.isEmpty() && queuedPaste == null
-        val explicitImageRequest = personWithoutMedia && io.github.nanomuse.router.ImageRequestIntent.explicit(person!!.text)
+        val explicitImageRequest = personWithoutMedia && ai.tama.router.ImageRequestIntent.explicit(person!!.text)
         val imageShortcut = person?.let {
-            io.github.nanomuse.router.ImageShortcutEligibility.select(
-                it.text, io.github.nanomuse.router.ImageShortcutContext(
+            ai.tama.router.ImageShortcutEligibility.select(
+                it.text, ai.tama.router.ImageShortcutContext(
                     person = it.petGeneration != null, batchSize = queued.size,
                     hasAttachments = it.attachments.isNotEmpty(), hasPastedContent = queuedPaste != null,
                     editing = _editingMessageId.value != null, sharedContent = _hasInjectedShareContent.value,
@@ -6542,8 +6542,8 @@ class ChatViewModel(
                 val personWithoutMedia = person != null && person.petGeneration != null &&
                     person.attachments.isEmpty() && drainPaste == null
                 val shortcut = person?.let {
-                    io.github.nanomuse.router.ImageShortcutEligibility.select(
-                        it.text, io.github.nanomuse.router.ImageShortcutContext(
+                    ai.tama.router.ImageShortcutEligibility.select(
+                        it.text, ai.tama.router.ImageShortcutContext(
                             person = it.petGeneration != null, batchSize = queued.size,
                             hasAttachments = it.attachments.isNotEmpty(), hasPastedContent = drainPaste != null,
                             editing = _editingMessageId.value != null, sharedContent = _hasInjectedShareContent.value,
@@ -6563,7 +6563,7 @@ class ChatViewModel(
                         withContext(Dispatchers.Main) { nmAppendAssistantLine(sid, reply.text) }
                     }
                 } else {
-                    val imageRequested = personWithoutMedia && io.github.nanomuse.router.ImageRequestIntent.explicit(person!!.text)
+                    val imageRequested = personWithoutMedia && ai.tama.router.ImageRequestIntent.explicit(person!!.text)
                     val completedImageShortcut = runAgentLoop(
                         provider = this@ChatViewModel.currentProvider ?: provider,
                         promptInput = nmCapturePromptInput(),
@@ -6642,8 +6642,8 @@ class ChatViewModel(
         if (petGeneration != null && nmInterceptAvatar(text, petGeneration)) { nmCountableTurn = false; return }
         // Both branches are explicit so the same decision can be tested with a
         // fake chat client; automated, busy or media-bearing turns fall through.
-        io.github.nanomuse.router.ImageShortcutEligibility.dispatch(
-            text, io.github.nanomuse.router.ImageShortcutContext(
+        ai.tama.router.ImageShortcutEligibility.dispatch(
+            text, ai.tama.router.ImageShortcutContext(
                 person = petGeneration != null, hasAttachments = _attachments.value.isNotEmpty(),
                 hasPastedContent = _pastedTexts.value.isNotEmpty(), editing = _editingMessageId.value != null,
                 sharedContent = _hasInjectedShareContent.value, busy = _isStreaming.value || _isCompacting.value,
@@ -6656,18 +6656,18 @@ class ChatViewModel(
     /** Runs the native tool and retains Stop ownership until its reply is saved. */
     private suspend fun nmRunImageShortcut(
         sid: String,
-        image: io.github.nanomuse.router.Shortcut.Image,
-        commit: suspend (io.github.nanomuse.media.ImageShortcutRunner.Reply) -> Unit,
+        image: ai.tama.router.Shortcut.Image,
+        commit: suspend (ai.tama.media.ImageShortcutRunner.Reply) -> Unit,
     ) {
         val owner = kotlin.coroutines.coroutineContext[Job]
         nmActiveImageShortcutCall = owner
         try {
-            val reply = io.github.nanomuse.media.ImageShortcutRunner.run(
+            val reply = ai.tama.media.ImageShortcutRunner.run(
                 prompt = image.prompt,
                 failureMessage = context.getString(R.string.nm_image_request_failed),
                 settingsLabel = context.getString(R.string.nm_drawer_settings),
             ) { prompt ->
-                com.openminis.app.tools.ImageGenerationTool.execute(
+                ai.tama.tools.ImageGenerationTool.execute(
                     JSONObject().put("prompt", prompt).toString(), sid, context,
                 )
             }
@@ -6679,7 +6679,7 @@ class ChatViewModel(
     }
 
     /** Starts a classified standalone person request without a chat-model call. */
-    private fun nmStartImageShortcut(text: String, petGeneration: Long, image: io.github.nanomuse.router.Shortcut.Image) {
+    private fun nmStartImageShortcut(text: String, petGeneration: Long, image: ai.tama.router.Shortcut.Image) {
         _error.value = null
         _canResume.value = false
         _nmContinueAsk.value = null
@@ -6757,8 +6757,8 @@ class ChatViewModel(
     private fun nmContinueShortcutQueue() {
         if (_isStreaming.value || _isCompacting.value) return
         val next = _promptQueue.value.firstOrNull() ?: return
-        val localImage = io.github.nanomuse.router.ImageShortcutEligibility.select(
-            next.text, io.github.nanomuse.router.ImageShortcutContext(
+        val localImage = ai.tama.router.ImageShortcutEligibility.select(
+            next.text, ai.tama.router.ImageShortcutContext(
                 person = next.petGeneration != null, hasAttachments = next.attachments.isNotEmpty(),
                 hasPastedContent = _pastedTexts.value.isNotEmpty(), editing = _editingMessageId.value != null,
                 sharedContent = _hasInjectedShareContent.value,
@@ -7572,7 +7572,7 @@ class ChatViewModel(
                             fallbackStrategy = activeFallbackStrategy,
                             explicitImageRequest = petChatGeneration != null && headless == null &&
                                 currentAttachments.isEmpty() && pasted == null &&
-                                io.github.nanomuse.router.ImageRequestIntent.explicit(trimmed),
+                                ai.tama.router.ImageRequestIntent.explicit(trimmed),
                             // A headless receipt must finish its own turn before local queued messages.
                             allowQueuedInterruption = headless == null,
                             onTerminalFailure = { SessionActivityTracker.markStreamError(trackedSessionId, trackedTurnId) },
@@ -8307,7 +8307,7 @@ class ChatViewModel(
                 .find { it.id == _activeEntryId.value && it.model.id == currentProvider.model.id }
                 ?.takeIf { this@ChatViewModel.currentProvider === currentProvider }
                 ?.providerInstanceId
-            return io.github.nanomuse.router.ModelRouteHistory.forProvider(
+            return ai.tama.router.ModelRouteHistory.forProvider(
                 effectiveAgentHistory(), instanceId, currentProvider.model.id, nmRouteFingerprint(currentProvider),
             )
         }
@@ -8319,7 +8319,7 @@ class ChatViewModel(
         var nmUsedTools = false
         // At most one native image call per explicit person turn. A failure can
         // still have been charged, so a model's retry must not dispatch again.
-        val nmImageGuard = io.github.nanomuse.router.ImageTurnGuard(explicitImageRequest)
+        val nmImageGuard = ai.tama.router.ImageTurnGuard(explicitImageRequest)
         var nmWarnedWithoutTools = false
         var nmAttempt: TurnRequestPlanner.Attempt? = null
         // Captured at dispatch, not looked up later after a settings change.
@@ -8444,7 +8444,7 @@ class ChatViewModel(
                 else nmRoute.copy(profile = nmRoute.requestedProfile, budgetLimited = false)
             val minimum = if (Need.TOOLS in needs) Profile.BASIC else Profile.LEAN
             if (intended.profile < minimum) return candidate.copy(fitFailure = ModelRouter.Reason.PROFILE_TOO_SMALL)
-            val history = io.github.nanomuse.router.ModelRouteHistory.forProvider(
+            val history = ai.tama.router.ModelRouteHistory.forProvider(
                 messages, instance.id, entry.model.id, AutoModelStore.historyFingerprint(context, instance),
             )
             val prefix = if (instance.providerType == ProviderType.anthropic &&
@@ -8528,13 +8528,13 @@ class ChatViewModel(
                     is ModelRouter.Choice.None -> throw nmAutoNoCandidate(choices, selection)
                     is ModelRouter.Choice.Selected -> {
                         val selected = choices.first { it.entry.id == selection.candidate.entryId }
-                        val why = when (val cause = io.github.nanomuse.router.AutoSwitchReason.forSwitch(
+                        val why = when (val cause = ai.tama.router.AutoSwitchReason.forSwitch(
                             _activeEntryId.value, selection.candidate.entryId, turnState.failureRecords(),
                             nmAutoLocalBlocks, selection.rejected,
                         )) {
-                            is io.github.nanomuse.router.AutoSwitchReason.Cause.Failure -> nmAutoFailureReason(cause.reason)
-                            is io.github.nanomuse.router.AutoSwitchReason.Cause.Local -> cause.explanation
-                            is io.github.nanomuse.router.AutoSwitchReason.Cause.Rejected -> nmAutoReason(cause.reason)
+                            is ai.tama.router.AutoSwitchReason.Cause.Failure -> nmAutoFailureReason(cause.reason)
+                            is ai.tama.router.AutoSwitchReason.Cause.Local -> cause.explanation
+                            is ai.tama.router.AutoSwitchReason.Cause.Rejected -> nmAutoReason(cause.reason)
                             null -> null
                         }
                         // The actual reservation below checks the live ledger again atomically.
@@ -9145,8 +9145,8 @@ class ChatViewModel(
                         val pendingLimit = pendingOutput?.takeIf {
                             it.provider === currentProvider && it.model == currentProvider.model.id && it.route == durableOutputKey
                         }?.limit
-                        val proposedOutput = io.github.nanomuse.net.ProviderRecovery.clamp(
-                            io.github.nanomuse.net.ProviderRecovery.clamp(dynamicMaxTokens(currentProvider, lastContextTokens), learnedLimit),
+                        val proposedOutput = ai.tama.net.ProviderRecovery.clamp(
+                            ai.tama.net.ProviderRecovery.clamp(dynamicMaxTokens(currentProvider, lastContextTokens), learnedLimit),
                             pendingLimit,
                         )
                         val output = TurnRequestPlanner.outputLimit(proposedOutput, requestBudgetLimit, dispatchInput, available)
@@ -9214,14 +9214,14 @@ class ChatViewModel(
                         }
                     }
                     // The debug observer sees only counts for the exact outbound view.
-                    val sizeObserver = if (com.openminis.app.BuildConfig.DEBUG) io.github.nanomuse.chat.PromptSizeTrace.observer else null
+                    val sizeObserver = if (com.openminis.app.BuildConfig.DEBUG) ai.tama.chat.PromptSizeTrace.observer else null
                     if (sizeObserver != null) runCatching {
                         val imageReady = runCatching { io.github.nanomuse.media.MediaModels.agentImageEndpoint(context) != null }.getOrNull()
-                        sizeObserver(io.github.nanomuse.chat.PromptSizeTrace.Event.System(planned.systemSizes, imageReady))
-                        sizeObserver(io.github.nanomuse.chat.PromptSizeTrace.Event.Tools(
+                        sizeObserver(ai.tama.chat.PromptSizeTrace.Event.System(planned.systemSizes, imageReady))
+                        sizeObserver(ai.tama.chat.PromptSizeTrace.Event.Tools(
                             PromptSize.tools(originalAgentTools(), requestTools),
                         ))
-                        sizeObserver(io.github.nanomuse.chat.PromptSizeTrace.Event.Request(planned.system.length))
+                        sizeObserver(ai.tama.chat.PromptSizeTrace.Event.Request(planned.system.length))
                     }
                     var requestUsage: LLMUsage? = null
                     nmLastSentRoute = nmRouteFingerprint(currentProvider)
@@ -9519,7 +9519,7 @@ class ChatViewModel(
                         // the downstream tool-result join all key on the
                         // same value (matches the rename applied at start).
                         val toolCompleteId = dedupeToolCompleteId(chunk.id)
-                        val loggedToolArgs = if (chunk.name == com.openminis.app.tools.ImageGenerationTool.NAME) "<omitted>" else chunk.args.toString().take(300)
+                        val loggedToolArgs = if (chunk.name == ai.tama.tools.ImageGenerationTool.NAME) "<omitted>" else chunk.args.toString().take(300)
                         android.util.Log.d("ToolChain[VM]", "[turn=$turn] ToolCallComplete id=$toolCompleteId name=${chunk.name} args=$loggedToolArgs")
                         toolCalls.add(Triple(toolCompleteId, chunk.name, chunk.args))
                         // [T-android-gemini3-thoughtsig / #179] Stash the Gemini
@@ -9604,7 +9604,7 @@ class ChatViewModel(
                     pendingOutput?.takeIf {
                         it.provider === currentProvider && it.model == currentProvider.model.id && it.route == durableOutputKey
                     }?.let { accepted ->
-                        val confirmed = io.github.nanomuse.net.ProviderRecovery.confirmedOutput(
+                        val confirmed = ai.tama.net.ProviderRecovery.confirmedOutput(
                             accepted.limit, lastRequestedOutput, turnFinishReason != null,
                         )
                         if (confirmed != null) {
@@ -9727,9 +9727,9 @@ class ChatViewModel(
                     }
                     // nanoMuse: a verified upper bound changes the next request; a short 429
                     // gets one bounded wait. Neither path repeats already executed tools.
-                    val outputRetry = io.github.nanomuse.net.ProviderRecovery.outputRetry(reach, lastRequestedOutput, outputRetried)
+                    val outputRetry = ai.tama.net.ProviderRecovery.outputRetry(reach, lastRequestedOutput, outputRetried)
                     val rateDelay = if (isRateLimit && nmAutoTurn == null)
-                        io.github.nanomuse.net.ProviderRecovery.rateDelay(reach, rateRetried) else null
+                        ai.tama.net.ProviderRecovery.rateDelay(reach, rateRetried) else null
                     if (smallerProfile != null ||
                         (((isTransient && nmAutoTurn == null) || recoveredContext || outputRetry != null || rateDelay != null) &&
                             retryAttempt < AUTO_RETRY_DELAYS_SEC.size)) {
@@ -9848,16 +9848,16 @@ class ChatViewModel(
                     if (nmAutoTurn != null) {
                         // A bug, malformed request, safety refusal or cancellation must not
                         // silently trigger another potentially billable provider.
-                        val decision = io.github.nanomuse.router.AutoModelFailure.classify(actual, nmRequestTools.isNotEmpty())
+                        val decision = ai.tama.router.AutoModelFailure.classify(actual, nmRequestTools.isNotEmpty())
                             ?: throw actual
                         val failed = checkNotNull(nmAutoCandidate)
                         val expectedVersion = nmDispatchAccountVersion
                         if (expectedVersion != null && expectedVersion == AutoModelRuntime.accountVersion(failed.providerId)) {
                             when (decision) {
-                                is io.github.nanomuse.router.AutoModelFailure.Decision.Cooldown ->
+                                is ai.tama.router.AutoModelFailure.Decision.Cooldown ->
                                     nmAutoTurn.fail(failed.entryId, failed.providerId, decision.reason,
                                         decision.retryAfterSeconds, decision.retryAfterPresent)
-                                io.github.nanomuse.router.AutoModelFailure.Decision.UnsupportedTools -> {
+                                ai.tama.router.AutoModelFailure.Decision.UnsupportedTools -> {
                                     nmAutoIdentity?.let { AutoModelStore.noteUnsupportedTools(context, it) }
                                     nmAutoLocalBlocks[failed.entryId] = context.getString(R.string.nm_auto_reason_capability)
                                     nmAutoTurn.exclude(failed.entryId)
@@ -10276,7 +10276,7 @@ class ChatViewModel(
                         "ToolPreflight",
                         "[ToolRepair] REPAIRED tool=$name id=$id strategies=[${repairs.joinToString(", ")}] " +
                             "argsKeys=[${args.keys().asSequence().toList().sorted().joinToString(",")}] " +
-                            "rawTail=<<<${if (name == com.openminis.app.tools.ImageGenerationTool.NAME) "<omitted>" else toolInputChunkRings[id]?.lastOrNull()?.take(500) ?: ""}>>>"
+                            "rawTail=<<<${if (name == ai.tama.tools.ImageGenerationTool.NAME) "<omitted>" else toolInputChunkRings[id]?.lastOrNull()?.take(500) ?: ""}>>>"
                     )
                 }
                 // [T-truncated-args-visibility #119] Non-null when THIS call's
@@ -10288,7 +10288,7 @@ class ChatViewModel(
 
                 // Repaired image arguments must not cause a billable request for
                 // a description or size the person or model did not provide intact.
-                if (repairs.isNotEmpty() && name == com.openminis.app.tools.ImageGenerationTool.NAME) {
+                if (repairs.isNotEmpty() && name == ai.tama.tools.ImageGenerationTool.NAME) {
                     nmImageGuard.consume(truncated = true)
                     val reason = "Image request was not sent because its arguments needed repair. Ask the user before trying again."
                     val idx = allToolBlocks.indexOfFirst { it.id == id }
@@ -10402,9 +10402,9 @@ class ChatViewModel(
                         "BLOCKED tool=$name id=$id reason=\"$preflightError\" " +
                             "argsKeys=[${args.keys().asSequence().toList().sorted().joinToString(",")}] " +
                             "chunkCount=${chunkRing.size} " +
-                            "lastChunk=<<<${if (name == com.openminis.app.tools.ImageGenerationTool.NAME) "<omitted>" else chunkRing.lastOrNull()?.take(500) ?: ""}>>>"
+                            "lastChunk=<<<${if (name == ai.tama.tools.ImageGenerationTool.NAME) "<omitted>" else chunkRing.lastOrNull()?.take(500) ?: ""}>>>"
                     )
-                    if (name != com.openminis.app.tools.ImageGenerationTool.NAME) chunkRing.forEachIndexed { i, snap ->
+                    if (name != ai.tama.tools.ImageGenerationTool.NAME) chunkRing.forEachIndexed { i, snap ->
                         AppLogger.warning(
                             "ToolPreflight",
                             "  chunk[$i] bytes=${snap.toByteArray(Charsets.UTF_8).size} raw=<<<${snap.take(500)}>>>"
@@ -10440,10 +10440,10 @@ class ChatViewModel(
                     continue
                 }
 
-                if (name == com.openminis.app.tools.ImageGenerationTool.NAME) {
+                if (name == ai.tama.tools.ImageGenerationTool.NAME) {
                     val decision = nmImageGuard.consume()
-                    if (decision != io.github.nanomuse.router.ImageTurnGuard.Decision.ALLOW) {
-                        val reason = if (decision == io.github.nanomuse.router.ImageTurnGuard.Decision.NOT_REQUESTED)
+                    if (decision != ai.tama.router.ImageTurnGuard.Decision.ALLOW) {
+                        val reason = if (decision == ai.tama.router.ImageTurnGuard.Decision.NOT_REQUESTED)
                             "Image generation was not requested explicitly by the person in this turn. Do not generate or retry."
                         else "An image was already attempted in this turn and may have been charged. Do not retry without a new user request."
                         val idx = allToolBlocks.indexOfFirst { it.id == id }
@@ -10454,7 +10454,7 @@ class ChatViewModel(
                         continue
                     }
                 }
-                val loggedArgs = if (name == com.openminis.app.tools.ImageGenerationTool.NAME) "<omitted>" else argsStr.take(200)
+                val loggedArgs = if (name == ai.tama.tools.ImageGenerationTool.NAME) "<omitted>" else argsStr.take(200)
                 android.util.Log.d("ToolChain[VM]", "[turn=$turn] executeTool START name=$name args=$loggedArgs")
                 // nanoMuse: rejected/unoffered/preflight-blocked calls must not create tool continuity.
                 nmUsedTools = true
@@ -10463,7 +10463,7 @@ class ChatViewModel(
                 if (result.success && truncationRepairTag == null) {
                     io.github.nanomuse.pet.PetEvents.tool(context, realSessionId.ifEmpty { sessionId }, id, name, petRunGeneration)
                 }
-                val loggedOutput = if (name == com.openminis.app.tools.ImageGenerationTool.NAME) "<omitted>" else result.output.take(200)
+                val loggedOutput = if (name == ai.tama.tools.ImageGenerationTool.NAME) "<omitted>" else result.output.take(200)
                 android.util.Log.d("ToolChain[VM]", "[turn=$turn] executeTool END name=$name success=${result.success} title=${result.toolTitle} outputLen=${result.output.length} output=$loggedOutput")
 
                 // Record post-execution. WARNING text is appended to the tool
@@ -10820,8 +10820,8 @@ class ChatViewModel(
             // bindMounts map and would surface another session's
             // /var/minis/{workspace,attachments,offloads,browser} files.
             ReadImageTool.NAME -> executeReadImageTool(argsJson)
-            com.openminis.app.tools.ImageGenerationTool.NAME ->
-                com.openminis.app.tools.ImageGenerationTool.execute(argsJson, activeSessionId, context)
+            ai.tama.tools.ImageGenerationTool.NAME ->
+                ai.tama.tools.ImageGenerationTool.execute(argsJson, activeSessionId, context)
             "shell_execute" -> executeShellCommand(argsJson, toolId, toolBlocks, assistantId, currentText)
             "browser_use" -> executeBrowserUseTool(argsJson)
             "memory_write" -> executeMemoryWriteTool(argsJson)
@@ -11612,7 +11612,7 @@ class ChatViewModel(
         routeFingerprint: String? = null,
     ): String = buildString {
         val routeField = routeFingerprint
-            ?.takeIf { io.github.nanomuse.router.ModelRouteHistory.validFingerprint(it) }
+            ?.takeIf { ai.tama.router.ModelRouteHistory.validFingerprint(it) }
             ?.let { ",\"_tamaRoute\":${escapeJson(it)}" }.orEmpty()
         append("[")
         parts.forEachIndexed { index, part ->
@@ -11735,7 +11735,7 @@ class ChatViewModel(
 
     // nanoMuse: an optional local, count-only snapshot for /prompt-size.
     private fun buildSystemPrompt(
-        onSnapshot: ((io.github.nanomuse.chat.PromptProfiles.Input) -> Unit)? = null,
+        onSnapshot: ((ai.tama.chat.PromptProfiles.Input) -> Unit)? = null,
         onMeasured: ((List<PromptSize.Measure<PromptSize.Section>>, Boolean?) -> Unit)? = null,
     ): String? {
         // Cache-friendly layout: keep `base` byte-stable by stripping out anything
@@ -11776,10 +11776,10 @@ class ChatViewModel(
         // gate is symmetrical: enable both or disable both, never mismatch.
         val memoryOn = _memoryEnabled.value
         // nanoMuse: share the exact memory instructions with the count-only host fixture.
-        val toolListMemoryBullets = io.github.nanomuse.chat.AgentMemoryPrompt.toolList(memoryOn)
-        val memorySystemSection = io.github.nanomuse.chat.AgentMemoryPrompt.guidance(memoryOn)
+        val toolListMemoryBullets = ai.tama.chat.AgentMemoryPrompt.toolList(memoryOn)
+        val memorySystemSection = ai.tama.chat.AgentMemoryPrompt.guidance(memoryOn)
         // nanoMuse: the same stable template is shared with the host measurement.
-        val base = io.github.nanomuse.chat.AgentBasePrompt.build(identitySection)
+        val base = ai.tama.chat.AgentBasePrompt.build(identitySection)
 
         // nanoMuse: match iOS suffix groups: model/tool/session state, then memory and USER.md;
         // PromptCacheLayout appends runtime context last by contract.
@@ -11834,7 +11834,6 @@ class ChatViewModel(
         }
         // nanoMuse: label each actual section once, so diagnostics cannot change its contents
         // or order. A local command or isolated debug test receives counts, never fragments.
-        val dietedBase = io.github.nanomuse.chat.PromptDiet.prompt(base)
         val stable: List<Pair<PromptSize.Section, String?>> = listOf(
             PromptSize.Section.RISK_POLICY to io.github.nanomuse.guard.RiskPolicy.promptParagraph(),
             PromptSize.Section.HANDS to io.github.nanomuse.hands.Hands.promptParagraph(context),
@@ -11856,23 +11855,15 @@ class ChatViewModel(
         )
         // nanoMuse: capture the exact session fragments once; retries derive smaller profiles
         // from this snapshot instead of re-reading memory or rebuilding completed tool results.
-        val profileInput = io.github.nanomuse.chat.PromptProfiles.Input(identitySection, base, stable, volatile, runtimeContext)
+        val profileInput = ai.tama.chat.PromptProfiles.Input(identitySection, base, stable, volatile, runtimeContext)
         onSnapshot?.invoke(profileInput)
-        val prompt = io.github.nanomuse.chat.PromptProfiles.build(io.github.nanomuse.router.Profile.FULL, profileInput).prompt
+        val built = ai.tama.chat.PromptProfiles.build(ai.tama.router.Profile.FULL, profileInput)
         if (onMeasured != null) runCatching {
-            val rows = PromptSize.system(
-                beforeBase = base,
-                afterBase = dietedBase,
-                identityLength = identitySection.length,
-                stable = stable,
-                volatile = volatile,
-                runtime = runtimeContext,
-            )
-            // nanoMuse: resolving a configured image endpoint is local; no image is generated.
+            // nanoMuse: measure the exact compact prompt, not the former dieted template.
             val imageReady = runCatching { io.github.nanomuse.media.MediaModels.agentImageEndpoint(context) != null }.getOrNull()
-            onMeasured(rows, imageReady)
+            onMeasured(built.sizes, imageReady)
         }
-        return prompt
+        return built.prompt
     }
 
     // ─── Legacy tool execution methods (kept for compatibility) ───────────
@@ -13981,7 +13972,7 @@ class ChatViewModel(
             originModelId = modelId,
             originProviderInstanceId = providerInstanceId,
             originRouteFingerprint = if (r == LLMMessage.Role.ASSISTANT)
-                io.github.nanomuse.router.ModelRouteHistory.fingerprintFromPartsJson(partsJson) else null,
+                ai.tama.router.ModelRouteHistory.fingerprintFromPartsJson(partsJson) else null,
         )
     }
 

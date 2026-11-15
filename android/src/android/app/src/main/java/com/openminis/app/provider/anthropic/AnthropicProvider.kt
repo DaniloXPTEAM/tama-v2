@@ -1057,7 +1057,7 @@ class AnthropicProvider(
 
     // nanoMuse: retain only request-scoped, decoded and redacted diagnostics.
     private fun requestCredentials(request: Request): List<String> =
-        io.github.nanomuse.net.ProviderCredentials.fromHeaders(
+        ai.tama.net.ProviderCredentials.fromHeaders(
             request.headers.names().associateWith { request.headers.values(it) }, apiKey,
         )
 
@@ -1065,7 +1065,7 @@ class AnthropicProvider(
         statusCode: Int, body: String, retryAfter: String?, requestModel: String?,
         credentials: Collection<String>, hasHttpStatus: Boolean = true, transientStream: Boolean = false,
     ): LLMError {
-        val diagnostics = io.github.nanomuse.net.ProviderErrorDiagnostics
+        val diagnostics = ai.tama.net.ProviderErrorDiagnostics
         val captured = diagnostics.capture(
             code = statusCode, body = body, host = io.github.nanomuse.net.OwnProviderProxy.hostOf(basePath),
             oauth = isOAuth, requestModel = requestModel, credentials = credentials,

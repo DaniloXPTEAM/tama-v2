@@ -6,7 +6,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
-import io.github.nanomuse.sandbox.ShellMarkerDecoder // nanoMuse: fragmented process output.
+import ai.tama.sandbox.ShellMarkerDecoder // nanoMuse: fragmented process output.
 import java.io.BufferedWriter
 import java.io.File
 import java.io.InputStreamReader

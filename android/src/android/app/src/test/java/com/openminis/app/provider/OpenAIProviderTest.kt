@@ -378,7 +378,7 @@ class OpenAIProviderTest {
             .setBody("""{"error":{"message":"Rate limit reached"}}"""))
         assertTrue(blankWait.nmProviderReach!!.retryAfterPresent)
         assertNull(blankWait.nmProviderReach!!.retryAfterS)
-        assertNull(io.github.nanomuse.net.ProviderRecovery.rateDelay(blankWait.nmProviderReach, false))
+        assertNull(ai.tama.net.ProviderRecovery.rateDelay(blankWait.nmProviderReach, false))
     }
 
     // nanoMuse: details belong to the actual failed request and redact JSON-escaped credentials.

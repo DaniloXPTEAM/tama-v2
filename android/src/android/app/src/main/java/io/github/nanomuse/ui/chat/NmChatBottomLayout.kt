@@ -1,5 +1,7 @@
 package io.github.nanomuse.ui.chat
 
+import ai.tama.ui.chat.*
+
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column

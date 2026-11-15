@@ -1,5 +1,7 @@
 package io.github.nanomuse.chat
 
+import ai.tama.chat.*
+
 import com.openminis.app.data.ContextPolicy
 import com.openminis.app.tools.AgentTools
 import org.junit.Assert.assertEquals
@@ -18,8 +20,8 @@ import java.io.File
 class PromptDietTest {
     private val templateSource: String by lazy {
         val f = listOf(
-            "src/main/java/io/github/nanomuse/chat/AgentBasePrompt.kt",
-            "app/src/main/java/io/github/nanomuse/chat/AgentBasePrompt.kt",
+            "src/main/java/ai/tama/chat/AgentBasePrompt.kt",
+            "app/src/main/java/ai/tama/chat/AgentBasePrompt.kt",
         ).map(::File).first { it.exists() }
         f.readText()
     }

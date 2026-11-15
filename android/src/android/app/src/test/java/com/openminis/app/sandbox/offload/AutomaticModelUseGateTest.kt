@@ -5,7 +5,7 @@ import com.openminis.app.R
 import com.openminis.app.data.repository.ProviderRepository
 import com.openminis.app.sandbox.NativeOffloadRequest
 import io.github.nanomuse.pet.PetMapPreferences
-import io.github.nanomuse.router.AutoModelStore
+import ai.tama.router.AutoModelStore
 import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Test

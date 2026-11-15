@@ -17,8 +17,8 @@ import com.openminis.app.provider.thinking.ThinkingRuleResolver
 import com.openminis.app.provider.LLMProvider
 import com.openminis.app.provider.applyUserAgentOverride
 import com.openminis.app.provider.safeOptString
-import io.github.nanomuse.net.singleUseImageBody
-import io.github.nanomuse.net.singleUseImageClient
+import ai.tama.net.singleUseImageBody
+import ai.tama.net.singleUseImageClient
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
@@ -353,7 +353,7 @@ class OpenAIProvider private constructor(
 
     // nanoMuse: request headers can override the configured key or send several credentials.
     private fun requestCredentials(request: Request): List<String> =
-        io.github.nanomuse.net.ProviderCredentials.fromHeaders(
+        ai.tama.net.ProviderCredentials.fromHeaders(
             request.headers.names().associateWith { request.headers.values(it) }, apiKey,
         )
 
@@ -3521,7 +3521,7 @@ class OpenAIProvider private constructor(
         // slot could show a different request's failure after a fallback or a parallel call.
         // Parse raw JSON first: literal redaction before parsing can corrupt JSON when a key
         // contains a quote, and does not find a JSON-escaped credential. The body itself is not retained.
-        val diagnostic = io.github.nanomuse.net.ProviderErrorDiagnostics.capture(
+        val diagnostic = ai.tama.net.ProviderErrorDiagnostics.capture(
             code = statusCode, body = body,
             host = if (isOAuth && !forceChatCompletions) "chatgpt.com" else io.github.nanomuse.net.OwnProviderProxy.hostOf(basePath),
             oauth = isOAuth, requestModel = requestModelId, credentials = requestCredentials,

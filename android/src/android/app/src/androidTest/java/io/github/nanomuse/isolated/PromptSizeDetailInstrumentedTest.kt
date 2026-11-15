@@ -43,8 +43,8 @@ import com.openminis.app.ui.chat.SelectionController
 import com.openminis.app.ui.chat.minisTextKitSelectionGesture
 import com.openminis.app.ui.theme.MinisTheme
 import io.github.nanomuse.ui.chat.NmChatBottomLayout
-import io.github.nanomuse.ui.chat.PromptSizeDetailHost
-import io.github.nanomuse.ui.chat.PromptSizeDetailTrace
+import ai.tama.ui.chat.PromptSizeDetailHost
+import ai.tama.ui.chat.PromptSizeDetailTrace
 import java.util.Collections
 import org.junit.After
 import org.junit.Assert.assertTrue

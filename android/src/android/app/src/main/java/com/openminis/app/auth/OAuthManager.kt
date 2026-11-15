@@ -300,7 +300,7 @@ abstract class OAuthManager(
     }
 
     protected fun invalidateAutomaticConsent() {
-        io.github.nanomuse.router.AutoModelStore.accountChanged(context, instanceId)
+        ai.tama.router.AutoModelStore.accountChanged(context, instanceId)
     }
 
     fun logout() {
