@@ -38,6 +38,26 @@ class AutoModelStoreTest {
         assertFalse(AutoModelStore.approved(context, AutoModelStore.identity(entry, changedAuth)))
     }
 
+    @Test fun imageConsentIsSeparateAndRevokedWithTheAccountOrRoute() {
+        val context = PetPrefsContext()
+        val identity = AutoModelStore.Identity("image-entry", "provider", "image-model", "route-a")
+        assertFalse(AutoModelStore.imageApproved(context, identity))
+        AutoModelStore.setApproved(context, identity, true)
+        AutoModelStore.setCapability(context, identity, Need.IMAGE_GENERATION, true)
+        assertFalse(AutoModelStore.imageApproved(context, identity)) // chat permission is not image permission
+        AutoModelStore.setImageApproved(context, identity, true)
+        assertTrue(AutoModelStore.imageApproved(context, identity))
+        AutoModelStore.setApproved(context, identity, false)
+        assertTrue(AutoModelStore.imageApproved(context, identity)) // image-only use can be approved independently
+        assertFalse(AutoModelStore.imageApproved(context, identity.copy(modelId = "other-model")))
+        val moved = identity.copy(route = "route-b")
+        assertFalse(AutoModelStore.imageApproved(context, moved))
+        assertFalse(AutoModelStore.imageApproved(context, identity)) // moving back does not restore old consent
+        AutoModelStore.setImageApproved(context, identity, true)
+        AutoModelStore.accountChanged(context, identity.providerId)
+        assertFalse(AutoModelStore.imageApproved(context, identity))
+    }
+
     @Test fun aRouteChangeOrNewAccountCannotResurrectOldPermission() {
         val context = PetPrefsContext()
         val old = AutoModelStore.Identity("entry", "provider", "model", "route-a")

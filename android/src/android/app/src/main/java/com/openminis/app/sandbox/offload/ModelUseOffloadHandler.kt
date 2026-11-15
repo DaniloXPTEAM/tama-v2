@@ -47,7 +47,10 @@ class ModelUseOffloadHandler(
             when (val sub = args.positional[0]) {
                 "list" -> cmdList(args)
                 "search" -> cmdSearch(args)
-                "run" -> cmdRun(args, request)
+                // This escape hatch can address arbitrary endpoints and bypasses the
+                // automatic chat/image permissions. Leave it available in manual mode.
+                "run" -> if (io.github.nanomuse.router.AutoModelStore.enabled(context)) automaticRunBlocked()
+                    else cmdRun(args, request)
                 else -> NativeOffloadResult(2, "minis-model-use: unknown subcommand '$sub'\n$HELP")
             }
         } catch (e: Throwable) {
@@ -59,6 +62,14 @@ class ModelUseOffloadHandler(
             )
         }
     }
+
+    private fun automaticRunBlocked(): NativeOffloadResult = NativeOffloadResult(
+        3, JSONObject().put("error", "automatic_direct_model_use_unavailable")
+            .put("message", context.getString(com.openminis.app.R.string.nm_auto_model_use_blocked))
+            .put("settings", "minis://settings/models")
+            .put("tell_user", "Explain the message and link [Models](minis://settings/models); do not retry this command.")
+            .toString(2) + "\n",
+    )
 
     private fun cmdList(args: OffloadArgs): NativeOffloadResult {
         val providerFilter = args.get("provider")?.lowercase()
@@ -259,6 +270,10 @@ class ModelUseOffloadHandler(
 
         val maxTokens = args.get("max-tokens")?.toIntOrNull() ?: 4096
         val temperature = args.get("temperature")?.toDoubleOrNull()
+
+        // The mode may have changed while input was being read. Fail closed before
+        // creating a client or entering any of the raw, image or chat transports.
+        if (io.github.nanomuse.router.AutoModelStore.enabled(context)) return automaticRunBlocked()
 
         // Build provider + call — runBlocking is acceptable here: this handler
         // is invoked off the main thread by the offload server.

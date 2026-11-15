@@ -61,6 +61,13 @@ object MediaModels {
     /** The image model when it is usable: a provider with a key *and* a model name (the catalogue may not know one). */
     fun imageEndpoint(context: Context): ImageGen.Endpoint? = ImageGen.endpoint(context)?.takeIf { it.model.isNotBlank() }
 
+    /** Agent image requests in automatic mode need their own exact-model consent. */
+    internal fun agentImageEndpoint(context: Context): ImageGen.Endpoint? {
+        if (!io.github.nanomuse.router.AutoModelStore.enabled(context)) return imageEndpoint(context)
+        val selected = AutoImageSelection.choose(context) ?: return null
+        return AutoImageSelection.endpointIfStillAllowed(context, selected)
+    }
+
     // ── video ─────────────────────────────────────────────────────────────
 
     /**
@@ -261,13 +268,18 @@ object MediaModels {
      */
     // nanoMuse: share the exact paragraph with a synthetic host measurement.
     fun promptParagraph(context: Context): String {
-        val image = imageEndpoint(context)
+        val automatic = io.github.nanomuse.router.AutoModelStore.enabled(context)
+        val image = agentImageEndpoint(context)
         val video = videoEndpoint(context)
-        return MediaPrompt.build(
-            image?.let { "${it.model} via ${it.label}" },
-            video?.let { "${it.model} via ${it.label}" },
-            DEEP_LINK,
-        )
+        val imageStatus = image?.let {
+            if (!automatic) "${it.model} via ${it.label}" else {
+                val secrets = listOf(it.apiKey)
+                val model = io.github.nanomuse.net.ProviderReach.redactedText(it.model, secrets, 128)
+                val provider = io.github.nanomuse.net.ProviderReach.redactedText(it.label, secrets, 128)
+                "$model via $provider"
+            }
+        }
+        return MediaPrompt.build(imageStatus, video?.let { "${it.model} via ${it.label}" }, DEEP_LINK, automatic)
     }
 
     /** The one-turn addendum when an avatar change was asked for but cannot be drawn. */

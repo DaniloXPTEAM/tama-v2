@@ -99,6 +99,17 @@ object AutoModelStore {
         prefs(context).edit().putBoolean(prefix(identity) + "approved", approved).apply()
     }
 
+    /** Image endpoints can charge per picture; chat consent alone never authorizes them. */
+    fun imageApproved(context: Context, identity: Identity): Boolean {
+        synchronizeRoute(context, identity.providerId, identity.route)
+        return prefs(context).getBoolean(prefix(identity) + "image_approved", false)
+    }
+
+    fun setImageApproved(context: Context, identity: Identity, approved: Boolean) {
+        synchronizeRoute(context, identity.providerId, identity.route)
+        prefs(context).edit().putBoolean(prefix(identity) + "image_approved", approved).apply()
+    }
+
     private fun capabilityKey(identity: Identity, need: Need) = prefix(identity) + "cap." + need.name
     private fun deniedToolsKey(identity: Identity) = prefix(identity) + "tools_refused"
 

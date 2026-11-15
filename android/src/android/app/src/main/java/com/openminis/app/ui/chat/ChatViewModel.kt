@@ -3667,6 +3667,23 @@ class ChatViewModel(
 
     init {
         loadSession()
+        // Wait until restored rows are installed, then drain for publications and
+        // draft promotion. These local notices never enter the model's history.
+        viewModelScope.launch {
+            sessionLoaded.first { it }
+            io.github.nanomuse.media.AutoImageNotices.forSessions(nmDisplayedSessionId).collect { notices ->
+                notices.forEach { notice ->
+                    val id = "nm_auto_image_${java.util.UUID.randomUUID()}"
+                    val block = AssistantBlock(
+                        id = id, kind = "info", toolName = "info",
+                        content = context.getString(R.string.nm_auto_image_used, notice.model, notice.provider),
+                    )
+                    _messages.value = _messages.value + ChatMessage(
+                        id = id, role = "system", content = "", toolBlocks = listOf(block),
+                    )
+                }
+            }
+        }
         // nanoMuse: rows synced from the account's other devices land in this chat while it is
         // open — reloaded from the database between turns, never under a running one; what
         // arrives during a turn is shown the moment the turn ends (C8: no reload by hand).
@@ -3686,7 +3703,7 @@ class ChatViewModel(
                 if (!streaming) io.github.nanomuse.sync.ConversationSync.turnEnded(realSessionId.ifEmpty { sessionId })
                 // …and the record hears how it ended, when it ended short (TurnFeedback: a Stop was told at the Stop);
                 // only a turn that ran here counts, not the flag's first value when the chat opens
-                if (!streaming && nmWasStreaming) io.github.nanomuse.ui.feedback.TurnFeedback.turnEnded(realSessionId.ifEmpty { sessionId }, errored = _messages.value.lastOrNull()?.let { it.role == "assistant" && !it.error.isNullOrBlank() } == true)
+                if (!streaming && nmWasStreaming) io.github.nanomuse.ui.feedback.TurnFeedback.turnEnded(realSessionId.ifEmpty { sessionId }, errored = _messages.value.lastOrNull { !it.id.startsWith("nm_auto_image_") }?.let { it.role == "assistant" && !it.error.isNullOrBlank() } == true)
                 nmWasStreaming = streaming
                 if (!streaming && nmPulledWhileStreaming) {
                     // a breath after the end: the turn's last rows are still being written
@@ -4425,7 +4442,7 @@ class ChatViewModel(
             // session's enlarged cap (set via loadOlderMessages), defeating
             // the windowing intent on the first paint of every new session.
             _visibleMessageCap.value = INITIAL_VISIBLE_MESSAGE_CAP
-            _messages.value = if (marker == null) {
+            val restoredMessages = if (marker == null) {
                 ordered
             } else {
                 // Phase 2.5: build the historyDbIds set used by the
@@ -4439,6 +4456,9 @@ class ChatViewModel(
                 }
                 applyCompactMarkerGraying(ordered, marker, loaded.messages, historyDbIds)
             }
+            // A remote-row refresh or compact reload must not erase an image
+            // attribution that was already drained from the in-memory queue.
+            _messages.value = restoredMessages + _messages.value.filter { it.id.startsWith("nm_auto_image_") }
             nmSeedFirstConversation() // nanoMuse: re-seat the virtual opening in the session it belongs to
 
             // Cold-start interrupt detection: an agent loop that was killed by
@@ -8999,7 +9019,7 @@ class ChatViewModel(
                     // The debug observer sees only counts for the exact outbound view.
                     val sizeObserver = if (com.openminis.app.BuildConfig.DEBUG) io.github.nanomuse.chat.PromptSizeTrace.observer else null
                     if (sizeObserver != null) runCatching {
-                        val imageReady = runCatching { io.github.nanomuse.media.MediaModels.imageEndpoint(context) != null }.getOrNull()
+                        val imageReady = runCatching { io.github.nanomuse.media.MediaModels.agentImageEndpoint(context) != null }.getOrNull()
                         sizeObserver(io.github.nanomuse.chat.PromptSizeTrace.Event.System(planned.systemSizes, imageReady))
                         sizeObserver(io.github.nanomuse.chat.PromptSizeTrace.Event.Tools(
                             PromptSize.tools(originalAgentTools(), requestTools),
@@ -11601,7 +11621,7 @@ class ChatViewModel(
                 runtime = runtimeContext,
             )
             // nanoMuse: resolving a configured image endpoint is local; no image is generated.
-            val imageReady = runCatching { io.github.nanomuse.media.MediaModels.imageEndpoint(context) != null }.getOrNull()
+            val imageReady = runCatching { io.github.nanomuse.media.MediaModels.agentImageEndpoint(context) != null }.getOrNull()
             onMeasured(rows, imageReady)
         }
         return prompt

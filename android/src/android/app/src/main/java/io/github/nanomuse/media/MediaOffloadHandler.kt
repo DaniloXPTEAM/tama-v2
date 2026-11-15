@@ -10,12 +10,14 @@ import com.openminis.app.sandbox.NativeOffloadResult
 import com.openminis.app.sandbox.PRootKernel
 import io.github.nanomuse.sandbox.SandboxPaths
 import io.github.nanomuse.avatar.ImageGen
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.UUID
 
 /**
  * `nanomuse-media` — the agent's way to the image and video models, from the sandbox shell:
@@ -29,7 +31,11 @@ import java.util.Locale
  * Without the needed model it exits 3 with a plain reason and the settings link, so the agent can
  * tell the user instead of guessing. Registered in `MinisApp` next to `minis-model-use`.
  */
-class MediaOffloadHandler(private val context: Context) : NativeOffloadHandler {
+class MediaOffloadHandler internal constructor(
+    private val context: Context,
+    private val images: MediaImageServices,
+) : NativeOffloadHandler {
+    constructor(context: Context) : this(context, AndroidMediaImageServices(context))
 
     override fun handle(request: NativeOffloadRequest): NativeOffloadResult {
         val args = Args(request.argv.drop(1))
@@ -43,40 +49,105 @@ class MediaOffloadHandler(private val context: Context) : NativeOffloadHandler {
     }
 
     private fun status(): JSONObject {
-        val image = MediaModels.imageEndpoint(context)
+        val automatic = images.automatic()
+        val image = images.agentEndpoint()
         val video = MediaModels.videoEndpoint(context)
         return JSONObject()
-            .put("image_model", image?.let { JSONObject().put("model", it.model).put("provider", it.label) } ?: JSONObject.NULL)
+            .put("image_model", image?.let {
+                val model = if (automatic) safeAttribution(it.model, it.apiKey) else it.model
+                val provider = if (automatic) safeAttribution(it.label, it.apiKey) else it.label
+                JSONObject().put("model", model).put("provider", provider)
+            } ?: JSONObject.NULL)
+            .put("image_automatic_unavailable", automatic && image == null)
             .put("video_model", video?.let { JSONObject().put("model", it.model).put("provider", it.label) } ?: JSONObject.NULL)
             .put("settings", MediaModels.DEEP_LINK)
     }
 
+    private class ImageAuthorizationChanged : Exception()
+    private class ImageReferenceUnavailable(val path: String) : Exception()
+
     private fun image(args: Args, sessionId: String?): NativeOffloadResult {
         val prompt = args.get("prompt")?.trim().orEmpty()
         if (prompt.isEmpty()) return NativeOffloadResult(2, "nanomuse-media image: --prompt is required\n")
-        val ep = MediaModels.imageEndpoint(context) ?: return missing("image")
-        val reference = args.get("from")?.let { path ->
-            loadPicture(path, sessionId) ?: return NativeOffloadResult(2, "nanomuse-media: cannot read picture '$path'\n")
-        }
+        val automatic = images.automatic()
+        val referencePath = args.get("from")
         val size = args.get("size")?.takeIf { Regex("\\d{3,4}x\\d{3,4}").matches(it) } ?: "1024x1024"
-        val bitmap = try {
+        var sentEndpoint: ImageGen.Endpoint? = null
+        val outcome = try {
             runBlocking {
-                if (reference != null) ImageGen.edit(context, ep, reference, prompt) else ImageGen.generate(context, ep, prompt, size)
+                ImageDispatch.run(
+                    automatic = automatic,
+                    hasReference = referencePath != null,
+                    automaticNow = images::automatic,
+                    select = images::choose,
+                    revalidate = images::revalidate,
+                    manualEndpoint = images::manualEndpoint,
+                    send = { endpoint ->
+                        // Only manual editing may read a private reference. DashScope can
+                        // substitute an edit model, so it is blocked for automatic use.
+                        val reference = referencePath?.let { path ->
+                            loadPicture(path, sessionId) ?: throw ImageReferenceUnavailable(path)
+                        }
+                        if (automatic != images.automatic()) throw ImageAuthorizationChanged()
+                        sentEndpoint = endpoint
+                        if (reference != null) images.edit(endpoint, reference, prompt)
+                        else images.generate(endpoint, prompt, size, allowFormatRetry = !automatic)
+                    },
+                )
             }
+        } catch (e: ImageReferenceUnavailable) {
+            return NativeOffloadResult(2, "nanomuse-media: cannot read picture '${e.path}'\n")
+        } catch (_: ImageAuthorizationChanged) {
+            return automaticImageError("image_authorization_changed", com.openminis.app.R.string.nm_auto_image_changed)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
-            AppLogger.warning(TAG, "image failed: ${e.message}")
-            return failed("image", e.message ?: "failed")
+            // A failed image request may still have been charged. Do not automatically try another.
+            val secrets = listOfNotNull(sentEndpoint?.apiKey)
+            val safe = io.github.nanomuse.net.ProviderReach.redactedText(e.message ?: "failed", secrets, 500)
+            // The provider may echo the prompt even when the key was redacted.
+            AppLogger.warning(TAG, "image request failed")
+            return failed("image", safe, noRetry = automatic)
         }
+        val sent = when (outcome) {
+            is ImageDispatch.Outcome.Sent -> outcome
+            is ImageDispatch.Outcome.Blocked -> return when (outcome.reason) {
+                ImageDispatch.Block.AUTO_EDIT_UNAVAILABLE -> automaticImageError(
+                    "automatic_image_edit_unavailable", com.openminis.app.R.string.nm_auto_image_edit_blocked)
+                ImageDispatch.Block.NO_APPROVED_IMAGE -> automaticImageError(
+                    "no_approved_image_model", com.openminis.app.R.string.nm_auto_image_missing)
+                ImageDispatch.Block.AUTHORIZATION_CHANGED -> automaticImageError(
+                    "image_authorization_changed", com.openminis.app.R.string.nm_auto_image_changed)
+                ImageDispatch.Block.NO_MANUAL_IMAGE -> missing("image")
+            }
+        }
+        val ep = sent.endpoint
+        val picture = sent.picture
         val name = fileName(args.get("name"), "png")
-        val file = save(sessionId, name) { out -> bitmap.compress(Bitmap.CompressFormat.PNG, 100, out) }
-            ?: return failed("image", "cannot write to /var/minis/attachments")
-        return ok(JSONObject()
+        val file = save(sessionId, name) { out -> check(picture.writeTo(out)) }
+            ?: return failed("image", "cannot write to /var/minis/attachments without replacing an existing file", noRetry = automatic)
+        val model = if (automatic) safeAttribution(ep.model, ep.apiKey) else ep.model
+        val provider = if (automatic) safeAttribution(ep.label, ep.apiKey) else ep.label
+        if (automatic) AutoImageNotices.published(sessionId, model, provider)
+        val result = JSONObject()
             .put("ok", true)
             .put("path", "/var/minis/attachments/$name")
             .put("markdown", "![${prompt.take(60).replace("]", "")}](minis://attachments/$name)")
-            .put("model", ep.model).put("provider", ep.label)
-            .put("bytes", file.length()))
+            .put("model", model).put("provider", provider)
+            .put("bytes", file.length())
+        if (automatic) result.put("tell_user", context.getString(com.openminis.app.R.string.nm_auto_image_used, model, provider))
+        return ok(result)
     }
+
+    private fun safeAttribution(value: String, apiKey: String): String =
+        io.github.nanomuse.net.ProviderReach.redactedText(value, listOf(apiKey), 128)
+
+    private fun automaticImageError(code: String, message: Int): NativeOffloadResult = NativeOffloadResult(
+        3, JSONObject().put("ok", false).put("error", code).put("message", context.getString(message))
+            .put("settings", "minis://settings/models")
+            .put("tell_user", "Explain the message in the user's language, link [Models](minis://settings/models), and do not retry.")
+            .toString(2) + "\n",
+    )
 
     private fun video(args: Args, sessionId: String?): NativeOffloadResult {
         val prompt = args.get("prompt")?.trim().orEmpty()
@@ -120,10 +191,12 @@ class MediaOffloadHandler(private val context: Context) : NativeOffloadHandler {
             .toString(2) + "\n",
     )
 
-    private fun failed(kind: String, message: String): NativeOffloadResult = NativeOffloadResult(
+    private fun failed(kind: String, message: String, noRetry: Boolean = false): NativeOffloadResult = NativeOffloadResult(
         1,
         JSONObject().put("ok", false).put("error", "${kind}_failed").put("message", message)
-            .put("tell_user", "Tell the user what went wrong in their language; the settings are at ${MediaModels.DEEP_LINK}.")
+            .put("tell_user", if (noRetry)
+                "Tell the user the request may have been charged. Do not retry or try another image model without a new user request."
+            else "Tell the user what went wrong in their language; the settings are at ${MediaModels.DEEP_LINK}.")
             .toString(2) + "\n",
     )
 
@@ -132,7 +205,7 @@ class MediaOffloadHandler(private val context: Context) : NativeOffloadHandler {
     private fun fileName(requested: String?, ext: String): String {
         val stamp = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date())
         val base = requested?.substringAfterLast('/')?.substringBeforeLast('.')?.replace(Regex("[^A-Za-z0-9._-]"), "_")?.takeIf { it.isNotBlank() }
-            ?: "nanomuse-$stamp"
+            ?: "nanomuse-$stamp-${UUID.randomUUID()}"
         return "$base.$ext"
     }
 
@@ -142,9 +215,19 @@ class MediaOffloadHandler(private val context: Context) : NativeOffloadHandler {
 
     private fun save(sessionId: String?, name: String, write: (java.io.OutputStream) -> Unit): File? {
         val dir = attachmentsDir(sessionId) ?: return null
-        dir.mkdirs()
+        if (!dir.isDirectory && !dir.mkdirs()) return null
         val file = File(dir, name)
-        return runCatching { file.outputStream().use(write); file }.getOrNull()
+        return runCatching {
+            // Never truncate an existing attachment, even when a caller supplied its name.
+            if (!file.createNewFile()) return null
+            try {
+                file.outputStream().use(write)
+                file
+            } catch (e: Exception) {
+                file.delete() // remove only the incomplete file this call just created
+                throw e
+            }
+        }.getOrNull()
     }
 
     /**

@@ -79,8 +79,12 @@ fun ModelEntryDetailScreen(
     var autoApproved by remember(autoIdentity) {
         mutableStateOf(autoIdentity?.let { AutoModelStore.approved(context, it) } == true)
     }
+    var autoImageApproved by remember(autoIdentity) {
+        mutableStateOf(autoIdentity?.let { AutoModelStore.imageApproved(context, it) } == true)
+    }
     var autoEdits by remember(autoIdentity) { mutableStateOf<Map<Need, Boolean>>(emptyMap()) }
     var confirmAuto by remember(autoIdentity) { mutableStateOf(false) }
+    var confirmAutoImage by remember(autoIdentity) { mutableStateOf(false) }
 
     var modelId by remember { mutableStateOf(baseModel.id) }
     var displayName by remember { mutableStateOf(overrides.displayName ?: baseModel.displayName) }
@@ -168,6 +172,7 @@ fun ModelEntryDetailScreen(
                     if (instance != null && autoIdentity != null &&
                         AutoModelStore.identity(updated, instance) == autoIdentity) {
                         AutoModelStore.setApproved(context, autoIdentity, autoApproved)
+                        AutoModelStore.setImageApproved(context, autoIdentity, autoImageApproved)
                         autoEdits.forEach { (need, value) -> AutoModelStore.setCapability(context, autoIdentity, need, value) }
                     }
                     onBack()
@@ -263,6 +268,11 @@ fun ModelEntryDetailScreen(
                 checked = autoApproved,
                 onCheckedChange = { enabled -> if (enabled) confirmAuto = true else autoApproved = false },
             )
+            SettingsSwitchRow(
+                title = stringResource(R.string.nm_auto_image_allow),
+                checked = autoImageApproved,
+                onCheckedChange = { enabled -> if (enabled) confirmAutoImage = true else autoImageApproved = false },
+            )
             val abilities = listOf(
                 Need.CHAT to R.string.nm_auto_cap_chat,
                 Need.TOOLS to R.string.nm_auto_cap_tools,
@@ -290,6 +300,22 @@ fun ModelEntryDetailScreen(
                 },
                 dismissButton = {
                     MinisTextButton(onClick = { confirmAuto = false }) { Text(stringResource(R.string.common_cancel)) }
+                },
+            )
+        }
+
+        if (confirmAutoImage) {
+            AlertDialog(
+                onDismissRequest = { confirmAutoImage = false },
+                title = { Text(stringResource(R.string.nm_auto_image_consent_title)) },
+                text = { Text(stringResource(R.string.nm_auto_image_consent_body)) },
+                confirmButton = {
+                    MinisTextButton(onClick = { autoImageApproved = true; confirmAutoImage = false }) {
+                        Text(stringResource(R.string.nm_auto_image_allow))
+                    }
+                },
+                dismissButton = {
+                    MinisTextButton(onClick = { confirmAutoImage = false }) { Text(stringResource(R.string.common_cancel)) }
                 },
             )
         }
