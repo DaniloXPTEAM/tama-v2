@@ -4,7 +4,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
-- Kept Android image session approvals bound to the displayed model, route and account, and withdrew outstanding permission requests when their session grants are cleared.
+- Kept Android image session approvals bound to the displayed model, route and account, and withdrew outstanding permission requests when a chat is cleared or deleted.
 
 - Added a tappable Android provider-error detail sheet with the failed request's model, redacted message and guarded retry. Stream error codes are not labelled as HTTP statuses.
 

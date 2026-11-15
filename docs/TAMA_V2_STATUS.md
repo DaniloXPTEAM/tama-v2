@@ -29,7 +29,7 @@ depois T5, T6, T8 e T7; T9 aguarda o Poco e T12 fica na leitura estática já fe
 | T5: atalhos sem modelo | PARCIAL — EM VALIDAÇÃO | Atalho restrito de imagem conectado ao envio e à fila; a ramificação usada no envio passou teste host com ações falsas. Isso **não** comprova zero requisições no ViewModel Android. | Validar envio/Stop/fila no Android; implementar e testar abrir app, clima, alarme e lembrete pelos handlers e gates existentes. |
 | T6: tools sob demanda | PENDENTE | Sem `load_tools` nesta alteração. | Carregar grupos sem alterar o prefixo estável. |
 | T7: onboarding | PENDENTE | As jornadas anteriores não validam o fluxo novo do plano. | Presets, explicações e teste de conexão seguro. |
-| T8: imagem | PARCIAL — EM VALIDAÇÃO | `generate_image(prompt, size?)`, seleção e permissão compartilhadas e mensagem pt-BR exigida implementadas; build e unitários filtrados do incremento anterior passaram no CI. | Validar os novos testes de permissão e ferramenta no Android, comprovar a mensagem no envio e uma geração autorizada real; consultar configuração ou simular serviço não equivale a gerar imagem. |
+| T8: imagem | PARCIAL — EM VALIDAÇÃO | `generate_image(prompt, size?)`, seleção e permissão compartilhadas e mensagem pt-BR exigida implementadas; build e unitários filtrados, inclusive os de permissão e ferramenta, passaram no CI de `dc18299`. | Validar o complemento de ciclo de vida no Android, comprovar a mensagem no envio e uma geração autorizada real; consultar configuração ou simular serviço não equivale a gerar imagem. |
 | T9: segundo plano | PARCIAL / BLOQUEADA | [Investigação](TAMA_V2_SEGUNDO_PLANO.md) distingue chat local e remoto; tracker e aviso sintético passaram no build e emulação `43608695720`. Isso não prova um turno em segundo plano nem o Poco. `mediaPlayback` permanece inalterado. | Testar turno lento e investigar o Poco com autorização. |
 | T10: tradução e resíduos | PARCIAL / BLOQUEADA | `0e55075`: avisos em 17 locales e WebView sintética passou em `43593761942`. Após a correção de terminologia, Linux e macOS passaram na matriz Python de `20b44fa`; Windows experimental falhou. Arte e keystore dependem do dono. | Investigar Windows experimental e continuar por erros, provedores, onboarding e permissões; preservar dados do Pet. |
 | T11: fechamento | BLOQUEADA | Depende das tarefas anteriores e dos testes físicos. | Consolidar as provas sem promover gates antecipadamente. |
@@ -58,11 +58,12 @@ concessão de sessão; o diálogo mostra modelo/provedor e alerta para custo des
 de sessão para imagem fica vinculada ao modelo, provedor, rota e versão da conta apresentados; trocar
 algum deles exige nova resposta. Negar na sessão continua bloqueando a ferramenta inteira. A fila de
 permissões serializa ferramentas e identifica cada diálogo: resposta atrasada ou duplicada não responde
-ao próximo. Alterar a configuração invalida grants e respostas anteriores. `clearSessionGrants` também
-retira solicitações ativas e invalida as que estão na fila daquela sessão quando é chamado; ainda é
-necessário verificar os pontos do ciclo de vida que devem chamá-lo. Isso muda o comportamento de fila
-de **todas** as tools ASK_ONCE e precisa de regressão de interface. Timeout ou recusa bloqueiam o envio;
-revalidação e rede ainda **não são atômicas**.
+ao próximo. Alterar a configuração invalida grants e respostas anteriores. `clearSessionGrants` retira
+solicitações ativas e invalida as que estão na fila daquela sessão; agora é chamado ao limpar ou
+excluir o chat, ao aplicar exclusão remota e ao liberar o ViewModel. Isso muda o comportamento de
+fila de **todas** as tools ASK_ONCE e precisa de regressão de interface e de ciclo de vida Android;
+novos pedidos após a limpeza e envio concorrente ainda não são bloqueados atomicamente. Timeout ou
+recusa bloqueiam o envio; revalidação e rede também **não são atômicas**.
 
 A tool do modelo exige uma intenção explícita, bloqueia argumentos reparados e limita a uma tentativa
 nativa por turno. A heurística pode recusar pedidos válidos ou interpretar alguma frase errada; não é
@@ -123,22 +124,27 @@ o smoke falhou e continua fora de investigação. O APK arm64 reportou SHA-256
 `6c82885344735a6f09660e8512297e4c348d33fb50dc1900ac8a4be8dd695120`; seu certificado difere
 do artefato anterior. A assinatura instalada no telefone é desconhecida: **não desinstalar nem limpar
 os dados**. As classes `OffloadPermissionQueueTest` e `ImageGenerationToolTest` não estavam no filtro
-daquele job; foram acrescentadas ao workflow agora, mas a execução desse ajuste ainda está pendente.
+daquele job; foram acrescentadas ao workflow. No [Android 43700494786](https://github.com/DaniloXPTEAM/tamaaiv2/actions/runs/43700494786),
+referente a `dc18299`, passaram `assembleDebug` e os unitários com esse filtro ampliado. O complemento
+posterior que liga a limpeza de permissões ao ciclo de vida ainda precisa de execução Android.
 
 O [Test Suite 43664210945](https://github.com/DaniloXPTEAM/tamaaiv2/actions/runs/43664210945) falhou
 na etapa de testes Python das cinco combinações; os logs completos retornaram EOF. No host foi
 reproduzida uma falha de terminologia em chinês simplificado, e a inspeção encontrou o mesmo termo
-proibido em chinês tradicional. Ambas foram corrigidas; isso não prova que não haja
-outra causa no CI. O job de commits apontou dois títulos não convencionais criados neste incremento.
-O pedido manual anterior de `android.yml` havia recebido HTTP 403, mas a execução automática acima
-não precisou dele. A restrição de não voltar a investigar o smoke continua válida.
+proibido em chinês tradicional. Ambas foram corrigidas. No [Test Suite 43700494829](https://github.com/DaniloXPTEAM/tamaaiv2/actions/runs/43700494829),
+referente a `dc18299`, a suíte Linux (3 versões de Python) e macOS passou; o job Windows falhou na
+etapa de testes, mas é experimental e não bloqueia o workflow, que concluiu com sucesso. O mesmo job
+Windows já havia falhado em `df76c3b`; o log desta nova falha também retornou EOF, sem causa confirmada.
+Os dois títulos de commits não convencionais foram corrigidos e o job de commits passou. A restrição
+de não voltar a investigar o smoke continua válida.
 
 Na revisão atual, os testes host reproduziram e corrigiram o reaproveitamento de aprovação para outro
-modelo e a resposta de uma sessão encerrada. Passaram **14 testes** da fila e do gate, com stubs
-Android/provedor e adaptação do contexto Mockito, repetidos dez vezes. A suíte Python no host passou
-**1.716 testes, 9 pulados e 2 desmarcados**, além de 33 subtestes; Ruff, formatação, mypy, catálogos,
-XML dos 17 locales e `git diff --check` passaram. Os testes reais da alteração no Android, o ciclo de
-vida da UI, o envio/Stop/fila, a chamada paga e o Poco ainda precisam de prova.
+modelo e a resposta de uma sessão encerrada. Passaram **15 testes** da fila e do gate, com stubs
+Android/provedor e adaptação do contexto Mockito, repetidos dez vezes; verificações estáticas cobrem
+os pontos de limpeza de sessão. A suíte Python no host passou **1.722 testes, 9 pulados e 2
+selecionados para não executar**, além de 33 subtestes; Ruff, formatação, mypy, catálogos, XML dos 17 locales e
+`git diff --check` passaram. Os testes reais do complemento no Android, o ciclo de vida da UI, o
+envio/Stop/fila, a chamada paga e o Poco ainda precisam de prova.
 
 ## T4b: imagens do agente e último CI conhecido
 

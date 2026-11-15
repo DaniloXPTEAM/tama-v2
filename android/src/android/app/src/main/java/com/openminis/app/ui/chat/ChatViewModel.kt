@@ -5219,6 +5219,8 @@ class ChatViewModel(
     fun clearChat() {
         if (_isStreaming.value) cancelStream()
         val sid = activeSessionId
+        // End both kinds of session approval before erasing the conversation.
+        OffloadPermissionManager.clearSessionGrants(sid)
         io.github.nanomuse.guard.Grants.clearSession(sid) // nanoMuse: "allow for this chat" ends with the chat
         // T-streaming-side-channel: ensure no stale stream delta survives a
         // session wipe; the messages list is about to be cleared, so any
@@ -13454,8 +13456,10 @@ class ChatViewModel(
         // Tear down whichever shell was actually serving this VM. Terminate
         // both ids when the rename happened, since a draft shell may still
         // linger if the agent ran a tool before `ensureSession()`.
+        OffloadPermissionManager.clearSessionGrants(activeSessionId)
         ExecutionCoordinator.sessionDidTerminate(activeSessionId)
         if (activeSessionId != sessionId) {
+            OffloadPermissionManager.clearSessionGrants(sessionId)
             ExecutionCoordinator.sessionDidTerminate(sessionId)
         }
     }

@@ -161,6 +161,32 @@ class OffloadPermissionQueueTest {
         manager.clearSessionGrants(session)
     }
 
+    @Test fun `clearing a chat forgets its grants and denials without changing another chat`() = runBlocking {
+        manager.init(PetPrefsContext())
+        manager.setLevel("image_generation", OffloadPermissionManager.PermissionLevel.ASK_ONCE)
+        val cleared = UUID.randomUUID().toString()
+        val other = UUID.randomUUID().toString()
+        suspend fun answer(session: String, response: OffloadPermissionManager.Response): Boolean {
+            val request = async(start = CoroutineStart.UNDISPATCHED) {
+                manager.checkPermission("image_generation", "Image", session, grantScope = "model")
+            }
+            assertFalse(request.isCompleted)
+            respond(response)
+            return withTimeout(2_000) { request.await() }
+        }
+        assertTrue(answer(cleared, OffloadPermissionManager.Response.ALLOW_SESSION))
+        assertTrue(answer(other, OffloadPermissionManager.Response.ALLOW_SESSION))
+        manager.clearSessionGrants(cleared)
+        assertTrue(manager.checkPermission("image_generation", "Image", other, grantScope = "model"))
+        assertFalse(answer(cleared, OffloadPermissionManager.Response.DENY_SESSION))
+        assertFalse(manager.checkPermission("image_generation", "Image", cleared, grantScope = "model"))
+        manager.clearSessionGrants(cleared)
+        assertTrue(answer(cleared, OffloadPermissionManager.Response.ALLOW_ONCE))
+        assertTrue(manager.checkPermission("image_generation", "Image", other, grantScope = "model"))
+        manager.clearSessionGrants(cleared)
+        manager.clearSessionGrants(other)
+    }
+
     @Test fun `ending a session withdraws its active and queued requests only`() = runBlocking {
         manager.init(PetPrefsContext())
         manager.setLevel("calendar", OffloadPermissionManager.PermissionLevel.ASK_ONCE)

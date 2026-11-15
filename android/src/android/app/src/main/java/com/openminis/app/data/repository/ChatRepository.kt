@@ -115,6 +115,8 @@ class ChatRepository(internal val dao: ChatDao) {
     }
 
     suspend fun deleteSession(id: String) {
+        // A deleted chat must not retain approvals or leave a paid-action dialog open.
+        com.openminis.app.offload.OffloadPermissionManager.clearSessionGrants(id)
         // nanoMuse: deleted history must not reappear as a later Hands run note.
         io.github.nanomuse.hands.HandsRunMemory.shared.clear(id)
         dao.deleteMessages(id)
