@@ -4,6 +4,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+- In the side-by-side Android test build, omit the unsupported assistant `reasoning_content` field when sending Chat Completions history to Groq's direct API; other packages and gateways keep their existing behavior.
+
 - Added an Android diagnostic preview in About and through `/diagnostico`; it copies only allowlisted build, device and classified chat-state fields after a tap, without conversations, credentials, addresses or logs.
 
 - Shortened the Android FULL agent prompt while keeping its tools and safety gates, and added a separately named debug build for side-by-side phone testing.

@@ -2061,7 +2061,10 @@ class OpenAIProvider private constructor(
         // history while Mistral forbids it, and neither advertises
         // supportsReasoning via /v1/models — opposite requirements on the same
         // generic openAI provider path. Hence a spec-driven vendor flag.
-        val forbidReasoningField = isMistral
+        // nanoMuse: the parallel TAMA test build must not echo or synthesize this field
+        // for Groq, whose assistant-message schema rejects even an empty value.
+        val tamaGroqHistory = ai.tama.net.GroqHistoryPolicy.applies(com.openminis.app.BuildConfig.APPLICATION_ID, basePath)
+        val forbidReasoningField = isMistral || tamaGroqHistory
         val includeReasoning =
             (thinkingLevel.isEnabled || modelAlwaysReasons) && modelMayReason && !forbidReasoningField
         val echoReasoning = includeReasoning
@@ -2348,6 +2351,9 @@ class OpenAIProvider private constructor(
         // shape). User keys win over our defaults, but `model` is force-kept so a
         // stray override can't misroute. Mirrors generateImage's merge + iOS.
         mergeChatExtraBody(body)
+        // nanoMuse: passthrough data may replace the generated messages; enforce the same
+        // Groq-specific rule on the final request without mutating the saved conversation.
+        if (tamaGroqHistory) ai.tama.net.GroqHistoryPolicy.removeUnsupportedReasoning(body)
 
         return body
     }
