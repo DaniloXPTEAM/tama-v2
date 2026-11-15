@@ -40,10 +40,18 @@ uma instalação existente; certificados debug de outros runs podem ser diferent
 Nessa execução: build debug e paralelo, unitários Android e compilação da instrumentação passaram;
 o teste Compose sintético do diálogo e da cópia passou no emulador (**1 teste**); o smoke completo
 falhou na jornada e no sandbox. O teste usa o debug normal, não instala a variante paralela. O Poco
-não foi testado. O release normal compilou, porém a inspeção binária adicional falhou sem detalhe
-útil na anotação; não tratar essa inspeção como aprovada. A comparação de fonte com `d2ed0d5` é
-uma evidência separada. A ferramenta de inspeção foi ajustada para resolver o recurso de ícone pelo
-manifesto e publicar detalhes caso falhe; seu resultado deve ser conferido em uma execução posterior.
+não foi testado.
+
+A primeira inspeção binária do release falhou porque a ferramenta exigia o mesmo caminho interno
+do ícone, que o empacotamento do release encurta. Na [execução 43716044475](https://github.com/DaniloXPTEAM/tamaaiv2/actions/runs/43716044475),
+a ferramenta corrigida resolveu o ID de recurso pelo manifesto e confirmou, nos APKs debug e release,
+`ai.tama.assistant`, `TAMA AI`, `1.0.9-tama.1`/530, API mínima 26, alvo 35, arm64 e o recurso
+`mipmap/ic_launcher`; também verificou ambas as assinaturas. O release do CI usa chave debug,
+não é release de produção e não prova compatibilidade com o certificado do celular. A comparação
+de fonte com `d2ed0d5` é evidência separada, e não houve alterações no código Android entre
+`3b469dd` e essa nova inspeção. O smoke da execução 43716044475 falhou antes dos testes de interface
+porque não conseguiu confirmar o hash lido do APK instalado no emulador. Não confundir esse resultado
+com o teste sintético do diálogo que passou na execução anterior.
 
 ## Incremento: FULL compacto e APK paralelo
 
