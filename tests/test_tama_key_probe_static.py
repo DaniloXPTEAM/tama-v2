@@ -19,7 +19,8 @@ class KeyProbeIntegration(unittest.TestCase):
         self.assertLess(code.index("KeyDestinationGuard.permits"), code.index("KeyProbe.check("))
         probe = (MAIN / "ai/tama/providers/KeyProbe.kt").read_text()
         for text in (".get()", ".followRedirects(false)", ".followSslRedirects(false)",
-                     ".retryOnConnectionFailure(false)", ".callTimeout(15, TimeUnit.SECONDS)"):
+                     ".retryOnConnectionFailure(false)", ".callTimeout(15, TimeUnit.SECONDS)",
+                     "suspendCancellableCoroutine", "invokeOnCancellation { call.cancel() }", "response.use {"):
             self.assertIn(text, probe)
         self.assertNotIn("Log.", probe)
         self.assertNotIn(".post(", probe)
