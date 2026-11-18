@@ -156,3 +156,13 @@ resposta 403 não é declarada chave inválida, e o sucesso não prova acesso a 
 modelo, preço ou saldo. Endereços personalizados não são testados. O teste host
 confere planejamento e respostas simuladas, sem executar HTTP; a tela, o
 transporte Android e contas reais não foram verificados.
+
+## Ordenação de modelos anunciados gratuitos
+
+Quando a escolha atual é uma conta OpenRouter com chave própria, o seletor
+automático do paralelo usa a evidência recente da importação para ordenar
+modelos anunciados gratuitos dessa conta antes de outros, quando não há ordem
+de grupo nem escolha atual elegível. Isso não muda a rota Cloud, não sobrepõe
+uma escolha fixa elegível e não concede permissão de custo. A preferência de
+catálogo não garante ausência de cobranças. A política foi testada com
+candidatos fictícios, sem chat real nem rede.

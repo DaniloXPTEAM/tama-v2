@@ -4,6 +4,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+- Used fresh free-catalogue evidence to rank automatic chat candidates within the selected own-key OpenRouter account in the parallel Android test build.
+
 - Added an explicit, short-lived retry offer after a failed standalone image request in the parallel Android test build.
 
 - Avoided suggesting an image charge for known preflight refusals in the parallel Android test build.

@@ -9381,6 +9381,16 @@ class ChatViewModel(
                 config.modelGroups.find { it.id == id }?.memberEntryIds?.toList()
             } else null
             val groupMembers = selectedMembers?.distinct().orEmpty()
+            // nanoMuse: prefer a freshly advertised free entry only within the
+            // currently selected own-key OpenRouter account. A selected group,
+            // sticky choice, Cloud route and all cost checks retain their rules.
+            val activeEntry = config.modelEntries.find { it.id == _activeEntryId.value }
+            val activeInstance = config.instances.find { it.id == activeEntry?.providerInstanceId }
+            val freeRankInstance = activeInstance?.takeIf {
+                tamaV2Test && it.providerType == ProviderType.openRouter && it.credentialType == ProviderCredential.apiKey &&
+                    it.id != io.github.nanomuse.cloud.NanoMuseCloud.instance(context)?.id
+            }
+            val freeRankIds = freeRankInstance?.let { providerRepository.tamaEligibleFreeModelIds(it.id) }.orEmpty()
             return config.modelEntries.toList().mapNotNull { entry ->
                 val instance = config.instances.find { it.id == entry.providerInstanceId } ?: return@mapNotNull null
                 val identity = AutoModelStore.identity(entry, instance)
@@ -9407,6 +9417,8 @@ class ChatViewModel(
                     visible = !entry.isHidden, credentialed = credentialed,
                     automaticApproved = AutoModelStore.approved(context, identity),
                     automaticCostAllowed = ai.tama.router.AutomaticCostGuard.permits(context),
+                    // Catalogue ranking is not proof of a zero-cost request or spending permission.
+                    verifiedFree = instance.id == freeRankInstance?.id && entry.model.id in freeRankIds,
                     preference = preference,
                 )
                 AutoChoice(candidate, entry, instance, identity, model, AutoModelRuntime.accountVersion(instance.id),

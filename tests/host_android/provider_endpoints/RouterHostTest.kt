@@ -18,6 +18,14 @@ fun main() {
     val third = pick(); check(third.entryId == "c")
     turn.fail(third.entryId, third.providerId, ModelHealth.Failure.NETWORK)
     check(turn.pick(choices, setOf(Need.CHAT), null) is ModelRouter.Choice.None)
+    val advertisedFree = choices[0].copy(entryId = "free", preference = null, verifiedFree = true)
+    val unknown = choices[1].copy(entryId = "unknown", preference = null, verifiedFree = false)
+    val ranked = ModelRouter.pick(listOf(unknown, advertisedFree), setOf(Need.CHAT)) as ModelRouter.Choice.Selected
+    check(ranked.candidate.entryId == "free")
+    val sticky = ModelRouter.pick(listOf(unknown, advertisedFree), setOf(Need.CHAT), "unknown") as ModelRouter.Choice.Selected
+    check(sticky.candidate.entryId == "unknown")
+    val freeBlocked = ModelRouter.pick(listOf(unknown, advertisedFree.copy(automaticCostAllowed = false)), setOf(Need.CHAT)) as ModelRouter.Choice.Selected
+    check(freeBlocked.candidate.entryId == "unknown")
     val noCostConsent = choices.map { it.copy(automaticCostAllowed = false) }
     val blocked = ModelRouter.pick(noCostConsent, setOf(Need.CHAT)) as ModelRouter.Choice.None
     check(blocked.rejected.all { it.reason == ModelRouter.Reason.UNVERIFIED_COST })
