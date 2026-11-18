@@ -1491,4 +1491,28 @@
     <string name="nm_media_model_change_blocked">此请求会换用另一个媒体模型，价格可能不同。请在图像和视频设置中选择兼容模型。此请求未发送，之前发送的其他请求仍可能产生费用。</string>
     <string name="nm_video_request_failed">无法完成视频。任务可能已发送并可能产生费用。没有新请求时不要重试。</string>
     <string name="nm_video_authorization_changed">视频服务商、账户、设置或会话已更改。视频任务未发送。其他已发送的请求仍可能产生费用。</string>
+
+    <!-- TAMA: provider setup and free-only import in the parallel test build. -->
+    <string name="nm_provider_known_title">已知提供商</string>
+    <string name="nm_provider_known_help">选择密钥所属的提供商以填入端点。有些提供商按地区使用不同地址。</string>
+    <string name="nm_provider_show_all">显示所有提供商</string>
+    <string name="nm_key_autofill_confirm">已为 %1$s 建议端点。点按确认此提供商。</string>
+    <string name="nm_key_autofill_help">前缀只是一条提示。保存前请确认提供商，你也可以修改地址。</string>
+    <string name="nm_endpoint_region">端点地区</string>
+    <string name="nm_endpoint_region_help">请选择账户所在地区。更改地区会替换地址。</string>
+    <string name="nm_endpoint_global">全球</string>
+    <string name="nm_endpoint_mainland">中国大陆</string>
+    <string name="nm_endpoint_effective">保存后使用的端点：%1$s</string>
+    <string name="nm_endpoint_fixed_help">OpenRouter 使用此固定地址。</string>
+    <string name="nm_endpoint_auto_help">地址来自所选提供商。你可以修改；粘贴密钥不会替换自定义地址。</string>
+    <string name="nm_free_import_title">仅导入免费模型</string>
+    <string name="nm_free_import_help">仅导入当前 OpenRouter 目录中标称免费的聊天模型。已有模型会保留。这不会授权请求或阻止收费；价格和额外服务可能变化。</string>
+    <string name="nm_free_import_unsupported">此处无法核实该提供商及账户的价格。开启时不会导入新模型。关闭后可导入完整列表。</string>
+    <string name="nm_free_import_checking">正在查询目录...</string>
+    <string name="nm_free_import_missing_key">请先添加密钥，再查询目录。</string>
+    <string name="nm_free_import_failed">无法查询目录，未导入新模型。请检查连接和密钥，然后刷新。</string>
+    <string name="nm_free_import_empty">未找到免费价格信息完整且最新的模型。已有模型已保留。</string>
+    <string name="nm_free_import_found">标称免费的模型 %1$d 个，新增 %2$d 个。尚未验证账户访问权限。</string>
+    <string name="nm_provider_save_failed">无法保存。请检查设备存储空间后重试。</string>
+    <string name="nm_useit_incomplete">部分所选用途未能设置。其他用途可能已经更改。请检查模型列表或重试。</string>
 </resources>

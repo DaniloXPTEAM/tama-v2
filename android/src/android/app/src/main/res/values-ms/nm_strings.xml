@@ -1514,4 +1514,28 @@
     <string name="nm_media_model_change_blocked">Permintaan ini akan beralih kepada model media lain yang mungkin berbeza harganya. Pilih model yang serasi dalam tetapan imej dan video. Permintaan ini tidak dihantar. Permintaan lain yang telah dihantar masih mungkin dikenakan caj.</string>
     <string name="nm_video_request_failed">Video tidak dapat diselesaikan. Tugasan mungkin telah dihantar dan boleh dikenakan caj. Jangan cuba lagi tanpa permintaan baharu.</string>
     <string name="nm_video_authorization_changed">Penyedia, akaun, tetapan atau sesi video telah berubah. Tugasan video tidak dihantar. Permintaan lain yang telah dihantar masih boleh dikenakan caj.</string>
+
+    <!-- TAMA: provider setup and free-only import in the parallel test build. -->
+    <string name="nm_provider_known_title">Penyedia yang dikenali</string>
+    <string name="nm_provider_known_help">Pilih penyedia kunci anda untuk mengisi titik akhir. Sesetengah penyedia menggunakan alamat berbeza mengikut rantau.</string>
+    <string name="nm_provider_show_all">Tunjukkan semua penyedia</string>
+    <string name="nm_key_autofill_confirm">Titik akhir dicadangkan untuk %1$s. Ketik untuk mengesahkan penyedia.</string>
+    <string name="nm_key_autofill_help">Awalan hanyalah petunjuk. Sahkan penyedia sebelum menyimpan. Anda boleh mengubah alamat.</string>
+    <string name="nm_endpoint_region">Rantau titik akhir</string>
+    <string name="nm_endpoint_region_help">Pilih rantau akaun anda. Menukar rantau akan menggantikan alamat.</string>
+    <string name="nm_endpoint_global">Global</string>
+    <string name="nm_endpoint_mainland">Tanah Besar China</string>
+    <string name="nm_endpoint_effective">Titik akhir selepas disimpan: %1$s</string>
+    <string name="nm_endpoint_fixed_help">OpenRouter menggunakan alamat tetap ini.</string>
+    <string name="nm_endpoint_auto_help">Alamat datang daripada penyedia yang dipilih. Anda boleh mengubahnya; menampal kunci tidak menggantikan alamat tersuai.</string>
+    <string name="nm_free_import_title">Import model percuma sahaja</string>
+    <string name="nm_free_import_help">Hanya mengimport model sembang yang diiklankan sebagai percuma dalam katalog OpenRouter semasa. Model sedia ada kekal. Ini tidak membenarkan permintaan atau menghalang caj; harga dan perkhidmatan tambahan boleh berubah.</string>
+    <string name="nm_free_import_unsupported">Harga untuk penyedia dan akaun ini tidak dapat disahkan di sini. Tiada model baharu akan diimport apabila pilihan ini hidup. Matikan untuk mengimport senarai penuh.</string>
+    <string name="nm_free_import_checking">Menyemak katalog...</string>
+    <string name="nm_free_import_missing_key">Tambahkan kunci sebelum menyemak katalog.</string>
+    <string name="nm_free_import_failed">Katalog tidak dapat disemak. Tiada model baharu diimport. Semak sambungan dan kunci, kemudian muat semula.</string>
+    <string name="nm_free_import_empty">Tiada model dengan maklumat harga percuma yang lengkap dan terkini ditemui. Model sedia ada dikekalkan.</string>
+    <string name="nm_free_import_found">%1$d model diiklankan percuma, %2$d ditambah. Akses akaun belum disahkan.</string>
+    <string name="nm_provider_save_failed">Tidak dapat menyimpan. Semak storan peranti dan cuba lagi.</string>
+    <string name="nm_useit_incomplete">Sesetengah kegunaan yang dipilih tidak dapat ditetapkan. Pilihan lain mungkin telah berubah. Semak senarai model atau cuba lagi.</string>
 </resources>

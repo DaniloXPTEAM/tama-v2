@@ -35,6 +35,7 @@ object AnthropicModelsApi {
         // [T-provider-custom-user-agent] Per-provider UA override; null/blank
         // keeps the default UA. Threaded from ProviderRepository.refreshModels.
         customUserAgent: String? = null,
+        discoverParents: Boolean = true, // nanoMuse: the parallel form lists only its selected route
     ): List<LLMModel> = withContext(Dispatchers.IO) {
         // Cache key: base URL included so the same API key across proxies doesn't
         // share cached model lists (vLLM vs api.anthropic.com can differ).
@@ -53,7 +54,7 @@ object AnthropicModelsApi {
         // path up to 3 levels. Lets vendor-specific bases like
         // `https://api.deepseek.com/anthropic` discover `/v1/models` at the host root.
         val candidateBases = mutableListOf<String?>(baseURL)
-        if (baseURL != null) {
+        if (baseURL != null && discoverParents) { // nanoMuse: do not send the credential to unselected parent paths
             var current: String = baseURL
             for (i in 0 until 3) {
                 val parent = parentPath(current) ?: break
@@ -79,7 +80,9 @@ object AnthropicModelsApi {
                 // [T-provider-custom-user-agent] models-list UA override.
                 .applyUserAgentOverride(customUserAgent)
 
-            if (isOAuth) {
+            if (apiKey.isEmpty() && com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test") {
+                // nanoMuse: keyless local endpoints receive no empty auth header, like chat.
+            } else if (isOAuth) {
                 // OAuth: Bearer token + required beta header (mirrors iOS fetchModels(oauthToken:))
                 requestBuilder.header("Authorization", "Bearer $apiKey")
                 requestBuilder.header("anthropic-beta", "oauth-2025-04-20")

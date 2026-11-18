@@ -1497,4 +1497,28 @@
     <string name="nm_media_model_change_blocked">This request would switch to a different media model, which may have a different price. Choose a compatible model in Image and video settings. This request was not sent. Other requests already sent may still be charged.</string>
     <string name="nm_video_request_failed">The video could not be completed. The task may have been sent and may be charged. Do not retry without a new request.</string>
     <string name="nm_video_authorization_changed">The video provider, account, settings or session changed. The video task was not sent. Other requests already sent may still be charged.</string>
+
+    <!-- TAMA: provider setup and free-only import in the parallel test build. -->
+    <string name="nm_provider_known_title">Known providers</string>
+    <string name="nm_provider_known_help">Choose the provider of your key to fill its endpoint. Some providers use different regional addresses.</string>
+    <string name="nm_provider_show_all">Show all providers</string>
+    <string name="nm_key_autofill_confirm">Endpoint suggested for %1$s. Tap to confirm this provider.</string>
+    <string name="nm_key_autofill_help">The prefix is only a hint. Confirm the provider before saving. You can edit the address.</string>
+    <string name="nm_endpoint_region">Endpoint region</string>
+    <string name="nm_endpoint_region_help">Choose the region of your account. Changing the region replaces the address.</string>
+    <string name="nm_endpoint_global">Global</string>
+    <string name="nm_endpoint_mainland">Mainland China</string>
+    <string name="nm_endpoint_effective">Endpoint after saving: %1$s</string>
+    <string name="nm_endpoint_fixed_help">OpenRouter uses this fixed address.</string>
+    <string name="nm_endpoint_auto_help">The address comes from the chosen provider. You can edit it; pasting a key does not replace a custom address.</string>
+    <string name="nm_free_import_title">Import only free models</string>
+    <string name="nm_free_import_help">Imports only chat models advertised as free in the current OpenRouter catalogue. Existing models remain. This does not authorize requests or prevent charges; prices and extra services can change.</string>
+    <string name="nm_free_import_unsupported">The price for this provider and account cannot be verified here. No new models will be imported while this is on. Turn it off to import the full list.</string>
+    <string name="nm_free_import_checking">Checking the catalogue...</string>
+    <string name="nm_free_import_missing_key">Add a key before checking the catalogue.</string>
+    <string name="nm_free_import_failed">Could not check the catalogue. No new models were imported. Check the connection and key, then refresh.</string>
+    <string name="nm_free_import_empty">No models with complete, current free-price information were found. Existing models were kept.</string>
+    <string name="nm_free_import_found">%1$d models advertised as free, %2$d added. Account access was not verified.</string>
+    <string name="nm_provider_save_failed">Could not save. Check device storage and try again.</string>
+    <string name="nm_useit_incomplete">Some selected uses could not be set. Other choices may already have changed. Check the model list or try again.</string>
 </resources>

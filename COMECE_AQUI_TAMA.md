@@ -5,8 +5,9 @@ leia nesta ordem:
 
 1. `docs/planos/TAMA_IA_CONTINUIDADE_CONSERTO_DO_MOTOR.md`.
 2. `docs/TAMA_V2_CORRECOES_TESTE_MANUAL.md` e `docs/TAMA_V2_STATUS.md`.
-3. `docs/TAMA_V2_COMPARACAO_NANOMUSE.md` para a comparação, os testes e as pendências.
-4. `docs/TAMA_V2_PACOTE_CONTINUIDADE.md` se estiver usando a cópia entregue em ZIP.
+3. `docs/TAMA_V2_RELATORIO_REVISAO_COMPLETA.md` para a revisão consolidada, os riscos e as provas.
+4. `docs/TAMA_V2_COMPARACAO_NANOMUSE.md` para a comparação, os testes e as pendências.
+5. `docs/TAMA_V2_PACOTE_CONTINUIDADE.md` se estiver usando a cópia entregue em ZIP.
 
 ## Regras para a próxima sessão Arena
 

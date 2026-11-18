@@ -1526,4 +1526,28 @@
     <string name="nm_media_model_change_blocked">Этот запрос переключил бы приложение на другую медиамодель, цена которой может отличаться. Выберите совместимую модель в настройках изображений и видео. Этот запрос не отправлен. За другие уже отправленные запросы всё ещё может взиматься плата.</string>
     <string name="nm_video_request_failed">Не удалось завершить создание видео. Задача могла быть отправлена и за неё может взиматься плата. Не повторяйте попытку без нового запроса.</string>
     <string name="nm_video_authorization_changed">Поставщик, аккаунт, настройки или сеанс видео изменились. Задача на создание видео не отправлена. За другие уже отправленные запросы всё ещё может взиматься плата.</string>
+
+    <!-- TAMA: provider setup and free-only import in the parallel test build. -->
+    <string name="nm_provider_known_title">Известные провайдеры</string>
+    <string name="nm_provider_known_help">Выберите провайдера ключа, чтобы заполнить адрес API. У некоторых провайдеров адрес зависит от региона.</string>
+    <string name="nm_provider_show_all">Показать всех провайдеров</string>
+    <string name="nm_key_autofill_confirm">Предложен адрес API для %1$s. Нажмите, чтобы подтвердить провайдера.</string>
+    <string name="nm_key_autofill_help">Префикс служит только подсказкой. Подтвердите провайдера перед сохранением. Адрес можно изменить.</string>
+    <string name="nm_endpoint_region">Регион адреса API</string>
+    <string name="nm_endpoint_region_help">Выберите регион аккаунта. При смене региона адрес будет заменён.</string>
+    <string name="nm_endpoint_global">Глобальный</string>
+    <string name="nm_endpoint_mainland">Материковый Китай</string>
+    <string name="nm_endpoint_effective">Адрес API после сохранения: %1$s</string>
+    <string name="nm_endpoint_fixed_help">OpenRouter использует этот фиксированный адрес.</string>
+    <string name="nm_endpoint_auto_help">Адрес взят у выбранного провайдера. Его можно изменить; вставка ключа не заменяет пользовательский адрес.</string>
+    <string name="nm_free_import_title">Импортировать только бесплатные модели</string>
+    <string name="nm_free_import_help">Импортируются только модели чата, указанные как бесплатные в текущем каталоге OpenRouter. Существующие модели сохраняются. Это не разрешает запросы и не предотвращает списания; цены и дополнительные услуги могут измениться.</string>
+    <string name="nm_free_import_unsupported">Здесь нельзя проверить цену для этого провайдера и аккаунта. Пока настройка включена, новые модели не импортируются. Выключите её для импорта полного списка.</string>
+    <string name="nm_free_import_checking">Проверка каталога...</string>
+    <string name="nm_free_import_missing_key">Добавьте ключ перед проверкой каталога.</string>
+    <string name="nm_free_import_failed">Не удалось проверить каталог. Новые модели не импортированы. Проверьте соединение и ключ, затем обновите список.</string>
+    <string name="nm_free_import_empty">Не найдены модели с полной актуальной информацией о бесплатной цене. Существующие модели сохранены.</string>
+    <string name="nm_free_import_found">Моделей, указанных как бесплатные: %1$d; добавлено: %2$d. Доступ аккаунта не проверялся.</string>
+    <string name="nm_provider_save_failed">Не удалось сохранить. Проверьте память устройства и повторите попытку.</string>
+    <string name="nm_useit_incomplete">Не удалось настроить некоторые выбранные задачи. Другие параметры могли уже измениться. Проверьте список моделей или повторите попытку.</string>
 </resources>

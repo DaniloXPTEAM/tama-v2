@@ -1518,4 +1518,28 @@
     <string name="nm_media_model_change_blocked">Este pedido trocaria para outro modelo de mídia, que pode ter um preço diferente. Escolha um modelo compatível nas configurações de imagem e vídeo. Este pedido não foi enviado. Outros pedidos já enviados ainda podem ser cobrados.</string>
     <string name="nm_video_request_failed">Não foi possível concluir o vídeo. A tarefa pode ter sido enviada e cobrada. Não tente novamente sem um novo pedido.</string>
     <string name="nm_video_authorization_changed">O provedor, a conta, as configurações ou a sessão de vídeo mudaram. A tarefa de vídeo não foi enviada. Outras solicitações já enviadas ainda podem ser cobradas.</string>
+
+    <!-- TAMA: provider setup and free-only import in the parallel test build. -->
+    <string name="nm_provider_known_title">Provedores conhecidos</string>
+    <string name="nm_provider_known_help">Escolha o provedor da sua chave para preencher o endpoint. Alguns usam endereços diferentes por região.</string>
+    <string name="nm_provider_show_all">Mostrar todos os provedores</string>
+    <string name="nm_key_autofill_confirm">Endpoint sugerido para %1$s. Toque para confirmar o provedor.</string>
+    <string name="nm_key_autofill_help">O prefixo é apenas uma sugestão. Confirme o provedor antes de salvar. Você pode editar o endereço.</string>
+    <string name="nm_endpoint_region">Região do endpoint</string>
+    <string name="nm_endpoint_region_help">Escolha a região da sua conta. Mudar a região substitui o endereço.</string>
+    <string name="nm_endpoint_global">Global</string>
+    <string name="nm_endpoint_mainland">China continental</string>
+    <string name="nm_endpoint_effective">Endpoint após salvar: %1$s</string>
+    <string name="nm_endpoint_fixed_help">O OpenRouter usa este endereço fixo.</string>
+    <string name="nm_endpoint_auto_help">O endereço vem do provedor escolhido. Você pode alterá-lo; colar uma chave não substitui um endereço personalizado.</string>
+    <string name="nm_free_import_title">Importar apenas gratuitos</string>
+    <string name="nm_free_import_help">Importa somente modelos de chat anunciados como gratuitos no catálogo atual do OpenRouter. Modelos já existentes permanecem. Isto não autoriza chamadas nem impede cobranças; preços e serviços extras podem mudar.</string>
+    <string name="nm_free_import_unsupported">O preço deste provedor e desta conta não pode ser verificado aqui. Com a opção ligada, nenhum modelo novo será importado. Desligue para importar a lista completa.</string>
+    <string name="nm_free_import_checking">Consultando o catálogo...</string>
+    <string name="nm_free_import_missing_key">Adicione uma chave antes de consultar o catálogo.</string>
+    <string name="nm_free_import_failed">Não foi possível consultar o catálogo. Nenhum modelo novo foi importado. Confira a conexão e a chave e atualize novamente.</string>
+    <string name="nm_free_import_empty">Nenhum modelo com informações completas e atuais de gratuidade foi encontrado. Os modelos anteriores foram preservados.</string>
+    <string name="nm_free_import_found">%1$d modelos anunciados como gratuitos; %2$d novos adicionados. O acesso da conta não foi verificado.</string>
+    <string name="nm_provider_save_failed">Não foi possível salvar. Confira o armazenamento do aparelho e tente novamente.</string>
+    <string name="nm_useit_incomplete">Não foi possível configurar todos os usos selecionados. Outros usos podem já ter mudado. Confira a lista de modelos ou tente novamente.</string>
 </resources>

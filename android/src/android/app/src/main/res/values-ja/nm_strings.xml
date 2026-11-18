@@ -1514,4 +1514,28 @@
     <string name="nm_media_model_change_blocked">このリクエストでは、料金が異なる可能性のある別のメディアモデルに切り替わります。画像と動画の設定で対応するモデルを選択してください。このリクエストは送信されていません。送信済みの他のリクエストには料金が発生する場合があります。</string>
     <string name="nm_video_request_failed">動画を完了できませんでした。タスクは送信済みで、料金が発生する可能性があります。新しい依頼がない限り再試行しないでください。</string>
     <string name="nm_video_authorization_changed">動画のプロバイダー、アカウント、設定またはセッションが変更されました。動画タスクは送信されませんでした。他の送信済みリクエストには料金が発生する可能性があります。</string>
+
+    <!-- TAMA: provider setup and free-only import in the parallel test build. -->
+    <string name="nm_provider_known_title">登録済みのプロバイダー</string>
+    <string name="nm_provider_known_help">キーのプロバイダーを選ぶとエンドポイントが入力されます。地域によってアドレスが異なる場合があります。</string>
+    <string name="nm_provider_show_all">すべてのプロバイダーを表示</string>
+    <string name="nm_key_autofill_confirm">%1$s のエンドポイント候補です。タップしてプロバイダーを確認してください。</string>
+    <string name="nm_key_autofill_help">接頭辞は目安にすぎません。保存前にプロバイダーを確認してください。アドレスは変更できます。</string>
+    <string name="nm_endpoint_region">エンドポイントの地域</string>
+    <string name="nm_endpoint_region_help">アカウントの地域を選んでください。地域を変更するとアドレスが置き換わります。</string>
+    <string name="nm_endpoint_global">グローバル</string>
+    <string name="nm_endpoint_mainland">中国本土</string>
+    <string name="nm_endpoint_effective">保存後のエンドポイント：%1$s</string>
+    <string name="nm_endpoint_fixed_help">OpenRouter はこの固定アドレスを使います。</string>
+    <string name="nm_endpoint_auto_help">選択したプロバイダーのアドレスです。変更できます。キーを貼り付けてもカスタムアドレスは置き換わりません。</string>
+    <string name="nm_free_import_title">無料モデルのみをインポート</string>
+    <string name="nm_free_import_help">現在の OpenRouter カタログで無料と表示されたチャットモデルのみをインポートします。既存のモデルは残ります。リクエストを許可したり課金を防いだりする設定ではありません。価格や追加サービスは変わる場合があります。</string>
+    <string name="nm_free_import_unsupported">このプロバイダーとアカウントの価格はここでは確認できません。オンの間は新しいモデルをインポートしません。全一覧を取り込むにはオフにしてください。</string>
+    <string name="nm_free_import_checking">カタログを確認しています...</string>
+    <string name="nm_free_import_missing_key">カタログを確認する前にキーを追加してください。</string>
+    <string name="nm_free_import_failed">カタログを確認できませんでした。新しいモデルはインポートしていません。接続とキーを確認してから更新してください。</string>
+    <string name="nm_free_import_empty">無料価格の完全で最新の情報を持つモデルが見つかりませんでした。既存のモデルは保持されました。</string>
+    <string name="nm_free_import_found">無料と表示されたモデル %1$d 件、追加 %2$d 件。アカウントのアクセスは確認していません。</string>
+    <string name="nm_provider_save_failed">保存できませんでした。端末のストレージを確認して、もう一度お試しください。</string>
+    <string name="nm_useit_incomplete">選択した用途の一部を設定できませんでした。他の選択は既に変更された可能性があります。モデル一覧を確認するか、もう一度お試しください。</string>
 </resources>

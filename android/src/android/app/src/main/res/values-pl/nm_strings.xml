@@ -1526,4 +1526,28 @@
     <string name="nm_media_model_change_blocked">To żądanie przełączyłoby na inny model multimediów, który może mieć inną cenę. Wybierz zgodny model w ustawieniach obrazów i wideo. To żądanie nie zostało wysłane. Za inne już wysłane żądania nadal mogą zostać naliczone opłaty.</string>
     <string name="nm_video_request_failed">Nie udało się ukończyć filmu. Zadanie mogło zostać wysłane i może wiązać się z opłatą. Nie ponawiaj go bez nowej prośby.</string>
     <string name="nm_video_authorization_changed">Zmieniono dostawcę, konto, ustawienia lub sesję filmu. Zadanie filmu nie zostało wysłane. Inne wysłane już żądania nadal mogą wiązać się z opłatą.</string>
+
+    <!-- TAMA: provider setup and free-only import in the parallel test build. -->
+    <string name="nm_provider_known_title">Znani dostawcy</string>
+    <string name="nm_provider_known_help">Wybierz dostawcę klucza, aby uzupełnić punkt końcowy. Niektórzy dostawcy używają adresów regionalnych.</string>
+    <string name="nm_provider_show_all">Pokaż wszystkich dostawców</string>
+    <string name="nm_key_autofill_confirm">Zasugerowano punkt końcowy dla %1$s. Dotknij, aby potwierdzić dostawcę.</string>
+    <string name="nm_key_autofill_help">Prefiks jest tylko wskazówką. Potwierdź dostawcę przed zapisaniem. Możesz zmienić adres.</string>
+    <string name="nm_endpoint_region">Region punktu końcowego</string>
+    <string name="nm_endpoint_region_help">Wybierz region konta. Zmiana regionu zastąpi adres.</string>
+    <string name="nm_endpoint_global">Globalny</string>
+    <string name="nm_endpoint_mainland">Chiny kontynentalne</string>
+    <string name="nm_endpoint_effective">Punkt końcowy po zapisaniu: %1$s</string>
+    <string name="nm_endpoint_fixed_help">OpenRouter używa tego stałego adresu.</string>
+    <string name="nm_endpoint_auto_help">Adres pochodzi od wybranego dostawcy. Możesz go zmienić; wklejenie klucza nie zastąpi własnego adresu.</string>
+    <string name="nm_free_import_title">Importuj tylko darmowe modele</string>
+    <string name="nm_free_import_help">Importuje tylko modele czatu oznaczone jako darmowe w aktualnym katalogu OpenRouter. Istniejące modele pozostają. Opcja nie zezwala na żądania ani nie blokuje opłat; ceny i dodatkowe usługi mogą się zmienić.</string>
+    <string name="nm_free_import_unsupported">Nie można tu sprawdzić ceny dla tego dostawcy i konta. Przy włączonej opcji nowe modele nie będą importowane. Wyłącz ją, aby zaimportować pełną listę.</string>
+    <string name="nm_free_import_checking">Sprawdzanie katalogu...</string>
+    <string name="nm_free_import_missing_key">Dodaj klucz przed sprawdzeniem katalogu.</string>
+    <string name="nm_free_import_failed">Nie można sprawdzić katalogu. Nie zaimportowano nowych modeli. Sprawdź połączenie i klucz, a następnie odśwież.</string>
+    <string name="nm_free_import_empty">Nie znaleziono modeli z pełną i aktualną informacją o darmowej cenie. Istniejące modele zachowano.</string>
+    <string name="nm_free_import_found">%1$d modeli oznaczonych jako darmowe, dodano %2$d. Dostęp konta nie został sprawdzony.</string>
+    <string name="nm_provider_save_failed">Nie udało się zapisać. Sprawdź pamięć urządzenia i spróbuj ponownie.</string>
+    <string name="nm_useit_incomplete">Nie udało się ustawić niektórych wybranych zastosowań. Inne wybory mogły już zostać zmienione. Sprawdź listę modeli lub spróbuj ponownie.</string>
 </resources>

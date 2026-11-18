@@ -1519,4 +1519,28 @@
     <string name="nm_media_model_change_blocked">Cette demande utiliserait un autre modèle multimédia, dont le prix peut être différent. Choisissez un modèle compatible dans les paramètres d’image et de vidéo. Cette demande n’a pas été envoyée. Les autres demandes déjà envoyées peuvent encore être facturées.</string>
     <string name="nm_video_request_failed">Impossible de terminer la vidéo. La tâche a peut-être été envoyée et peut être facturée. Ne réessayez pas sans une nouvelle demande.</string>
     <string name="nm_video_authorization_changed">Le fournisseur, le compte, les paramètres ou la session vidéo ont changé. La tâche vidéo ne fut pas envoyée. Les autres requêtes déjà envoyées peuvent encore être facturées.</string>
+
+    <!-- TAMA: provider setup and free-only import in the parallel test build. -->
+    <string name="nm_provider_known_title">Fournisseurs connus</string>
+    <string name="nm_provider_known_help">Choisissez le fournisseur de votre clé pour remplir le point de terminaison. Certains utilisent des adresses régionales différentes.</string>
+    <string name="nm_provider_show_all">Afficher tous les fournisseurs</string>
+    <string name="nm_key_autofill_confirm">Point de terminaison suggéré pour %1$s. Touchez pour confirmer le fournisseur.</string>
+    <string name="nm_key_autofill_help">Le préfixe est seulement un indice. Confirmez le fournisseur avant d’enregistrer. Vous pouvez modifier l’adresse.</string>
+    <string name="nm_endpoint_region">Région du point de terminaison</string>
+    <string name="nm_endpoint_region_help">Choisissez la région de votre compte. Changer de région remplace l’adresse.</string>
+    <string name="nm_endpoint_global">Global</string>
+    <string name="nm_endpoint_mainland">Chine continentale</string>
+    <string name="nm_endpoint_effective">Point de terminaison après enregistrement : %1$s</string>
+    <string name="nm_endpoint_fixed_help">OpenRouter utilise cette adresse fixe.</string>
+    <string name="nm_endpoint_auto_help">L’adresse vient du fournisseur choisi. Vous pouvez la modifier ; coller une clé ne remplace pas une adresse personnalisée.</string>
+    <string name="nm_free_import_title">Importer uniquement les modèles gratuits</string>
+    <string name="nm_free_import_help">Importe uniquement les modèles de discussion annoncés gratuits dans le catalogue OpenRouter actuel. Les modèles existants restent. Cela ne permet pas les requêtes et ne bloque pas les frais ; les prix et services supplémentaires peuvent changer.</string>
+    <string name="nm_free_import_unsupported">Le prix pour ce fournisseur et ce compte ne peut pas être vérifié ici. Aucun nouveau modèle ne sera importé tant que cette option est active. Désactivez-la pour importer toute la liste.</string>
+    <string name="nm_free_import_checking">Consultation du catalogue...</string>
+    <string name="nm_free_import_missing_key">Ajoutez une clé avant de consulter le catalogue.</string>
+    <string name="nm_free_import_failed">Impossible de consulter le catalogue. Aucun nouveau modèle importé. Vérifiez la connexion et la clé, puis actualisez.</string>
+    <string name="nm_free_import_empty">Aucun modèle avec des informations gratuites complètes et actuelles. Les modèles existants sont conservés.</string>
+    <string name="nm_free_import_found">%1$d modèles annoncés gratuits, %2$d ajoutés. L’accès du compte n’a pas été vérifié.</string>
+    <string name="nm_provider_save_failed">Enregistrement impossible. Vérifiez le stockage de l’appareil et réessayez.</string>
+    <string name="nm_useit_incomplete">Certaines utilisations sélectionnées ne sont pas configurées. Les autres choix ont peut-être déjà changé. Vérifiez la liste des modèles ou réessayez.</string>
 </resources>

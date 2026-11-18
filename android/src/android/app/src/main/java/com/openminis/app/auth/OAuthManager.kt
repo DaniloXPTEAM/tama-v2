@@ -732,6 +732,10 @@ abstract class OAuthManager(
             prefs.getString("oauth_${KEY_MANUAL_BEARER}_$instanceId", null) != null
     }
 
+    // nanoMuse: before the new-provider form reports success, flush prior
+    // apply() writes for this OAuth bundle. Caller holds the credential lock.
+    internal fun nmFlushCredentialPrefs(): Boolean = getEncryptedPrefs().edit().commit()
+
     /** Called inside the credential transaction when restoring a different account. */
     internal fun nmClearAccountMetadata() {
         val editor = getEncryptedPrefs().edit()

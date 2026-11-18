@@ -1518,4 +1518,28 @@
     <string name="nm_media_model_change_blocked">Lilipat ang kahilingang ito sa ibang media model na maaaring may ibang presyo. Pumili ng katugmang modelo sa mga setting ng larawan at video. Hindi ipinadala ang kahilingang ito. Maaari pa ring masingil ang ibang kahilingang naipadala na.</string>
     <string name="nm_video_request_failed">Hindi nakumpleto ang video. Maaaring naipadala ang gawain at may singil. Huwag ulitin nang walang bagong kahilingan.</string>
     <string name="nm_video_authorization_changed">Nagbago ang provider, account, mga setting o session ng video. Hindi naipadala ang gawain sa video. Maaaring may singil pa rin ang ibang kahilingang naipadala na.</string>
+
+    <!-- TAMA: provider setup and free-only import in the parallel test build. -->
+    <string name="nm_provider_known_title">Mga kilalang provider</string>
+    <string name="nm_provider_known_help">Piliin ang provider ng iyong key upang punan ang endpoint. May mga provider na iba ang address bawat rehiyon.</string>
+    <string name="nm_provider_show_all">Ipakita ang lahat ng provider</string>
+    <string name="nm_key_autofill_confirm">Iminungkahing endpoint para sa %1$s. I-tap upang kumpirmahin ang provider.</string>
+    <string name="nm_key_autofill_help">Pahiwatig lamang ang prefix. Kumpirmahin ang provider bago mag-save. Maaari mong baguhin ang address.</string>
+    <string name="nm_endpoint_region">Rehiyon ng endpoint</string>
+    <string name="nm_endpoint_region_help">Piliin ang rehiyon ng iyong account. Papalitan ng pagbabago ng rehiyon ang address.</string>
+    <string name="nm_endpoint_global">Global</string>
+    <string name="nm_endpoint_mainland">Mainland China</string>
+    <string name="nm_endpoint_effective">Endpoint pagkatapos i-save: %1$s</string>
+    <string name="nm_endpoint_fixed_help">Ginagamit ng OpenRouter ang nakatakdang address na ito.</string>
+    <string name="nm_endpoint_auto_help">Mula sa napiling provider ang address. Maaari mo itong baguhin; hindi papalitan ng pag-paste ng key ang pasadyang address.</string>
+    <string name="nm_free_import_title">Mga libreng model lang ang i-import</string>
+    <string name="nm_free_import_help">Mga chat model lang na nakasaad na libre sa kasalukuyang katalogo ng OpenRouter ang ini-import. Mananatili ang mga dati nang model. Hindi nito pinapahintulutan ang mga request o pinipigilan ang singil; maaaring magbago ang presyo at dagdag na serbisyo.</string>
+    <string name="nm_free_import_unsupported">Hindi matiyak dito ang presyo para sa provider at account na ito. Walang bagong model na mai-import habang naka-on ito. I-off upang i-import ang buong listahan.</string>
+    <string name="nm_free_import_checking">Sinusuri ang katalogo...</string>
+    <string name="nm_free_import_missing_key">Magdagdag muna ng key bago suriin ang katalogo.</string>
+    <string name="nm_free_import_failed">Hindi nasuri ang katalogo. Walang bagong model na na-import. Suriin ang koneksyon at key, saka i-refresh.</string>
+    <string name="nm_free_import_empty">Walang nakitang model na may kumpleto at kasalukuyang impormasyon ng libreng presyo. Napanatili ang mga dati nang model.</string>
+    <string name="nm_free_import_found">%1$d model ang nakasaad na libre, %2$d ang naidagdag. Hindi nasuri ang access ng account.</string>
+    <string name="nm_provider_save_failed">Hindi na-save. Suriin ang storage ng device at subukan muli.</string>
+    <string name="nm_useit_incomplete">Hindi naitakda ang ilang piniling gamit. Maaaring nabago na ang iba pang pagpili. Suriin ang listahan ng mga modelo o subukan muli.</string>
 </resources>

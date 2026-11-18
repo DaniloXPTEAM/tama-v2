@@ -1518,4 +1518,28 @@
     <string name="nm_media_model_change_blocked">Diese Anfrage würde zu einem anderen Medienmodell wechseln, das einen anderen Preis haben kann. Wähle in den Bild- und Videoeinstellungen ein kompatibles Modell. Diese Anfrage wurde nicht gesendet. Andere bereits gesendete Anfragen können dennoch Kosten verursachen.</string>
     <string name="nm_video_request_failed">Das Video konnte nicht fertiggestellt werden. Die Aufgabe wurde möglicherweise gesendet und kann Kosten verursachen. Wiederhole sie nur auf neue Anfrage.</string>
     <string name="nm_video_authorization_changed">Anbieter, Konto, Einstellungen oder Sitzung für das Video haben sich geändert. Die Videoaufgabe wurde nicht gesendet. Andere bereits gesendete Anfragen können dennoch Kosten verursachen.</string>
+
+    <!-- TAMA: provider setup and free-only import in the parallel test build. -->
+    <string name="nm_provider_known_title">Bekannte Anbieter</string>
+    <string name="nm_provider_known_help">Wähle den Anbieter deines Schlüssels, um den Endpunkt einzutragen. Manche Anbieter verwenden regionale Adressen.</string>
+    <string name="nm_provider_show_all">Alle Anbieter anzeigen</string>
+    <string name="nm_key_autofill_confirm">Endpunkt für %1$s vorgeschlagen. Tippe, um den Anbieter zu bestätigen.</string>
+    <string name="nm_key_autofill_help">Das Präfix ist nur ein Hinweis. Bestätige den Anbieter vor dem Speichern. Du kannst die Adresse ändern.</string>
+    <string name="nm_endpoint_region">Endpunktregion</string>
+    <string name="nm_endpoint_region_help">Wähle die Region deines Kontos. Ein Regionswechsel ersetzt die Adresse.</string>
+    <string name="nm_endpoint_global">Global</string>
+    <string name="nm_endpoint_mainland">Festlandchina</string>
+    <string name="nm_endpoint_effective">Endpunkt nach dem Speichern: %1$s</string>
+    <string name="nm_endpoint_fixed_help">OpenRouter verwendet diese feste Adresse.</string>
+    <string name="nm_endpoint_auto_help">Die Adresse stammt vom gewählten Anbieter. Du kannst sie ändern; ein Schlüssel ersetzt keine eigene Adresse.</string>
+    <string name="nm_free_import_title">Nur kostenlose Modelle importieren</string>
+    <string name="nm_free_import_help">Importiert nur Chatmodelle, die im aktuellen OpenRouter-Katalog als kostenlos angegeben sind. Vorhandene Modelle bleiben. Dies erlaubt keine Anfragen und verhindert keine Kosten; Preise und Zusatzdienste können sich ändern.</string>
+    <string name="nm_free_import_unsupported">Der Preis für diesen Anbieter und dieses Konto lässt sich hier nicht prüfen. Solange die Option aktiv ist, werden keine neuen Modelle importiert. Schalte sie für die vollständige Liste aus.</string>
+    <string name="nm_free_import_checking">Katalog wird geprüft...</string>
+    <string name="nm_free_import_missing_key">Füge vor der Katalogabfrage einen Schlüssel hinzu.</string>
+    <string name="nm_free_import_failed">Der Katalog konnte nicht geprüft werden. Es wurden keine neuen Modelle importiert. Prüfe Verbindung und Schlüssel und aktualisiere erneut.</string>
+    <string name="nm_free_import_empty">Keine Modelle mit vollständigen und aktuellen Angaben zu kostenlosen Preisen gefunden. Vorhandene Modelle bleiben erhalten.</string>
+    <string name="nm_free_import_found">%1$d als kostenlos angegebene Modelle, %2$d hinzugefügt. Der Kontozugriff wurde nicht geprüft.</string>
+    <string name="nm_provider_save_failed">Speichern fehlgeschlagen. Prüfe den Gerätespeicher und versuche es erneut.</string>
+    <string name="nm_useit_incomplete">Einige ausgewählte Verwendungen konnten nicht eingestellt werden. Andere Einstellungen wurden möglicherweise bereits geändert. Prüfe die Modellliste oder versuche es erneut.</string>
 </resources>

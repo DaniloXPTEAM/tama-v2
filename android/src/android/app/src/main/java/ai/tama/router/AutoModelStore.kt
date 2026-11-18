@@ -75,8 +75,11 @@ object AutoModelStore {
     private fun currentRouteKey(providerId: String) = "p.${digest(listOf(providerId))}.current_route"
 
     /**
-     * Serialize a short credential read/write with account invalidation and review.
-     * Never suspend, do network I/O, or acquire the provider-config lock here.
+     * Serialize credential reads/writes with account invalidation and review.
+     * Never suspend or perform network I/O here. Do not acquire the provider-config
+     * lock from this callback: a caller that needs both must already hold that lock.
+     * Model-list commits may synchronously write local storage while both are held,
+     * so they run on an IO worker and credential writers can briefly wait for them.
      * This coordinates cooperating writers in this process only.
      */
     @Synchronized

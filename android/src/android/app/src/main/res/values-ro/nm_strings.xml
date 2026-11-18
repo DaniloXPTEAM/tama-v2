@@ -1522,4 +1522,28 @@
     <string name="nm_media_model_change_blocked">Această solicitare ar schimba modelul media cu altul, care poate avea un preț diferit. Alege un model compatibil în setările pentru imagini și video. Această solicitare nu a fost trimisă. Alte solicitări deja trimise pot fi totuși taxate.</string>
     <string name="nm_video_request_failed">Videoclipul nu a putut fi finalizat. Este posibil ca sarcina să fi fost trimisă și să fie taxată. Nu reîncerca fără o cerere nouă.</string>
     <string name="nm_video_authorization_changed">Furnizorul, contul, setările sau sesiunea video s-au schimbat. Sarcina video nu a fost trimisă. Alte cereri deja trimise pot fi taxate în continuare.</string>
+
+    <!-- TAMA: provider setup and free-only import in the parallel test build. -->
+    <string name="nm_provider_known_title">Furnizori cunoscuți</string>
+    <string name="nm_provider_known_help">Alege furnizorul cheii pentru completarea endpointului. Unii furnizori folosesc adrese diferite în funcție de regiune.</string>
+    <string name="nm_provider_show_all">Arată toți furnizorii</string>
+    <string name="nm_key_autofill_confirm">Endpoint sugerat pentru %1$s. Apasă pentru a confirma furnizorul.</string>
+    <string name="nm_key_autofill_help">Prefixul este doar un indiciu. Confirmă furnizorul înainte de salvare. Poți modifica adresa.</string>
+    <string name="nm_endpoint_region">Regiunea endpointului</string>
+    <string name="nm_endpoint_region_help">Alege regiunea contului. Schimbarea regiunii înlocuiește adresa.</string>
+    <string name="nm_endpoint_global">Global</string>
+    <string name="nm_endpoint_mainland">China continentală</string>
+    <string name="nm_endpoint_effective">Endpoint după salvare: %1$s</string>
+    <string name="nm_endpoint_fixed_help">OpenRouter folosește această adresă fixă.</string>
+    <string name="nm_endpoint_auto_help">Adresa provine de la furnizorul ales. O poți modifica; lipirea unei chei nu înlocuiește o adresă personalizată.</string>
+    <string name="nm_free_import_title">Importă doar modele gratuite</string>
+    <string name="nm_free_import_help">Importă doar modele de chat anunțate ca gratuite în catalogul OpenRouter actual. Modelele existente rămân. Aceasta nu autorizează cereri și nu împiedică taxarea; prețurile și serviciile suplimentare se pot schimba.</string>
+    <string name="nm_free_import_unsupported">Prețul pentru acest furnizor și cont nu poate fi verificat aici. Cât timp opțiunea este activă, nu se importă modele noi. Dezactiveaz-o pentru lista completă.</string>
+    <string name="nm_free_import_checking">Se verifică catalogul...</string>
+    <string name="nm_free_import_missing_key">Adaugă o cheie înainte de verificarea catalogului.</string>
+    <string name="nm_free_import_failed">Catalogul nu a putut fi verificat. Nu au fost importate modele noi. Verifică conexiunea și cheia, apoi actualizează.</string>
+    <string name="nm_free_import_empty">Nu s-au găsit modele cu informații complete și actuale despre prețul gratuit. Modelele existente au fost păstrate.</string>
+    <string name="nm_free_import_found">%1$d modele anunțate gratuite, %2$d adăugate. Accesul contului nu a fost verificat.</string>
+    <string name="nm_provider_save_failed">Nu s-a putut salva. Verifică spațiul de stocare al dispozitivului și încearcă din nou.</string>
+    <string name="nm_useit_incomplete">Unele utilizări selectate nu au putut fi configurate. Alte opțiuni este posibil să se fi schimbat deja. Verifică lista de modele sau încearcă din nou.</string>
 </resources>

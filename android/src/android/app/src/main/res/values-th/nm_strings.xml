@@ -1514,4 +1514,28 @@
     <string name="nm_media_model_change_blocked">คำขอนี้จะเปลี่ยนไปใช้โมเดลสื่ออื่นที่อาจมีราคาต่างกัน โปรดเลือกโมเดลที่รองรับในการตั้งค่าภาพและวิดีโอ คำขอนี้ไม่ได้ถูกส่ง คำขออื่นที่ส่งไปแล้วอาจยังมีค่าใช้จ่าย</string>
     <string name="nm_video_request_failed">ไม่สามารถสร้างวิดีโอให้เสร็จได้ งานอาจถูกส่งไปแล้วและอาจมีค่าใช้จ่าย โปรดอย่าลองอีกโดยไม่มีคำขอใหม่</string>
     <string name="nm_video_authorization_changed">ผู้ให้บริการ บัญชี การตั้งค่า หรือเซสชันวิดีโอเปลี่ยนไป จึงไม่ได้ส่งงานวิดีโอ คำขออื่นที่ส่งไปแล้วอาจยังมีค่าใช้จ่าย</string>
+
+    <!-- TAMA: provider setup and free-only import in the parallel test build. -->
+    <string name="nm_provider_known_title">ผู้ให้บริการที่รู้จัก</string>
+    <string name="nm_provider_known_help">เลือกผู้ให้บริการของคีย์เพื่อกรอก endpoint ผู้ให้บริการบางรายใช้ที่อยู่ต่างกันตามภูมิภาค</string>
+    <string name="nm_provider_show_all">แสดงผู้ให้บริการทั้งหมด</string>
+    <string name="nm_key_autofill_confirm">แนะนำ endpoint สำหรับ %1$s แตะเพื่อยืนยันผู้ให้บริการ</string>
+    <string name="nm_key_autofill_help">คำนำหน้าเป็นเพียงคำใบ้ โปรดยืนยันผู้ให้บริการก่อนบันทึก คุณแก้ไขที่อยู่ได้</string>
+    <string name="nm_endpoint_region">ภูมิภาคของ endpoint</string>
+    <string name="nm_endpoint_region_help">เลือกภูมิภาคของบัญชี การเปลี่ยนภูมิภาคจะเปลี่ยนที่อยู่</string>
+    <string name="nm_endpoint_global">ทั่วโลก</string>
+    <string name="nm_endpoint_mainland">จีนแผ่นดินใหญ่</string>
+    <string name="nm_endpoint_effective">Endpoint หลังบันทึก: %1$s</string>
+    <string name="nm_endpoint_fixed_help">OpenRouter ใช้ที่อยู่คงที่นี้</string>
+    <string name="nm_endpoint_auto_help">ที่อยู่มาจากผู้ให้บริการที่เลือก คุณแก้ไขได้ การวางคีย์จะไม่แทนที่อยู่ที่กำหนดเอง</string>
+    <string name="nm_free_import_title">นำเข้าเฉพาะโมเดลฟรี</string>
+    <string name="nm_free_import_help">นำเข้าเฉพาะโมเดลแชตที่ระบุว่าฟรีในแค็ตตาล็อก OpenRouter ปัจจุบัน โมเดลเดิมจะยังอยู่ ตัวเลือกนี้ไม่ได้อนุญาตคำขอหรือป้องกันค่าใช้จ่าย ราคาและบริการเพิ่มเติมอาจเปลี่ยนแปลง</string>
+    <string name="nm_free_import_unsupported">ไม่สามารถตรวจสอบราคาสำหรับผู้ให้บริการและบัญชีนี้ได้ที่นี่ เมื่อเปิดตัวเลือกจะไม่นำเข้าโมเดลใหม่ ปิดเพื่อนำเข้ารายการทั้งหมด</string>
+    <string name="nm_free_import_checking">กำลังตรวจสอบแค็ตตาล็อก...</string>
+    <string name="nm_free_import_missing_key">เพิ่มคีย์ก่อนตรวจสอบแค็ตตาล็อก</string>
+    <string name="nm_free_import_failed">ตรวจสอบแค็ตตาล็อกไม่ได้ ไม่มีการนำเข้าโมเดลใหม่ ตรวจสอบการเชื่อมต่อและคีย์แล้วรีเฟรช</string>
+    <string name="nm_free_import_empty">ไม่พบโมเดลที่มีข้อมูลราคาฟรีครบถ้วนและเป็นปัจจุบัน โมเดลเดิมยังคงอยู่</string>
+    <string name="nm_free_import_found">ระบุว่าฟรี %1$d โมเดล เพิ่มแล้ว %2$d โมเดล ยังไม่ได้ตรวจสอบสิทธิ์บัญชี</string>
+    <string name="nm_provider_save_failed">บันทึกไม่ได้ ตรวจสอบพื้นที่เก็บข้อมูลในอุปกรณ์แล้วลองอีกครั้ง</string>
+    <string name="nm_useit_incomplete">ไม่สามารถตั้งค่าการใช้งานบางรายการที่เลือกไว้ ตัวเลือกอื่นอาจเปลี่ยนไปแล้ว โปรดตรวจสอบรายการโมเดลหรือลองอีกครั้ง</string>
 </resources>

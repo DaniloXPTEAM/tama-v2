@@ -1514,4 +1514,28 @@
     <string name="nm_media_model_change_blocked">Permintaan ini akan beralih ke model media lain yang mungkin memiliki harga berbeda. Pilih model yang kompatibel di pengaturan gambar dan video. Permintaan ini tidak dikirim. Permintaan lain yang sudah dikirim masih dapat dikenai biaya.</string>
     <string name="nm_video_request_failed">Video tidak dapat diselesaikan. Tugas mungkin telah dikirim dan dapat dikenai biaya. Jangan coba lagi tanpa permintaan baru.</string>
     <string name="nm_video_authorization_changed">Penyedia, akun, pengaturan, atau sesi video berubah. Tugas video tidak dikirim. Permintaan lain yang sudah dikirim masih dapat dikenai biaya.</string>
+
+    <!-- TAMA: provider setup and free-only import in the parallel test build. -->
+    <string name="nm_provider_known_title">Penyedia yang dikenal</string>
+    <string name="nm_provider_known_help">Pilih penyedia kunci untuk mengisi endpoint. Beberapa penyedia menggunakan alamat berbeda menurut wilayah.</string>
+    <string name="nm_provider_show_all">Tampilkan semua penyedia</string>
+    <string name="nm_key_autofill_confirm">Endpoint disarankan untuk %1$s. Ketuk untuk mengonfirmasi penyedia.</string>
+    <string name="nm_key_autofill_help">Awalan hanya petunjuk. Konfirmasikan penyedia sebelum menyimpan. Anda dapat mengubah alamat.</string>
+    <string name="nm_endpoint_region">Wilayah endpoint</string>
+    <string name="nm_endpoint_region_help">Pilih wilayah akun Anda. Mengubah wilayah akan mengganti alamat.</string>
+    <string name="nm_endpoint_global">Global</string>
+    <string name="nm_endpoint_mainland">Tiongkok daratan</string>
+    <string name="nm_endpoint_effective">Endpoint setelah disimpan: %1$s</string>
+    <string name="nm_endpoint_fixed_help">OpenRouter menggunakan alamat tetap ini.</string>
+    <string name="nm_endpoint_auto_help">Alamat berasal dari penyedia yang dipilih. Anda dapat mengubahnya; menempelkan kunci tidak mengganti alamat khusus.</string>
+    <string name="nm_free_import_title">Impor hanya model gratis</string>
+    <string name="nm_free_import_help">Hanya mengimpor model chat yang dinyatakan gratis dalam katalog OpenRouter saat ini. Model yang sudah ada tetap tersimpan. Ini tidak mengizinkan permintaan atau mencegah biaya; harga dan layanan tambahan dapat berubah.</string>
+    <string name="nm_free_import_unsupported">Harga untuk penyedia dan akun ini tidak dapat diverifikasi di sini. Tidak ada model baru yang diimpor saat opsi aktif. Matikan untuk mengimpor daftar lengkap.</string>
+    <string name="nm_free_import_checking">Memeriksa katalog...</string>
+    <string name="nm_free_import_missing_key">Tambahkan kunci sebelum memeriksa katalog.</string>
+    <string name="nm_free_import_failed">Katalog tidak dapat diperiksa. Tidak ada model baru yang diimpor. Periksa koneksi dan kunci, lalu perbarui.</string>
+    <string name="nm_free_import_empty">Tidak ditemukan model dengan informasi harga gratis yang lengkap dan terbaru. Model sebelumnya tetap tersimpan.</string>
+    <string name="nm_free_import_found">%1$d model dinyatakan gratis, %2$d ditambahkan. Akses akun belum diverifikasi.</string>
+    <string name="nm_provider_save_failed">Tidak dapat menyimpan. Periksa penyimpanan perangkat dan coba lagi.</string>
+    <string name="nm_useit_incomplete">Beberapa penggunaan yang dipilih tidak dapat diatur. Pilihan lain mungkin sudah berubah. Periksa daftar model atau coba lagi.</string>
 </resources>

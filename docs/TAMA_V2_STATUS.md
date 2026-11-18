@@ -6,7 +6,8 @@ para os limites das provas. O artefato paralelo antigo citado abaixo foi removid
 atual de metadados encontrou outros artefatos antigos não expirados no GitHub, incluindo artefatos
 de debug e instrumentação cujos workflows estavam configurados para carregar APKs. Seus arquivos não foram
 baixados nem removidos nesta revisão. Não há autorização para publicar APK ou artefato; a entrega
-privada precisa ser acordada.
+privada precisa ser acordada. A revisão consolidada e o inventário desses artefatos estão em
+[TAMA_V2_RELATORIO_REVISAO_COMPLETA.md](TAMA_V2_RELATORIO_REVISAO_COMPLETA.md).
 
 Este registro acompanha o plano completo fornecido pelo dono. O trabalho está somente na branch
 `arena/4f0fb56f-tamaaiv2`; não houve merge nem sincronização integral com nanoMuse ou OpenMinis.

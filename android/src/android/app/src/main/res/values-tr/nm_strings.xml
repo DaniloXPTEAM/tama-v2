@@ -1518,4 +1518,28 @@
     <string name="nm_media_model_change_blocked">Bu istek, fiyatı farklı olabilecek başka bir medya modeline geçecekti. Görüntü ve video ayarlarından uyumlu bir model seçin. Bu istek gönderilmedi. Daha önce gönderilen diğer istekler yine de ücretlendirilebilir.</string>
     <string name="nm_video_request_failed">Video tamamlanamadı. Görev gönderilmiş olabilir ve ücret alınabilir. Yeni bir istek olmadan tekrar denemeyin.</string>
     <string name="nm_video_authorization_changed">Video sağlayıcısı, hesap, ayarlar veya oturum değişti. Video görevi gönderilmedi. Daha önce gönderilen diğer istekler yine de ücretlendirilebilir.</string>
+
+    <!-- TAMA: provider setup and free-only import in the parallel test build. -->
+    <string name="nm_provider_known_title">Bilinen sağlayıcılar</string>
+    <string name="nm_provider_known_help">Uç noktayı doldurmak için anahtarınızın sağlayıcısını seçin. Bazı sağlayıcılar bölgeye göre farklı adresler kullanır.</string>
+    <string name="nm_provider_show_all">Tüm sağlayıcıları göster</string>
+    <string name="nm_key_autofill_confirm">%1$s için uç nokta önerildi. Sağlayıcıyı doğrulamak için dokunun.</string>
+    <string name="nm_key_autofill_help">Önek yalnızca bir ipucudur. Kaydetmeden önce sağlayıcıyı doğrulayın. Adresi düzenleyebilirsiniz.</string>
+    <string name="nm_endpoint_region">Uç nokta bölgesi</string>
+    <string name="nm_endpoint_region_help">Hesabınızın bölgesini seçin. Bölgeyi değiştirmek adresi değiştirir.</string>
+    <string name="nm_endpoint_global">Küresel</string>
+    <string name="nm_endpoint_mainland">Çin ana karası</string>
+    <string name="nm_endpoint_effective">Kaydettikten sonraki uç nokta: %1$s</string>
+    <string name="nm_endpoint_fixed_help">OpenRouter bu sabit adresi kullanır.</string>
+    <string name="nm_endpoint_auto_help">Adres seçilen sağlayıcıdan gelir. Düzenleyebilirsiniz; anahtar yapıştırmak özel adresi değiştirmez.</string>
+    <string name="nm_free_import_title">Yalnızca ücretsiz modelleri içe aktar</string>
+    <string name="nm_free_import_help">Yalnızca güncel OpenRouter kataloğunda ücretsiz olarak belirtilen sohbet modellerini içe aktarır. Mevcut modeller kalır. Bu, isteklere izin vermez veya ücretleri önlemez; fiyatlar ve ek hizmetler değişebilir.</string>
+    <string name="nm_free_import_unsupported">Bu sağlayıcı ve hesap için fiyat burada doğrulanamaz. Bu seçenek açıkken yeni model içe aktarılmaz. Tam listeyi almak için kapatın.</string>
+    <string name="nm_free_import_checking">Katalog kontrol ediliyor...</string>
+    <string name="nm_free_import_missing_key">Kataloğu kontrol etmeden önce anahtar ekleyin.</string>
+    <string name="nm_free_import_failed">Katalog kontrol edilemedi. Yeni model içe aktarılmadı. Bağlantıyı ve anahtarı kontrol edip yenileyin.</string>
+    <string name="nm_free_import_empty">Ücretsiz fiyat bilgisi eksiksiz ve güncel olan model bulunamadı. Mevcut modeller korundu.</string>
+    <string name="nm_free_import_found">Ücretsiz olarak belirtilen %1$d model, eklenen %2$d model. Hesap erişimi doğrulanmadı.</string>
+    <string name="nm_provider_save_failed">Kaydedilemedi. Cihaz depolamasını kontrol edip yeniden deneyin.</string>
+    <string name="nm_useit_incomplete">Seçilen kullanımlardan bazıları ayarlanamadı. Diğer seçimler zaten değişmiş olabilir. Model listesini kontrol edin veya yeniden deneyin.</string>
 </resources>

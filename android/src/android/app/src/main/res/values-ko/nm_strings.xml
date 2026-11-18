@@ -1514,4 +1514,28 @@
     <string name="nm_media_model_change_blocked">이 요청은 가격이 다를 수 있는 다른 미디어 모델로 전환합니다. 이미지 및 동영상 설정에서 호환되는 모델을 선택하세요. 이 요청은 전송되지 않았습니다. 이미 전송된 다른 요청에는 요금이 청구될 수 있습니다.</string>
     <string name="nm_video_request_failed">동영상을 완료하지 못했습니다. 작업이 전송되어 요금이 청구될 수 있습니다. 새 요청 없이 다시 시도하지 마세요.</string>
     <string name="nm_video_authorization_changed">동영상 제공업체, 계정, 설정 또는 세션이 변경되었습니다. 동영상 작업은 전송되지 않았습니다. 이미 전송된 다른 요청에는 요금이 청구될 수 있습니다.</string>
+
+    <!-- TAMA: provider setup and free-only import in the parallel test build. -->
+    <string name="nm_provider_known_title">알려진 제공업체</string>
+    <string name="nm_provider_known_help">키의 제공업체를 선택하면 엔드포인트가 채워집니다. 일부 제공업체는 지역별 주소가 다릅니다.</string>
+    <string name="nm_provider_show_all">모든 제공업체 표시</string>
+    <string name="nm_key_autofill_confirm">%1$s의 엔드포인트가 제안되었습니다. 탭하여 제공업체를 확인하세요.</string>
+    <string name="nm_key_autofill_help">접두사는 단서일 뿐입니다. 저장하기 전에 제공업체를 확인하세요. 주소는 수정할 수 있습니다.</string>
+    <string name="nm_endpoint_region">엔드포인트 지역</string>
+    <string name="nm_endpoint_region_help">계정의 지역을 선택하세요. 지역을 변경하면 주소가 바뀝니다.</string>
+    <string name="nm_endpoint_global">글로벌</string>
+    <string name="nm_endpoint_mainland">중국 본토</string>
+    <string name="nm_endpoint_effective">저장 후 엔드포인트: %1$s</string>
+    <string name="nm_endpoint_fixed_help">OpenRouter는 이 고정 주소를 사용합니다.</string>
+    <string name="nm_endpoint_auto_help">선택한 제공업체의 주소입니다. 직접 수정할 수 있으며 키를 붙여 넣어도 사용자 지정 주소는 바뀌지 않습니다.</string>
+    <string name="nm_free_import_title">무료 모델만 가져오기</string>
+    <string name="nm_free_import_help">현재 OpenRouter 카탈로그에서 무료로 표시된 채팅 모델만 가져옵니다. 기존 모델은 유지됩니다. 요청을 허용하거나 요금을 차단하는 기능은 아닙니다. 가격과 추가 서비스는 바뀔 수 있습니다.</string>
+    <string name="nm_free_import_unsupported">이 제공업체와 계정의 가격을 여기서 확인할 수 없습니다. 켜져 있으면 새 모델을 가져오지 않습니다. 전체 목록을 가져오려면 끄세요.</string>
+    <string name="nm_free_import_checking">카탈로그 확인 중...</string>
+    <string name="nm_free_import_missing_key">카탈로그를 확인하기 전에 키를 추가하세요.</string>
+    <string name="nm_free_import_failed">카탈로그를 확인하지 못했습니다. 새 모델은 가져오지 않았습니다. 연결과 키를 확인한 후 새로고침하세요.</string>
+    <string name="nm_free_import_empty">무료 가격 정보가 완전하고 최신인 모델을 찾지 못했습니다. 기존 모델은 유지됩니다.</string>
+    <string name="nm_free_import_found">무료로 표시된 모델 %1$d개, 추가된 모델 %2$d개. 계정 접근 권한은 확인하지 않았습니다.</string>
+    <string name="nm_provider_save_failed">저장하지 못했습니다. 기기 저장 공간을 확인한 후 다시 시도하세요.</string>
+    <string name="nm_useit_incomplete">선택한 용도 중 일부를 설정하지 못했습니다. 다른 선택 항목은 이미 변경되었을 수 있습니다. 모델 목록을 확인하거나 다시 시도하세요.</string>
 </resources>
