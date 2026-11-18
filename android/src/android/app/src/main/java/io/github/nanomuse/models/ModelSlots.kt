@@ -189,12 +189,15 @@ object ModelSlots {
 
     /** Models of [inst] that answer in text: the chat lane. For the relay, its menu's chat lane. */
     fun chatEntriesOf(context: Context, inst: ProviderInstance): List<ModelEntry> {
-        val cfg = repo(context)?.config?.value ?: return emptyList()
+        val providers = repo(context) ?: return emptyList()
+        val cfg = providers.config.value
         val all = cfg.modelEntries.filter {
             it.providerInstanceId == inst.id && !it.isHidden && it.model.isTextOutput &&
                 !ImageGen.looksLikeImageModel(it.model.id) && !VideoGen.looksLikeVideoModel(it.model.id)
         }
-        if (!isCloud(context, inst)) return all
+        if (!isCloud(context, inst)) return if (providers.tamaFreeChatOnly(inst))
+            ai.tama.pricing.FreeModelList.filter(all, true, providers.tamaEligibleFreeModelIds(inst.id)) { it.model.id }
+        else all
         val lane = NanoMuseCloud.chatLaneIds(context)
         return if (lane.isEmpty()) all.filter { !NanoMuseCloud.isCatalogModel(context, it.model.id) }
         else lane.mapNotNull { id -> all.firstOrNull { it.model.id == id } }
@@ -341,6 +344,8 @@ object ModelSlots {
         val entry = config.modelEntries.firstOrNull { it.id == entryId } ?: return false
         val inst = config.instances.firstOrNull { it.id == entry.providerInstanceId } ?: return false
         if (NanoMuseCloud.drawsOrFilms(entry.model) || ImageGen.looksLikeImageModel(entry.model.id)) return false
+        // nanoMuse: setting a default cannot bypass a personal key's free-only filter.
+        if (!repo.tamaAllowsChatModel(inst, entry.model.id)) return false
         val name = providerLabel(context, inst)
         val picked = groupId?.let { id -> config.modelGroups.firstOrNull { it.id == id && entryId in it.memberEntryIds } }
         if (picked != null && MainChatFollow.keepAsIs(picked.name, name, picked.memberEntryIds.map { id -> config.modelEntries.firstOrNull { it.id == id }?.providerInstanceId })) {

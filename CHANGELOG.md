@@ -4,6 +4,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+- Adjusted the parallel Android test build’s chat header, model picker, avatar footer and Hands setup, with PT-BR labels.
+
 - Counted confirmed personal-key chat responses and offered a larger approved context after a confirmed input overflow in the parallel Android test build.
 
 - Clarified image cost refusals for personal-key chat in the parallel Android test build without changing media permissions.

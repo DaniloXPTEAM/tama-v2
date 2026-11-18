@@ -375,3 +375,18 @@ Não eram 11 cobranças nem 11 respostas confirmadas. Agora **Etapas concluídas
 conta etapas de resposta salvas por esta versão com término confirmado. Uma etapa
 pode devolver ferramentas ou o texto final. Tentativa de envio que falhou, texto
 parcial, imagem local e histórico antigo sem confirmação não contam.
+
+### Ajustes de telas do paralelo
+
+O título de Habilidades e os campos de OAuth dos Conectores usam PT-BR no
+paralelo. Descrições de terceiros não foram traduzidas. Atualizar modelos usa o
+texto local em um provedor com chave própria, mesmo sem conta Cloud cadastrada.
+O rodapé do Avatar respeita a área dos botões/gestos do Android. Em **Adicionar
+modelos**, a seta tem a ação de cancelar, sem um segundo botão apertando o título.
+A conversa rola abaixo do cabeçalho no paralelo. Mãos reavalia a escolha de modelo
+quando ela muda; se já há modelos compatíveis, o atalho vai ao seletor. As
+permissões de acessibilidade e sobreposição continuam sob controle do Android.
+
+O seletor de modelo padrão não lista nem grava um modelo fora da lista
+confirmada de gratuitos da conta própria quando o filtro está ativo. Nenhum
+modelo pago virou padrão por conta própria. Não há alteração no padrão Cloud.

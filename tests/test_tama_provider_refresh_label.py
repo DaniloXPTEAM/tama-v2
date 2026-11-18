@@ -13,9 +13,8 @@ class OwnKeyRefreshLabel(unittest.TestCase):
         start = source.index("// nanoMuse: localize only an own-key provider")
         end = source.index("onClick = if (isRefreshing)", start)
         block = source[start:end]
-        for guard in ("nmParallel && storedKey.isNotBlank()", "ProviderCredential.apiKey",
-                      "NanoMuseCloud.instance(exportContext)?.id?.let { it != instanceId } == true"):
-            self.assertIn(guard, block)
+        self.assertIn("if (nmHasOwnKey)", block)
+        self.assertIn("storedKey.isNotBlank() && providerRepository.tamaOwnApiKey(instance) != null", source)
         self.assertIn("stringResource(R.string.nm_cloud_refreshing)", block)
         self.assertIn("stringResource(R.string.provider_detail_refresh_models)", block)
         self.assertIn('else if (isRefreshing) "Refreshing…" else "Refresh model list"', block)
