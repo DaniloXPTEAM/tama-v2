@@ -169,6 +169,25 @@ jobs:
             --max-workers=1 --console=plain --no-daemon \
             '-Dorg.gradle.jvmargs=-Xmx4608m -XX:MaxMetaspaceSize=768m -Dfile.encoding=UTF-8' \
             -Pkotlin.compiler.execution.strategy=in-process -Pkotlin.incremental=false
+      # UI tests use a separate opt-in target manifest. Compile it only during
+      # verification, never in a run that may deliver the signed app.
+      - name: Compile parallel Compose instrumentation locally
+        if: ${{ !inputs.deliver_to_drive }}
+        working-directory: android/src/android
+        run: |
+          export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/$NDK_VERSION"
+          set -o pipefail
+          if ./gradlew -PtamaTestInstrumentation=true :app:compileTamaTestAndroidTestKotlin \
+            --max-workers=1 --console=plain --no-daemon \
+            '-Dorg.gradle.jvmargs=-Xmx4608m -XX:MaxMetaspaceSize=768m -Dfile.encoding=UTF-8' \
+            -Pkotlin.compiler.execution.strategy=in-process -Pkotlin.incremental=false 2>&1 | tee "$RUNNER_TEMP/tama-compose-compile.log"; then
+            rm -f "$RUNNER_TEMP/tama-compose-compile.log"
+          else
+            status=$?
+            python3 ../../../scripts/android/summarize-build-failure.py "$RUNNER_TEMP/tama-compose-compile.log" "$status" || true
+            rm -f "$RUNNER_TEMP/tama-compose-compile.log"
+            exit "$status"
+          fi
       - name: Check stable signature for private delivery
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.deliver_to_drive }}
         env:
@@ -193,4 +212,6 @@ jobs:
           python3 scripts/android/deliver-private-drive.py android/src/android/app/build/outputs/apk/tamaTest/app-tamaTest.apk
       - name: Remove private test signer
         if: ${{ always() }}
-        run: rm -f "$RUNNER_TEMP/tama-test-signing.jks" "$RUNNER_TEMP/tama-assemble.log" "$RUNNER_TEMP/tama-unit-tests.log"
+        run: |
+          rm -f "$RUNNER_TEMP/tama-test-signing.jks" "$RUNNER_TEMP/tama-assemble.log" \
+            "$RUNNER_TEMP/tama-unit-tests.log" "$RUNNER_TEMP/tama-compose-compile.log"

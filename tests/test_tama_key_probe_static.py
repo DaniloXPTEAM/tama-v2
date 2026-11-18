@@ -3,7 +3,9 @@ from pathlib import Path
 import unittest
 from xml.etree import ElementTree
 
-MAIN = Path(__file__).resolve().parents[1] / "android/src/android/app/src/main/java"
+ROOT = Path(__file__).resolve().parents[1]
+APP = ROOT / "android/src/android/app"
+MAIN = APP / "src/main/java"
 
 
 class KeyProbeIntegration(unittest.TestCase):
@@ -27,6 +29,19 @@ class KeyProbeIntegration(unittest.TestCase):
             self.assertIn(text, probe)
         self.assertNotIn("Log.", probe)
         self.assertNotIn(".post(", probe)
+
+    def test_ci_compiles_parallel_instrumentation_only_on_no_delivery_runs(self):
+        workflow = (ROOT / ".github/workflows/android.yml").read_text()
+        step = workflow.split("- name: Compile parallel Compose instrumentation locally", 1)[1].split("- name:", 1)[0]
+        self.assertIn("if: ${{ !inputs.deliver_to_drive }}", step)
+        self.assertIn("-PtamaTestInstrumentation=true :app:compileTamaTestAndroidTestKotlin", step)
+        self.assertNotIn("secrets.", step)
+        for forbidden in ("connectedTamaTestAndroidTest", "adb ", "assemble", "upload-artifact"):
+            self.assertNotIn(forbidden, step)
+        self.assertIn(
+            'if (providers.gradleProperty("tamaTestInstrumentation").orNull == "true") testBuildType = "tamaTest"',
+            (APP / "build.gradle.kts").read_text(),
+        )
 
     def test_portuguese_success_does_not_claim_the_key_is_valid(self):
         resources = MAIN.parent / "res/values-pt-rBR/nm_strings.xml"

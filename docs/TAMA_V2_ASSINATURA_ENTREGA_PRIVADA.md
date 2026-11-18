@@ -82,14 +82,19 @@ com respostas simuladas, não com uma conta real do Drive.
 ## 3. Instalação e teste no telefone, sem cobrança
 
 - Confira que o pacote é `ai.tama.assistant.tamav2test` (**Tama V2 Test**), não
-  `ai.tama.assistant`. Se o Test antigo tiver outro certificado, faça backup do
-  necessário; a primeira instalação com o certificado novo exige desinstalar
-  **só o Tama V2 Test**. Nunca desinstale nem limpe os dados do app normal. Com
-  o mesmo certificado e versão compatível, as próximas instalações atualizam por
-  cima. Via ADB use `adb install -r <APK-do-Test>`; em caso de incompatibilidade
-  de assinatura, confirme a identidade antes de desinstalar pelo Android.
-- Ligue o modo avião e confirme que Wi-Fi e dados estão desligados. Inicie o
-  Test, escolha PT-BR e verifique primeiro **sem nenhuma chave própria**. Abra
+  `ai.tama.assistant`. Compare a assinatura antes de instalar. Se você já usa
+  ADB e não tem o APK original, `adb shell pm path ai.tama.assistant.tamav2test`
+  lista o caminho instalado sem alterar dados. Copie somente o `base.apk` para
+  um diretório privado no seu computador com `adb pull <caminho-do-base.apk>` e
+  use `apksigner verify --print-certs` nos dois APKs. Não publique os arquivos.
+  Com o mesmo certificado e uma versão compatível, `adb install -r <APK-do-Test>`
+  atualiza por cima. **Se o certificado não coincidir, pare:** não desinstale
+  nem limpe dados de nenhum app neste roteiro. APKs com a assinatura temporária
+  do CI são só para verificação, não para atualizar o Test instalado.
+- Use uma instalação de teste sem dados importantes. Se já houver chaves reais,
+  não apague nem substitua esses dados para simular uma conta vazia. Ligue o modo
+  avião e confirme que Wi-Fi e dados estão desligados. Inicie o Test, escolha
+  PT-BR e verifique primeiro **sem nenhuma chave própria**. Abra
   chat e provedores; nenhum filtro de conta própria deve aparecer. A tentativa
   offline, se feita, não comprova que o Cloud responde com rede.
 - Em **Adicionar provedor**, selecione OpenRouter, confira `openrouter.ai/api`
@@ -111,5 +116,10 @@ com respostas simuladas, não com uma conta real do Drive.
   `cd android/src/android && ./gradlew -PtamaTestInstrumentation=true
   :app:connectedTamaTestAndroidTest
   -Pandroid.testInstrumentationRunnerArguments.class=ai.tama.providers.KeyProbeSectionInstrumentedTest`
-  (execute em uma linha, com SDK e dependências nativas preparados). Esse teste
-  de componente não executa os formulários inteiros nem acessa provedores.
+  (execute em uma linha, com SDK e dependências nativas preparados). Os testes
+  incluem botão desativado sem chave, mudança de endereço e descarte de uma
+  resposta atrasada após A → B → A; usam respostas injetadas, sem provedores.
+  Em execuções sem entrega, o CI compila essa instrumentação com
+  `-PtamaTestInstrumentation=true :app:compileTamaTestAndroidTestKotlin`.
+  Compilar não executa o Compose, não instala APK e não valida os formulários
+  inteiros ou o Poco. A opção de instrumentação não faz parte do build de entrega.

@@ -30,6 +30,7 @@ class FailureSummary(unittest.TestCase):
         for step, log in (
             ('Assemble parallel test locally', 'tama-assemble.log'),
             ('Run parallel routing, key probe and history tests', 'tama-unit-tests.log'),
+            ('Compile parallel Compose instrumentation locally', 'tama-compose-compile.log'),
         ):
             body = workflow.split(f'- name: {step}', 1)[1].split('- name:', 1)[0]
             for part in ('set -o pipefail', 'status=$?', 'exit "$status"', 'summarize-build-failure.py',
