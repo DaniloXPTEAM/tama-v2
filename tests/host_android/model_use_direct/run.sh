@@ -75,6 +75,7 @@ kotlinc -nowarn -cp "$CP" -include-runtime -d "$OUT/model-use-host.jar" \
     "$MAIN/ai/tama/net/OwnKeyFailureSignals.kt" \
     "$MAIN/ai/tama/pricing/ModelCostGuard.kt" \
     "$MAIN/ai/tama/pricing/DocumentedChatDispatch.kt" \
+    "$MAIN/ai/tama/pricing/DocumentedGeminiBody.kt" \
     "$MAIN/ai/tama/pricing/DocumentedFreeChat.kt" \
     "$MAIN/ai/tama/providers/KeyDestinationGuard.kt" \
     "$MAIN/com/openminis/app/provider/anthropic/AnthropicProvider.kt" \

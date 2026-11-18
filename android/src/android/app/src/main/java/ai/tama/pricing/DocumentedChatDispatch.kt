@@ -19,12 +19,12 @@ internal class DocumentedChatDispatch(
             if (BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test") context[Key] else null
 
         fun checkGemini(
-            context: CoroutineContext, base: String, key: String, id: String, textOnly: Boolean,
+            context: CoroutineContext, base: String, key: String, id: String, supportedBody: Boolean,
             nowMillis: Long = System.currentTimeMillis(),
         ) {
             val ticket = ticket(context)
             if (ticket == null) return ModelCostGuard.requireAllowed()
-            if (!textOnly || id != ticket.modelId || key != ticket.credential ||
+            if (!supportedBody || id != ticket.modelId || key != ticket.credential ||
                 DocumentedFreeChat.status(base, id, nowMillis, false) != DocumentedFreeChat.Status.FREE) {
                 throw ModelCostGuard.Blocked()
             }

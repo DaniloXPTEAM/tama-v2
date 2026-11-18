@@ -64,6 +64,7 @@ class MediaOffloadImageTest {
         Mockito.`when`(context.getString(R.string.nm_auto_image_changed)).thenReturn("Image authorization changed")
         Mockito.`when`(context.getString(R.string.nm_auto_reason_unverified_cost)).thenReturn("Automatic cost is not verified")
         Mockito.`when`(context.getString(R.string.nm_model_cost_blocked)).thenReturn("Model cost is not verified")
+        Mockito.`when`(context.getString(R.string.nm_free_image_unavailable)).thenReturn("No verified free generator")
         Mockito.`when`(context.getString(R.string.nm_auto_image_edit_blocked)).thenReturn("Automatic edit unavailable")
         Mockito.`when`(context.getString(R.string.nm_image_permission_denied)).thenReturn("Permission denied")
         Mockito.`when`(context.getString(R.string.nm_image_detail_failed)).thenReturn("Image could not be completed")

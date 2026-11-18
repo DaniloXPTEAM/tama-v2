@@ -134,6 +134,7 @@ jobs:
             --tests 'ai.tama.net.GroqHistoryWireTest' \
             --tests 'ai.tama.net.ProviderHistoryInteroperabilityTest' \
             --tests 'ai.tama.net.AutomaticFailureWireTest' \
+            --tests 'ai.tama.net.GeminiDocumentedChatWireTest' \
             --tests 'ai.tama.net.KeyProbeWireTest' \
             --tests 'ai.tama.router.ModelRouteHistoryTest' \
             --tests 'ai.tama.router.AutoFailureSimulationTest' \

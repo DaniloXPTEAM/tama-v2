@@ -17,7 +17,9 @@ import com.openminis.app.provider.LLMProvider
 import com.openminis.app.provider.safeOptString
 import ai.tama.net.singleUseImageBody
 import ai.tama.net.singleUseImageClient
-import ai.tama.pricing.DocumentedChatDispatch
+import ai.tama.pricing.DocumentedChatDispatch // nanoMuse: scoped main-chat cost evidence
+import ai.tama.pricing.DocumentedGeminiBody
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.awaitClose
@@ -36,18 +38,19 @@ import java.util.concurrent.TimeUnit
 import com.openminis.app.provider.failOnSilentEmptyCompletion
 import com.openminis.app.provider.thinking.ThinkingRuleResolver
 
-class GeminiProvider(
+// nanoMuse: an internal client and clock seam lets tests intercept the exact logical route.
+class GeminiProvider internal constructor(
     private val apiKey: String,
-    override var model: LLMModel = LLMModel.gemini25Flash,
-    private val basePath: String = "https://generativelanguage.googleapis.com/v1beta",
+    override var model: LLMModel,
+    private val basePath: String,
+    private val client: OkHttpClient,
+    private val costTimeMillis: () -> Long,
 ) : LLMProvider {
-    override val name = "Google"
-
-    // nanoMuse: set on fresh providers for protected images or direct ModelUse.
-    internal var singleUseImageRequest: Boolean = false
-    internal var beforeDirectRequest: (() -> Unit)? = null
-
-    private val client = OkHttpClient.Builder()
+    constructor(
+        apiKey: String,
+        model: LLMModel = LLMModel.gemini25Flash,
+        basePath: String = "https://generativelanguage.googleapis.com/v1beta",
+    ) : this(apiKey, model, basePath, OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(10, TimeUnit.MINUTES)
         .writeTimeout(30, TimeUnit.SECONDS)
@@ -55,7 +58,13 @@ class GeminiProvider(
         // Network-transition eviction must reach provider connections.
         .connectionPool(com.openminis.app.network.NetworkMonitor.sharedLLMConnectionPool)
         .proxyAuthenticator(io.github.nanomuse.net.OwnProviderProxy.authenticator) // nanoMuse: Settings → Network, a proxy with a password
-        .build()
+        .build(), System::currentTimeMillis)
+
+    override val name = "Google"
+
+    // nanoMuse: set on fresh providers for protected images or direct ModelUse.
+    internal var singleUseImageRequest: Boolean = false
+    internal var beforeDirectRequest: (() -> Unit)? = null
 
     override suspend fun sendMessageClamped(
         messages: List<LLMMessage>,
@@ -135,10 +144,10 @@ class GeminiProvider(
         // nanoMuse: a documented free-only Gemini model has a chat-scoped ticket.
         // No other caller (image, tool/offload, probe) inherits this permission.
         val costTicket = DocumentedChatDispatch.ticket(coroutineContext)
-        DocumentedChatDispatch.checkGemini(coroutineContext, basePath, apiKey, model.id, textOnly = true)
-        val body = buildRequestBody(messages, systemPrompt, maxTokens, temperature, imageParts, tools, thinkingLevel)
-        // nanoMuse: snapshot the model in the URL before the request starts.
         val requestModel = model.id
+        DocumentedChatDispatch.checkGemini(coroutineContext, basePath, apiKey, requestModel,
+            supportedBody = true, nowMillis = costTimeMillis())
+        val body = buildRequestBody(messages, systemPrompt, maxTokens, temperature, imageParts, tools, thinkingLevel)
         val url = "$basePath/models/$requestModel:streamGenerateContent?alt=sse&key=$apiKey"
         // nanoMuse: a protected image/direct stream must not replay the POST.
         val requestBody = body.toString().toRequestBody("application/json".toMediaType())
@@ -154,12 +163,13 @@ class GeminiProvider(
         val credentials = requestCredentials(request)
         // nanoMuse: the guards may have changed while the request was prepared.
         beforeDirectRequest?.invoke()
+        val requestClient = if (singleUseImageRequest || costTicket != null) client.singleUseImageClient() else client
         DocumentedChatDispatch.checkGemini(
             coroutineContext, basePath, apiKey, requestModel,
-            textOnly = body.optJSONObject("generationConfig")?.has("responseModalities") != true &&
-                !body.has("cachedContent"),
+            supportedBody = costTicket == null || (model.id == requestModel && DocumentedGeminiBody.permits(body)),
+            nowMillis = costTimeMillis(),
         )
-        val requestClient = if (singleUseImageRequest || costTicket != null) client.singleUseImageClient() else client
+        if (costTicket != null) coroutineContext.ensureActive()
         val response = requestClient.newCall(request).execute()
         if (!response.isSuccessful) {
             val errorBody = response.body?.string() ?: ""
