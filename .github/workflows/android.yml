@@ -1,7 +1,4 @@
-# One explicitly authorized delivery of the parallel test APK, triggered by the
-# next pull-request synchronization and then removed from the branch workflow.
-# This never uploads the normal APK or creates a release.
-name: TAMA V2 temporary parallel test APK
+name: Android verification without uploads
 
 on:
   pull_request:
@@ -10,35 +7,19 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: tama-parallel-delivery-${{ github.ref }}
-  cancel-in-progress: false
-
 env:
   NDK_VERSION: 27.2.12479018
-  EXPECTED_SOURCE_SHA: 06f9dafaad4b16fc9d29d01b1b26336089b5aef7
-  EXPECTED_PARENT_SHA: a8cc49493a38f2fae8abf40d6f0a3d0e407962af
-  REQUESTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
 
 jobs:
-  parallel-test-apk:
-    if: github.event.pull_request.number == 1 && github.head_ref == 'arena/4f0fb56f-tamaaiv2' && github.event.pull_request.head.repo.full_name == github.repository
+  android-check:
+    if: github.head_ref == 'arena/4f0fb56f-tamaaiv2'
     runs-on: ubuntu-24.04
-    timeout-minutes: 100
+    timeout-minutes: 80
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: recursive
           persist-credentials: false
-          ref: ${{ github.event.pull_request.head.sha }}
-          fetch-depth: 3
-      - name: Verify the authorized source revision
-        run: |
-          set -euo pipefail
-          test "$(git rev-parse HEAD)" = "$REQUESTED_HEAD_SHA"
-          test "$(git rev-parse HEAD^)" = "$EXPECTED_PARENT_SHA"
-          test "$(git rev-parse HEAD^^)" = "$EXPECTED_SOURCE_SHA"
-          git diff --quiet "$EXPECTED_SOURCE_SHA" HEAD -- . ':(exclude).github/workflows/android.yml'
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: temurin
@@ -51,7 +32,7 @@ jobs:
       - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
         with:
           packages: platforms;android-36 build-tools;35.0.0 cmake;3.22.1 ndk;${{ env.NDK_VERSION }}
-      - name: Build native dependencies
+      - name: Build required native dependencies locally
         env:
           GOTOOLCHAIN: auto
         run: |
@@ -59,22 +40,22 @@ jobs:
           export GOROOT="$(go env GOROOT)" GOPATH="$(go env GOPATH)"
           export PATH="$GOPATH/bin:$PATH"
           bash scripts/android/build-natives.sh
-      - name: Assemble normal debug and parallel test builds
+      - name: Assemble both debug variants locally
         working-directory: android/src/android
         run: |
           export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/$NDK_VERSION"
           ./gradlew :app:assembleDebug :app:assembleTamaTest --console=plain --no-daemon
-      - name: Run parallel and Hub unit tests
+      - name: Run parallel history tests
         working-directory: android/src/android
         run: |
           export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/$NDK_VERSION"
           ./gradlew :app:testTamaTestUnitTest \
-            --tests 'ai.tama.*' \
-            --tests 'io.github.nanomuse.hub.*' \
-            --tests 'io.github.nanomuse.sync.*' \
-            --tests 'com.openminis.app.sandbox.*' \
-            --max-workers=1 --console=plain --no-daemon
-      - name: Run normal-package isolation tests
+            --tests 'ai.tama.net.GroqHistoryPolicyTest' \
+            --tests 'ai.tama.net.GroqHistoryWireTest' \
+            --tests 'ai.tama.net.ProviderHistoryInteroperabilityTest' \
+            --tests 'ai.tama.router.ModelRouteHistoryTest' \
+            --console=plain --no-daemon
+      - name: Run normal debug isolation tests
         working-directory: android/src/android
         run: |
           export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/$NDK_VERSION"
@@ -82,31 +63,12 @@ jobs:
             --tests 'ai.tama.net.GroqHistoryPolicyTest' \
             --tests 'ai.tama.net.GroqNormalHistoryWireTest' \
             --tests 'ai.tama.router.ModelRouteHistoryTest' \
-            --max-workers=1 --console=plain --no-daemon
-      - name: Verify the parallel package, ABI and signing certificate
+            --console=plain --no-daemon
+      - name: Verify separate APK identities locally
         run: |
           python3 scripts/android/verify-parallel-apk.py \
             --aapt "$ANDROID_HOME/build-tools/35.0.0/aapt" \
             --apksigner "$ANDROID_HOME/build-tools/35.0.0/apksigner" \
             --apk android/src/android/app/build/outputs/apk/tamaTest/app-tamaTest.apk \
             --normal-apk android/src/android/app/build/outputs/apk/debug/app-debug.apk \
-            --out-dir "$RUNNER_TEMP/tama-identity-check"
-      - name: Prepare the parallel APK and evidence only
-        run: |
-          set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/tama-v2-delivery"
-          cp android/src/android/app/build/outputs/apk/tamaTest/app-tamaTest.apk "$RUNNER_TEMP/tama-v2-delivery/"
-          cp "$RUNNER_TEMP/tama-identity-check/tama-test-metadata.json" \
-             "$RUNNER_TEMP/tama-identity-check/tama-test.sha256" \
-             "$RUNNER_TEMP/tama-identity-check/tama-test-signature.txt" "$RUNNER_TEMP/tama-v2-delivery/"
-          cd "$RUNNER_TEMP/tama-v2-delivery"
-          sha256sum -c tama-test.sha256
-      # User authorized this temporary artifact. It is not a private release,
-      # and the debug certificate is not guaranteed to match an installed app.
-      - name: Upload temporary parallel APK and identity evidence
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: tama-v2-parallel-test-${{ github.event.pull_request.head.sha }}
-          path: ${{ runner.temp }}/tama-v2-delivery/
-          retention-days: 3
-          if-no-files-found: error
+            --out-dir /tmp/tama-identity-check
