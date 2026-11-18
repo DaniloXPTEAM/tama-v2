@@ -121,3 +121,10 @@ entre a quantidade de mensagens do assistente e a soma de blocos de ferramentas
 que não são texto nem informação (`loadSessionTokenStats`). Assim, um valor 11
 não demonstra 11 chamadas de API, cobranças ou laços reais. Sem dados do teste
 antigo, não é possível identificar quais mensagens originaram esse 11.
+
+### Atualização da revisão de destinatário
+
+A proteção parcial acima foi ampliada para pistas `sk-ant-`, `xai-`, `AQ.` e
+`AIza` no mesmo conjunto limitado de rotas. Os testes locais usam chaves fictícias;
+as rotas não cobertas continua existindo risco de envio não revisado. Os trechos
+anteriores que descrevem apenas dois prefixos são o registro da etapa inicial.
