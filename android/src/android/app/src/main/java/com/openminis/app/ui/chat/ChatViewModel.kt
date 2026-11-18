@@ -9310,8 +9310,14 @@ class ChatViewModel(
                 io.github.nanomuse.cloud.ProviderCatalogue.load(context), instance,
             )
             val identity = AutoModelStore.identity(entry, instance)
+            // nanoMuse: the fresh, exact own-key free-import response can establish chat
+            // and tools capabilities even when the bundled catalogue lacks this model.
+            // This never approves a route or bypasses either cost guard.
+            val discovered = if (tamaV2Test &&
+                io.github.nanomuse.cloud.NanoMuseCloud.instance(context)?.id != instance.id)
+                providerRepository.tamaFreeModelCapabilities(instance.id, entry.model.id) else emptySet()
             val caps = AutoModelStore.capabilities(context, identity,
-                vendor?.models?.get(entry.model.id)?.capabilities.orEmpty()).toMutableSet()
+                vendor?.models?.get(entry.model.id)?.capabilities.orEmpty() + discovered).toMutableSet()
             val auth = vendor?.let { io.github.nanomuse.cloud.ProviderCatalogue.authOf(instance, it) }
             val authCaps = auth?.let { vendor?.authCapabilities?.get(it) }
             if (authCaps != null) {

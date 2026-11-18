@@ -136,3 +136,13 @@ cadastrada usa textos já traduzidos quando a instância Cloud pode ser identifi
 A linha da Cloud, a ausência de chave, a Cloud não identificada e o app normal mantêm
 o texto anterior. A condição foi verificada estaticamente; Compose,
 o dispositivo e a atualização real da lista não foram executados neste teste.
+
+## Capacidades na seleção automática
+
+A seleção de chaves próprias OpenRouter, no teste paralelo, também usa capacidades
+de chat e ferramentas da importação gratuita exata e recente. Isso corrige uma
+possível rejeição quando o catálogo incorporado não conhece o modelo importado.
+A confirmação de rota, as guardas de custo e rejeições explícitas de capacidade
+continuam independentes. Esta correção não prova que essa foi a causa do erro do
+Poco; não houve chamada real. `tests/host_android/free_import/run.sh` exercita a
+política com dublês, não a tela ou o transporte Android.

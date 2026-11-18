@@ -4,6 +4,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+- Used fresh own-key OpenRouter free-import metadata for automatic chat and tool capabilities in the parallel test build, without changing spending permissions.
+
 - Localized the model refresh row for configured own-key providers in the parallel Android test build.
 
 - In the parallel Android test build, asked for a local recipient review for selected key prefixes on covered provider and chat paths. Other transports remain unverified.

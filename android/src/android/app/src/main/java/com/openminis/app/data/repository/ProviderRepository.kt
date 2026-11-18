@@ -2342,6 +2342,19 @@ class ProviderRepository(private val context: Context) {
         }
     }
 
+    /** Fresh exact-model capabilities from this own-key provider's free import only. */
+    internal fun tamaFreeModelCapabilities(instanceId: String, modelId: String): Set<String> = synchronized(configLock) {
+        val live = _config.value.instances.firstOrNull { it.id == instanceId } ?: return@synchronized emptySet()
+        if (live.providerType != ProviderType.openRouter || live.credentialType != ProviderCredential.apiKey) return@synchronized emptySet()
+        val evidence = nmFreeEvidence[instanceId] ?: return@synchronized emptySet()
+        ai.tama.router.AutoModelStore.credentialTransaction {
+            evidence.currentCapabilities(
+                nmRefreshGate, live.tamaImportFreeOnly, ai.tama.router.AutoModelStore.routeFingerprint(live),
+                ai.tama.router.AutoModelRuntime.accountVersion(instanceId), System.currentTimeMillis(), modelId,
+            )
+        }
+    }
+
     private fun nmBeginRefresh(instanceId: String): NmRefresh? {
         try {
             encryptedPrefs // nanoMuse: initialize the keystore before either lock

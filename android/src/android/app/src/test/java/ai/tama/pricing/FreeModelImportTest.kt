@@ -72,6 +72,28 @@ class FreeModelImportTest {
         assertFalse(gate.isCurrent(other, true, "route-a"))
     }
 
+    @Test fun `fresh exact free import supplies chat and declared tools but never unknown or stale models`() {
+        val gate = ModelRefreshGate()
+        val ticket = gate.begin("one", true, "route-a")
+        val withTools = quote("vendor/tools:free").put("supported_parameters", JSONArray().put("tools"))
+        val withoutTools = quote("vendor/simple:free")
+        val paid = quote("vendor/paid:free", "0.1").put("supported_parameters", JSONArray().put("tools"))
+        val catalogue = OpenRouterPricing.parse(JSONArray().put(withTools).put(withoutTools).put(paid), now)
+        val evidence = FreeModelImportEvidence(ticket, 7, catalogue,
+            setOf("vendor/tools:free", "vendor/simple:free", "vendor/paid:free"))
+        fun caps(id: String, time: Long = now, version: Long = 7, route: String = "route-a", enabled: Boolean = true) =
+            evidence.currentCapabilities(gate, enabled, route, version, time, id)
+        assertEquals(setOf("chat", "tools"), caps("vendor/tools:free"))
+        assertEquals(setOf("chat"), caps("vendor/simple:free"))
+        for (id in listOf("vendor/paid:free", "vendor/missing:free", "vendor/tools")) assertTrue(caps(id).isEmpty())
+        assertTrue(caps("vendor/tools:free", time = now + OpenRouterPricing.MAX_AGE_MILLIS + 1).isEmpty())
+        assertTrue(caps("vendor/tools:free", version = 8).isEmpty())
+        assertTrue(caps("vendor/tools:free", route = "other").isEmpty())
+        assertTrue(caps("vendor/tools:free", enabled = false).isEmpty())
+        gate.invalidate("one")
+        assertTrue(caps("vendor/tools:free").isEmpty())
+    }
+
     @Test fun `post import candidates require current route account mode and fresh exact evidence`() {
         val gate = ModelRefreshGate()
         val ticket = gate.begin("one", true, "route-a")
