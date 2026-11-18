@@ -1,0 +1,109 @@
+name: One-time Tama V2 Test APK download
+
+on:
+  push:
+    branches: ["arena/a4704b56-tama-v2"]
+    paths: [".github/workflows/tama-v2-test-download-once.yml"]
+
+permissions:
+  contents: read
+
+env:
+  APK_SOURCE: d786d9b51ddda095b59fc8094680fd3ffb09f566
+  NDK_VERSION: 27.2.12479018
+
+jobs:
+  apk:
+    if: >-
+      ${{ github.repository == 'DaniloXPTEAM/tama-v2'
+          && github.ref == 'refs/heads/arena/a4704b56-tama-v2'
+          && github.run_attempt == '1'
+          && startsWith(github.event.head_commit.message, 'ci: gerar uma vez o APK de d786d9b') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.APK_SOURCE }}
+          submodules: recursive
+          persist-credentials: false
+      - name: Verify requested source revision
+        run: test "$(git rev-parse HEAD)" = "$APK_SOURCE"
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache-jdk: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.26'
+          cache: false
+      - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+        with:
+          packages: platforms;android-36 build-tools;35.0.0 cmake;3.22.1 ndk;${{ env.NDK_VERSION }}
+      - name: Build required native dependencies
+        env:
+          GOTOOLCHAIN: auto
+        run: |
+          export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/$NDK_VERSION"
+          export GOROOT="$(go env GOROOT)" GOPATH="$(go env GOPATH)"
+          export PATH="$GOPATH/bin:$PATH"
+          bash scripts/android/build-natives.sh
+      - name: Assemble and verify only the requested Test APK
+        id: build
+        working-directory: android/src/android
+        run: |
+          set -euo pipefail
+          export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/$NDK_VERSION"
+          signing_dir=$(mktemp -d "$RUNNER_TEMP/tama-signing.XXXXXX")
+          export TAMA_TEST_KEYSTORE_FILE="$signing_dir/temporary.jks"
+          trap 'rm -f -- "$TAMA_TEST_KEYSTORE_FILE"; rmdir -- "$signing_dir"' EXIT
+          export TAMA_TEST_KEY_ALIAS=tama-test-temporary
+          TAMA_TEST_STORE_PASSWORD=$(openssl rand -hex 24)
+          export TAMA_TEST_STORE_PASSWORD
+          export TAMA_TEST_KEY_PASSWORD="$TAMA_TEST_STORE_PASSWORD"
+          keytool -genkeypair -storetype JKS -keystore "$TAMA_TEST_KEYSTORE_FILE" \
+            -alias "$TAMA_TEST_KEY_ALIAS" -keyalg RSA -keysize 2048 -validity 365 \
+            -dname 'CN=Tama V2 Test Temporary CI' -storepass:env TAMA_TEST_STORE_PASSWORD \
+            -keypass:env TAMA_TEST_KEY_PASSWORD -noprompt
+
+          ./gradlew :app:assembleTamaTest --max-workers=1 --console=plain --no-daemon \
+            '-Dorg.gradle.jvmargs=-Xmx4608m -XX:MaxMetaspaceSize=768m -Dfile.encoding=UTF-8' \
+            -Pkotlin.compiler.execution.strategy=in-process -Pkotlin.incremental=false
+
+          apk=app/build/outputs/apk/tamaTest/app-tamaTest.apk
+          tools="$ANDROID_HOME/build-tools/35.0.0"
+          badging=$("$tools/aapt" dump badging "$apk")
+          package=$(sed -n "s/^package: name='\([^']*\)'.*/\1/p" <<< "$badging")
+          test "$package" = ai.tama.assistant.tamav2test
+          grep -Fxq "application-label:'Tama V2 Test'" <<< "$badging"
+          grep -Eq "^native-code: 'arm64-v8a'[[:space:]]*$" <<< "$badging"
+          signature=$("$tools/apksigner" verify --print-certs "$apk")
+          actual=$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' <<< "$signature")
+          expected=$(keytool -exportcert -keystore "$TAMA_TEST_KEYSTORE_FILE" \
+            -storepass:env TAMA_TEST_STORE_PASSWORD -alias "$TAMA_TEST_KEY_ALIAS" | sha256sum | cut -d' ' -f1)
+          [[ "$actual" =~ ^[0-9a-f]{64}$ && "$actual" == "$expected" ]]
+          test "$(grep -Ec '^Signer #[0-9]+ certificate SHA-256 digest: ' <<< "$signature")" = 1
+          install -m 0600 "$apk" "$RUNNER_TEMP/Tama-V2-Test-d786d9b.apk"
+          digest=$(sha256sum "$RUNNER_TEMP/Tama-V2-Test-d786d9b.apk" | cut -d' ' -f1)
+          size=$(stat -c %s "$RUNNER_TEMP/Tama-V2-Test-d786d9b.apk")
+          echo "sha256=$digest" >> "$GITHUB_OUTPUT"
+          echo "::notice title=TAMA_PARALLEL_APK::commit=$APK_SOURCE package=$package sha256=$digest cert=$actual size=$size signer=temporary"
+      - name: Upload the authorized temporary APK without a ZIP
+        id: upload
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          path: ${{ runner.temp }}/Tama-V2-Test-d786d9b.apk
+          archive: false
+          if-no-files-found: error
+          overwrite: false
+          retention-days: 1
+      - name: Verify published bytes
+        env:
+          APK_SHA256: ${{ steps.build.outputs.sha256 }}
+          ARTIFACT_DIGEST: ${{ steps.upload.outputs.artifact-digest }}
+          ARTIFACT_URL: ${{ steps.upload.outputs.artifact-url }}
+        run: |
+          test "${ARTIFACT_DIGEST#sha256:}" = "$APK_SHA256"
+          printf '[Download Tama V2 Test (APK)](%s)\n\nSHA-256: `%s`\n\nTemporary certificate.\n' \
+            "$ARTIFACT_URL" "$APK_SHA256" >> "$GITHUB_STEP_SUMMARY"
