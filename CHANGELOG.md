@@ -4,6 +4,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+- Added a searchable bundled provider directory and a dedicated custom compatible form to Android Test. Automatic code requests prefer capable, approved models.
+
 - Kept unverified image generators out of free-only Android Test requests and choices.
 
 - Distinguished image input from image output and queried the OpenRouter image-output catalogue in the Android Test build.

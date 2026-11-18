@@ -1,6 +1,10 @@
 package ai.tama.providers
 
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.runtime.produceState
+import androidx.compose.ui.unit.dp
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -37,34 +41,78 @@ internal fun KnownProviderSection(onSelect: (VoiceProviderTemplate) -> Unit) {
         ProviderCatalogue.ordered(ProviderCatalogue.load(context), mainland).filter { it.takesKey }
     }
     val featured = remember(providers) {
-        listOf("openrouter", "groq", "gemini", "openai", "anthropic")
+        listOf("openrouter", "groq", "gemini", "nvidia", "deepseek", "mistral", "openai", "anthropic")
             .mapNotNull { id -> providers.firstOrNull { it.id == id } }
     }
     var showAll by remember { mutableStateOf(false) }
-    val shown = if (showAll) featured + providers.filter { it !in featured } else featured
-    if (shown.isEmpty()) return
+    var query by remember { mutableStateOf("") }
+    var shownCount by remember(query) { mutableStateOf(24) }
+    val directory by produceState<List<ProviderDirectory.Vendor>>(emptyList(), showAll) {
+        if (showAll) value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            com.openminis.app.provider.ModelsDevApi.bundledRegistrySnapshot().values.map {
+                ProviderDirectory.Vendor(it.id, it.name ?: it.id, it.sdk, it.api, it.docs)
+            }
+        }
+    }
+    val results = remember(directory, query) { ProviderDirectory.search(directory, query) }
+    fun template(vendor: ProviderDirectory.Vendor): VoiceProviderTemplate? {
+        val key = if (vendor.id == "google") "gemini" else vendor.id
+        providers.firstOrNull { it.id == key }?.let { return OwnKeyPresets.template(it, mainland, chinese) }
+        val endpoint = ProviderDirectory.endpoint(vendor) ?: return null
+        val type = if (endpoint.protocol == "anthropic") ProviderType.anthropic else ProviderType.openAI
+        return newKeyTemplate(vendor.id, vendor.name, type, endpoint.base)
+    }
+    val customName = stringResource(R.string.nm_provider_custom)
     SettingsSection(
         header = stringResource(R.string.nm_provider_known_title),
         footer = stringResource(R.string.nm_provider_known_help),
     ) {
-        shown.forEachIndexed { index, provider ->
-            val template = OwnKeyPresets.template(provider, mainland, chinese)
+        if (!showAll) featured.forEach { provider ->
+            val preset = OwnKeyPresets.template(provider, mainland, chinese)
             SettingsRow(
-                title = template.name,
-                subtitle = ProviderEndpoints.effective(template.providerType, template.baseURL, template.appendV1),
-                onClick = { onSelect(template) },
-                showDivider = !showAll || index != shown.lastIndex,
+                title = preset.name,
+                subtitle = ProviderEndpoints.effective(preset.providerType, preset.baseURL, preset.appendV1),
+                onClick = { onSelect(preset) },
             )
         }
-        if (!showAll && providers.size > shown.size) {
-            SettingsRow(
-                title = stringResource(R.string.nm_provider_show_all),
-                onClick = { showAll = true },
-                showDivider = false,
+        SettingsRow(
+            title = customName,
+            onClick = { onSelect(newKeyTemplate("tama-custom", customName, ProviderType.openAI, "")) },
+        )
+        SettingsRow(
+            title = stringResource(if (showAll) R.string.nm_provider_hide_catalogue else R.string.nm_provider_show_all),
+            onClick = { showAll = !showAll },
+            showDivider = false,
+        )
+    }
+    if (showAll) {
+        OutlinedTextField(
+            value = query, onValueChange = { query = it }, singleLine = true,
+            label = { Text(stringResource(R.string.nm_provider_search)) },
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        )
+        SettingsSection(header = stringResource(R.string.nm_provider_catalogue_count, results.size, directory.size)) {
+            results.take(shownCount).forEach { vendor ->
+                val preset = template(vendor)
+                SettingsRow(
+                    title = vendor.name,
+                    subtitle = preset?.let { ProviderEndpoints.effective(it.providerType, it.baseURL, it.appendV1) }
+                        ?: stringResource(R.string.nm_provider_no_preset),
+                    onClick = preset?.let { { onSelect(it) } },
+                    showChevron = preset != null,
+                )
+            }
+            if (results.size > shownCount) SettingsRow(
+                title = stringResource(R.string.nm_provider_more_results), onClick = { shownCount += 24 }, showDivider = false,
             )
         }
     }
 }
+
+private fun newKeyTemplate(id: String, name: String, type: ProviderType, base: String) = VoiceProviderTemplate(
+    id = id, name = name, providerType = type, baseURL = base, appendV1 = false,
+    capability = VoiceProviderTemplate.Capability.BOTH, baseURLMarkers = emptyList(), mockModels = emptyList(),
+)
 
 /** Suggest locally. Prefixes are hints, not proof of an account or recipient. */
 internal fun suggestedKeyProvider(context: android.content.Context, apiKey: String): VoiceProviderTemplate? {

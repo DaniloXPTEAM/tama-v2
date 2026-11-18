@@ -16,6 +16,14 @@ import sys
 main = Path(sys.argv[1])
 assets = main.parent / 'assets/nanomuse/providers.json'
 providers = {p['id']: p for p in json.loads(assets.read_text())['providers']}
+bundled = json.loads((assets.parent.parent / 'models-dev-api.json').read_text())
+assert len(bundled) == 225
+for vendor in ('nvidia', 'agnes', 'deepseek', 'ai-router', 'unorouter', 'agentrouter', 'fastrouter',
+               'orcarouter', 'tokenrouter', 'trustedrouter'):
+    assert bundled[vendor]['npm'] == '@ai-sdk/openai-compatible'
+    assert bundled[vendor]['api'].startswith('https://')
+assert {'agnes-2.5-pro-alpha', 'agnes-2.0-flash', 'agnes-2.5-flash'} == set(bundled['agnes']['models'])
+assert all('image' not in m['modalities']['output'] for m in bundled['agnes']['models'].values())
 assert providers['groq']['base_url'] == 'https://api.groq.com/openai/v1'
 assert providers['openrouter']['base_url'] == 'https://openrouter.ai/api/v1'
 assert providers['groq']['key_hint'] == 'gsk_…'

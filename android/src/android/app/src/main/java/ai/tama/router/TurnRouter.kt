@@ -22,6 +22,7 @@ sealed interface Route {
         /** The original intent is retained even if a provider budget lowers the profile. */
         val requestedProfile: Profile = profile,
         val budgetLimited: Boolean = false,
+        val codeRequested: Boolean = false,
     ) : Route
 }
 
@@ -91,7 +92,9 @@ object TurnRouter {
                 add(Need.IMAGE_GENERATION)
             }
         }
-        return Route.Chat(profile = profile, hints = hints, needs = needs)
+        val code = containsAny(normalized, listOf("codigo", "script", "programacao", "funcao python", "funcao javascript",
+            "write code", "code", "coding", "python function", "javascript function"))
+        return Route.Chat(profile = profile, hints = hints, needs = needs, codeRequested = code)
     }
 
     /**

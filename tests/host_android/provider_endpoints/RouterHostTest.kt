@@ -2,6 +2,7 @@ import ai.tama.router.*
 import ai.tama.net.OwnKeyFailureSignals
 import ai.tama.net.OwnKeyFailureSignals.Hint
 import ai.tama.providers.OwnKeyScope
+import ai.tama.providers.ProviderDirectory
 
 /** Selection policy only, no HTTP, Android, Cloud, pricing catalogue or chat UI. */
 fun main() {
@@ -46,5 +47,23 @@ fun main() {
     check(OwnKeyFailureSignals.detect(404, listOf("model_decommissioned"), "retired") == Hint.MODEL_UNAVAILABLE)
     check(OwnKeyFailureSignals.detect(404, emptyList(), "Not found") == null)
     check(OwnKeyFailureSignals.detect(400, listOf("unsupported_parameter"), "model does not accept temperature") == null)
+    val nvidia = ProviderDirectory.Vendor("nvidia", "NVIDIA", "@ai-sdk/openai-compatible", "https://integrate.api.nvidia.com/v1", null)
+    val unknownVendor = ProviderDirectory.Vendor("other", "Other", "sdk-with-unknown-auth", "https://example.com/v1", null)
+    check(ProviderDirectory.search(listOf(nvidia, unknownVendor), "Nvidia integrate") == listOf(nvidia))
+    check(ProviderDirectory.endpoint(nvidia)?.base == "https://integrate.api.nvidia.com/v1")
+    check(ProviderDirectory.endpoint(unknownVendor) == null)
+    check(!ProviderDirectory.validCustomAddress("https://example.com/v1?key=fixture"))
+    check(ProviderDirectory.validCustomAddress("https://example.com/v1"))
+    val code = TurnRouter.route("Escreva um código de exemplo")
+    check(code.codeRequested && !TurnRouter.route("Conte uma história").codeRequested)
+    val coder = advertisedFree.copy(entryId = "coder", codePreference = CodeModelPreference.rank(nvidia.base,
+        "qwen/qwen3-coder-480b-a35b-instruct"))
+    check(coder.codePreference > 0)
+    fun winner(list: List<ModelRouter.Candidate>) =
+        (ModelRouter.pick(list, setOf(Need.CHAT), "free") as ModelRouter.Choice.Selected).candidate.entryId
+    check(winner(listOf(advertisedFree, coder)) == "coder")
+    check(winner(listOf(advertisedFree, coder.copy(automaticApproved = false))) == "free")
+    check(winner(listOf(advertisedFree, coder.copy(automaticCostAllowed = false))) == "free")
+    check(winner(listOf(advertisedFree.copy(preference = 0), coder.copy(preference = 1))) == "free")
     println("PASSOU: seleção e cooldowns fictícios; não testa chat, provedor ou rede")
 }

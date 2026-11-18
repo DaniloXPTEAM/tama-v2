@@ -342,7 +342,9 @@ object ModelsDevApi {
     private fun parseProviderEntry(id: String, obj: JSONObject): ProviderEntry? {
         val name = obj.optString("name", "").ifEmpty { null }
         val api = obj.optString("api", "").ifEmpty { null }
-        val modelsObj = obj.optJSONObject("models") ?: return ProviderEntry(id, name, api, emptyMap())
+        val sdk = obj.optString("npm", "").ifBlank { null }
+        val docs = obj.optString("doc", "").ifBlank { null }
+        val modelsObj = obj.optJSONObject("models") ?: return ProviderEntry(id, name, api, emptyMap(), sdk, docs)
 
         val models = mutableMapOf<String, ModelDevEntry>()
         val modelKeys = modelsObj.keys()
@@ -351,7 +353,7 @@ object ModelsDevApi {
             val modelObj = modelsObj.optJSONObject(modelKey) ?: continue
             models[modelKey] = parseModelDevEntry(modelKey, modelObj)
         }
-        return ProviderEntry(id, name, api, models)
+        return ProviderEntry(id, name, api, models, sdk, docs)
     }
 
     private fun parseModelDevEntry(id: String, obj: JSONObject): ModelDevEntry {
@@ -458,7 +460,9 @@ object ModelsDevApi {
         val url = base?.trimEnd('/') ?: return null
         val providers = bundledRegistrySnapshot()
         val candidates = normalizedCandidates(url)
-        return providers.values.firstOrNull { it.api?.trimEnd('/') in candidates } ?: when (url) {
+        val matches = providers.values.filter { it.api?.trimEnd('/') in candidates }
+        return matches.firstOrNull { it.api?.trimEnd('/') == url && matches.count { other -> other.api?.trimEnd('/') == url } == 1 }
+            ?: matches.singleOrNull() ?: when (url) {
             "https://api.groq.com/openai/v1" -> providers["groq"]
             "https://generativelanguage.googleapis.com/v1beta", "https://generativelanguage.googleapis.com/v1beta/openai" -> providers["google"]
             "https://api.cerebras.ai/v1" -> providers["cerebras"]
@@ -520,6 +524,8 @@ object ModelsDevApi {
         val name: String?,
         val api: String?,
         val models: Map<String, ModelDevEntry>,
+        val sdk: String? = null, // nanoMuse: only create presets for known compatible transports
+        val docs: String? = null,
     )
 
     data class ModelDevEntry(

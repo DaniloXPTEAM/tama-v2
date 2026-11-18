@@ -1565,4 +1565,12 @@
     <string name="nm_free_unknown_action">There is no confirmed free price for this model. Refresh the list in Providers or choose a confirmed free model.</string>
     <string name="nm_auto_no_routes">In Providers, add a confirmed free model and approve it for automatic selection.</string>
     <string name="nm_free_image_unavailable">No free image model is active. In Settings → Models, add a confirmed free image generator. No image request was sent.</string>
+    <string name="nm_provider_custom">Custom OpenAI-compatible provider</string>
+    <string name="nm_provider_custom_url">API address</string>
+    <string name="nm_provider_custom_url_required">Enter the provider API address, including its version path.</string>
+    <string name="nm_provider_hide_catalogue">Hide provider catalogue</string>
+    <string name="nm_provider_search">Search by provider or address</string>
+    <string name="nm_provider_catalogue_count">%1$d of %2$d catalogue providers</string>
+    <string name="nm_provider_no_preset">No preset for this API</string>
+    <string name="nm_provider_more_results">Show more results</string>
 </resources>

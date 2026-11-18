@@ -2970,7 +2970,10 @@ class ProviderRepository(private val context: Context) {
         // gateways by hostname, and when there's no match `fetchModels` returns
         // empty so the existing list (vLLM/Ollama on a private host) is preserved.
         val fallbackBaseURL = modelsDevBaseURL(instance)
-        val fallbackModels = ModelsDevApi.fetchModels(fallbackBaseURL)
+        // nanoMuse: do not fill a personal gateway with another tenant's models.
+        val fallbackModels = if (nmParallel && tamaOwnApiKey(instance) != null)
+            ModelsDevApi.bundledModels(tamaModelBase(instance))
+        else ModelsDevApi.fetchModels(fallbackBaseURL)
         if (fallbackModels.isNotEmpty()) {
             android.util.Log.i("ProviderRepo", "models.dev fallback returned ${fallbackModels.size} models for ${instance.label}")
             if (nmParallel) kotlinx.coroutines.currentCoroutineContext().ensureActive() // nanoMuse

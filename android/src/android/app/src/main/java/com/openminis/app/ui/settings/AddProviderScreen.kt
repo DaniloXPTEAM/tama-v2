@@ -554,6 +554,7 @@ private fun ConfigureProviderScreen(
                 appendV1Suffix = appendV1Suffix,
                 onAppendV1Change = { appendV1Suffix = it; endpointEdited = true },
                 importFreeOnly = importFreeOnly && apiKey.isNotBlank(),
+                requireCustomAddress = voiceTemplate?.id == "tama-custom",
                 canOfferPreset = ai.tama.providers.ProviderKeySuggestion.mayOfferPreset(endpointEdited, voiceTemplate != null),
                 onSelectSuggestedProvider = onSelectSuggestedProvider,
                 providerRepository = providerRepository,
@@ -584,6 +585,7 @@ private fun ColumnScope.ApiKeyConfigSection(
     appendV1Suffix: Boolean, // nanoMuse: shared with the regional endpoint selector
     onAppendV1Change: (Boolean) -> Unit,
     importFreeOnly: Boolean,
+    requireCustomAddress: Boolean,
     canOfferPreset: Boolean,
     onSelectSuggestedProvider: (com.openminis.app.data.model.VoiceProviderTemplate) -> Unit,
     providerRepository: ProviderRepository,
@@ -666,14 +668,17 @@ private fun ColumnScope.ApiKeyConfigSection(
         val baseUrlProblem = io.github.nanomuse.net.LanOnly.refusedHost(customBaseURL)?.let { stringResource(R.string.nm_lan_only_https, it) }
         SettingsSection(
             header = stringResource(R.string.add_provider_endpoint),
-            footer = baseUrlProblem ?: baseUrlFooter,
+            footer = baseUrlProblem ?: if (requireCustomAddress &&
+                !ai.tama.providers.ProviderDirectory.validCustomAddress(customBaseURL))
+                stringResource(R.string.nm_provider_custom_url_required) else baseUrlFooter,
         ) {
             SettingsCardBlock {
-                RowLabel(text = stringResource(R.string.add_provider_custom_api_base_optional))
+                RowLabel(text = stringResource(if (requireCustomAddress) R.string.nm_provider_custom_url
+                    else R.string.add_provider_custom_api_base_optional))
                 SectionTextField(
                     value = customBaseURL,
                     onValueChange = onCustomBaseURLChange,
-                    placeholder = defaultUrl,
+                    placeholder = if (requireCustomAddress) "https://api.example.com/v1" else defaultUrl,
                     singleLine = true,
                 )
             }
@@ -723,7 +728,10 @@ private fun ColumnScope.ApiKeyConfigSection(
     val nmDestination = if (nmParallel) ai.tama.providers.ProviderEndpoints.factoryBase(
         providerType, ai.tama.providers.ProviderEndpoints.storageBase(providerType, customBaseURL, appendV1Suffix), appendV1Suffix,
     ) else null
-    val nmDestinationAllowed = if (nmParallel) ai.tama.providers.KeyDestinationReview(apiKey, nmDestination) else true
+    val nmCustomAddressMissing = nmParallel && requireCustomAddress &&
+        !ai.tama.providers.ProviderDirectory.validCustomAddress(customBaseURL)
+    val nmDestinationAllowed = if (nmCustomAddressMissing) false
+        else if (nmParallel) ai.tama.providers.KeyDestinationReview(apiKey, nmDestination) else true
     var probeResult by remember(providerType, apiKey, nmDestination, nmDestinationAllowed) {
         mutableStateOf<ai.tama.providers.KeyProbePlan.Result?>(null)
     }

@@ -34,6 +34,8 @@ object ModelRouter {
         val failures: Int = 0,
         val latencyMs: Long? = null,
         val unavailable: ModelHealth.Cooldown? = null,
+        /** Advisory rank for a code request; it cannot make an ineligible candidate eligible. */
+        val codePreference: Int = 0,
     )
 
     enum class Reason {
@@ -74,11 +76,14 @@ object ModelRouter {
             if (reason == null) eligible += candidate else rejected += reason
         }
         val sticky = eligible.firstOrNull { it.entryId == currentEntryId }
-        if (sticky != null) return Choice.Selected(sticky, rejected)
+        if (sticky != null && (sticky.preference != null || eligible.none {
+                it.verifiedFree == sticky.verifiedFree && it.codePreference > sticky.codePreference
+            })) return Choice.Selected(sticky, rejected)
         val hasPreference = eligible.any { it.preference != null }
         val chosen = eligible.withIndex().minWithOrNull(
             compareBy<IndexedValue<Candidate>> { if (hasPreference) it.value.preference ?: Int.MAX_VALUE else 0 }
                 .thenBy { if (it.value.verifiedFree) 0 else 1 }
+                .thenByDescending { it.value.codePreference }
                 .thenBy { it.value.failures.coerceAtLeast(0) }
                 .thenBy { it.value.latencyMs?.takeIf { value -> value >= 0 } ?: Long.MAX_VALUE }
                 .thenBy { it.index },

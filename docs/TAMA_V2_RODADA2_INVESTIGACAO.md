@@ -54,3 +54,9 @@ A base de chat `https://integrate.api.nvidia.com/v1` não comprovou uma API de i
 | Qwen Image e Qwen Image Edit | [Qwen Image](https://build.nvidia.com/qwen/qwen-image/deploy), [Qwen Image Edit](https://build.nvidia.com/qwen/qwen-image-edit/deploy) | As páginas documentam download/implantação. Não confirmei uma rota pública NVIDIA de inferência com preço zero. Não confundir parceiro ou instância hospedada com o catálogo de chat. |
 
 Nenhum POST de imagem foi feito. Em “Somente gratuitos” os modelos de imagem sem rota comprovadamente gratuita não aparecem como opção nem são trocados por um padrão pago. A seleção salva é preservada e o bloqueio é reavaliado antes de enviar. Fora desse modo, a tela ainda exige as permissões existentes; a resposta ao negar não foi alterada.
+
+### Catálogo e escolha para código
+
+Em `154f076`, `AddProviderScreen` tinha seis tipos nativos, incluindo OpenAI compatível. Os 225 provedores são registros do asset `models-dev-api.json`, não 225 integrações testadas. A lista Test em **Provedores → Adicionar → Mostrar todos os provedores** pesquisa nome, ID e endereço; quando não há protocolo conhecido ou base válida, a entrada fica visível sem formulário pré-configurado. Groq, Gemini, NVIDIA, DeepSeek e Mistral têm formulários conhecidos. Agnes AI e os sete roteadores solicitados usam as bases do catálogo OpenAI compatível. Os três modelos Agnes são de chat; nenhum tem saída de imagem no asset.
+
+Na falta de lista ao vivo para uma chave própria, o catálogo embutido só preenche modelos da base correspondente: não se usa outro provedor por semelhança de nomes ou só pelo host. O ranking de código é uma preferência do Auto para alguns pares base/ID (inclui Qwen Coder 480B/32B, GPT-OSS e Gemma 4); não prova capacidade, não muda grupos manuais e não permite uma rota sem autorização ou que falhe nos requisitos de custo e tamanho.

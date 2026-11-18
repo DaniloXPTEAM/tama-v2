@@ -9561,6 +9561,11 @@ class ChatViewModel(
                     // Catalogue ranking is not proof of a zero-cost request or spending permission.
                     verifiedFree = instance.id == freeRankInstance?.id && entry.model.id in freeRankIds,
                     preference = preference,
+                    codePreference = if (tamaV2Test && nmOwnKeyTurn && nmRoute.codeRequested)
+                        ai.tama.router.CodeModelPreference.rank(
+                            ai.tama.providers.ProviderEndpoints.factoryBase(instance.providerType, instance.customBaseURL, instance.appendV1Suffix),
+                            entry.model.id,
+                        ) else 0,
                 )
                 AutoChoice(candidate, entry, instance, identity, model, AutoModelRuntime.accountVersion(instance.id),
                     if (tamaV2Test) selectedGroupId else null, selectedMembers)
