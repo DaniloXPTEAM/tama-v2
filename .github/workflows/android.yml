@@ -147,6 +147,7 @@ jobs:
             --tests 'ai.tama.pricing.OpenRouterPricingTest' \
             --tests 'ai.tama.providers.ProviderModelsWireTest' \
             --tests 'ai.tama.media.ImageToolPresentationTest' \
+            --tests 'ai.tama.media.MediaOffloadImageTest' \
             --tests 'ai.tama.media.ImageRawToolFilterTest' \
             --tests 'ai.tama.providers.ProviderEndpointsTest' \
             --max-workers=1 --console=plain --no-daemon \

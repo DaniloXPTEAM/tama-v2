@@ -247,6 +247,8 @@ fun ModelsScreen(
                         value != null -> value.label(context)
                         videoOff -> stringResource(R.string.nm_media_video_off_option)
                         hasOptions -> stringResource(R.string.nm_media_not_set)
+                        slot == Slot.IMAGE && io.github.nanomuse.avatar.ImageGen.noFreeImageAvailable(context) ->
+                            stringResource(R.string.nm_free_image_unavailable)
                         else -> Capabilities.unavailableLine(context, slot.capability)
                     },
                     icon = slotIcon(slot),

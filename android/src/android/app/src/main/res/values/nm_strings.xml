@@ -1564,4 +1564,5 @@
     <string name="nm_free_plan_action">The provider lists a free plan, but this API does not confirm your key’s plan. Choose a confirmed free model in Providers.</string>
     <string name="nm_free_unknown_action">There is no confirmed free price for this model. Refresh the list in Providers or choose a confirmed free model.</string>
     <string name="nm_auto_no_routes">In Providers, add a confirmed free model and approve it for automatic selection.</string>
+    <string name="nm_free_image_unavailable">No free image model is active. In Settings → Models, add a confirmed free image generator. No image request was sent.</string>
 </resources>

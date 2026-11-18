@@ -159,7 +159,8 @@ fun MediaModelsScreen(
         SettingsSection(
             header = stringResource(R.string.nm_media_section_image),
             // C11: no configured provider draws — the one sentence that says which would
-            footer = if (imageInstances.isEmpty()) stringResource(R.string.nm_cap_pictures_unavailable) else stringResource(R.string.nm_media_image_footer),
+            footer = if (imageInstances.isEmpty()) ImageGen.unavailableLine(context) ?: stringResource(R.string.nm_cap_pictures_unavailable)
+                else stringResource(R.string.nm_media_image_footer),
         ) {
             StatusRow(
                 icon = Icons.Outlined.Image,

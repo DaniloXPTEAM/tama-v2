@@ -29,12 +29,14 @@ object ImageGenerationTool {
         propertyOrdering = listOf("prompt", "size"),
     )
 
-    suspend fun execute(argsJson: String, sessionId: String, context: Context, ownKeyChat: Boolean = false): ToolExecutionResult {
+    suspend fun execute(
+        argsJson: String, sessionId: String, context: Context, ownKeyChat: Boolean = false, freeOnly: Boolean = false,
+    ): ToolExecutionResult {
         val parallel = com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test"
         val title = context.getString(R.string.nm_models_image_title)
         val result = try {
             execute(argsJson, title) { prompt, size ->
-                withContext(Dispatchers.IO) { MediaOffloadHandler(context).generateImage(prompt, size, sessionId) }
+                withContext(Dispatchers.IO) { MediaOffloadHandler(context).generateImage(prompt, size, sessionId, freeOnly) }
             }
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
@@ -66,7 +68,7 @@ object ImageGenerationTool {
         "media_model_change_blocked" to context.getString(R.string.nm_media_model_change_blocked),
         "invalid_image_request" to context.getString(R.string.nm_image_guard_invalid),
         "no_confirmed_image_generator" to context.getString(R.string.nm_own_image_no_generator),
-        "no_verified_free_image_generator" to context.getString(R.string.nm_own_image_no_verified_free),
+        "no_verified_free_image_generator" to context.getString(R.string.nm_free_image_unavailable),
         "image_failed" to context.getString(if (ownKeyChat) R.string.nm_image_detail_failed else R.string.nm_image_request_failed),
     )
 

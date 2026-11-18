@@ -84,6 +84,8 @@ class MediaOffloadImageTest {
         var autoRevision = 0L
         var choiceRevision = 0L
         var costRevision = 0L
+        var freeOnly = false
+        override fun freeImagesOnly(endpoint: ImageGen.Endpoint?) = freeOnly
         var mode = true
             set(value) { if (field != value) autoRevision++; field = value }
         var costAllowed = true
@@ -175,6 +177,25 @@ class MediaOffloadImageTest {
         assertEquals(3, revoked.exitCode)
         assertEquals("image_cost_unverified", JSONObject(revoked.output).getString("error"))
         assertEquals(0, fake.generateCalls)
+    }
+
+    @Test fun `free-only refuses paid defaults before permission and at the transport edge`() {
+        var permissions = 0
+        val fake = FakeImages().apply { mode = false; freeOnly = true }
+        val sid = UUID.randomUUID().toString()
+        val gate = testGate { _, _, _, _, _ -> permissions++; true }
+        val handler = MediaOffloadHandler(context(), fake, gate)
+        val blocked = handler.handle(request(sid, "--prompt", "Draw a bird"))
+        assertEquals("no_verified_free_image_generator", JSONObject(blocked.output).getString("error"))
+        assertEquals(0, permissions)
+        assertEquals(0, fake.manualCalls)
+        assertEquals(0, fake.submissions)
+        fake.freeOnly = false
+        fake.beforeStage = { if (it == 0) fake.freeOnly = true }
+        val refused = handler.handle(request(sid, "--prompt", "Draw a bird"))
+        assertEquals("no_verified_free_image_generator", JSONObject(refused.output).getString("error"))
+        assertEquals(1, permissions)
+        assertEquals(0, fake.submissions)
     }
 
     @Test fun `unverified automatic cost blocks before selection and before send`() {

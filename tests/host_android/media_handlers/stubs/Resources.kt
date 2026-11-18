@@ -15,4 +15,5 @@ object R { object string {
  const val nm_video_request_failed=13
  const val nm_video_authorization_changed=14
  const val nm_media_model_change_blocked=15
+ const val nm_free_image_unavailable=16
 } }

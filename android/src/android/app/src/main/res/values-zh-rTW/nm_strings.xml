@@ -1533,4 +1533,5 @@
     <string name="nm_loop_estimate_explanation">本對話的估算值取助理訊息數和工具區塊數中的較大值，並非請求次數或收費次數的準確統計。</string>
     <string name="nm_free_chat_choose">請選擇免費模型，或在服務商設定中更新模型清單。</string>
     <string name="nm_key_probe_no_credit">服務商回報額度不足。</string>
+    <string name="nm_free_image_unavailable">沒有啟用免費的影像模型。請在設定 → 模型中新增已確認免費的影像生成模型。未傳送影像請求。</string>
 </resources>

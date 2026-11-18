@@ -85,16 +85,40 @@ object ImageGen {
      * (contract C11, [io.github.nanomuse.cloud.Capabilities]): a DeepSeek or Groq key draws
      * nothing, and a ChatGPT plan signed in through the Codex OAuth is chat and vision only.
      */
+    // nanoMuse: scoped to personal keys in Test. A free chat filter is not
+    // evidence that a different endpoint (image creation) is free.
+    internal fun freeImagesOnly(context: Context, instanceId: String? = null): Boolean {
+        if (com.openminis.app.BuildConfig.APPLICATION_ID != "ai.tama.assistant.tamav2test") return false
+        val repo = (context.applicationContext as? MinisApp)?.providerRepositoryOrNull ?: return false
+        val id = instanceId ?: io.github.nanomuse.models.ModelSlots.ownChatInstance(context)?.id ?: return false
+        return repo.instance(id)?.let(repo::tamaFreeChatOnly) == true
+    }
+
+    internal fun noFreeImageAvailable(context: Context): Boolean {
+        if (freeImagesOnly(context)) return true
+        val picked = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY_INSTANCE, null)
+        if (picked != null && freeImagesOnly(context, picked)) return true
+        val repo = (context.applicationContext as? MinisApp)?.providerRepositoryOrNull ?: return false
+        return repo.config.value.instances.any { it.isEnabled && repo.tamaFreeChatOnly(it) } && eligibleInstances(context).isEmpty()
+    }
+
+    private fun requireImageCostScope(context: Context, ep: Endpoint) {
+        if (!ai.tama.media.OwnKeyImagePolicy.mayRequest(freeImagesOnly(context) || freeImagesOnly(context, ep.instanceId))) {
+            throw ai.tama.media.OwnKeyImagePolicy.NoVerifiedFreeGenerator()
+        }
+    }
+
     fun eligibleInstances(context: Context): List<ProviderInstance> {
         val app = context.applicationContext as? MinisApp ?: return emptyList()
         val repo = app.providerRepositoryOrNull ?: return emptyList()
         val cloudId = NanoMuseCloud.instance(context)?.id
+        if (freeImagesOnly(context)) return emptyList() // nanoMuse
         val relayCanDraw = cloudId != null &&
             NanoMuseCloud.baseUrl(context) != NanoMuseCloud.DEFAULT_BASE &&
             repo.config.value.instances.firstOrNull { it.id == cloudId }
                 ?.let { availableModels(context, it).isNotEmpty() } == true
         return repo.config.value.instances.filter { inst ->
-            (inst.id != cloudId || relayCanDraw) &&
+            !freeImagesOnly(context, inst.id) && (inst.id != cloudId || relayCanDraw) &&
                 ImageModelRequests.supports(inst) &&
                 io.github.nanomuse.cloud.Capabilities.allows(context, inst, io.github.nanomuse.cloud.ProviderCatalogue.IMAGE)
         }
@@ -102,7 +126,8 @@ object ImageGen {
 
     /** No configured provider can draw: the one sentence that says so (C11), or null when one can. */
     fun unavailableLine(context: Context): String? =
-        if (eligibleInstances(context).isEmpty()) io.github.nanomuse.cloud.Capabilities.unavailableLine(context, io.github.nanomuse.cloud.ProviderCatalogue.IMAGE) else null
+        if (noFreeImageAvailable(context)) context.getString(com.openminis.app.R.string.nm_free_image_unavailable)
+        else if (eligibleInstances(context).isEmpty()) io.github.nanomuse.cloud.Capabilities.unavailableLine(context, io.github.nanomuse.cloud.ProviderCatalogue.IMAGE) else null
 
     /**
      * Model entries of [instance] that draw: the catalogue says so (`image` among the output
@@ -114,11 +139,15 @@ object ImageGen {
     fun imageEntries(context: Context, instance: ProviderInstance): List<ModelEntry> {
         val app = context.applicationContext as? MinisApp ?: return emptyList()
         val repo = app.providerRepositoryOrNull ?: return emptyList()
+        if (freeImagesOnly(context) || freeImagesOnly(context, instance.id)) return emptyList() // nanoMuse
         val dashScope = speaksDashScope(baseUrlOf(instance))
         return repo.config.value.modelEntries.filter {
             it.providerInstanceId == instance.id && !it.isHidden && run {
                 val id = it.model.id
-                val draws = "image" in it.model.outputModalities.orEmpty() || looksLikeImageModel(id)
+                val outputs = repo.tamaModelMetadata(it, instance)?.outputs
+                // nanoMuse: explicit output metadata wins over the legacy name hint.
+                val draws = if (outputs != null) "image" in outputs
+                    else "image" in it.model.outputModalities.orEmpty() || looksLikeImageModel(id)
                 // Model Studio's native endpoint takes qwen-image and wan-image; z-image and the
                 // rest go through a different (asynchronous) API this build does not speak.
                 val native = id.startsWith("qwen-image", ignoreCase = true) ||
@@ -224,6 +253,7 @@ object ImageGen {
             inst.id != cloudId || availableModels(context, inst).isNotEmpty()
         }
         val savedId = if (automatic) null else prefs.getString(KEY_INSTANCE, null)
+        if (savedId != null && freeImagesOnly(context, savedId)) return null // nanoMuse: no paid substitute for a restricted pick
         val inst = eligible.firstOrNull { it.id == savedId }
             ?: io.github.nanomuse.models.SlotOrder.resolve(
                 chosen = null,
@@ -284,16 +314,24 @@ object ImageGen {
         beforeRequest: (() -> Unit)? = null,
     ): Bitmap = withContext(Dispatchers.IO) {
         // nanoMuse: image selection and per-image permission are not price evidence.
+        requireImageCostScope(context, ep)
         ai.tama.pricing.ModelCostGuard.requireAllowed()
+        val costChecked = if (com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test") ({
+            requireImageCostScope(context, ep)
+            beforeRequest?.invoke()
+            Unit
+        }) else beforeRequest
         if (ep.model.isBlank()) throw ImageGenException("No image model set")
         // Model Studio's OpenAI-compatible host has no `images/generations` (the public one
         // answers 404 to every model); its native endpoint draws with the same key.
-        if (ep.isDashScope) return@withContext generateDashScope(ep, prompt, size, singleAttempt = !allowFormatRetry, beforeRequest = beforeRequest)
+        if (ep.isDashScope) return@withContext generateDashScope(ep, prompt, size, singleAttempt = !allowFormatRetry, beforeRequest = costChecked)
         val response = try {
             ImageModelRequests.request(provider(context, ep, ep.model), prompt, size,
-                allowFormatRetry = allowFormatRetry, beforeRequest = beforeRequest)
+                allowFormatRetry = allowFormatRetry, beforeRequest = costChecked)
         } catch (e: ImageGenException) {
             throw e
+        } catch (e: ai.tama.media.OwnKeyImagePolicy.NoVerifiedFreeGenerator) {
+            throw e // nanoMuse: keep the local free-only refusal distinct.
         } catch (e: ai.tama.media.AutomaticAvatarGuard.Blocked) {
             throw e
         } catch (e: ai.tama.media.ImageDispatch.AuthorizationChanged) {
@@ -319,8 +357,14 @@ object ImageGen {
         beforeRequest: (() -> Unit)? = null,
     ): Bitmap = withContext(Dispatchers.IO) {
         // nanoMuse: editing can have its own price even when chat is advertised free.
+        requireImageCostScope(context, ep)
         ai.tama.pricing.ModelCostGuard.requireAllowed()
-        if (ep.isDashScope) return@withContext editDashScope(ep, image, instruction, singleAttempt = !allowFormatRetry, beforeRequest = beforeRequest)
+        val costChecked = if (com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test") ({
+            requireImageCostScope(context, ep)
+            beforeRequest?.invoke()
+            Unit
+        }) else beforeRequest
+        if (ep.isDashScope) return@withContext editDashScope(ep, image, instruction, singleAttempt = !allowFormatRetry, beforeRequest = costChecked)
         val png = pngBytes(image)
         val response = try {
             // gpt-image-* edits with the same model; other hosts get the configured one.
@@ -330,8 +374,10 @@ object ImageGen {
                 images = listOf(LLMMessage.ImagePart(data = png, mimeType = "image/png")),
                 size = "1024x1024",
                 allowFormatRetry = allowFormatRetry,
-                beforeRequest = beforeRequest,
+                beforeRequest = costChecked,
             )
+        } catch (e: ai.tama.media.OwnKeyImagePolicy.NoVerifiedFreeGenerator) {
+            throw e // nanoMuse: keep the local free-only refusal distinct.
         } catch (e: ai.tama.media.AutomaticAvatarGuard.Blocked) {
             throw e
         } catch (e: ai.tama.media.ImageDispatch.AuthorizationChanged) {

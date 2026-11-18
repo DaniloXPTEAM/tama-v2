@@ -4,6 +4,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+- Kept unverified image generators out of free-only Android Test requests and choices.
+
 - Distinguished image input from image output and queried the OpenRouter image-output catalogue in the Android Test build.
 
 - Distinguished confirmed free chat offers from unverified account plans and prices in the Android Test build, without asking users to declare a plan.

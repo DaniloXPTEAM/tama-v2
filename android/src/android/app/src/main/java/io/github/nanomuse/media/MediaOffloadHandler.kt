@@ -80,14 +80,16 @@ class MediaOffloadHandler internal constructor(
     )
 
     /** Shared by the native tool and direct shortcut; neither enters a shell or blocks the UI. */
-    internal suspend fun generateImage(prompt: String, size: String?, sessionId: String?): NativeOffloadResult = image(
+    internal suspend fun generateImage(
+        prompt: String, size: String?, sessionId: String?, freeOnly: Boolean = false,
+    ): NativeOffloadResult = image(
         promptValue = prompt, referencePath = null, requestedSize = size,
-        requestedName = null, sessionId = sessionId, origin = ImageOrigin.NATIVE, peer = null,
+        requestedName = null, sessionId = sessionId, origin = ImageOrigin.NATIVE, peer = null, freeOnly = freeOnly,
     )
 
     private suspend fun image(
         promptValue: String?, referencePath: String?, requestedSize: String?, requestedName: String?,
-        sessionId: String?, origin: ImageOrigin, peer: ai.tama.sandbox.OffloadPeerLease?,
+        sessionId: String?, origin: ImageOrigin, peer: ai.tama.sandbox.OffloadPeerLease?, freeOnly: Boolean = false,
     ): NativeOffloadResult {
         // nanoMuse: a CLI worker can outlive its shell; a native tool can start
         // after its own coroutine was cancelled. Check both lifetimes, even when
@@ -98,7 +100,7 @@ class MediaOffloadHandler internal constructor(
         } else null
         try {
             attempt?.requireActive()
-            return imageAttempt(promptValue, referencePath, requestedSize, requestedName, sessionId, origin, attempt)
+            return imageAttempt(promptValue, referencePath, requestedSize, requestedName, sessionId, origin, attempt, freeOnly)
         } catch (_: ImageAttemptTracker.Stopped) {
             return if (attempt?.mayHaveSubmitted() == true) failed(
                 "image", context.getString(com.openminis.app.R.string.nm_image_request_failed), noRetry = true,
@@ -110,7 +112,7 @@ class MediaOffloadHandler internal constructor(
 
     private suspend fun imageAttempt(
         promptValue: String?, referencePath: String?, requestedSize: String?, requestedName: String?,
-        sessionId: String?, origin: ImageOrigin, attempt: ImageAttemptTracker.Attempt?,
+        sessionId: String?, origin: ImageOrigin, attempt: ImageAttemptTracker.Attempt?, freeOnly: Boolean,
     ): NativeOffloadResult {
         val prompt = promptValue?.trim().orEmpty()
         if (prompt.isEmpty() || prompt.length > 4_000) {
@@ -133,6 +135,10 @@ class MediaOffloadHandler internal constructor(
             false
         }
         val automatic = images.automatic()
+        // nanoMuse: refuse before choosing a generator or asking for permission.
+        fun allowedImage(endpoint: ImageGen.Endpoint? = null): Boolean =
+            !parallel || OwnKeyImagePolicy.mayRequest(freeOnly || images.freeImagesOnly(endpoint))
+        if (!allowedImage()) return noFreeImage()
         // nanoMuse: manual image approval does not prove a free request either.
         if (!costStillCurrent()) return modelCostError("image")
         if (automatic && !images.automaticCostAllowed()) return automaticImageError(
@@ -165,6 +171,7 @@ class MediaOffloadHandler internal constructor(
                 // The legacy CLI can be invoked by scripts or automated turns, so
                 // a remembered native-tool grant is not sufficient for this call.
                 authorize = { endpoint ->
+                    if (!allowedImage(endpoint)) throw OwnKeyImagePolicy.NoVerifiedFreeGenerator()
                     attempt?.requireActive()
                     if (parallel) {
                         permissionObservation = try {
@@ -197,6 +204,7 @@ class MediaOffloadHandler internal constructor(
                     // nanoMuse: re-read mode, approval, route and credential at the
                     // actual transport edge, not just before request preparation.
                     val requireCurrentImage = {
+                        if (!allowedImage(endpoint)) throw OwnKeyImagePolicy.NoVerifiedFreeGenerator()
                         attempt?.requireActive()
                         if (!costStillCurrent()) throw ai.tama.pricing.ModelCostGuard.Blocked()
                         val unchanged = try {
@@ -234,6 +242,11 @@ class MediaOffloadHandler internal constructor(
             // nanoMuse: a tool argument can contain private text, even when it is not a credential.
             return NativeOffloadResult(2, if (com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test")
                 "nanomuse-media: cannot read the picture\n" else "nanomuse-media: cannot read picture '${e.path}'\n")
+        } catch (_: OwnKeyImagePolicy.NoVerifiedFreeGenerator) {
+            if (possiblySubmitted.get()) return failed(
+                "image", context.getString(com.openminis.app.R.string.nm_image_request_failed), noRetry = true,
+            )
+            return noFreeImage()
         } catch (_: ai.tama.pricing.ModelCostGuard.Blocked) {
             // nanoMuse: a cost revocation at a later download cannot undo a POST.
             if (possiblySubmitted.get()) return failed(
@@ -318,6 +331,10 @@ class MediaOffloadHandler internal constructor(
 
     private fun safeAttribution(value: String, apiKey: String): String =
         io.github.nanomuse.net.ProviderReach.redactedText(value, listOf(apiKey), 128)
+
+    private fun noFreeImage(): NativeOffloadResult = automaticImageError(
+        "no_verified_free_image_generator", com.openminis.app.R.string.nm_free_image_unavailable,
+    )
 
     private fun automaticImageError(code: String, message: Int): NativeOffloadResult = NativeOffloadResult(
         3, JSONObject().put("ok", false).put("error", code).put("message", context.getString(message))

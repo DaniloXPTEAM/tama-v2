@@ -40,3 +40,17 @@ O app não pede declaração. `DocumentedFreeChat` separa Free, plano não confi
 ### Modalidades
 
 A atualização da lista completa no Test consulta o catálogo de texto e solicita, separadamente, `output_modalities=image` ao OpenRouter. O segundo resultado não apaga o de texto em caso de erro. Entrada `image` deixa o modelo ler imagens; saída `image` descreve geração, mas não comprova que o endpoint do aplicativo é compatível ou gratuito. A cotação de chat guarda as modalidades do ID exato. O catálogo embutido da rota correspondente documenta entrada de imagem para Gemma 4 31B e Nemotron 3 Nano Omni; nome, variante irmã e modalidade de outro provedor não servem de evidência. Áudio/vídeo nas informações do modelo só são confirmados com metadados, sem modificar os atalhos legados de voz.
+
+### NVIDIA: geração e edição de imagens (18/11/2026)
+
+A base de chat `https://integrate.api.nvidia.com/v1` não comprovou uma API de imagem compatível com `/images/generations`. A documentação usa outro host e outro corpo no NIM:
+
+| Modelo | Referência oficial | O que ainda falta para o Test |
+| --- | --- | --- |
+| FLUX.1 schnell | [NIM `ai.api.nvidia.com/v1/genai/black-forest-labs/flux.1-schnell`](https://docs.api.nvidia.com/nim/reference/black-forest-labs-flux_1-schnell-infer) | Adaptador NIM de texto para imagem, contrato de resposta e gratuidade da rota/chave. |
+| FLUX.1 dev | [NIM `ai.api.nvidia.com/v1/genai/black-forest-labs/flux.1-dev`](https://docs.api.nvidia.com/nim/reference/black-forest-labs-flux_1-dev-infer) | Adaptador NIM, esquema das referências aceitas e custo. O preview cita referências de exemplo para Canny/Depth. |
+| FLUX.1 Kontext dev | [NIM `ai.api.nvidia.com/v1/genai/black-forest-labs/flux.1-kontext-dev`](https://docs.api.nvidia.com/nim/reference/black-forest-labs-flux_1-kontext-dev-infer) | A operação documentada exige uma imagem; o preview lista imagens de exemplo. Faltam suporte a referências do usuário no endpoint escolhido, adaptador e custo. |
+| FLUX.2 Klein 4B | [NIM `ai.api.nvidia.com/v1/genai/black-forest-labs/flux.2-klein-4b`](https://docs.api.nvidia.com/nim/reference/black-forest-labs-flux_2-klein-4b-infer) | Adaptador para o modo explícito de geração/edição e confirmação de acesso e custo. A referência do preview limita a entrada de edição. |
+| Qwen Image e Qwen Image Edit | [Qwen Image](https://build.nvidia.com/qwen/qwen-image/deploy), [Qwen Image Edit](https://build.nvidia.com/qwen/qwen-image-edit/deploy) | As páginas documentam download/implantação. Não confirmei uma rota pública NVIDIA de inferência com preço zero. Não confundir parceiro ou instância hospedada com o catálogo de chat. |
+
+Nenhum POST de imagem foi feito. Em “Somente gratuitos” os modelos de imagem sem rota comprovadamente gratuita não aparecem como opção nem são trocados por um padrão pago. A seleção salva é preservada e o bloqueio é reavaliado antes de enviar. Fora desse modo, a tela ainda exige as permissões existentes; a resposta ao negar não foi alterada.

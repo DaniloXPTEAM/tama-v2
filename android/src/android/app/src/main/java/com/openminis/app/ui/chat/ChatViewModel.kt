@@ -7044,6 +7044,10 @@ class ChatViewModel(
         return providerRepository.tamaOwnApiKey(ownImageProvider) != null
     }
 
+    private fun nmFreeImageOnly(): Boolean = currentProvider?.let { nmOwnClients[it] }?.let { own ->
+        providerRepository.instance(own.providerId)?.let(providerRepository::tamaFreeChatOnly)
+    } == true
+
     /** Runs the native tool and retains Stop ownership until its reply is saved. */
     private suspend fun nmRunImageShortcut(
         sid: String,
@@ -7065,6 +7069,7 @@ class ChatViewModel(
             ) { prompt ->
                 ai.tama.tools.ImageGenerationTool.execute(
                     JSONObject().put("prompt", prompt).toString(), sid, context, ownKeyChat = ownKeyChat,
+                    freeOnly = nmFreeImageOnly(),
                 )
             }
             kotlin.coroutines.coroutineContext.ensureActive()
@@ -8823,6 +8828,7 @@ class ChatViewModel(
         turn: Int,
         petRunGeneration: Long,
         onToolDispatched: () -> Unit,
+        freeImageOnly: Boolean,
     ): MutableList<AgentContentPart> {
         // Execute all tool calls
         val resultParts = mutableListOf<AgentContentPart>()
@@ -9071,7 +9077,7 @@ class ChatViewModel(
             if (!tamaV2Test) android.util.Log.d("ToolChain[VM]", "[turn=$turn] executeTool START name=$name args=$loggedArgs")
             // nanoMuse: rejected/unoffered/preflight-blocked calls must not create tool continuity.
             onToolDispatched()
-            val result = executeTool(name, argsStr, id, allToolBlocks, assistantId, accumulatedText)
+            val result = executeTool(name, argsStr, id, allToolBlocks, assistantId, accumulatedText, freeImageOnly)
             // nanoMuse: only confirmed, intact writes advance the Pet bound to this tracker run.
             if (result.success && truncationRepairTag == null) {
                 io.github.nanomuse.pet.PetEvents.tool(context, realSessionId.ifEmpty { sessionId }, id, name, petRunGeneration)
@@ -11811,6 +11817,7 @@ class ChatViewModel(
                 turn = turn,
                 petRunGeneration = petRunGeneration,
                 onToolDispatched = { nmUsedTools = true },
+                freeImageOnly = nmRequireFree(),
             )
 
             // Update UI with tool statuses. Mark as awaiting the next model
@@ -12041,6 +12048,7 @@ class ChatViewModel(
         toolBlocks: MutableList<AssistantBlock>,
         assistantId: String,
         currentText: String,
+        freeImageOnly: Boolean,
     ): ToolExecutionResult {
         // T330: tri-state permission gating moved into the offload IPC
         // handler (OffloadGate). The CLIs land there whether the LLM
@@ -12081,7 +12089,8 @@ class ChatViewModel(
             // /var/minis/{workspace,attachments,offloads,browser} files.
             ReadImageTool.NAME -> executeReadImageTool(argsJson)
             ai.tama.tools.ImageGenerationTool.NAME ->
-                ai.tama.tools.ImageGenerationTool.execute(argsJson, activeSessionId, context, ownKeyChat = nmOwnKeyImageRequest())
+                ai.tama.tools.ImageGenerationTool.execute(argsJson, activeSessionId, context, ownKeyChat = nmOwnKeyImageRequest(),
+                    freeOnly = freeImageOnly || nmFreeImageOnly())
             "shell_execute" -> executeShellCommand(argsJson, toolId, toolBlocks, assistantId, currentText)
             "browser_use" -> executeBrowserUseTool(argsJson)
             "memory_write" -> executeMemoryWriteTool(argsJson)

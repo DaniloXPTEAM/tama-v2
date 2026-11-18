@@ -1585,4 +1585,5 @@
     <string name="nm_free_plan_action">O provedor anuncia um plano gratuito, mas a API não confirma o plano da chave. Escolha um modelo gratuito confirmado em Provedores.</string>
     <string name="nm_free_unknown_action">Não há preço gratuito confirmado para este modelo. Atualize a lista em Provedores ou escolha um modelo gratuito confirmado.</string>
     <string name="nm_auto_no_routes">Adicione um modelo gratuito confirmado em Provedores e autorize seu uso na seleção automática.</string>
+    <string name="nm_free_image_unavailable">Nenhum modelo gratuito de imagem está ativo. Em Configurações → Modelos, adicione um gerador com gratuidade confirmada. Nenhum pedido de imagem foi enviado.</string>
 </resources>

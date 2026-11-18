@@ -40,6 +40,7 @@ kotlinc -nowarn -cp "$CP" -include-runtime -d "$OUT/media-host.jar" \
     "$MAIN/ai/tama/media/AutomaticVideoGuard.kt" \
     "$MAIN/ai/tama/media/MediaModelChangeGuard.kt" \
     "$MAIN/ai/tama/media/AutoImageNotices.kt" \
+    "$MAIN/ai/tama/media/OwnKeyImagePolicy.kt" \
     "$MAIN/ai/tama/media/ImageDispatch.kt" \
     "$MAIN/ai/tama/media/MediaImageGate.kt" \
     "$MAIN/ai/tama/media/MediaImageServices.kt" \

@@ -19,6 +19,7 @@ internal interface MediaImageServices {
     /** Changes for any account while the route is being resolved, not only the selected one. */
     fun accountRevision(): Long
     /** The dispatcher must check this independently from route and image approval. */
+    fun freeImagesOnly(endpoint: ImageGen.Endpoint? = null): Boolean = false
     fun modelCostAllowed(): Boolean
     /** Revocation witness spanning a single attempt; it is not a permission. */
     fun observeModelCost(): () -> Boolean
@@ -48,6 +49,9 @@ internal class AndroidMediaImageServices(private val context: Context) : MediaIm
     override fun automaticPolicyRevision() = AutoModelStore.automaticPolicyRevision()
     override fun imageChoiceRevision() = ImageGen.imageChoiceRevision()
     override fun accountRevision() = ai.tama.router.AutoModelRuntime.accountRevision()
+    override fun freeImagesOnly(endpoint: ImageGen.Endpoint?) =
+        ImageGen.freeImagesOnly(context) || if (endpoint == null) ImageGen.noFreeImageAvailable(context)
+        else ImageGen.freeImagesOnly(context, endpoint.instanceId)
     override fun modelCostAllowed() = ai.tama.pricing.ModelCostGuard.permits()
     override fun observeModelCost(): () -> Boolean {
         val observation = ai.tama.pricing.ModelCostGuard.observe()
