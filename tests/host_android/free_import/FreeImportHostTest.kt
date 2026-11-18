@@ -32,6 +32,10 @@ fun main() {
     check(FreeModelList.filter(original, true, null) { it }.isEmpty())
     check(FreeModelList.filter(original, false, null) { it } == original)
     check(original.size == 3) // filter never removes saved rows
+    check(!FreeModelList.restricted(hasOwnKey = false, requested = true, zeroSpendLimit = true))
+    check(FreeModelList.restricted(hasOwnKey = true, requested = false, zeroSpendLimit = true))
+    check(FreeModelList.restricted(hasOwnKey = true, requested = true, zeroSpendLimit = false))
+    check(!FreeModelList.restricted(hasOwnKey = true, requested = false, zeroSpendLimit = false))
     val gate = ModelRefreshGate()
     val ticket = gate.begin("instance", true, "route")
     val evidence = FreeModelImportEvidence(ticket, 1, prices,

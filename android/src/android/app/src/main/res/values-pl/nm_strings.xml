@@ -1540,7 +1540,7 @@
     <string name="nm_endpoint_effective">Punkt końcowy po zapisaniu: %1$s</string>
     <string name="nm_endpoint_fixed_help">OpenRouter używa tego stałego adresu.</string>
     <string name="nm_endpoint_auto_help">Adres pochodzi od wybranego dostawcy. Możesz go zmienić; wklejenie klucza nie zastąpi własnego adresu.</string>
-    <string name="nm_free_import_title">Importuj tylko darmowe modele</string>
+    <string name="nm_free_import_title">Używaj tylko bezpłatnych modeli</string>
     <string name="nm_free_import_help">Importuje tylko modele czatu oznaczone jako darmowe w aktualnym katalogu OpenRouter. Istniejące modele pozostają. Opcja nie zezwala na żądania ani nie blokuje opłat; ceny i dodatkowe usługi mogą się zmienić.</string>
     <string name="nm_free_import_unsupported">Nie można tu sprawdzić ceny dla tego dostawcy i konta. Przy włączonej opcji nowe modele nie będą importowane. Wyłącz ją, aby zaimportować pełną listę.</string>
     <string name="nm_free_import_checking">Sprawdzanie katalogu...</string>
@@ -1561,8 +1561,8 @@
     <string name="nm_key_probe_denied">Dostawca odmówił dostępu; przyczyna jest nieznana.</string>
     <string name="nm_key_probe_unavailable">Nie można sprawdzić klucza. Sprawdź połączenie.</string>
     <string name="nm_key_probe_unsupported">Nie można sprawdzić klucza pod tym adresem. Klucz nie został wysłany.</string>
-    <string name="nm_free_bulk_button">Zezwól na wszystkie modele czatu oznaczone jako darmowe</string>
-    <string name="nm_free_bulk_help">Zezwala na widoczne modele oznaczone jako darmowe w aktualnym katalogu do automatycznego wyboru czatu. Nie włącza trybu automatycznego ani zgody na koszty i nie zezwala na obrazy. Ceny i dodatkowe usługi mogą się zmienić.</string>
+    <string name="nm_free_bulk_button">Użyj wszystkich bezpłatnych modeli</string>
+    <string name="nm_free_bulk_help">Dodaje bezpłatne modele z listy i zatwierdza je do czatu. Ochrona kosztów i tryb automatyczny pozostają bez zmian.</string>
     <string name="nm_free_bulk_done">Dozwolone trasy czatu: %1$d. Pozostałe kontrole dostępności i kosztów nadal obowiązują.</string>
     <string name="nm_free_bulk_retry">Nie zezwolono na żaden aktualnie dostępny model. Odśwież katalog i spróbuj ponownie.</string>
     <string name="nm_image_retry_question">Czy chcesz ponowić próbę tej ilustracji? Odpowiedz tak lub poproś o ponowną próbę.</string>
@@ -1573,4 +1573,5 @@
     <string name="nm_free_list_refresh">Brak aktualnych danych katalogu. Odśwież listę modeli lub wyłącz filtr.</string>
     <string name="nm_usage_reports_note">Zużycie opiera się na zapisanych raportach dostawców i może być niepełne. Nie jest rachunkiem ani dowodem braku kosztów.</string>
     <string name="nm_loop_estimate_explanation">Szacunek dla tej rozmowy: większa liczba wiadomości asystenta lub bloków narzędzi. To nie jest dokładna liczba żądań ani opłat.</string>
+    <string name="nm_free_chat_choose">Wybierz bezpłatny model lub odśwież listę modeli dostawcy.</string>
 </resources>

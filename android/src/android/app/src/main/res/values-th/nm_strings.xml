@@ -1528,7 +1528,7 @@
     <string name="nm_endpoint_effective">Endpoint หลังบันทึก: %1$s</string>
     <string name="nm_endpoint_fixed_help">OpenRouter ใช้ที่อยู่คงที่นี้</string>
     <string name="nm_endpoint_auto_help">ที่อยู่มาจากผู้ให้บริการที่เลือก คุณแก้ไขได้ การวางคีย์จะไม่แทนที่อยู่ที่กำหนดเอง</string>
-    <string name="nm_free_import_title">นำเข้าเฉพาะโมเดลฟรี</string>
+    <string name="nm_free_import_title">ใช้เฉพาะโมเดลฟรี</string>
     <string name="nm_free_import_help">นำเข้าเฉพาะโมเดลแชตที่ระบุว่าฟรีในแค็ตตาล็อก OpenRouter ปัจจุบัน โมเดลเดิมจะยังอยู่ ตัวเลือกนี้ไม่ได้อนุญาตคำขอหรือป้องกันค่าใช้จ่าย ราคาและบริการเพิ่มเติมอาจเปลี่ยนแปลง</string>
     <string name="nm_free_import_unsupported">ไม่สามารถตรวจสอบราคาสำหรับผู้ให้บริการและบัญชีนี้ได้ที่นี่ เมื่อเปิดตัวเลือกจะไม่นำเข้าโมเดลใหม่ ปิดเพื่อนำเข้ารายการทั้งหมด</string>
     <string name="nm_free_import_checking">กำลังตรวจสอบแค็ตตาล็อก...</string>
@@ -1549,8 +1549,8 @@
     <string name="nm_key_probe_denied">ผู้ให้บริการปฏิเสธการเข้าถึง โดยไม่ทราบสาเหตุ</string>
     <string name="nm_key_probe_unavailable">ทดสอบคีย์ไม่ได้ โปรดตรวจสอบการเชื่อมต่อ</string>
     <string name="nm_key_probe_unsupported">ไม่สามารถทดสอบคีย์สำหรับที่อยู่นี้ และไม่ได้ส่งคีย์</string>
-    <string name="nm_free_bulk_button">อนุญาตโมเดลแชตทั้งหมดที่ระบุว่าฟรี</string>
-    <string name="nm_free_bulk_help">อนุญาตโมเดลที่มองเห็นและระบุว่าฟรีในแค็ตตาล็อกล่าสุดสำหรับการเลือกแชตอัตโนมัติ โดยไม่เปิดโหมดอัตโนมัติหรือสิทธิ์ค่าใช้จ่าย และไม่อนุญาตการสร้างภาพ ราคาและบริการเพิ่มเติมอาจเปลี่ยนแปลง</string>
+    <string name="nm_free_bulk_button">ใช้โมเดลฟรีทั้งหมด</string>
+    <string name="nm_free_bulk_help">เพิ่มและอนุญาตโมเดลแชตฟรีในรายการ การป้องกันค่าใช้จ่ายและโหมดอัตโนมัติไม่เปลี่ยนแปลง</string>
     <string name="nm_free_bulk_done">เส้นทางแชตที่อนุญาต: %1$d ยังมีการตรวจสอบคุณสมบัติและค่าใช้จ่ายอื่น</string>
     <string name="nm_free_bulk_retry">ไม่มีโมเดลที่เข้าเกณฑ์ปัจจุบันได้รับอนุญาต โปรดรีเฟรชแค็ตตาล็อกแล้วลองอีกครั้ง</string>
     <string name="nm_image_retry_question">ต้องการลองสร้างภาพนี้อีกครั้งหรือไม่ ตอบว่าใช่หรือลองอีกครั้ง</string>
@@ -1561,4 +1561,5 @@
     <string name="nm_free_list_refresh">ไม่มีข้อมูลแค็ตตาล็อกปัจจุบัน รีเฟรชรายการโมเดลหรือปิดตัวกรอง</string>
     <string name="nm_usage_reports_note">การใช้งานอิงตามรายงานของผู้ให้บริการที่บันทึกไว้และอาจไม่ครบถ้วน ไม่ใช่ใบแจ้งหนี้หรือหลักฐานว่าไม่มีค่าใช้จ่าย</string>
     <string name="nm_loop_estimate_explanation">ค่าประมาณของบทสนทนานี้ใช้จำนวนที่มากกว่าระหว่างข้อความผู้ช่วยกับบล็อกเครื่องมือ ไม่ใช่จำนวนคำขอหรือค่าบริการที่แน่นอน</string>
+    <string name="nm_free_chat_choose">เลือกโมเดลฟรีหรือรีเฟรชรายการโมเดลของผู้ให้บริการ</string>
 </resources>

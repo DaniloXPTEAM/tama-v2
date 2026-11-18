@@ -533,8 +533,8 @@ private fun ConfigureProviderScreen(
             }
         }
 
-        // nanoMuse: this is an import preference, not a spending authorization.
-        if (nmParallel) {
+        // nanoMuse: this preference is only for a personal key, not OAuth or keyless gateways.
+        if (nmParallel && credentialType == ProviderCredential.apiKey && apiKey.isNotBlank()) {
             ai.tama.providers.FreeModelImportSection(
                 type = providerType,
                 checked = importFreeOnly,
@@ -574,7 +574,7 @@ private fun ConfigureProviderScreen(
                 onCustomBaseURLChange = { customBaseURL = it; endpointEdited = true },
                 appendV1Suffix = appendV1Suffix,
                 onAppendV1Change = { appendV1Suffix = it; endpointEdited = true },
-                importFreeOnly = importFreeOnly,
+                importFreeOnly = importFreeOnly && apiKey.isNotBlank(),
                 autoSuggested = autoSuggested,
                 suggestedProviderName = voiceTemplate?.name.orEmpty(),
                 onConfirmSuggestion = onConfirmSuggestion,

@@ -1532,7 +1532,7 @@
     <string name="nm_endpoint_effective">Endpunkt nach dem Speichern: %1$s</string>
     <string name="nm_endpoint_fixed_help">OpenRouter verwendet diese feste Adresse.</string>
     <string name="nm_endpoint_auto_help">Die Adresse stammt vom gewählten Anbieter. Du kannst sie ändern; ein Schlüssel ersetzt keine eigene Adresse.</string>
-    <string name="nm_free_import_title">Nur kostenlose Modelle importieren</string>
+    <string name="nm_free_import_title">Nur kostenlose Modelle verwenden</string>
     <string name="nm_free_import_help">Importiert nur Chatmodelle, die im aktuellen OpenRouter-Katalog als kostenlos angegeben sind. Vorhandene Modelle bleiben. Dies erlaubt keine Anfragen und verhindert keine Kosten; Preise und Zusatzdienste können sich ändern.</string>
     <string name="nm_free_import_unsupported">Der Preis für diesen Anbieter und dieses Konto lässt sich hier nicht prüfen. Solange die Option aktiv ist, werden keine neuen Modelle importiert. Schalte sie für die vollständige Liste aus.</string>
     <string name="nm_free_import_checking">Katalog wird geprüft...</string>
@@ -1553,8 +1553,8 @@
     <string name="nm_key_probe_denied">Der Anbieter hat den Zugriff verweigert; der Grund ist unbekannt.</string>
     <string name="nm_key_probe_unavailable">Der Schlüssel konnte nicht geprüft werden. Verbindung prüfen.</string>
     <string name="nm_key_probe_unsupported">An dieser Adresse ist kein Schlüsseltest verfügbar. Es wurde kein Schlüssel gesendet.</string>
-    <string name="nm_free_bulk_button">Alle als kostenlos angebotenen Chatmodelle zulassen</string>
-    <string name="nm_free_bulk_help">Lässt sichtbare, im aktuellen Katalog als kostenlos angebotene Modelle für die automatische Chatauswahl zu. Aktiviert weder Automatik noch Kostenerlaubnis und erlaubt keine Bilder. Preise und Zusatzdienste können sich ändern.</string>
+    <string name="nm_free_bulk_button">Alle kostenlosen Modelle verwenden</string>
+    <string name="nm_free_bulk_help">Fügt die kostenlosen Chatmodelle der Liste hinzu und genehmigt sie. Kostenschutz und Automatikmodus bleiben unverändert.</string>
     <string name="nm_free_bulk_done">Zugelassene Chatrouten: %1$d. Weitere Eignungs- und Kostenprüfungen gelten weiterhin.</string>
     <string name="nm_free_bulk_retry">Keine aktuell geeigneten Modelle zugelassen. Katalog aktualisieren und erneut versuchen.</string>
     <string name="nm_image_retry_question">Möchtest du dieses Bild erneut versuchen? Antworte mit Ja oder bitte um einen neuen Versuch.</string>
@@ -1565,4 +1565,5 @@
     <string name="nm_free_list_refresh">Keine aktuellen Katalogdaten. Aktualisiere die Modellliste oder schalte den Filter aus.</string>
     <string name="nm_usage_reports_note">Die Nutzung basiert auf gespeicherten Anbieterangaben und kann unvollständig sein. Sie ist keine Rechnung und kein Nachweis für kostenlose Nutzung.</string>
     <string name="nm_loop_estimate_explanation">Schätzung für diese Unterhaltung: der höhere Wert aus Assistentennachrichten und Werkzeugblöcken. Keine genaue Anzahl von Anfragen oder Kosten.</string>
+    <string name="nm_free_chat_choose">Wähle ein kostenloses Modell oder aktualisiere die Modellliste des Anbieters.</string>
 </resources>

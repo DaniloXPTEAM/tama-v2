@@ -219,6 +219,9 @@ class ProviderRepository(private val context: Context) {
     private val nmFreeEvidence = mutableMapOf<String, FreeModelImportEvidence>()
     private val _nmFreeImportStatus = MutableStateFlow<Map<String, FreeModelImportStatus>>(emptyMap())
     val nmFreeImportStatus: StateFlow<Map<String, FreeModelImportStatus>> = _nmFreeImportStatus.asStateFlow()
+    // nanoMuse: observations belong to an account generation, never to a replacement key.
+    private val nmZeroSpendLimits = MutableStateFlow<Map<String, Long>>(emptyMap())
+    internal val tamaZeroSpendLimits = nmZeroSpendLimits.asStateFlow()
 
     // nanoMuse: the async loader can run immediately, so all locks and status
     // fields it may read must be initialized before launch.
@@ -915,7 +918,9 @@ class ProviderRepository(private val context: Context) {
         val config = workingCopy()
         val index = config.instances.indexOfFirst { it.id == instanceId }
         if (index < 0) return@synchronized false
-        if (config.instances[index].tamaImportFreeOnly == enabled) return@synchronized true
+        val live = config.instances[index]
+        if (tamaOwnApiKey(live) == null || (!enabled && tamaZeroSpendLimit(live))) return@synchronized false
+        if (live.tamaImportFreeOnly == enabled) return@synchronized true
         nmRefreshGate.invalidate(instanceId)
         nmFreeEvidence.remove(instanceId)
         config.instances[index] = config.instances[index].copy(tamaImportFreeOnly = enabled)
@@ -2332,6 +2337,35 @@ class ProviderRepository(private val context: Context) {
         val key: OAuthKeySnapshot,
     )
 
+    internal fun tamaZeroSpendLimit(instance: ProviderInstance): Boolean =
+        nmZeroSpendLimits.value[instance.id] == ai.tama.router.AutoModelRuntime.accountVersion(instance.id) &&
+            instance.providerType == ProviderType.openRouter && tamaOwnApiKey(instance) != null
+
+    /** Only the exact official OpenRouter account may be restricted by a key limit response. */
+    internal fun tamaRecordZeroSpendLimit(instanceId: String, accountVersion: Long): Boolean = synchronized(configLock) {
+        val live = instance(instanceId) ?: return@synchronized false
+        if (live.providerType != ProviderType.openRouter || tamaOwnApiKey(live) == null) return@synchronized false
+        ai.tama.router.AutoModelRuntime.runIfCurrent(instanceId, accountVersion) {
+            nmZeroSpendLimits.value = nmZeroSpendLimits.value + (instanceId to accountVersion)
+        }
+    }
+
+    private fun nmFreeRefreshMode(instance: ProviderInstance): Boolean =
+        instance.tamaImportFreeOnly || tamaZeroSpendLimit(instance)
+
+    internal fun tamaFreeChatOnly(instance: ProviderInstance): Boolean =
+        ai.tama.pricing.FreeModelList.restricted(
+            hasOwnKey = tamaOwnApiKey(instance) != null,
+            requested = instance.tamaImportFreeOnly,
+            zeroSpendLimit = tamaZeroSpendLimit(instance),
+        )
+
+    /** This check excludes unknown/paid routes. It cannot grant either cost permission. */
+    internal fun tamaAllowsChatModel(instance: ProviderInstance, modelId: String, requireFree: Boolean = false): Boolean {
+        val restricted = requireFree || tamaFreeChatOnly(instance)
+        return !restricted || (tamaOwnApiKey(instance) != null && modelId in tamaEligibleFreeModelIds(instance.id).orEmpty())
+    }
+
     /**
      * Current candidates for the optional post-save choice screen. Null means
      * no usable evidence; an empty set means a fresh check found no candidates.
@@ -2342,7 +2376,7 @@ class ProviderRepository(private val context: Context) {
         val evidence = nmFreeEvidence[instanceId] ?: return@synchronized null
         ai.tama.router.AutoModelStore.credentialTransaction {
             evidence.current(
-                nmRefreshGate, live.tamaImportFreeOnly, ai.tama.router.AutoModelStore.routeFingerprint(live),
+                nmRefreshGate, nmFreeRefreshMode(live), ai.tama.router.AutoModelStore.routeFingerprint(live),
                 ai.tama.router.AutoModelRuntime.accountVersion(instanceId), System.currentTimeMillis(),
             )
         }
@@ -2353,20 +2387,29 @@ class ProviderRepository(private val context: Context) {
      * This never turns on automatic mode or its separate cost permission. A
      * changed account, route, refresh or disabled import invalidates the evidence.
      */
-    internal fun tamaApproveFreeChatModels(instanceId: String): Int {
+    internal suspend fun tamaUseAllFreeChatModels(instanceId: String, key: OAuthKeySnapshot): Int {
+        val live = instance(instanceId) ?: return 0
+        if (key.providerId != instanceId || live.providerType != ProviderType.openRouter ||
+            !live.isEnabled || !nmOAuthKeyStillCurrent(key) || !setTamaImportFreeOnly(instanceId, true)) return 0
+        if (tamaEligibleFreeModelIds(instanceId) == null) refreshModels(live)
+        return tamaApproveFreeChatModels(instanceId, key)
+    }
+
+    private fun tamaApproveFreeChatModels(instanceId: String, expectedKey: OAuthKeySnapshot): Int {
         if (com.openminis.app.BuildConfig.APPLICATION_ID != "ai.tama.assistant.tamav2test") return 0
         val secrets = encryptedPrefs // initialize before acquiring either lock
         return synchronized(configLock) {
             ensureConfigLoaded()
             val live = _config.value.instances.firstOrNull { it.id == instanceId } ?: return@synchronized 0
-            if (!live.isEnabled || !live.tamaImportFreeOnly || live.providerType != ProviderType.openRouter ||
+            if (!live.isEnabled || !tamaFreeChatOnly(live) || live.providerType != ProviderType.openRouter ||
                 live.credentialType != ProviderCredential.apiKey ||
                 io.github.nanomuse.cloud.NanoMuseCloud.instance(context)?.id == instanceId) return@synchronized 0
             val evidence = nmFreeEvidence[instanceId] ?: return@synchronized 0
             ai.tama.router.AutoModelStore.credentialTransaction {
-                if (secrets.getString("apikey_$instanceId", null).isNullOrBlank()) return@credentialTransaction 0
+                if (secrets.getString("apikey_$instanceId", null).isNullOrBlank() ||
+                    !nmOAuthKeyStillCurrent(expectedKey)) return@credentialTransaction 0
                 val free = evidence.current(
-                    nmRefreshGate, live.tamaImportFreeOnly, ai.tama.router.AutoModelStore.routeFingerprint(live),
+                    nmRefreshGate, nmFreeRefreshMode(live), ai.tama.router.AutoModelStore.routeFingerprint(live),
                     ai.tama.router.AutoModelRuntime.accountVersion(instanceId), System.currentTimeMillis(),
                 ) ?: return@credentialTransaction 0
                 val entries = _config.value.modelEntries
@@ -2388,7 +2431,7 @@ class ProviderRepository(private val context: Context) {
         val evidence = nmFreeEvidence[instanceId] ?: return@synchronized emptySet()
         ai.tama.router.AutoModelStore.credentialTransaction {
             evidence.currentCapabilities(
-                nmRefreshGate, live.tamaImportFreeOnly, ai.tama.router.AutoModelStore.routeFingerprint(live),
+                nmRefreshGate, nmFreeRefreshMode(live), ai.tama.router.AutoModelStore.routeFingerprint(live),
                 ai.tama.router.AutoModelRuntime.accountVersion(instanceId), System.currentTimeMillis(), modelId,
             )
         }
@@ -2405,16 +2448,16 @@ class ProviderRepository(private val context: Context) {
                 // route must not pick up a newer account's key when it starts.
                 val key = nmOAuthKeySnapshot(copy.id)
                 val route = ai.tama.router.AutoModelStore.routeFingerprint(copy)
-                val ticket = nmRefreshGate.begin(copy.id, copy.tamaImportFreeOnly, route)
+                val ticket = nmRefreshGate.begin(copy.id, nmFreeRefreshMode(copy), route)
                 nmFreeEvidence.remove(copy.id)
-                _nmFreeImportStatus.value = if (copy.tamaImportFreeOnly)
+                _nmFreeImportStatus.value = if (ticket.freeOnly)
                     _nmFreeImportStatus.value + (copy.id to FreeModelImportStatus.Checking)
                 else _nmFreeImportStatus.value - copy.id
                 NmRefresh(copy, ticket, key)
             }
         } catch (_: Exception) {
             synchronized(configLock) {
-                if (_config.value.instances.any { it.id == instanceId && it.tamaImportFreeOnly }) {
+                if (_config.value.instances.any { it.id == instanceId && nmFreeRefreshMode(it) }) {
                     nmRefreshGate.invalidate(instanceId)
                     nmFreeEvidence.remove(instanceId)
                     _nmFreeImportStatus.value = _nmFreeImportStatus.value + (instanceId to FreeModelImportStatus.Failed)
@@ -2428,7 +2471,7 @@ class ProviderRepository(private val context: Context) {
     private fun nmRefreshCurrent(refresh: NmRefresh): Boolean {
         val live = _config.value.instances.firstOrNull { it.id == refresh.instance.id } ?: return false
         return nmRefreshGate.isCurrent(
-            refresh.ticket, live.tamaImportFreeOnly, ai.tama.router.AutoModelStore.routeFingerprint(live),
+            refresh.ticket, nmFreeRefreshMode(live), ai.tama.router.AutoModelStore.routeFingerprint(live),
         )
     }
 
@@ -2445,7 +2488,7 @@ class ProviderRepository(private val context: Context) {
             // changes. Otherwise a key can change between the check and save.
             // The configuration lock is already held, in the established order.
             ai.tama.router.AutoModelStore.credentialTransaction {
-                if (nmRefreshCurrent(refresh) && !refresh.instance.tamaImportFreeOnly &&
+                if (nmRefreshCurrent(refresh) && !refresh.ticket.freeOnly &&
                     keySnapshot != null && nmOAuthKeyStillCurrent(keySnapshot)) {
                     replaceEntries(instanceId, models)
                 }
@@ -2530,7 +2573,7 @@ class ProviderRepository(private val context: Context) {
     // nanoMuse: publish a failure only for the request that still owns the
     // screen status. Never include exception text, URLs, credentials or names.
     private fun nmRefreshFailed(refresh: NmRefresh) = synchronized(configLock) {
-        if (refresh.instance.tamaImportFreeOnly && nmRefreshCurrent(refresh)) {
+        if (refresh.ticket.freeOnly && nmRefreshCurrent(refresh)) {
             ai.tama.router.AutoModelStore.credentialTransaction {
                 _nmFreeImportStatus.value = if (nmOAuthKeyStillCurrent(refresh.key))
                     _nmFreeImportStatus.value + (refresh.instance.id to FreeModelImportStatus.Failed)
@@ -2555,7 +2598,7 @@ class ProviderRepository(private val context: Context) {
                     return
                 }
             }
-            if (refresh.instance.tamaImportFreeOnly) nmRefreshFreeModels(refresh)
+            if (refresh.ticket.freeOnly) nmRefreshFreeModels(refresh)
             else refreshStandardModels(refresh.instance, refresh)
         } catch (e: kotlinx.coroutines.CancellationException) {
             nmRefreshFailed(refresh)

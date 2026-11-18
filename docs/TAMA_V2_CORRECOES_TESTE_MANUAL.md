@@ -332,3 +332,19 @@ data e ID para estabilidade. A contagem de loops continua sendo uma aproximaçã
 da conversa, não uma contagem de chamadas nem de cobranças. A consulta foi
 exercitada em SQLite local com linhas fictícias e isolamento entre sessões; a
 tela Compose, o banco Room e o aparelho ainda precisam de verificação.
+
+### F1/F4/F10: uma lista por chave própria
+
+No Tama V2 Test, abra o provedor com uma chave própria cadastrada. **Usar somente
+modelos gratuitos** filtra a lista e as rotas do chat dessa conta. Desligar a opção
+restaura a lista salva; nenhum modelo é apagado. **Usar todos os gratuitos** no
+OpenRouter liga esse filtro, atualiza o catálogo se necessário e autoriza as rotas
+visíveis de chat da lista em um toque. Não muda o modo automático, não autoriza
+imagem e não liga nenhuma permissão de custo. O catálogo não comprova a cobrança
+final. Sem evidência atual, o filtro não inclui modelos de custo desconhecido.
+
+Se uma recusa oficial indicar limite de gastos zero, o app restringe o chat aos
+gratuitos para aquela chave enquanto a observação estiver ativa. Se não houver
+rota elegível, mostra a explicação em português em vez do código HTTP. Catálogos
+sem evidência compatível não são tratados como gratuitos. Esta opção não altera
+a nuvem TAMA, o app normal, a voz nem os seletores de mídia.

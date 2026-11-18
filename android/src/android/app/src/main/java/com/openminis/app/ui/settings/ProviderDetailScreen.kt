@@ -145,6 +145,12 @@ fun ProviderDetailScreen(
     var customUserAgent by remember { mutableStateOf(instance.customUserAgent ?: "") }
 
     val entries = providerRepository.entriesFor(instanceId)
+    val nmHasOwnKey = storedKey.isNotBlank() && providerRepository.tamaOwnApiKey(instance) != null
+    val nmLimits by providerRepository.tamaZeroSpendLimits.collectAsState()
+    val nmZeroLimit = nmHasOwnKey && nmLimits.containsKey(instanceId) && providerRepository.tamaZeroSpendLimit(instance)
+    val nmOnlyFree = nmHasOwnKey && (instance.tamaImportFreeOnly || nmZeroLimit)
+    val nmImportStatuses by providerRepository.nmFreeImportStatus.collectAsState()
+    val nmImportStatus = nmImportStatuses[instanceId]
     var isRefreshing by remember { mutableStateOf(false) }
 
     val exportContext = androidx.compose.ui.platform.LocalContext.current
@@ -295,40 +301,39 @@ fun ProviderDetailScreen(
             }
         }
 
-        // nanoMuse: changing this preference is additive and never deletes
-        // existing entries or group members. Cloud has its own account menu.
-        if (nmParallel && io.github.nanomuse.cloud.NanoMuseCloud.instance(exportContext)?.id != instanceId) {
-            val statuses by providerRepository.nmFreeImportStatus.collectAsState()
+        // nanoMuse: one per-key choice, no deletion and no changes to spending permissions.
+        if (nmHasOwnKey) {
             ai.tama.providers.FreeModelImportSection(
                 type = instance.providerType,
-                checked = instance.tamaImportFreeOnly,
+                checked = nmOnlyFree,
+                lockedByZeroLimit = nmZeroLimit,
                 onCheckedChange = { enabled ->
                     val saved = providerRepository.setTamaImportFreeOnly(instanceId, enabled)
                     if (saved && enabled) providerRepository.refreshModelsInBackground(instance)
                 },
-                status = statuses[instanceId],
+                status = nmImportStatus,
             )
-            // nanoMuse: chat-route approval is not cost or image consent, and does not send a request.
-            if (instance.providerType == ProviderType.openRouter &&
-                instance.credentialType == com.openminis.app.data.model.ProviderCredential.apiKey &&
-                instance.tamaImportFreeOnly) {
+            // nanoMuse: one tap enables the filter, fetches catalogue metadata if needed,
+            // and approves the visible free chat routes. It does not run inference.
+            if (instance.providerType == ProviderType.openRouter && instance.isEnabled) {
                 var nmBulkBusy by remember(instanceId) { mutableStateOf(false) }
-                var nmBulkResult by remember(instanceId, statuses[instanceId], storedKey, instance.customBaseURL) { mutableStateOf<Int?>(null) }
+                var nmBulkResult by remember(instanceId, storedKey, instance.customBaseURL) { mutableStateOf<Int?>(null) }
                 SettingsSection(footer = stringResource(R.string.nm_free_bulk_help)) {
                     MinisButton(
                         onClick = {
+                            val key = providerRepository.nmOAuthKeySnapshot(instanceId)
                             nmBulkBusy = true
                             scope.launch {
                                 nmBulkResult = try {
                                     kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                                        providerRepository.tamaApproveFreeChatModels(instanceId)
+                                        providerRepository.tamaUseAllFreeChatModels(instanceId, key)
                                     }
                                 } catch (e: kotlinx.coroutines.CancellationException) { throw e }
                                 catch (_: Exception) { 0 }
                                 nmBulkBusy = false
                             }
                         },
-                        enabled = !nmBulkBusy && statuses[instanceId] is ai.tama.pricing.FreeModelImportStatus.Complete,
+                        enabled = !nmBulkBusy && !isRefreshing,
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                     ) { Text(stringResource(R.string.nm_free_bulk_button)) }
                     nmBulkResult?.let { count ->
@@ -676,27 +681,13 @@ fun ProviderDetailScreen(
         ThinkingRulesSection(instance = instance, providerRepository = providerRepository)
 
         // ─── Models ─────────────────────────────────────────────────
-        // nanoMuse: this is a reversible view filter, not a change to saved entries,
-        // model selection or spending authorization.
-        val nmShowFreeFilter = nmParallel && instance.providerType == ProviderType.openRouter &&
-            instance.credentialType == com.openminis.app.data.model.ProviderCredential.apiKey && instance.tamaImportFreeOnly &&
-            io.github.nanomuse.cloud.NanoMuseCloud.instance(exportContext)?.id != instanceId
-        var nmFilterFree by remember(instanceId, instance.tamaImportFreeOnly) { mutableStateOf(instance.tamaImportFreeOnly) }
-        val nmImportStatuses by providerRepository.nmFreeImportStatus.collectAsState()
-        // Reading the status makes the view re-evaluate after a background refresh.
-        val nmImportStatus = nmImportStatuses[instanceId]
-        val nmFreeIds = if (nmShowFreeFilter && nmFilterFree && nmImportStatus !is ai.tama.pricing.FreeModelImportStatus.Checking)
+        // nanoMuse: the same switch filters this list and own-key chat. Saved entries stay intact.
+        val nmFreeIds = if (nmOnlyFree && nmImportStatus !is ai.tama.pricing.FreeModelImportStatus.Checking)
             providerRepository.tamaEligibleFreeModelIds(instanceId) else null
-        val nmDisplayedEntries = ai.tama.pricing.FreeModelList.filter(entries, nmShowFreeFilter && nmFilterFree, nmFreeIds) { it.model.id }
-        if (nmShowFreeFilter) {
-            SettingsSection(footer = stringResource(R.string.nm_free_list_help)) {
-                SettingsSwitchRow(title = stringResource(R.string.nm_free_list_filter), checked = nmFilterFree,
-                    onCheckedChange = { nmFilterFree = it }, showDivider = false)
-            }
-        }
+        val nmDisplayedEntries = ai.tama.pricing.FreeModelList.filter(entries, nmOnlyFree, nmFreeIds) { it.model.id }
         SettingsSection(
             header = stringResource(R.string.provider_detail_models_count_header, nmDisplayedEntries.size),
-            footer = if (nmShowFreeFilter && nmFilterFree && nmFreeIds == null)
+            footer = if (nmOnlyFree && nmFreeIds == null)
                 stringResource(R.string.nm_free_list_refresh) else null,
         ) {
             // Refresh action sits as the first row, mirroring the iOS

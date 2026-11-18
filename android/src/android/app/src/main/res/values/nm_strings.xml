@@ -1511,7 +1511,7 @@
     <string name="nm_endpoint_effective">Endpoint after saving: %1$s</string>
     <string name="nm_endpoint_fixed_help">OpenRouter uses this fixed address.</string>
     <string name="nm_endpoint_auto_help">The address comes from the chosen provider. You can edit it; pasting a key does not replace a custom address.</string>
-    <string name="nm_free_import_title">Import only free models</string>
+    <string name="nm_free_import_title">Use only free models</string>
     <string name="nm_free_import_help">Imports only chat models advertised as free in the current OpenRouter catalogue. Existing models remain. This does not authorize requests or prevent charges; prices and extra services can change.</string>
     <string name="nm_free_import_unsupported">The price for this provider and account cannot be verified here. No new models will be imported while this is on. Turn it off to import the full list.</string>
     <string name="nm_free_import_checking">Checking the catalogue...</string>
@@ -1534,8 +1534,8 @@
     <string name="nm_key_probe_unavailable">Could not check the key. Check the connection and try again.</string>
     <string name="nm_key_probe_unsupported">Key testing is unavailable for this address. No key was sent.</string>
     <string name="nm_context_near_limit">Context is near the model limit (%1$d / %2$d tokens). Start a new chat or use /compact to continue reliably.</string>
-    <string name="nm_free_bulk_button">Approve all listed free chat models</string>
-    <string name="nm_free_bulk_help">Approves visible models advertised as free in the latest catalogue for automatic chat selection. Does not turn on automatic mode or cost permission, and does not approve image generation. Prices and extra services may change.</string>
+    <string name="nm_free_bulk_button">Use all free models</string>
+    <string name="nm_free_bulk_help">Adds and approves the listed free chat models. Cost protections and the automatic mode setting stay as they are.</string>
     <string name="nm_free_bulk_done">Approved chat routes: %1$d. Other eligibility and cost checks still apply.</string>
     <string name="nm_free_bulk_retry">No current eligible models were approved. Refresh the catalogue and try again.</string>
     <string name="nm_image_retry_question">Would you like to try this image again? Reply yes or ask to try again.</string>
@@ -1544,4 +1544,5 @@
     <string name="nm_free_list_help">This filters this list only. It does not delete models or guarantee their cost. Turn it off to see all saved entries.</string>
     <string name="nm_free_list_refresh">No current catalogue evidence. Refresh the model list or turn off the filter.</string>
     <string name="nm_usage_reports_note">Usage is based on stored provider reports and may be incomplete. It is not a bill or proof of zero cost.</string>
+    <string name="nm_free_chat_choose">Choose a free model or refresh the provider’s model list.</string>
 </resources>

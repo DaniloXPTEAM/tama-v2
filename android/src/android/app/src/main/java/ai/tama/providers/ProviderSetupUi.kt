@@ -167,16 +167,18 @@ internal fun FreeModelImportSection(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
     status: FreeModelImportStatus? = null,
+    lockedByZeroLimit: Boolean = false,
 ) {
     val unsupported = checked && !FreeModelImport.supports(type)
     val statusText = freeModelImportStatusText(status).takeUnless { unsupported && status == FreeModelImportStatus.Unsupported }
-    val help = stringResource(R.string.nm_free_import_help)
+    val help = stringResource(if (lockedByZeroLimit) R.string.nm_reach_key_zero_body else R.string.nm_free_import_help)
     val explanation = if (unsupported) "$help\n${stringResource(R.string.nm_free_import_unsupported)}" else help
     SettingsSection(footer = listOfNotNull(explanation, statusText?.takeIf { checked || status == FreeModelImportStatus.SaveFailed }).joinToString("\n")) {
         SettingsSwitchRow(
             title = stringResource(R.string.nm_free_import_title),
             checked = checked,
-            onCheckedChange = onCheckedChange,
+            onCheckedChange = { if (!lockedByZeroLimit) onCheckedChange(it) },
+            enabled = !lockedByZeroLimit,
             showDivider = false,
         )
     }

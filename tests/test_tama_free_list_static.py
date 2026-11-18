@@ -7,14 +7,16 @@ ROOT = Path(__file__).resolve().parents[1] / 'android/src/android/app/src/main/j
 class FreeListWiring(unittest.TestCase):
     def test_parallel_own_key_list_is_reversible_and_does_not_change_saved_models(self):
         text = (ROOT / 'com/openminis/app/ui/settings/ProviderDetailScreen.kt').read_text()
-        view = text.split('// nanoMuse: this is a reversible view filter', 1)[1].split('nmDisplayedEntries.forEachIndexed', 1)[0]
-        for guard in ('nmParallel', 'ProviderType.openRouter', 'ProviderCredential.apiKey',
-                      'instance.tamaImportFreeOnly', 'tamaEligibleFreeModelIds(instanceId)',
-                      'FreeModelList.filter(entries, nmShowFreeFilter && nmFilterFree, nmFreeIds)',
-                      'onCheckedChange = { nmFilterFree = it }', 'nm_free_list_refresh'):
+        view = text.split('// nanoMuse: one per-key choice', 1)[1].split('nmDisplayedEntries.forEachIndexed', 1)[0]
+        for guard in ('if (nmHasOwnKey)', 'checked = nmOnlyFree', 'lockedByZeroLimit = nmZeroLimit',
+                      'tamaEligibleFreeModelIds(instanceId)', 'FreeModelList.filter(entries, nmOnlyFree, nmFreeIds)',
+                      'setTamaImportFreeOnly(instanceId, enabled)', 'nm_free_list_refresh'):
             self.assertIn(guard, view)
+        self.assertIn('storedKey.isNotBlank() && providerRepository.tamaOwnApiKey(instance) != null', text)
+        chat = (ROOT / 'com/openminis/app/ui/chat/ChatViewModel.kt').read_text()
+        self.assertIn('if (!nmFreeChatAllows(currentProvider)) throw ai.tama.pricing.FreeModelList.Blocked()', chat)
+        self.assertIn('if (!nmOwnKeyTurn || this@ChatViewModel.currentProvider !== client) return true', chat)
         self.assertNotIn('removeEntry(', view)
-        self.assertNotIn('updateEntry(', view)
         self.assertNotIn('setAllowUnverifiedAutomaticCost(', view)
 
 if __name__ == '__main__':

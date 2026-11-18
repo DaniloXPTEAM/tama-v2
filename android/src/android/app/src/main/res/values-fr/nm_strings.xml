@@ -1533,7 +1533,7 @@
     <string name="nm_endpoint_effective">Point de terminaison après enregistrement : %1$s</string>
     <string name="nm_endpoint_fixed_help">OpenRouter utilise cette adresse fixe.</string>
     <string name="nm_endpoint_auto_help">L’adresse vient du fournisseur choisi. Vous pouvez la modifier ; coller une clé ne remplace pas une adresse personnalisée.</string>
-    <string name="nm_free_import_title">Importer uniquement les modèles gratuits</string>
+    <string name="nm_free_import_title">Utiliser uniquement les modèles gratuits</string>
     <string name="nm_free_import_help">Importe uniquement les modèles de discussion annoncés gratuits dans le catalogue OpenRouter actuel. Les modèles existants restent. Cela ne permet pas les requêtes et ne bloque pas les frais ; les prix et services supplémentaires peuvent changer.</string>
     <string name="nm_free_import_unsupported">Le prix pour ce fournisseur et ce compte ne peut pas être vérifié ici. Aucun nouveau modèle ne sera importé tant que cette option est active. Désactivez-la pour importer toute la liste.</string>
     <string name="nm_free_import_checking">Consultation du catalogue...</string>
@@ -1554,8 +1554,8 @@
     <string name="nm_key_probe_denied">Le fournisseur a refusé l’accès ; la raison est inconnue.</string>
     <string name="nm_key_probe_unavailable">Impossible de tester la clé. Vérifiez la connexion.</string>
     <string name="nm_key_probe_unsupported">Le test de clé est indisponible pour cette adresse. Aucune clé envoyée.</string>
-    <string name="nm_free_bulk_button">Autoriser tous les modèles de chat annoncés gratuits</string>
-    <string name="nm_free_bulk_help">Autorise les modèles visibles annoncés gratuits dans le catalogue récent pour la sélection automatique du chat. Ne active ni le mode automatique ni les frais et ne autorise pas les images. Les prix et services supplémentaires peuvent changer.</string>
+    <string name="nm_free_bulk_button">Utiliser tous les modèles gratuits</string>
+    <string name="nm_free_bulk_help">Ajoute et autorise les modèles gratuits de la liste pour le chat. Le mode automatique et la protection des coûts restent inchangés.</string>
     <string name="nm_free_bulk_done">Routes de chat autorisées : %1$d. Les autres contrôles de disponibilité et de coût restent actifs.</string>
     <string name="nm_free_bulk_retry">Aucun modèle admissible actuel autorisé. Actualisez le catalogue et réessayez.</string>
     <string name="nm_image_retry_question">Voulez-vous réessayer cette image ? Répondez oui ou demandez un nouvel essai.</string>
@@ -1566,4 +1566,5 @@
     <string name="nm_free_list_refresh">Aucune donnée actuelle du catalogue. Actualisez la liste ou désactivez le filtre.</string>
     <string name="nm_usage_reports_note">La consommation repose sur les rapports enregistrés des fournisseurs et peut être incomplète. Ce n’est ni une facture ni une preuve de gratuité.</string>
     <string name="nm_loop_estimate_explanation">Estimation pour cette conversation : le plus grand nombre entre les messages de l’assistant et les blocs d’outils. Ce n’est pas un décompte exact des requêtes ou des frais.</string>
+    <string name="nm_free_chat_choose">Choisissez un modèle gratuit ou actualisez la liste du fournisseur.</string>
 </resources>

@@ -1528,7 +1528,7 @@
     <string name="nm_endpoint_effective">Titik akhir selepas disimpan: %1$s</string>
     <string name="nm_endpoint_fixed_help">OpenRouter menggunakan alamat tetap ini.</string>
     <string name="nm_endpoint_auto_help">Alamat datang daripada penyedia yang dipilih. Anda boleh mengubahnya; menampal kunci tidak menggantikan alamat tersuai.</string>
-    <string name="nm_free_import_title">Import model percuma sahaja</string>
+    <string name="nm_free_import_title">Guna model percuma sahaja</string>
     <string name="nm_free_import_help">Hanya mengimport model sembang yang diiklankan sebagai percuma dalam katalog OpenRouter semasa. Model sedia ada kekal. Ini tidak membenarkan permintaan atau menghalang caj; harga dan perkhidmatan tambahan boleh berubah.</string>
     <string name="nm_free_import_unsupported">Harga untuk penyedia dan akaun ini tidak dapat disahkan di sini. Tiada model baharu akan diimport apabila pilihan ini hidup. Matikan untuk mengimport senarai penuh.</string>
     <string name="nm_free_import_checking">Menyemak katalog...</string>
@@ -1549,8 +1549,8 @@
     <string name="nm_key_probe_denied">Penyedia menolak akses; sebabnya tidak diketahui.</string>
     <string name="nm_key_probe_unavailable">Kunci tidak dapat diuji. Semak sambungan.</string>
     <string name="nm_key_probe_unsupported">Ujian kunci tidak tersedia untuk alamat ini. Tiada kunci dihantar.</string>
-    <string name="nm_free_bulk_button">Benarkan semua model sembang yang disenaraikan percuma</string>
-    <string name="nm_free_bulk_help">Membenarkan model yang kelihatan dan disenaraikan percuma dalam katalog terkini untuk pilihan sembang automatik. Tidak menghidupkan mod automatik atau kebenaran kos dan tidak membenarkan imej. Harga dan perkhidmatan tambahan mungkin berubah.</string>
+    <string name="nm_free_bulk_button">Guna semua model percuma</string>
+    <string name="nm_free_bulk_help">Menambah dan membenarkan model sembang percuma dalam senarai. Perlindungan kos dan mod automatik tidak berubah.</string>
     <string name="nm_free_bulk_done">Laluan sembang dibenarkan: %1$d. Semakan kelayakan dan kos lain masih terpakai.</string>
     <string name="nm_free_bulk_retry">Tiada model layak semasa dibenarkan. Muat semula katalog dan cuba lagi.</string>
     <string name="nm_image_retry_question">Mahu cuba imej ini lagi? Jawab ya atau minta cuba lagi.</string>
@@ -1561,4 +1561,5 @@
     <string name="nm_free_list_refresh">Tiada data katalog terkini. Muat semula senarai model atau matikan penapis.</string>
     <string name="nm_usage_reports_note">Penggunaan berdasarkan laporan penyedia yang disimpan dan mungkin tidak lengkap. Ini bukan bil atau bukti tiada caj.</string>
     <string name="nm_loop_estimate_explanation">Anggaran untuk perbualan ini: jumlah yang lebih besar antara mesej pembantu dan blok alat. Ini bukan bilangan tepat permintaan atau caj.</string>
+    <string name="nm_free_chat_choose">Pilih model percuma atau muat semula senarai model penyedia.</string>
 </resources>

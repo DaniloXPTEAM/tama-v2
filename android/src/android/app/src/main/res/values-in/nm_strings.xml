@@ -1528,7 +1528,7 @@
     <string name="nm_endpoint_effective">Endpoint setelah disimpan: %1$s</string>
     <string name="nm_endpoint_fixed_help">OpenRouter menggunakan alamat tetap ini.</string>
     <string name="nm_endpoint_auto_help">Alamat berasal dari penyedia yang dipilih. Anda dapat mengubahnya; menempelkan kunci tidak mengganti alamat khusus.</string>
-    <string name="nm_free_import_title">Impor hanya model gratis</string>
+    <string name="nm_free_import_title">Gunakan hanya model gratis</string>
     <string name="nm_free_import_help">Hanya mengimpor model chat yang dinyatakan gratis dalam katalog OpenRouter saat ini. Model yang sudah ada tetap tersimpan. Ini tidak mengizinkan permintaan atau mencegah biaya; harga dan layanan tambahan dapat berubah.</string>
     <string name="nm_free_import_unsupported">Harga untuk penyedia dan akun ini tidak dapat diverifikasi di sini. Tidak ada model baru yang diimpor saat opsi aktif. Matikan untuk mengimpor daftar lengkap.</string>
     <string name="nm_free_import_checking">Memeriksa katalog...</string>
@@ -1549,8 +1549,8 @@
     <string name="nm_key_probe_denied">Penyedia menolak akses; alasannya tidak diketahui.</string>
     <string name="nm_key_probe_unavailable">Kunci tidak dapat diuji. Periksa koneksi.</string>
     <string name="nm_key_probe_unsupported">Pengujian kunci tidak tersedia untuk alamat ini. Tidak ada kunci yang dikirim.</string>
-    <string name="nm_free_bulk_button">Izinkan semua model chat yang tercantum gratis</string>
-    <string name="nm_free_bulk_help">Mengizinkan model terlihat yang tercantum gratis di katalog terbaru untuk pemilihan chat otomatis. Tidak mengaktifkan mode otomatis atau izin biaya dan tidak mengizinkan pembuatan gambar. Harga dan layanan tambahan dapat berubah.</string>
+    <string name="nm_free_bulk_button">Gunakan semua model gratis</string>
+    <string name="nm_free_bulk_help">Menambahkan dan mengizinkan model obrolan gratis dalam daftar. Perlindungan biaya dan mode otomatis tidak berubah.</string>
     <string name="nm_free_bulk_done">Rute chat diizinkan: %1$d. Pemeriksaan kelayakan dan biaya lain tetap berlaku.</string>
     <string name="nm_free_bulk_retry">Tidak ada model yang memenuhi syarat saat ini. Perbarui katalog dan coba lagi.</string>
     <string name="nm_image_retry_question">Ingin mencoba gambar ini lagi? Jawab ya atau minta coba lagi.</string>
@@ -1561,4 +1561,5 @@
     <string name="nm_free_list_refresh">Tidak ada data katalog terbaru. Perbarui daftar model atau matikan filter.</string>
     <string name="nm_usage_reports_note">Penggunaan berdasarkan laporan penyedia yang tersimpan dan mungkin tidak lengkap. Ini bukan tagihan atau bukti tanpa biaya.</string>
     <string name="nm_loop_estimate_explanation">Perkiraan percakapan ini: jumlah terbesar antara pesan asisten dan blok alat. Ini bukan jumlah pasti permintaan atau biaya.</string>
+    <string name="nm_free_chat_choose">Pilih model gratis atau perbarui daftar model penyedia.</string>
 </resources>

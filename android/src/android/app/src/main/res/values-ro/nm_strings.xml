@@ -1536,7 +1536,7 @@
     <string name="nm_endpoint_effective">Endpoint după salvare: %1$s</string>
     <string name="nm_endpoint_fixed_help">OpenRouter folosește această adresă fixă.</string>
     <string name="nm_endpoint_auto_help">Adresa provine de la furnizorul ales. O poți modifica; lipirea unei chei nu înlocuiește o adresă personalizată.</string>
-    <string name="nm_free_import_title">Importă doar modele gratuite</string>
+    <string name="nm_free_import_title">Folosește numai modele gratuite</string>
     <string name="nm_free_import_help">Importă doar modele de chat anunțate ca gratuite în catalogul OpenRouter actual. Modelele existente rămân. Aceasta nu autorizează cereri și nu împiedică taxarea; prețurile și serviciile suplimentare se pot schimba.</string>
     <string name="nm_free_import_unsupported">Prețul pentru acest furnizor și cont nu poate fi verificat aici. Cât timp opțiunea este activă, nu se importă modele noi. Dezactiveaz-o pentru lista completă.</string>
     <string name="nm_free_import_checking">Se verifică catalogul...</string>
@@ -1557,8 +1557,8 @@
     <string name="nm_key_probe_denied">Furnizorul a refuzat accesul; motivul nu este cunoscut.</string>
     <string name="nm_key_probe_unavailable">Cheia nu a putut fi verificată. Verifică conexiunea.</string>
     <string name="nm_key_probe_unsupported">Testarea cheii nu este disponibilă la această adresă. Nu a fost trimisă nicio cheie.</string>
-    <string name="nm_free_bulk_button">Autorizează toate modelele de chat anunțate gratuite</string>
-    <string name="nm_free_bulk_help">Autorizează modelele vizibile anunțate gratuite în catalogul recent pentru selectarea automată a chatului. Nu activează modul automat sau permisiunea de cost și nu autorizează imagini. Prețurile și serviciile suplimentare se pot schimba.</string>
+    <string name="nm_free_bulk_button">Folosește toate modelele gratuite</string>
+    <string name="nm_free_bulk_help">Adaugă și autorizează pentru chat modelele gratuite din listă. Protecția costurilor și modul automat rămân neschimbate.</string>
     <string name="nm_free_bulk_done">Rute de chat autorizate: %1$d. Celelalte verificări de eligibilitate și cost rămân valabile.</string>
     <string name="nm_free_bulk_retry">Nu a fost autorizat niciun model eligibil actual. Actualizează catalogul și încearcă din nou.</string>
     <string name="nm_image_retry_question">Vrei să încerci din nou această imagine? Răspunde da sau cere o nouă încercare.</string>
@@ -1569,4 +1569,5 @@
     <string name="nm_free_list_refresh">Nu există date actuale din catalog. Actualizează lista sau dezactivează filtrul.</string>
     <string name="nm_usage_reports_note">Utilizarea se bazează pe rapoartele salvate ale furnizorilor și poate fi incompletă. Nu este o factură sau o dovadă că nu există costuri.</string>
     <string name="nm_loop_estimate_explanation">Estimare pentru această conversație: numărul mai mare dintre mesajele asistentului și blocurile de instrumente. Nu este numărul exact de cereri sau taxe.</string>
+    <string name="nm_free_chat_choose">Alege un model gratuit sau actualizează lista furnizorului.</string>
 </resources>

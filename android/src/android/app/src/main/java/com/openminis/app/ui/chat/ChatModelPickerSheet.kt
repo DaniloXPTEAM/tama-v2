@@ -359,8 +359,10 @@ internal fun ModelPickerSheet(
         }
     }
 
-    // Filtered entries by instance
-    val allInstancesWithEntries = remember(config, searchText) {
+    // nanoMuse: the chat list follows the per-key filter and live account metadata.
+    val nmCatalogueStatuses by providerRepository.nmFreeImportStatus.collectAsState()
+    val nmSpendLimits by providerRepository.tamaZeroSpendLimits.collectAsState()
+    val allInstancesWithEntries = remember(config, searchText, nmCatalogueStatuses, nmSpendLimits) {
         val t0 = System.nanoTime()
         var totalCount = 0
         val result = config.instances
@@ -369,6 +371,10 @@ internal fun ModelPickerSheet(
                 val pt = System.nanoTime()
                 var entries = config.modelEntries.filter {
                     it.providerInstanceId == instance.id && !it.isHidden
+                }
+                if (providerRepository.tamaFreeChatOnly(instance)) {
+                    val ids = providerRepository.tamaEligibleFreeModelIds(instance.id)
+                    entries = ai.tama.pricing.FreeModelList.filter(entries, true, ids) { it.model.id }
                 }
                 // nanoMuse: the Cloud's menu first, in the menu's order; the catalog beyond
                 // it (models a member may name) after, so the recommended ones are on top.

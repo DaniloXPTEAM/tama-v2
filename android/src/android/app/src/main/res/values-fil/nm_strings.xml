@@ -1532,7 +1532,7 @@
     <string name="nm_endpoint_effective">Endpoint pagkatapos i-save: %1$s</string>
     <string name="nm_endpoint_fixed_help">Ginagamit ng OpenRouter ang nakatakdang address na ito.</string>
     <string name="nm_endpoint_auto_help">Mula sa napiling provider ang address. Maaari mo itong baguhin; hindi papalitan ng pag-paste ng key ang pasadyang address.</string>
-    <string name="nm_free_import_title">Mga libreng model lang ang i-import</string>
+    <string name="nm_free_import_title">Gumamit lamang ng mga libreng modelo</string>
     <string name="nm_free_import_help">Mga chat model lang na nakasaad na libre sa kasalukuyang katalogo ng OpenRouter ang ini-import. Mananatili ang mga dati nang model. Hindi nito pinapahintulutan ang mga request o pinipigilan ang singil; maaaring magbago ang presyo at dagdag na serbisyo.</string>
     <string name="nm_free_import_unsupported">Hindi matiyak dito ang presyo para sa provider at account na ito. Walang bagong model na mai-import habang naka-on ito. I-off upang i-import ang buong listahan.</string>
     <string name="nm_free_import_checking">Sinusuri ang katalogo...</string>
@@ -1553,8 +1553,8 @@
     <string name="nm_key_probe_denied">Tinanggihan ng provider ang access; hindi alam ang dahilan.</string>
     <string name="nm_key_probe_unavailable">Hindi masubukan ang key. Suriin ang koneksyon.</string>
     <string name="nm_key_probe_unsupported">Hindi available ang pagsubok sa address na ito. Walang key na ipinadala.</string>
-    <string name="nm_free_bulk_button">Pahintulutan ang lahat ng nakalistang libreng chat model</string>
-    <string name="nm_free_bulk_help">Pinapahintulutan ang nakikitang modelong nakalistang libre sa kamakailang katalogo para sa awtomatikong pagpili sa chat. Hindi nito binubuksan ang awtomatikong mode o pahintulot sa gastos at hindi nito pinapahintulutan ang larawan. Maaaring magbago ang presyo at dagdag na serbisyo.</string>
+    <string name="nm_free_bulk_button">Gamitin ang lahat ng libreng modelo</string>
+    <string name="nm_free_bulk_help">Idinaragdag at pinapahintulutan ang mga nakalistang libreng modelo para sa chat. Hindi binabago ang proteksiyon sa gastos at awtomatikong mode.</string>
     <string name="nm_free_bulk_done">Mga pinahintulutang chat route: %1$d. May iba pang pagsusuri sa pagiging angkop at gastos.</string>
     <string name="nm_free_bulk_retry">Walang kasalukuyang angkop na modelo ang pinahintulutan. I-refresh ang katalogo at subukan muli.</string>
     <string name="nm_image_retry_question">Gusto mo bang subukang muli ang larawang ito? Sumagot ng oo o hilinging subukan muli.</string>
@@ -1565,4 +1565,5 @@
     <string name="nm_free_list_refresh">Walang kasalukuyang datos ng katalogo. I-refresh ang listahan o patayin ang filter.</string>
     <string name="nm_usage_reports_note">Batay ang paggamit sa mga naka-save na ulat ng provider at maaaring hindi kumpleto. Hindi ito bill o patunay na walang gastos.</string>
     <string name="nm_loop_estimate_explanation">Tantiya sa usapang ito: ang mas mataas sa bilang ng mensahe ng assistant o mga bloke ng tool. Hindi ito eksaktong bilang ng request o bayarin.</string>
+    <string name="nm_free_chat_choose">Pumili ng libreng modelo o i-update ang listahan ng provider.</string>
 </resources>

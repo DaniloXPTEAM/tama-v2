@@ -1528,7 +1528,7 @@
     <string name="nm_endpoint_effective">保存後のエンドポイント：%1$s</string>
     <string name="nm_endpoint_fixed_help">OpenRouter はこの固定アドレスを使います。</string>
     <string name="nm_endpoint_auto_help">選択したプロバイダーのアドレスです。変更できます。キーを貼り付けてもカスタムアドレスは置き換わりません。</string>
-    <string name="nm_free_import_title">無料モデルのみをインポート</string>
+    <string name="nm_free_import_title">無料モデルのみ使用</string>
     <string name="nm_free_import_help">現在の OpenRouter カタログで無料と表示されたチャットモデルのみをインポートします。既存のモデルは残ります。リクエストを許可したり課金を防いだりする設定ではありません。価格や追加サービスは変わる場合があります。</string>
     <string name="nm_free_import_unsupported">このプロバイダーとアカウントの価格はここでは確認できません。オンの間は新しいモデルをインポートしません。全一覧を取り込むにはオフにしてください。</string>
     <string name="nm_free_import_checking">カタログを確認しています...</string>
@@ -1549,8 +1549,8 @@
     <string name="nm_key_probe_denied">アクセスが拒否されました。理由は不明です。</string>
     <string name="nm_key_probe_unavailable">キーを確認できませんでした。接続を確認してください。</string>
     <string name="nm_key_probe_unsupported">このアドレスではテストできません。キーは送信されていません。</string>
-    <string name="nm_free_bulk_button">無料と掲載されたチャットモデルをすべて許可</string>
-    <string name="nm_free_bulk_help">最新のカタログで無料と掲載された表示中のモデルを、チャットの自動選択に許可します。自動モードや費用の許可は有効にならず、画像生成も許可されません。価格や追加サービスは変更される場合があります。</string>
+    <string name="nm_free_bulk_button">すべての無料モデルを使用</string>
+    <string name="nm_free_bulk_help">一覧の無料チャットモデルを追加して承認します。費用の保護や自動モードの設定は変わりません。</string>
     <string name="nm_free_bulk_done">許可されたチャット経路: %1$d。その他の利用条件と費用の確認は引き続き適用されます。</string>
     <string name="nm_free_bulk_retry">現在利用条件を満たすモデルは許可されませんでした。カタログを更新して再試行してください。</string>
     <string name="nm_image_retry_question">この画像をもう一度試しますか？ はい、またはもう一度と返信してください。</string>
@@ -1561,4 +1561,5 @@
     <string name="nm_free_list_refresh">現在のカタログ情報がありません。モデル一覧を更新するか、フィルターをオフにしてください。</string>
     <string name="nm_usage_reports_note">使用量は保存されたプロバイダーの報告に基づき、不完全な場合があります。請求書でも無料の証明でもありません。</string>
     <string name="nm_loop_estimate_explanation">この会話の推定値です。アシスタントのメッセージ数とツールブロック数の多い方で、リクエスト数や請求数の正確な値ではありません。</string>
+    <string name="nm_free_chat_choose">無料モデルを選択するか、プロバイダーのモデル一覧を更新してください。</string>
 </resources>
