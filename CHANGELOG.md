@@ -4,6 +4,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+- In the parallel Android test build, asked for a local recipient review for selected key prefixes on covered provider and chat paths. Other transports remain unverified.
+
 - Split Android chat tool dispatch and stream handling out of the agent loop to reduce generated JVM method size.
 
 - In the side-by-side Android test build, serialized incoming Hub progress and terminal replies per call to prevent tested ordering and completion races. This does not fix relay misrouting.

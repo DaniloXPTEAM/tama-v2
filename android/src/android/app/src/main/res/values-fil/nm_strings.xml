@@ -1542,4 +1542,8 @@
     <string name="nm_free_import_found">%1$d model ang nakasaad na libre, %2$d ang naidagdag. Hindi nasuri ang access ng account.</string>
     <string name="nm_provider_save_failed">Hindi na-save. Suriin ang storage ng device at subukan muli.</string>
     <string name="nm_useit_incomplete">Hindi naitakda ang ilang piniling gamit. Maaaring nabago na ang iba pang pagpili. Suriin ang listahan ng mga modelo o subukan muli.</string>
+    <string name="nm_key_destination_action">Kumpirmahin ang patutunguhan</string>
+    <string name="nm_key_destination_body">Mukhang mula sa %1$s ang key, pero ipapadala ito sa %2$s. Kumpirmahin lamang kung pinagkakatiwalaan mo ang patutunguhan. Hindi nito pinapayagan ang singil.</string>
+    <string name="nm_key_destination_blocked">Hindi magkatugma ang key at address. Buksan ang setting ng provider at ayusin o kumpirmahin ang patutunguhan bago magpadala.</string>
+    <string name="nm_key_destination_invalid">Hindi valid ang address o hindi ito gumagamit ng HTTPS. Ayusin ito bago magpatuloy.</string>
 </resources>

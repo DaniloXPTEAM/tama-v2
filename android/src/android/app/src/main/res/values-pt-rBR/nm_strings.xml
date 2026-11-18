@@ -1542,4 +1542,8 @@
     <string name="nm_free_import_found">%1$d modelos anunciados como gratuitos; %2$d novos adicionados. O acesso da conta não foi verificado.</string>
     <string name="nm_provider_save_failed">Não foi possível salvar. Confira o armazenamento do aparelho e tente novamente.</string>
     <string name="nm_useit_incomplete">Não foi possível configurar todos os usos selecionados. Outros usos podem já ter mudado. Confira a lista de modelos ou tente novamente.</string>
+    <string name="nm_key_destination_action">Confirmar destino</string>
+    <string name="nm_key_destination_body">A chave parece ser da %1$s, mas será enviada para %2$s. Confirme somente se confiar nesse destino. Isso não autoriza cobranças.</string>
+    <string name="nm_key_destination_blocked">A chave e o endereço não correspondem. Abra as configurações do provedor e corrija ou confirme o destino antes de enviar.</string>
+    <string name="nm_key_destination_invalid">O endereço é inválido ou não usa HTTPS. Corrija antes de continuar.</string>
 </resources>

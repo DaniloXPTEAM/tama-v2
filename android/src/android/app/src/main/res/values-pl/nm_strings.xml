@@ -1550,4 +1550,8 @@
     <string name="nm_free_import_found">%1$d modeli oznaczonych jako darmowe, dodano %2$d. Dostęp konta nie został sprawdzony.</string>
     <string name="nm_provider_save_failed">Nie udało się zapisać. Sprawdź pamięć urządzenia i spróbuj ponownie.</string>
     <string name="nm_useit_incomplete">Nie udało się ustawić niektórych wybranych zastosowań. Inne wybory mogły już zostać zmienione. Sprawdź listę modeli lub spróbuj ponownie.</string>
+    <string name="nm_key_destination_action">Potwierdź cel</string>
+    <string name="nm_key_destination_body">Klucz wygląda na pochodzący od %1$s, ale zostanie wysłany do %2$s. Potwierdź tylko, jeśli ufasz temu celowi. To nie zezwala na opłaty.</string>
+    <string name="nm_key_destination_blocked">Klucz i adres nie pasują do siebie. Otwórz ustawienia dostawcy i popraw lub potwierdź cel przed wysłaniem.</string>
+    <string name="nm_key_destination_invalid">Adres jest nieprawidłowy lub nie używa HTTPS. Popraw go przed kontynuowaniem.</string>
 </resources>

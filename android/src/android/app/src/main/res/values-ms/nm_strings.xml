@@ -1538,4 +1538,8 @@
     <string name="nm_free_import_found">%1$d model diiklankan percuma, %2$d ditambah. Akses akaun belum disahkan.</string>
     <string name="nm_provider_save_failed">Tidak dapat menyimpan. Semak storan peranti dan cuba lagi.</string>
     <string name="nm_useit_incomplete">Sesetengah kegunaan yang dipilih tidak dapat ditetapkan. Pilihan lain mungkin telah berubah. Semak senarai model atau cuba lagi.</string>
+    <string name="nm_key_destination_action">Sahkan destinasi</string>
+    <string name="nm_key_destination_body">Kunci kelihatan daripada %1$s, tetapi akan dihantar ke %2$s. Sahkan hanya jika anda mempercayai destinasi ini. Ini tidak membenarkan caj.</string>
+    <string name="nm_key_destination_blocked">Kunci dan alamat tidak sepadan. Buka tetapan penyedia dan betulkan atau sahkan destinasi sebelum menghantar.</string>
+    <string name="nm_key_destination_invalid">Alamat tidak sah atau tidak menggunakan HTTPS. Betulkan sebelum meneruskan.</string>
 </resources>

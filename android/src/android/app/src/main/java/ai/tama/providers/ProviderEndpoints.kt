@@ -51,6 +51,17 @@ internal object ProviderEndpoints {
         ProviderType.antigravity, ProviderType.unsupported -> null
     }
 
+    /** The actual factory base for a stored configuration, including legacy empty strings. */
+    fun factoryBase(type: ProviderType, stored: String?, appendV1: Boolean): String? {
+        if (type == ProviderType.openRouter) return OPENROUTER
+        val base = stored?.trimEnd('/')
+        if (base != null) return if (appendV1 && !base.endsWith("/v1")) "$base/v1" else base
+        return when (type) {
+            ProviderType.anthropic -> "https://api.anthropic.com"
+            else -> defaultEffective(type)
+        }
+    }
+
     /**
      * Keep the built-in route as null. This matters for Anthropic: treating its
      * official address as a custom proxy changes x-api-key to Bearer auth.

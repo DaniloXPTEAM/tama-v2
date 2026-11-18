@@ -230,6 +230,13 @@ fun ProviderDetailScreen(
         // ─── Credential / API Key ───────────────────────────────────
         val isOAuthProvider =
             instance.credentialType == com.openminis.app.data.model.ProviderCredential.oauth
+        // nanoMuse: review the saved route; editing the field does not change the live route yet.
+        val nmLiveDestination = ai.tama.providers.ProviderEndpoints.factoryBase(
+            instance.providerType, instance.customBaseURL, instance.appendV1Suffix,
+        )
+        val nmReviewedKey = if (isEditingKey) editKeyValue else storedKey
+        val nmDestinationAllowed = if (nmParallel && !isOAuthProvider)
+            ai.tama.providers.KeyDestinationReview(nmReviewedKey, nmLiveDestination) else true
         SettingsSection(
             header = if (isOAuthProvider) stringResource(R.string.add_provider_credential) else stringResource(R.string.provider_list_api_key),
             footer = if (isOAuthProvider) {
@@ -263,6 +270,8 @@ fun ProviderDetailScreen(
                             keyVisible = false
                         },
                         onSave = {
+                            if (nmParallel && (!nmDestinationAllowed ||
+                                    !ai.tama.providers.KeyDestinationGuard.permits(editKeyValue, nmLiveDestination))) return@ApiKeyCredentialBlock
                             val nmFirstKey = storedKey.isBlank() && editKeyValue.isNotBlank() // nanoMuse
                             val saved = if (nmParallel) providerRepository.saveApiKeyChecked(instanceId, editKeyValue)
                                 else { providerRepository.saveApiKey(instanceId, editKeyValue); true }

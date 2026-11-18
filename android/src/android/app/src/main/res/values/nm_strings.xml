@@ -1521,4 +1521,8 @@
     <string name="nm_free_import_found">%1$d models advertised as free, %2$d added. Account access was not verified.</string>
     <string name="nm_provider_save_failed">Could not save. Check device storage and try again.</string>
     <string name="nm_useit_incomplete">Some selected uses could not be set. Other choices may already have changed. Check the model list or try again.</string>
+    <string name="nm_key_destination_action">Confirm destination</string>
+    <string name="nm_key_destination_body">This key looks like %1$s, but will be sent to %2$s. Confirm only if you trust this destination. This does not authorize charges.</string>
+    <string name="nm_key_destination_blocked">The key and address do not match. Open provider settings and correct or confirm the destination before sending.</string>
+    <string name="nm_key_destination_invalid">The address is invalid or does not use HTTPS. Correct it before continuing.</string>
 </resources>

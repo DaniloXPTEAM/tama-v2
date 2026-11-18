@@ -1508,4 +1508,8 @@
     <string name="nm_free_import_found">標示免費的模型 %1$d 個，新增 %2$d 個。尚未驗證帳戶存取權。</string>
     <string name="nm_provider_save_failed">無法儲存。請檢查裝置儲存空間後重試。</string>
     <string name="nm_useit_incomplete">部分選取的用途無法設定。其他用途可能已經變更。請檢查模型清單或再試一次。</string>
+    <string name="nm_key_destination_action">確認目標地址</string>
+    <string name="nm_key_destination_body">金鑰似乎屬於%1$s，但將傳送至%2$s。只有信任此地址時才確認。此操作不授權收費。</string>
+    <string name="nm_key_destination_blocked">金鑰和地址不相符。傳送前請開啟服務商設定，修改或確認目標地址。</string>
+    <string name="nm_key_destination_invalid">地址無效或未使用HTTPS。請先修改再繼續。</string>
 </resources>

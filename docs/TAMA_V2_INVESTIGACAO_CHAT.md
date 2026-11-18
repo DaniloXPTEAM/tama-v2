@@ -81,3 +81,24 @@ outras rotas que possam transmitir credenciais, sem desligar guardas de cobranç
 tratamento de endereço em JVM, com dublês e trechos extraídos, sem rede. O teste também
 confere estática e pontualmente o catálogo e a ligação do formulário; não executa a
 fábrica inteira, a tela, o envio HTTP ou Android. Os limites estão no README do teste.
+
+## Proteção parcial de destinatário no pacote paralelo
+
+Foi acrescentada uma revisão local dos prefixos `gsk_` e `sk-or-` no cadastro, na
+edição da chave, na descoberta de modelos do repositório e nos envios comuns de texto
+OpenAI, Anthropic e Gemini. Ela compara a URL efetiva, sem trocar o endereço; quando
+difere, a confirmação exibe o destino antes de permitir prosseguir. URLs inválidas ou
+sem HTTPS não podem ser confirmadas. A confirmação é limitada ao processo e ao par
+exato de chave e endereço, sem guardar nenhum dos dois. Ela não é autorização de custo;
+as guardas existentes continuam independentes. No chat, uma recusa local no caminho
+coberto tem texto específico e não deve disparar nova tentativa nem fallback.
+
+**NÃO VERIFICADO:** integração Android, tela, Room, loop completo, erro visível no Poco,
+concorrência, redirecionamentos e execução nas duas identidades reais. A rotina JVM
+exercita a política, não a transmissão ou o Android. O seletor automático ou a guarda
+de custo podem barrar a operação antes de o provider produzir o novo aviso.
+
+**NÃO FEITO:** proteção geral para todos os transportes e todas as credenciais. Em
+particular, chamadas de mídia, passthrough, voz, logins OAuth, cabeçalhos substituídos e
+outras rotas diretas precisam de auditoria própria. Não tratar a mudança como proteção
+completa contra envio incorreto de credenciais ou cobrança.

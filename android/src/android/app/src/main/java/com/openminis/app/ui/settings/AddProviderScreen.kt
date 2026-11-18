@@ -748,10 +748,16 @@ private fun ColumnScope.ApiKeyConfigSection(
         }
     }
 
+    // nanoMuse: a prefix suggests an owner, not consent to send a key to another host.
+    val nmDestination = if (nmParallel) ai.tama.providers.ProviderEndpoints.factoryBase(
+        providerType, ai.tama.providers.ProviderEndpoints.storageBase(providerType, customBaseURL, appendV1Suffix), appendV1Suffix,
+    ) else null
+    val nmDestinationAllowed = if (nmParallel) ai.tama.providers.KeyDestinationReview(apiKey, nmDestination) else true
     // ── Save button (outside any section — terminal action) ────────────
     Spacer(Modifier.height(20.dp))
     MinisButton(
         onClick = {
+            if (nmParallel && !ai.tama.providers.KeyDestinationGuard.permits(apiKey, nmDestination)) return@MinisButton
             val trimmedBase = customBaseURL.trim()
             val storedBase = if (nmParallel) ai.tama.providers.ProviderEndpoints.storageBase(providerType, trimmedBase, appendV1Suffix)
                 else trimmedBase.ifEmpty { null }
@@ -798,7 +804,7 @@ private fun ColumnScope.ApiKeyConfigSection(
         // private relays need no key. Official endpoints and OAuth flows
         // keep requiring a credential. Mirrors iOS AddProviderView.
         // nanoMuse: no saving while the endpoint is a plain http:// address off the local network
-        enabled = (!nmParallel || !autoSuggested) && io.github.nanomuse.net.LanOnly.refusedHost(customBaseURL) == null && (
+        enabled = (!nmParallel || (!autoSuggested && nmDestinationAllowed)) && io.github.nanomuse.net.LanOnly.refusedHost(customBaseURL) == null && (
             apiKey.isNotBlank() || (
                 (if (nmParallel) ai.tama.providers.ProviderEndpoints.storageBase(providerType, customBaseURL, appendV1Suffix) != null
                     else customBaseURL.isNotBlank()) &&

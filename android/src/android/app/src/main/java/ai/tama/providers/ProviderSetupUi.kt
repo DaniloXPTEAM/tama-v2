@@ -74,6 +74,40 @@ internal fun suggestedKeyProvider(context: android.content.Context, apiKey: Stri
     return OwnKeyPresets.template(provider, Region.mainland(context), ProviderCatalogue.chinese(context))
 }
 
+/** Local, process-only confirmation for a key whose prefix and destination differ. */
+@Composable
+internal fun KeyDestinationReview(key: String, endpoint: String?): Boolean {
+    var revision by remember(key, endpoint) { mutableStateOf(0) }
+    var showDialog by remember(key, endpoint) { mutableStateOf(false) }
+    // Reading revision makes a confirmation immediately update the Save button.
+    val allowed = remember(key, endpoint, revision) { KeyDestinationGuard.permits(key, endpoint) }
+    val review = KeyDestinationGuard.review(key, endpoint)
+    if (!allowed && review != null) {
+        val destination = review.destination
+        SettingsSection(footer = if (destination == null) stringResource(R.string.nm_key_destination_invalid)
+            else stringResource(R.string.nm_key_destination_body, review.provider, destination)) {
+            SettingsRow(
+                title = stringResource(R.string.nm_key_destination_action),
+                onClick = if (destination == null) null else ({ showDialog = true }),
+                showDivider = false,
+            )
+        }
+        if (showDialog && destination != null) {
+            com.openminis.app.ui.components.MinisAlertDialog(
+                onDismissRequest = { showDialog = false },
+                title = stringResource(R.string.nm_key_destination_action),
+                text = stringResource(R.string.nm_key_destination_body, review.provider, destination),
+                confirmText = stringResource(R.string.nm_key_destination_action),
+                onConfirm = {
+                    if (KeyDestinationGuard.confirm(key, endpoint)) revision += 1
+                    showDialog = false
+                },
+            )
+        }
+    }
+    return allowed
+}
+
 /** An inferred endpoint is displayed immediately, but cannot be saved without this tap. */
 @Composable
 internal fun KeyProviderConfirmation(providerName: String, onConfirm: () -> Unit) {

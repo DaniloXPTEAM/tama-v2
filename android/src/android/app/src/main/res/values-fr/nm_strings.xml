@@ -1543,4 +1543,8 @@
     <string name="nm_free_import_found">%1$d modèles annoncés gratuits, %2$d ajoutés. L’accès du compte n’a pas été vérifié.</string>
     <string name="nm_provider_save_failed">Enregistrement impossible. Vérifiez le stockage de l’appareil et réessayez.</string>
     <string name="nm_useit_incomplete">Certaines utilisations sélectionnées ne sont pas configurées. Les autres choix ont peut-être déjà changé. Vérifiez la liste des modèles ou réessayez.</string>
+    <string name="nm_key_destination_action">Confirmer la destination</string>
+    <string name="nm_key_destination_body">La clé semble provenir de %1$s, mais sera envoyée à %2$s. Confirmez uniquement si cette destination est fiable. Cela ne permet pas de frais.</string>
+    <string name="nm_key_destination_blocked">La clé et la destination ne correspondent pas. Ouvrez les paramètres du fournisseur et corrigez ou confirmez la destination avant envoi.</string>
+    <string name="nm_key_destination_invalid">La destination est invalide ou ne prévoit pas HTTPS. Corrigez-la avant de continuer.</string>
 </resources>

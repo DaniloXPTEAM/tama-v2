@@ -1542,4 +1542,8 @@
     <string name="nm_free_import_found">%1$d als kostenlos angegebene Modelle, %2$d hinzugefügt. Der Kontozugriff wurde nicht geprüft.</string>
     <string name="nm_provider_save_failed">Speichern fehlgeschlagen. Prüfe den Gerätespeicher und versuche es erneut.</string>
     <string name="nm_useit_incomplete">Einige ausgewählte Verwendungen konnten nicht eingestellt werden. Andere Einstellungen wurden möglicherweise bereits geändert. Prüfe die Modellliste oder versuche es erneut.</string>
+    <string name="nm_key_destination_action">Ziel bestätigen</string>
+    <string name="nm_key_destination_body">Der Schlüssel scheint von %1$s zu stammen, wird aber an %2$s gesendet. Bestätigen Sie nur, wenn Sie diesem Ziel vertrauen. Dies erlaubt keine Kosten.</string>
+    <string name="nm_key_destination_blocked">Schlüssel und Adresse passen nicht zusammen. Öffnen Sie die Anbietereinstellungen und korrigieren oder bestätigen Sie das Ziel vor dem Senden.</string>
+    <string name="nm_key_destination_invalid">Die Adresse ist ungültig oder verwendet kein HTTPS. Korrigieren Sie sie vor dem Fortfahren.</string>
 </resources>

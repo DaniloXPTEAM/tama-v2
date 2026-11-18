@@ -2491,6 +2491,18 @@ class ProviderRepository(private val context: Context) {
         try {
             kotlinx.coroutines.currentCoroutineContext().ensureActive()
             if (!nmRefreshCanStart(refresh)) return
+            // nanoMuse: model discovery can transmit a key too. Use the captured
+            // credential and route, before either normal or free-only discovery.
+            val instance = refresh.instance
+            if (instance.credentialType == ProviderCredential.apiKey) {
+                val base = ai.tama.providers.ProviderEndpoints.factoryBase(
+                    instance.providerType, instance.customBaseURL, instance.appendV1Suffix,
+                )
+                if (!ai.tama.providers.KeyDestinationGuard.permits(refresh.key.key, base)) {
+                    nmRefreshFailed(refresh)
+                    return
+                }
+            }
             if (refresh.instance.tamaImportFreeOnly) nmRefreshFreeModels(refresh)
             else refreshStandardModels(refresh.instance, refresh)
         } catch (e: kotlinx.coroutines.CancellationException) {

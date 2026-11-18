@@ -8081,6 +8081,7 @@ class ChatViewModel(
         val localMessage = if (!parallel || llmError?.nmProviderReach != null || llmError?.nmRelayError != null) {
             actual.message ?: "Unknown error"
         } else when {
+            actual is ai.tama.providers.KeyDestinationGuard.Blocked -> context.getString(R.string.nm_key_destination_blocked)
             actual is ai.tama.pricing.ModelCostGuard.Blocked -> context.getString(R.string.nm_model_cost_blocked)
             detail == unconfirmed -> unconfirmed
             detail == disabled -> disabled
@@ -10843,8 +10844,9 @@ class ChatViewModel(
                             continue
                         }
                         val actual = unwrapFlowException(e)
-                        // nanoMuse: changing the cost guard cannot trigger retries or another provider.
-                        if (actual is ai.tama.pricing.ModelCostGuard.Blocked) throw actual
+                        // nanoMuse: local recipient/cost refusals cannot trigger retries or another provider.
+                        if (actual is ai.tama.pricing.ModelCostGuard.Blocked ||
+                            actual is ai.tama.providers.KeyDestinationGuard.Blocked) throw actual
                         if (nmAutoTurn != null && !AutoModelStore.enabled(context)) throw actual
                         val isRateLimit = actual is com.openminis.app.data.model.LLMError.RateLimited
                         // nanoMuse: a token count such as 5000 in a 400 is not an HTTP 500.

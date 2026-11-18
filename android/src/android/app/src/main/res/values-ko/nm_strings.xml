@@ -1538,4 +1538,8 @@
     <string name="nm_free_import_found">무료로 표시된 모델 %1$d개, 추가된 모델 %2$d개. 계정 접근 권한은 확인하지 않았습니다.</string>
     <string name="nm_provider_save_failed">저장하지 못했습니다. 기기 저장 공간을 확인한 후 다시 시도하세요.</string>
     <string name="nm_useit_incomplete">선택한 용도 중 일부를 설정하지 못했습니다. 다른 선택 항목은 이미 변경되었을 수 있습니다. 모델 목록을 확인하거나 다시 시도하세요.</string>
+    <string name="nm_key_destination_action">대상 확인</string>
+    <string name="nm_key_destination_body">키는 %1$s의 것으로 보이지만 %2$s에 전송됩니다. 신뢰하는 대상인 경우에만 확인하세요. 비용을 허용하는 것은 아닙니다.</string>
+    <string name="nm_key_destination_blocked">키와 주소가 일치하지 않습니다. 전송하기 전에 제공자 설정에서 대상을 수정하거나 확인하세요.</string>
+    <string name="nm_key_destination_invalid">주소가 잘못되었거나 HTTPS를 사용하지 않습니다. 계속하기 전에 수정하세요.</string>
 </resources>

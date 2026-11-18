@@ -1538,4 +1538,8 @@
     <string name="nm_free_import_found">%1$d model dinyatakan gratis, %2$d ditambahkan. Akses akun belum diverifikasi.</string>
     <string name="nm_provider_save_failed">Tidak dapat menyimpan. Periksa penyimpanan perangkat dan coba lagi.</string>
     <string name="nm_useit_incomplete">Beberapa penggunaan yang dipilih tidak dapat diatur. Pilihan lain mungkin sudah berubah. Periksa daftar model atau coba lagi.</string>
+    <string name="nm_key_destination_action">Konfirmasi tujuan</string>
+    <string name="nm_key_destination_body">Kunci tampaknya dari %1$s, tetapi akan dikirim ke %2$s. Konfirmasikan hanya jika tujuan ini tepercaya. Ini tidak mengizinkan biaya.</string>
+    <string name="nm_key_destination_blocked">Kunci dan alamat tidak cocok. Buka pengaturan penyedia dan perbaiki atau konfirmasi tujuan sebelum mengirim.</string>
+    <string name="nm_key_destination_invalid">Alamat tidak valid atau tidak menggunakan HTTPS. Perbaiki sebelum melanjutkan.</string>
 </resources>
