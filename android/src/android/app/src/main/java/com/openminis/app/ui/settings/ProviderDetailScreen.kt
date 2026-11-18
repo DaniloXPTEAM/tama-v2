@@ -654,7 +654,7 @@ fun ProviderDetailScreen(
                 // keep the normal app and Cloud row unchanged.
                 title = if (nmParallel && storedKey.isNotBlank() &&
                     instance.credentialType == com.openminis.app.data.model.ProviderCredential.apiKey &&
-                    io.github.nanomuse.cloud.NanoMuseCloud.instance(exportContext)?.id != instanceId) {
+                    io.github.nanomuse.cloud.NanoMuseCloud.instance(exportContext)?.id?.let { it != instanceId } == true) {
                     if (isRefreshing) stringResource(R.string.nm_cloud_refreshing)
                     else stringResource(R.string.provider_detail_refresh_models)
                 } else if (isRefreshing) "Refreshing…" else "Refresh model list",

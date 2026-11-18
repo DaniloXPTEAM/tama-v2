@@ -132,6 +132,7 @@ anteriores que descrevem apenas dois prefixos são o registro da etapa inicial.
 ## Texto de atualização da lista
 
 Na variante paralela, a linha de atualizar modelos de um provedor com chave própria
-cadastrada usa textos já traduzidos. A linha da Cloud, a ausência de chave e o app
-normal mantêm o texto anterior. A condição foi verificada estaticamente; Compose,
+cadastrada usa textos já traduzidos quando a instância Cloud pode ser identificada.
+A linha da Cloud, a ausência de chave, a Cloud não identificada e o app normal mantêm
+o texto anterior. A condição foi verificada estaticamente; Compose,
 o dispositivo e a atualização real da lista não foram executados neste teste.

@@ -14,7 +14,7 @@ class OwnKeyRefreshLabel(unittest.TestCase):
         end = source.index("onClick = if (isRefreshing)", start)
         block = source[start:end]
         for guard in ("nmParallel && storedKey.isNotBlank()", "ProviderCredential.apiKey",
-                      "NanoMuseCloud.instance(exportContext)?.id != instanceId"):
+                      "NanoMuseCloud.instance(exportContext)?.id?.let { it != instanceId } == true"):
             self.assertIn(guard, block)
         self.assertIn("stringResource(R.string.nm_cloud_refreshing)", block)
         self.assertIn("stringResource(R.string.provider_detail_refresh_models)", block)
