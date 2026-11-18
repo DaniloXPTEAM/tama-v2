@@ -128,3 +128,10 @@ A proteção parcial acima foi ampliada para pistas `sk-ant-`, `xai-`, `AQ.` e
 `AIza` no mesmo conjunto limitado de rotas. Os testes locais usam chaves fictícias;
 as rotas não cobertas continua existindo risco de envio não revisado. Os trechos
 anteriores que descrevem apenas dois prefixos são o registro da etapa inicial.
+
+## Texto de atualização da lista
+
+Na variante paralela, a linha de atualizar modelos de um provedor com chave própria
+cadastrada usa textos já traduzidos. A linha da Cloud, a ausência de chave e o app
+normal mantêm o texto anterior. A condição foi verificada estaticamente; Compose,
+o dispositivo e a atualização real da lista não foram executados neste teste.

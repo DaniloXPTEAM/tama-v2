@@ -4,6 +4,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+- Localized the model refresh row for configured own-key providers in the parallel Android test build.
+
 - In the parallel Android test build, asked for a local recipient review for selected key prefixes on covered provider and chat paths. Other transports remain unverified.
 
 - Split Android chat tool dispatch and stream handling out of the agent loop to reduce generated JVM method size.

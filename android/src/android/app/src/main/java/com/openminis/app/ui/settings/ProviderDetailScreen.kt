@@ -650,7 +650,14 @@ fun ProviderDetailScreen(
             // Refresh action sits as the first row, mirroring the iOS
             // tap-to-refresh affordance in the section header area.
             SettingsRow(
-                title = if (isRefreshing) "Refreshing…" else "Refresh model list",
+                // nanoMuse: localize only an own-key provider in the isolated build;
+                // keep the normal app and Cloud row unchanged.
+                title = if (nmParallel && storedKey.isNotBlank() &&
+                    instance.credentialType == com.openminis.app.data.model.ProviderCredential.apiKey &&
+                    io.github.nanomuse.cloud.NanoMuseCloud.instance(exportContext)?.id != instanceId) {
+                    if (isRefreshing) stringResource(R.string.nm_cloud_refreshing)
+                    else stringResource(R.string.provider_detail_refresh_models)
+                } else if (isRefreshing) "Refreshing…" else "Refresh model list",
                 onClick = if (isRefreshing) {
                     null
                 } else {
