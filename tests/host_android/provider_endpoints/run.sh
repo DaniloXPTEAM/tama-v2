@@ -33,7 +33,7 @@ start_refresh = repo.index('private suspend fun nmRunRefresh(')
 assert repo.index('KeyDestinationGuard.permits(refresh.key.key, base)', start_refresh) < repo.index('nmRefreshFreeModels(refresh)', start_refresh)
 chat = (main / 'com/openminis/app/ui/chat/ChatViewModel.kt').read_text()
 assert 'actual is ai.tama.providers.KeyDestinationGuard.Blocked -> context.getString(R.string.nm_key_destination_blocked)' in chat
-assert 'actual is ai.tama.providers.KeyDestinationGuard.Blocked) throw actual' in chat
+assert 'if (recipientBlocked && !nmOwnKeyTurn) throw actual' in chat
 for name in ('anthropic/AnthropicProvider.kt', 'gemini/GeminiProvider.kt'):
     provider_source = (main / 'com/openminis/app/provider' / name).read_text()
     assert provider_source.count('KeyDestinationGuard.requireAllowed(') == 2

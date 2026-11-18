@@ -3060,6 +3060,19 @@ class ProviderRepository(private val context: Context) {
     fun usableApiKey(instance: ProviderInstance): String? =
         loadApiKey(instance.id) ?: if (instance.allowsEmptyAPIKey) "" else null
 
+    // nanoMuse: do not treat the Cloud sign-in, OAuth, or an empty gateway credential as a personal key.
+    internal fun tamaOwnApiKey(instance: ProviderInstance): String? {
+        if (com.openminis.app.BuildConfig.APPLICATION_ID != "ai.tama.assistant.tamav2test" ||
+            instance.credentialType != ProviderCredential.apiKey) return null
+        val cloud = io.github.nanomuse.cloud.NanoMuseCloud.instance(context)
+        val key = loadApiKey(instance.id)
+        return key.takeIf {
+            ai.tama.providers.OwnKeyScope.active(true, true, it,
+                managedRelay = cloud?.id == instance.id ||
+                    instance.effectiveBaseURL?.let(io.github.nanomuse.net.OwnProviderProxy::isRelay) == true)
+        }
+    }
+
     fun deleteApiKey(instanceId: String) {
         val parallel = com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test" // nanoMuse
         val secrets = encryptedPrefs // nanoMuse: initialize outside the credential lock.

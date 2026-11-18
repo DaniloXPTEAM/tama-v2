@@ -119,6 +119,30 @@ class AutomaticFailureWireTest {
         } finally { server.shutdown() }
     }
 
+    @Test fun explicitPersonalKeyRefusalsCarryTheirOwnFallbackDecision() = runBlocking {
+        MockWebServer().use { server ->
+            server.start()
+            val fixtures = listOf(
+                Triple(403, "key_limit_exceeded", ModelHealth.Failure.SPEND_LIMIT),
+                Triple(404, "model_decommissioned", ModelHealth.Failure.MODEL_UNAVAILABLE),
+                Triple(408, "request_timeout", ModelHealth.Failure.NETWORK),
+                Triple(507, "server_error", ModelHealth.Failure.SERVER),
+            )
+            for ((status, code, reason) in fixtures) {
+                server.enqueue(MockResponse().setResponseCode(status)
+                    .setBody("""{"error":{"code":"$code","message":"fixture refusal"}}"""))
+                val error = failure(server)
+                val decision = AutoModelFailure.classify(error, false, switchOnAmbiguousAccessDenied = false,
+                    ownKeyTurn = true) as AutoModelFailure.Decision.Cooldown
+                assertEquals(reason, decision.reason)
+                if (status in setOf(403, 404, 408)) {
+                    assertNull(AutoModelFailure.classify(error, false, switchOnAmbiguousAccessDenied = false))
+                }
+            }
+            assertEquals(fixtures.size, server.requestCount)
+        }
+    }
+
     @Test fun inlineErrorDoesNotPretendToBeAnHttpStatus() = runBlocking {
         val server = MockWebServer()
         server.start()

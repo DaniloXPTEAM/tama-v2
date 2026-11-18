@@ -1,4 +1,7 @@
 import ai.tama.router.*
+import ai.tama.net.OwnKeyFailureSignals
+import ai.tama.net.OwnKeyFailureSignals.Hint
+import ai.tama.providers.OwnKeyScope
 
 /** Selection policy only, no HTTP, Android, Cloud, pricing catalogue or chat UI. */
 fun main() {
@@ -31,5 +34,17 @@ fun main() {
     check(blocked.rejected.all { it.reason == ModelRouter.Reason.UNVERIFIED_COST })
     val lackingTools = ModelRouter.pick(choices, setOf(Need.CHAT, Need.TOOLS)) as ModelRouter.Choice.None
     check(lackingTools.rejected.all { it.reason == ModelRouter.Reason.MISSING_CAPABILITY })
+    check(!OwnKeyScope.active(true, true, null, false))
+    check(!OwnKeyScope.active(true, true, "   ", false))
+    check(!OwnKeyScope.active(true, true, "fixture-relay", true))
+    check(!OwnKeyScope.active(true, false, "fixture-oauth", false))
+    check(!OwnKeyScope.active(false, true, "fixture-key", false))
+    check(OwnKeyScope.active(true, true, "fixture-key", false))
+    check(OwnKeyFailureSignals.detect(403, listOf("key_limit_exceeded"), "blocked") == Hint.SPEND_LIMIT)
+    check(OwnKeyFailureSignals.detect(403, emptyList(), "Key limit exceeded (spent 0)") == Hint.SPEND_LIMIT)
+    check(OwnKeyFailureSignals.detect(403, listOf("moderation"), "access denied") == null)
+    check(OwnKeyFailureSignals.detect(404, listOf("model_decommissioned"), "retired") == Hint.MODEL_UNAVAILABLE)
+    check(OwnKeyFailureSignals.detect(404, emptyList(), "Not found") == null)
+    check(OwnKeyFailureSignals.detect(400, listOf("unsupported_parameter"), "model does not accept temperature") == null)
     println("PASSOU: seleção e cooldowns fictícios; não testa chat, provedor ou rede")
 }

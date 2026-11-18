@@ -5337,6 +5337,7 @@ class ChatViewModel(
         // nanoMuse: these snapshots are populated only for the parallel build.
         val groupId: String? = null,
         val accountVersion: Long? = null,
+        val ownKeyFallback: Boolean = false,
     )
 
     private fun buildFallbackProviders(primaryProvider: LLMProvider): List<FallbackCandidate> {
@@ -5355,6 +5356,7 @@ class ChatViewModel(
             }
         val result = mutableListOf<FallbackCandidate>()
         val parallelTest = com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test"
+        val ownKeyFallback = parallelTest && nmOwnKeyFallbackTurn(primaryProvider)
         val legacyOrder = (1 until members.size).map { offset ->
             val idx = if (currentIdx >= 0) (currentIdx + offset) % members.size else offset
             members[idx]
@@ -5377,15 +5379,34 @@ class ChatViewModel(
                         instance.providerType.isUsable, credentialed, approved) ||
                     !ai.tama.router.AutomaticCostGuard.permits(context)) continue
             } else if (!instance.isEnabled || !credentialed) continue
+            if (ownKeyFallback && !nmOwnKeyRecipientAllowed(instance)) continue
             val accountVersion = if (parallelTest) AutoModelRuntime.accountVersion(instance.id) else null
             val apiKey = providerRepository.usableApiKey(instance) ?: ""
             val p = try {
                 nmCreateProvider(instance, apiKey, entry.model)
             } catch (_: Exception) { continue }
             result.add(FallbackCandidate(provider = p, entryId = entry.id,
-                groupId = if (parallelTest) groupId else null, accountVersion = accountVersion))
+                groupId = if (parallelTest) groupId else null, accountVersion = accountVersion, ownKeyFallback = ownKeyFallback))
         }
         return result
+    }
+
+    // nanoMuse: skip an unconfirmed recipient rather than retrying the same key elsewhere.
+    private fun nmOwnKeyRecipientAllowed(instance: ProviderInstance): Boolean {
+        val key = providerRepository.tamaOwnApiKey(instance) ?: return true
+        val base = if (instance.azureMode) instance.customBaseURL else ai.tama.providers.ProviderEndpoints.factoryBase(
+            instance.providerType, instance.customBaseURL, instance.appendV1Suffix,
+        )
+        return ai.tama.providers.KeyDestinationGuard.permits(key, base)
+    }
+
+    private fun nmOwnKeyFallbackTurn(client: LLMProvider): Boolean {
+        if (this.currentProvider !== client) return false // no one-shot or Cloud retry
+        val entryId = _activeEntryId.value ?: return false
+        val entry = providerRepository.config.value.modelEntries.find { it.id == entryId } ?: return false
+        val instance = providerRepository.instance(entry.providerInstanceId) ?: return false
+        return providerRepository.tamaOwnApiKey(instance) != null &&
+            nmRouteFingerprint(client) == AutoModelStore.historyFingerprint(context, instance)
     }
 
     /** A group can be edited while a failed request is waiting to retry. */
@@ -5399,6 +5420,7 @@ class ChatViewModel(
         val group = config.modelGroups.find { it.id == groupId } ?: return false
         val entry = config.modelEntries.find { it.id == candidate.entryId } ?: return false
         val instance = config.instances.find { it.id == entry.providerInstanceId } ?: return false
+        if (candidate.ownKeyFallback && !nmOwnKeyRecipientAllowed(instance)) return false
         return ai.tama.router.GroupFallback.eligible(
             hidden = entry.isHidden,
             enabled = instance.isEnabled,
@@ -9190,6 +9212,7 @@ class ChatViewModel(
         val tamaV2Test = com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test"
         // In the isolated build, selecting a fallback is provisional until that route answers.
         val nmFallbackCommit = if (tamaV2Test) ai.tama.router.FallbackCommit() else null
+        val nmOwnKeyTurn = tamaV2Test && nmOwnKeyFallbackTurn(provider)
         var nmManualFallback: FallbackCandidate? = null
         val nmLoopSession = realSessionId.ifEmpty { sessionId }
         // nanoMuse: capture the last persisted binding after prior queued selections.
@@ -9408,7 +9431,9 @@ class ChatViewModel(
                 val identity = AutoModelStore.identity(entry, instance)
                 val caps = nmAutoCapabilities(entry, instance)
                 val model = nmAutoModel(entry, caps)
-                val credentialed = providerRepository.hasAnyCredential(instance) &&
+                val recipientAllowed = !nmOwnKeyTurn || nmOwnKeyRecipientAllowed(instance)
+                if (!recipientAllowed) nmAutoLocalBlocks[entry.id] = context.getString(R.string.nm_key_destination_blocked)
+                val credentialed = recipientAllowed && providerRepository.hasAnyCredential(instance) &&
                     instance.providerType !in setOf(ProviderType.antigravity, ProviderType.unsupported)
                 val budget = nmBudgetForEntry(entry.id, entry.model.id)
                 val vendor = io.github.nanomuse.cloud.ProviderCatalogue.match(catalogue, instance)
@@ -9454,7 +9479,8 @@ class ChatViewModel(
                 !instance.providerType.isUsable || instance.providerType == ProviderType.antigravity ||
                 !providerRepository.hasAnyCredential(instance) || AutoModelStore.identity(entry, instance) != choice.identity ||
                 AutoModelRuntime.accountVersion(instance.id) != choice.accountVersion) return false
-            if (!AutoModelStore.approved(context, choice.identity)) return false
+            if (!AutoModelStore.approved(context, choice.identity) ||
+                (nmOwnKeyTurn && !nmOwnKeyRecipientAllowed(instance))) return false
             val capabilities = nmAutoCapabilities(entry, instance)
             return capabilities == choice.candidate.capabilities && nmAutoModel(entry, capabilities) == choice.model
         }
@@ -9530,6 +9556,8 @@ class ChatViewModel(
             ModelHealth.Failure.SERVER -> R.string.nm_auto_failure_server
             ModelHealth.Failure.NETWORK -> R.string.nm_auto_failure_network
             ModelHealth.Failure.REQUEST_TOO_LARGE -> R.string.nm_auto_failure_size
+            ModelHealth.Failure.MODEL_UNAVAILABLE -> R.string.nm_auto_reason_capability
+            ModelHealth.Failure.SPEND_LIMIT -> R.string.nm_auto_failure_quota
         })
         fun nmAutoWait(until: Long?): String = if (until == null) context.getString(R.string.nm_auto_wait_unknown) else {
             val remaining = (until - android.os.SystemClock.elapsedRealtime()).coerceAtLeast(0L)
@@ -10955,9 +10983,16 @@ class ChatViewModel(
                             continue
                         }
                         val actual = unwrapFlowException(e)
-                        // nanoMuse: local recipient/cost refusals cannot trigger retries or another provider.
-                        if (actual is ai.tama.pricing.ModelCostGuard.Blocked ||
-                            actual is ai.tama.providers.KeyDestinationGuard.Blocked) throw actual
+                        // nanoMuse: a cost refusal is terminal. A recipient refusal for a personal key
+                        // can skip that entry, never retry the same key at a different address.
+                        if (actual is ai.tama.pricing.ModelCostGuard.Blocked) throw actual
+                        val recipientBlocked = actual is ai.tama.providers.KeyDestinationGuard.Blocked ||
+                            (nmOwnKeyTurn && ai.tama.providers.KeyDestinationGuard.causedByBlock(e))
+                        if (recipientBlocked && !nmOwnKeyTurn) throw actual
+                        val decision = if (nmAutoTurn != null || nmFallbackCommit != null)
+                            ai.tama.router.AutoModelFailure.classify(actual, nmRequestTools.isNotEmpty(),
+                                switchOnAmbiguousAccessDenied = !tamaV2Test, ownKeyTurn = nmOwnKeyTurn)
+                        else null
                         if (nmAutoTurn != null && !AutoModelStore.enabled(context)) throw actual
                         val isRateLimit = actual is com.openminis.app.data.model.LLMError.RateLimited
                         // nanoMuse: a token count such as 5000 in a 400 is not an HTTP 500.
@@ -10999,10 +11034,12 @@ class ChatViewModel(
                         // nanoMuse: a verified upper bound changes the next request; a short 429
                         // gets one bounded wait. Neither path repeats already executed tools.
                         val outputRetry = ai.tama.net.ProviderRecovery.outputRetry(reach, lastRequestedOutput, outputRetried)
-                        val rateDelay = if (isRateLimit && nmAutoTurn == null)
+                        val switchBeforeRetry = nmOwnKeyTurn && remainingFallbacks.isNotEmpty() &&
+                            ai.tama.router.GroupFallback.canSwitch(decision, sizeRejection)
+                        val rateDelay = if (isRateLimit && nmAutoTurn == null && !switchBeforeRetry)
                             ai.tama.net.ProviderRecovery.rateDelay(reach, rateRetried) else null
                         if (smallerProfile != null ||
-                            (((isTransient && nmAutoTurn == null) || recoveredContext || outputRetry != null || rateDelay != null) &&
+                            (((isTransient && nmAutoTurn == null && !switchBeforeRetry) || recoveredContext || outputRetry != null || rateDelay != null) &&
                                 retryAttempt < AUTO_RETRY_DELAYS_SEC.size)) {
                             if (smallerProfile != null) {
                                 nmInstall(smallerProfile)
@@ -11121,9 +11158,7 @@ class ChatViewModel(
                         if (nmAutoTurn != null) {
                             // A bug, malformed request, safety refusal or cancellation must not
                             // silently trigger another potentially billable provider.
-                            val decision = ai.tama.router.AutoModelFailure.classify(
-                                actual, nmRequestTools.isNotEmpty(), switchOnAmbiguousAccessDenied = !tamaV2Test,
-                            ) ?: throw actual
+                            if (decision == null && !recipientBlocked) throw actual
                             val failed = checkNotNull(nmAutoCandidate)
                             val expectedVersion = nmDispatchAccountVersion
                             // nanoMuse: checking a version and then recording separately permits
@@ -11136,6 +11171,7 @@ class ChatViewModel(
                                     }
                                 ai.tama.router.AutoModelFailure.Decision.UnsupportedTools ->
                                     nmAutoIdentity?.let { AutoModelStore.noteUnsupportedToolsIfCurrent(context, it, expectedVersion) } == true
+                                null -> false
                             } else if (expectedVersion != null && expectedVersion == AutoModelRuntime.accountVersion(failed.providerId)) {
                                 when (decision) {
                                     is ai.tama.router.AutoModelFailure.Decision.Cooldown ->
@@ -11146,10 +11182,14 @@ class ChatViewModel(
                                         nmAutoLocalBlocks[failed.entryId] = context.getString(R.string.nm_auto_reason_capability)
                                         nmAutoTurn.exclude(failed.entryId)
                                     }
+                                    null -> Unit
                                 }
                                 true
                             } else false
-                            if (!recorded) {
+                            if (recipientBlocked) {
+                                nmAutoLocalBlocks[failed.entryId] = context.getString(R.string.nm_key_destination_blocked)
+                                nmAutoTurn.exclude(failed.entryId)
+                            } else if (!recorded) {
                                 // Never transfer an old in-flight error to a replacement account.
                                 nmAutoLocalBlocks[failed.entryId] = context.getString(R.string.nm_auto_reason_consent)
                                 nmAutoTurn.exclude(failed.entryId)
@@ -11188,10 +11228,7 @@ class ChatViewModel(
                         val shouldFallback = if (nmFallbackCommit != null) {
                             // nanoMuse: even the "always" strategy must not forward a generic
                             // 403, malformed request, safety refusal or cancellation.
-                            ai.tama.router.GroupFallback.canSwitch(
-                                ai.tama.router.AutoModelFailure.classify(actual, nmRequestTools.isNotEmpty(),
-                                    switchOnAmbiguousAccessDenied = false), sizeRejection,
-                            )
+                            recipientBlocked || ai.tama.router.GroupFallback.canSwitch(decision, sizeRejection)
                         } else !sizeRejection && (isRateLimit || is5xx ||
                             fallbackStrategy == com.openminis.app.data.model.FallbackStrategy.always)
                         if (nmFallbackCommit != null && this@ChatViewModel.currentProvider !== currentProvider) throw actual
@@ -11209,7 +11246,11 @@ class ChatViewModel(
                         }
                         val next = nextCandidate?.provider
                         if (next != null && nextCandidate != null) {
-                            val reason = if (nmFallbackCommit != null) context.getString(when {
+                            val reason = if (nmOwnKeyTurn) when {
+                                recipientBlocked -> context.getString(R.string.nm_key_destination_blocked)
+                                decision is ai.tama.router.AutoModelFailure.Decision.Cooldown -> nmAutoFailureReason(decision.reason)
+                                else -> context.getString(R.string.nm_auto_reason_capability)
+                            } else if (nmFallbackCommit != null) context.getString(when {
                                 reach?.kind == io.github.nanomuse.net.ProviderReach.Kind.QUOTA -> R.string.nm_auto_failure_quota
                                 isRateLimit -> R.string.nm_auto_failure_rate
                                 is5xx -> R.string.nm_auto_failure_server
@@ -11343,6 +11384,7 @@ class ChatViewModel(
                             // skipped (disabled / not logged in / hidden) so the
                             // user can see why fallback never reached them —
                             // mirrors iOS streamWithGroupFallback exhausted path.
+                            if (shouldFallback && nmOwnKeyTurn) throw actual
                             if (shouldFallback && tamaV2Test) {
                                 // nanoMuse: do not mix raw provider text or untranslated member
                                 // states into the chat. Preserve the original diagnostic on the error.

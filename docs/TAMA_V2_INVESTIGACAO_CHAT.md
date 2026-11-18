@@ -166,3 +166,19 @@ de grupo nem escolha atual elegível. Isso não muda a rota Cloud, não sobrepõ
 uma escolha fixa elegível e não concede permissão de custo. A preferência de
 catálogo não garante ausência de cobranças. A política foi testada com
 candidatos fictícios, sem chat real nem rede.
+
+## Continuação: F11, troca após falha
+
+A configuração antiga (chave `gsk_`, tipo OpenAI, base vazia) aponta para a
+OpenAI, não para a Groq. A PR 6 passou a barrar localmente essa combinação sem
+confirmação. A seleção automática ainda podia escolher a rota; a recusa local
+então encerrava o turno antes de procurar outra. No Tama V2 Test, um turno com
+chave própria agora pula rotas sem destinatário confirmado na seleção automática
+e no fallback de grupo. A chave nunca é reencaminhada para corrigir a URL. Na
+seleção manual fixa, corrija o endereço no provedor.
+
+O mesmo fallback reconhece recusa explícita de limite, modelo indisponível e
+timeout. Um 403 genérico ou recusa de política não é tratado como falta de crédito.
+A troca só usa candidatas elegíveis e autorizadas. As guardas de custo continuam
+independentes: o catálogo não é autorização de cobrança. Testes com dados
+fictícios não identificam qual resposta de fato ocorreu no Poco.

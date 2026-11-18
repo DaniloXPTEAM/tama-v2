@@ -16,10 +16,12 @@ internal object ProviderErrorDiagnostics {
         val reach: ProviderReach.Reach?,
         val relay: AllowanceSignal.HttpError?,
         val message: String,
+        val ownKeyHint: OwnKeyFailureSignals.Hint?,
     ) {
         fun attach(error: LLMError): LLMError = error.apply {
             nmProviderReach = reach
             nmRelayError = relay
+            tamaOwnKeyHint = ownKeyHint
         }
 
         /** Map native-client failures without treating an SSE code as an HTTP status. */
@@ -84,6 +86,16 @@ internal object ProviderErrorDiagnostics {
             includeOtherFailures = true,
             hasHttpStatus = hasHttpStatus,
         )?.let { ProviderReach.withRequestModel(it, requestModel, credentials = credentials) }
-        return Captured(reach, relay, ProviderReach.diagnosticMessage(body, credentials = credentials))
+        val message = ProviderReach.diagnosticMessage(body, credentials = credentials)
+        val hint = if (reach != null && reach.kind != ProviderReach.Kind.REGION_BLOCKED &&
+            diagnosticCode in setOf(400, 403, 404, 410, 422, 503)) {
+            val codes = runCatching {
+                val json = JSONObject(body)
+                val error = json.optJSONObject("error") ?: json
+                listOfNotNull(error.opt("code") as? String, error.opt("type") as? String)
+            }.getOrDefault(emptyList())
+            OwnKeyFailureSignals.detect(diagnosticCode, codes, message)
+        } else null
+        return Captured(reach, relay, message, hint)
     }
 }

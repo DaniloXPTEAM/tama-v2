@@ -4,6 +4,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+- Fixed automatic chat recovery for misconfigured recipients and explicit provider refusals on personal-key routes in the parallel Android test build.
+
 - Clarified the parallel Android chat usage sheet when provider usage has not been reported.
 
 - Added a reversible free-catalogue view filter for own-key OpenRouter providers in the parallel Android test build.

@@ -18,7 +18,9 @@ object AutoModelFailure {
         error: Throwable,
         sentTools: Boolean,
         switchOnAmbiguousAccessDenied: Boolean = true,
+        ownKeyTurn: Boolean = false,
     ): Decision? {
+        if (ownKeyTurn && error is java.net.SocketTimeoutException) return Decision.Cooldown(ModelHealth.Failure.NETWORK)
         val llm = error as? LLMError ?: return null
         if (llm is LLMError.Cancelled) return null
         // A relay refusal can be a safety/policy refusal. Only an explicit allowance
@@ -31,6 +33,13 @@ object AutoModelFailure {
         // Do not turn it into an account-wide no-credit cooldown.
         if (!switchOnAmbiguousAccessDenied && ai.tama.net.OpenRouterSpendLimit.keyLimitIsZero(reach)) {
             return Decision.Cooldown(ModelHealth.Failure.KEY_SPEND_LIMIT)
+        }
+        if (ownKeyTurn) when (llm.tamaOwnKeyHint) {
+            ai.tama.net.OwnKeyFailureSignals.Hint.MODEL_UNAVAILABLE ->
+                return Decision.Cooldown(ModelHealth.Failure.MODEL_UNAVAILABLE, reach?.retryAfterS, reach?.retryAfterPresent == true)
+            ai.tama.net.OwnKeyFailureSignals.Hint.SPEND_LIMIT ->
+                return Decision.Cooldown(ModelHealth.Failure.SPEND_LIMIT, reach?.retryAfterS, reach?.retryAfterPresent == true)
+            null -> if (reach?.httpStatus == 408) return Decision.Cooldown(ModelHealth.Failure.NETWORK)
         }
         // An ambiguous 403 may be a policy or regional refusal, even if its text
         // mentions tools. Only an explicitly classified credit/quota issue can move on.

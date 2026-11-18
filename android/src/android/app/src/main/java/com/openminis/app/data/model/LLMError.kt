@@ -3,6 +3,7 @@ package com.openminis.app.data.model
 sealed class LLMError(message: String, cause: Throwable? = null) : Exception(message, cause) {
     // nanoMuse: attach diagnostics to this failure, never to a global last-call slot.
     var nmProviderReach: io.github.nanomuse.net.ProviderReach.Reach? = null
+    internal var tamaOwnKeyHint: ai.tama.net.OwnKeyFailureSignals.Hint? = null // nanoMuse: explicit, request-scoped signal
     var nmRelayError: io.github.nanomuse.cloud.AllowanceSignal.HttpError? = null
 
     class InvalidApiKey(val detail: String = "") : LLMError(if (detail.isBlank()) "Invalid API key" else "Invalid API key: $detail")
