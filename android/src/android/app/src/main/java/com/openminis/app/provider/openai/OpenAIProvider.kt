@@ -663,10 +663,9 @@ class OpenAIProvider private constructor(
         thinkingLevel: ThinkingLevel,
     ): Flow<LLMStreamChunk> = callbackFlow {
         // nanoMuse: review the recipient before sending a recognized key, independently of cost consent.
-        ai.tama.providers.KeyDestinationGuard.requireAllowed(
-            com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test", apiKey,
-            if (isAzure) azureBase else basePath,
-        )
+        if (com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test") {
+            ai.tama.providers.KeyDestinationGuard.requireAllowed(true, apiKey, if (isAzure) azureBase else basePath)
+        }
         // nanoMuse: neither a selected model nor user-supplied request fields prove zero cost.
         ai.tama.pricing.ModelCostGuard.requireAllowed()
         val body = if (isCodexImageModel) {

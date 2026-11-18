@@ -231,9 +231,9 @@ fun ProviderDetailScreen(
         val isOAuthProvider =
             instance.credentialType == com.openminis.app.data.model.ProviderCredential.oauth
         // nanoMuse: review the saved route; editing the field does not change the live route yet.
-        val nmLiveDestination = ai.tama.providers.ProviderEndpoints.factoryBase(
+        val nmLiveDestination = if (nmParallel && !isOAuthProvider) ai.tama.providers.ProviderEndpoints.factoryBase(
             instance.providerType, instance.customBaseURL, instance.appendV1Suffix,
-        )
+        ) else null
         val nmReviewedKey = if (isEditingKey) editKeyValue else storedKey
         val nmDestinationAllowed = if (nmParallel && !isOAuthProvider)
             ai.tama.providers.KeyDestinationReview(nmReviewedKey, nmLiveDestination) else true

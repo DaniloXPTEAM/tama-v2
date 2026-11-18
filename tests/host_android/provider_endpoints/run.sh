@@ -37,6 +37,8 @@ assert 'actual is ai.tama.providers.KeyDestinationGuard.Blocked) throw actual' i
 for name in ('anthropic/AnthropicProvider.kt', 'gemini/GeminiProvider.kt'):
     provider_source = (main / 'com/openminis/app/provider' / name).read_text()
     assert provider_source.count('KeyDestinationGuard.requireAllowed(') == 2
+    assert provider_source.count('if (com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test") {\n            ai.tama.providers.KeyDestinationGuard.requireAllowed(') == 2
+assert 'if (com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test") {\n            ai.tama.providers.KeyDestinationGuard.requireAllowed(' in provider
 record = (main / 'io/github/nanomuse/cloud/OwnTurns.kt').read_text()
 assert record.count('KeyDestinationGuard.causedByBlock(e)') == 4
 ui = (main / 'ai/tama/providers/ProviderSetupUi.kt').read_text()

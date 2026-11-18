@@ -107,9 +107,9 @@ class AnthropicProvider(
         thinkingLevel: ThinkingLevel,
     ): LLMResponse = withContext(Dispatchers.IO) {
         // nanoMuse: check the destination before exposing a recognized key.
-        ai.tama.providers.KeyDestinationGuard.requireAllowed(
-            com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test", apiKey, basePath,
-        )
+        if (com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test") {
+            ai.tama.providers.KeyDestinationGuard.requireAllowed(true, apiKey, basePath)
+        }
         // nanoMuse: a selected model or account does not establish its request cost.
         ai.tama.pricing.ModelCostGuard.requireAllowed()
         val body = buildRequestBody(messages, systemPrompt, maxTokens, stream = false, temperature = temperature, imageParts = imageParts, tools = tools, thinkingLevel = thinkingLevel)
@@ -154,9 +154,9 @@ class AnthropicProvider(
         thinkingLevel: ThinkingLevel,
     ): Flow<LLMStreamChunk> = callbackFlow {
         // nanoMuse: check the destination before exposing a recognized key.
-        ai.tama.providers.KeyDestinationGuard.requireAllowed(
-            com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test", apiKey, basePath,
-        )
+        if (com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test") {
+            ai.tama.providers.KeyDestinationGuard.requireAllowed(true, apiKey, basePath)
+        }
         // nanoMuse: block unknown-cost streams before building the outbound request.
         ai.tama.pricing.ModelCostGuard.requireAllowed()
         val body = buildRequestBody(messages, systemPrompt, maxTokens, stream = true, temperature = temperature, imageParts = imageParts, tools = tools, thinkingLevel = thinkingLevel)

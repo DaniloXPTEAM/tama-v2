@@ -66,9 +66,9 @@ class GeminiProvider(
         thinkingLevel: ThinkingLevel,
     ): LLMResponse = withContext(Dispatchers.IO) {
         // nanoMuse: check the destination before exposing a recognized key.
-        ai.tama.providers.KeyDestinationGuard.requireAllowed(
-            com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test", apiKey, basePath,
-        )
+        if (com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test") {
+            ai.tama.providers.KeyDestinationGuard.requireAllowed(true, apiKey, basePath)
+        }
         // nanoMuse: no model or image capability by itself proves zero cost.
         ai.tama.pricing.ModelCostGuard.requireAllowed()
         val body = buildRequestBody(messages, systemPrompt, maxTokens, temperature, imageParts, tools, thinkingLevel)
@@ -128,9 +128,9 @@ class GeminiProvider(
         thinkingLevel: ThinkingLevel,
     ): Flow<LLMStreamChunk> = callbackFlow {
         // nanoMuse: check the destination before exposing a recognized key.
-        ai.tama.providers.KeyDestinationGuard.requireAllowed(
-            com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test", apiKey, basePath,
-        )
+        if (com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test") {
+            ai.tama.providers.KeyDestinationGuard.requireAllowed(true, apiKey, basePath)
+        }
         // nanoMuse: block unknown-cost streams before building the outbound request.
         ai.tama.pricing.ModelCostGuard.requireAllowed()
         val body = buildRequestBody(messages, systemPrompt, maxTokens, temperature, imageParts, tools, thinkingLevel)
