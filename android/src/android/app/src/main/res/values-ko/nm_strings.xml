@@ -1554,4 +1554,5 @@
     <string name="nm_free_bulk_done">허용된 채팅 경로: %1$d. 다른 자격 및 비용 검사도 적용됩니다.</string>
     <string name="nm_free_bulk_retry">현재 적격 모델이 허용되지 않았습니다. 카탈로그를 새로 고치고 다시 시도하세요.</string>
     <string name="nm_image_retry_question">이 이미지를 다시 시도할까요? 네 또는 다시 시도라고 답하세요.</string>
+    <string name="nm_context_near_limit">컨텍스트가 모델 한도에 가까워졌습니다 (%1$d / %2$d 토큰). 안정적으로 계속하려면 새 채팅을 시작하거나 /compact를 사용하세요.</string>
 </resources>

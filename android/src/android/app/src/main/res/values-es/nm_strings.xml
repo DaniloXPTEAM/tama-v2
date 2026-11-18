@@ -1558,4 +1558,5 @@
     <string name="nm_free_bulk_done">Rutas de chat autorizadas: %1$d. Siguen vigentes las demás comprobaciones de elegibilidad y coste.</string>
     <string name="nm_free_bulk_retry">No se autorizó ningún modelo elegible actual. Actualiza el catálogo y vuelve a intentarlo.</string>
     <string name="nm_image_retry_question">¿Quieres intentar esta imagen de nuevo? Responde sí o pide reintentar.</string>
+    <string name="nm_context_near_limit">El contexto está cerca del límite del modelo (%1$d / %2$d tokens). Inicia una conversación nueva o usa /compact para continuar de forma fiable.</string>
 </resources>

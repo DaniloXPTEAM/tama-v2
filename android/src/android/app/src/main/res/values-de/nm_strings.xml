@@ -1558,4 +1558,5 @@
     <string name="nm_free_bulk_done">Zugelassene Chatrouten: %1$d. Weitere Eignungs- und Kostenprüfungen gelten weiterhin.</string>
     <string name="nm_free_bulk_retry">Keine aktuell geeigneten Modelle zugelassen. Katalog aktualisieren und erneut versuchen.</string>
     <string name="nm_image_retry_question">Möchtest du dieses Bild erneut versuchen? Antworte mit Ja oder bitte um einen neuen Versuch.</string>
+    <string name="nm_context_near_limit">Der Kontext nähert sich dem Modelllimit (%1$d / %2$d Tokens). Beginne einen neuen Chat oder nutze /compact, um zuverlässig fortzufahren.</string>
 </resources>

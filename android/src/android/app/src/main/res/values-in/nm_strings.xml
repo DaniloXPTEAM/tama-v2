@@ -1554,4 +1554,5 @@
     <string name="nm_free_bulk_done">Rute chat diizinkan: %1$d. Pemeriksaan kelayakan dan biaya lain tetap berlaku.</string>
     <string name="nm_free_bulk_retry">Tidak ada model yang memenuhi syarat saat ini. Perbarui katalog dan coba lagi.</string>
     <string name="nm_image_retry_question">Ingin mencoba gambar ini lagi? Jawab ya atau minta coba lagi.</string>
+    <string name="nm_context_near_limit">Konteks mendekati batas model (%1$d / %2$d token). Mulai chat baru atau gunakan /compact agar dapat melanjutkan dengan andal.</string>
 </resources>

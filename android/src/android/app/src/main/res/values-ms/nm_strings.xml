@@ -1554,4 +1554,5 @@
     <string name="nm_free_bulk_done">Laluan sembang dibenarkan: %1$d. Semakan kelayakan dan kos lain masih terpakai.</string>
     <string name="nm_free_bulk_retry">Tiada model layak semasa dibenarkan. Muat semula katalog dan cuba lagi.</string>
     <string name="nm_image_retry_question">Mahu cuba imej ini lagi? Jawab ya atau minta cuba lagi.</string>
+    <string name="nm_context_near_limit">Konteks menghampiri had model (%1$d / %2$d token). Mulakan sembang baharu atau gunakan /compact untuk meneruskan dengan lancar.</string>
 </resources>

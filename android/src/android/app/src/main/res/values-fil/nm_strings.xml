@@ -1558,4 +1558,5 @@
     <string name="nm_free_bulk_done">Mga pinahintulutang chat route: %1$d. May iba pang pagsusuri sa pagiging angkop at gastos.</string>
     <string name="nm_free_bulk_retry">Walang kasalukuyang angkop na modelo ang pinahintulutan. I-refresh ang katalogo at subukan muli.</string>
     <string name="nm_image_retry_question">Gusto mo bang subukang muli ang larawang ito? Sumagot ng oo o hilinging subukan muli.</string>
+    <string name="nm_context_near_limit">Malapit na ang konteksto sa limitasyon ng modelo (%1$d / %2$d token). Magsimula ng bagong chat o gamitin ang /compact para makapagpatuloy nang maayos.</string>
 </resources>

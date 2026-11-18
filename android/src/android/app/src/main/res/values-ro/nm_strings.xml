@@ -1562,4 +1562,5 @@
     <string name="nm_free_bulk_done">Rute de chat autorizate: %1$d. Celelalte verificări de eligibilitate și cost rămân valabile.</string>
     <string name="nm_free_bulk_retry">Nu a fost autorizat niciun model eligibil actual. Actualizează catalogul și încearcă din nou.</string>
     <string name="nm_image_retry_question">Vrei să încerci din nou această imagine? Răspunde da sau cere o nouă încercare.</string>
+    <string name="nm_context_near_limit">Contextul se apropie de limita modelului (%1$d / %2$d tokenuri). Începe o conversație nouă sau folosește /compact pentru a continua în siguranță.</string>
 </resources>

@@ -1554,4 +1554,5 @@
     <string name="nm_free_bulk_done">許可されたチャット経路: %1$d。その他の利用条件と費用の確認は引き続き適用されます。</string>
     <string name="nm_free_bulk_retry">現在利用条件を満たすモデルは許可されませんでした。カタログを更新して再試行してください。</string>
     <string name="nm_image_retry_question">この画像をもう一度試しますか？ はい、またはもう一度と返信してください。</string>
+    <string name="nm_context_near_limit">コンテキストがモデルの上限に近づいています（%1$d / %2$d トークン）。安定して続けるには新しいチャットを始めるか、/compact を使用してください。</string>
 </resources>
