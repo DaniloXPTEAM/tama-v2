@@ -4,7 +4,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
-- Split Android chat tool dispatch into a separate method to keep the agent loop within the JVM bytecode size limit.
+- Split Android chat tool dispatch and stream handling out of the agent loop to reduce generated JVM method size.
 
 - In the side-by-side Android test build, serialized incoming Hub progress and terminal replies per call to prevent tested ordering and completion races. This does not fix relay misrouting.
 

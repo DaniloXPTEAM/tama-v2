@@ -71,3 +71,20 @@ def test_context_shape_diagnostic_is_called_outside_the_tool_dispatch() -> None:
     assert "runCatching {" in diagnostic
     assert "MemorySnapshot.capture().toLogString()" in diagnostic
     assert loop.count("nmLogAgentContextShape()") == 1
+
+
+def test_stream_compaction_restarts_only_after_the_stream_block_returns() -> None:
+    source = SOURCE.read_text(encoding="utf-8")
+    loop = source.split("    private suspend fun runAgentLoop(\n", 1)[1].split(
+        "    private fun finalizeAtTurnLimit(\n", 1
+    )[0]
+    block = loop.split(
+        "val nmRestartAgentTurn = ai.tama.chat.AgentStreamBlock.run streamBlock@{", 1
+    )[1].split("if (nmRestartAgentTurn) continue@agentTurns", 1)[0]
+    compaction = block.split("ContextMaintenance.Action.COMPACTED -> {", 1)[1].split(
+        "ContextMaintenance.Action.STOP", 1
+    )[0]
+    assert compaction.index("resumeAfterCompaction()") < compaction.index("return@streamBlock true")
+    assert block.count("return@streamBlock true") == 1
+    assert "continue@agentTurns" not in block
+    assert "firstChunkWatchdog.cancel()" in block

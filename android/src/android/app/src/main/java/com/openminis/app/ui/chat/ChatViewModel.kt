@@ -10016,1246 +10016,1252 @@ class ChatViewModel(
             var outputRetried = false
             var rateRetried = false
             var lastRequestedOutput = 0
-            while (!collectDone) {
-                var nmTicket: ModelHealth.Ticket? = null
-                var nmDispatchStarted = false
-                var nmMeasuredInput = 0
-                var nmMeasuredOutput = 0
-                var nmDispatchAt = 0L
-                var nmDispatchAccountVersion: Long? = null
-                try {
-                    // nanoMuse: a failed partial stream cannot confirm the next attempt's cap
-                    // or carry its finish reason, reasoning or usage into another provider.
-                    turnFinishReason = null
-                    turnReasoningBlob = null
-                    lastUsage = null
-                    lastRequestedOutput = 0
-                    // [T-android-enhanced-cache] Stamp the per-turn Enhanced
-                    // Cache flag onto the active provider here — the single
-                    // choke point every turn passes through, regardless of how
-                    // currentProvider was (re)assigned by the fallback loop.
-                    // Non-Anthropic providers ignore it (cast fails silently).
-                    (currentProvider as? com.openminis.app.provider.anthropic.AnthropicProvider)
-                        ?.enhancedCache = _enhancedCacheEnabled.value
-                    // [T-STALL-DIAG] First-chunk watchdog. The reported symptom
-                    // is "new session shows thinking… forever, UI empty, stop
-                    // button still armed" — which is indistinguishable, in the
-                    // current logs, between (a) the request never left, (b) it
-                    // left and the provider never answered, and (c) it answered
-                    // and the chunks were routed to the wrong session's UI.
-                    //
-                    // Stamp the request as it goes out, then have a detached
-                    // watchdog report every 10s while NOT ONE chunk has arrived.
-                    // Silence here + no network error = the request is hung
-                    // below the provider (DNS/TCP/TLS/read), which no existing
-                    // log covers. `firstChunkSeen` is flipped in the collector.
-                    val streamStartMs = android.os.SystemClock.elapsedRealtime()
-                    val firstChunkSeen = java.util.concurrent.atomic.AtomicBoolean(false)
-                    val diagSid = activeSessionId
-                    println(
-                        "[T-STALL-DIAG] stream REQUEST-OUT sid=$diagSid turn=$turn " +
-                            "provider=${currentProvider.javaClass.simpleName} " +
-                            "historySize=${agentHistory.size}",
-                    )
-                    val firstChunkWatchdog = viewModelScope.launch(Dispatchers.IO) {
-                        var waited = 0L
-                        while (!firstChunkSeen.get()) {
-                            kotlinx.coroutines.delay(10_000L)
-                            if (firstChunkSeen.get()) break
-                            waited += 10_000L
-                            println(
-                                "[T-STALL-DIAG] stream NO-FIRST-CHUNK sid=$diagSid turn=$turn " +
-                                    "waitedMs=$waited provider=${currentProvider.javaClass.simpleName} " +
-                                    "— request sent, provider has returned NOTHING (not even message_start)",
-                            )
-                        }
-                    }
+            // nanoMuse: run the stream state machine in the same coroutine, but
+            // in a separate JVM method. A compaction restarts the outer agent turn.
+            val nmRestartAgentTurn = ai.tama.chat.AgentStreamBlock.run streamBlock@{
+                while (!collectDone) {
+                    var nmTicket: ModelHealth.Ticket? = null
+                    var nmDispatchStarted = false
+                    var nmMeasuredInput = 0
+                    var nmMeasuredOutput = 0
+                    var nmDispatchAt = 0L
+                    var nmDispatchAccountVersion: Long? = null
                     try {
-                    // Route through effectiveAgentHistory() so a populated
-                    // [_compactSummary] is prepended as a `<context-summary>`
-                    // user message. Falls through to the raw agentHistory when
-                    // no compact has happened, so the common path stays zero-copy.
-                    // nanoMuse: pair reported usage with this request, before any later tool output (#719).
-                    // nanoMuse: a fallback provider must rebuild its own budgeted view.
-                    alignContextEstimate()
-                    if (preparedMessages == null) {
-                        // nanoMuse: fallback may change provider, model vision and OAuth prefix.
-                        val preview = applyRequestImageBudget(nmRequestHistory(), preview = true)
-                        nmInstall(nmPlan(preview, nmBudgetFor(currentProvider))
-                            ?: checkNotNull(nmPlan(preview, ProviderBudget())))
-                        prepareContext()
-                        // nanoMuse: fallback to a smaller model must pass the same guard.
-                        when (inLoopContextCheck(contextMaintenance, requestBudget,
-                            ::measureContextTokens, ::measureProbeTokens, { prepareContext() },
-                            allowAutomaticCompaction = nmAutoTurn == null)) {
-                            ContextMaintenance.Action.PROCEED -> Unit
-                            ContextMaintenance.Action.COMPACTED -> {
-                                resumeAfterCompaction()
-                                continue@agentTurns
-                            }
-                            ContextMaintenance.Action.STOP -> throw LLMError.ProviderError(
-                                context.getString(R.string.nm_context_limit_reached))
-                        }
-                    }
-                    val requestMessages = checkNotNull(preparedMessages)
-                    // Estimate the prepared history for each profile, including the account's
-                    // live window. A tool request may not silently fall to tool-less LEAN.
-                    val requestBudgetLimit = nmBudgetFor(currentProvider)
-                    val autoCandidate = if (nmAutoTurn != null) checkNotNull(nmAutoCandidate) else null
-                    val minimumProfile = if (autoCandidate != null && Need.TOOLS in nmAutoNeeds(requestMessages))
-                        Profile.BASIC else Profile.LEAN
-                    data class DispatchPlan(
-                        val attempt: TurnRequestPlanner.Attempt,
-                        val tools: List<AgentToolDefinition>,
-                        val snapshot: ContextUsageMeter.Request,
-                        val estimate: Int,
-                    )
-                    fun lowerForBudget(attempt: TurnRequestPlanner.Attempt): Boolean {
-                        val lower = TurnRouter.lower(attempt.route.profile) ?: return false
-                        if (lower < minimumProfile) return false
-                        nmRoute = attempt.route.copy(profile = lower, budgetLimited = true)
-                        return true
-                    }
-                    var dispatch: DispatchPlan? = null
-                    while (dispatch == null) {
-                        val health = autoCandidate?.let { AutoModelRuntime.health.snapshot(it.entryId, it.providerId) }
-                        if (health?.cooldown != null) throw AutoDispatchBlocked(checkNotNull(autoCandidate).entryId,
-                            "${context.getString(R.string.nm_auto_reason_cooldown)} · ${nmAutoWait(health.cooldown.untilMillis)}")
-                        val available = if (autoCandidate != null && health != null)
-                            TurnRequestPlanner.requestLimit(requestBudgetLimit, health.usedThisMinute, autoCandidate.contextLimit)
-                            else null
-                        val planned = nmPlan(requestMessages, requestBudgetLimit, available, minimumProfile)
-                        if (planned == null) {
-                            if (autoCandidate != null) {
-                                val withoutWindow = nmPlan(requestMessages, requestBudgetLimit,
-                                    autoCandidate.contextLimit?.toLong(), minimumProfile)
-                                val reason = when {
-                                    withoutWindow != null -> R.string.nm_auto_reason_minute
-                                    autoCandidate.contextLimit != null &&
-                                        nmPlan(requestMessages, requestBudgetLimit, null, minimumProfile) != null -> R.string.nm_auto_reason_context
-                                    else -> R.string.nm_auto_reason_size
-                                }
-                                throw AutoDispatchBlocked(autoCandidate.entryId, context.getString(reason))
-                            }
-                            throw LLMError.ProviderError(context.getString(R.string.nm_router_budget_exhausted))
-                        }
-                        nmInstall(planned)
-                        alignContextEstimate()
-                        val tools = nmRequestTools
-                        val snapshot = usageSnapshot(requestMessages)
-                        val estimate = ContextEstimate.request(requestMessages, nmSystemPrompt, tools,
-                            imageTokens = BPETokenizer::countImageTokens)
-                        // A calibration-only probe can use the raw estimate, but a live window
-                        // never treats a downward calibration as evidence of spare quota.
-                        lastContextTokens = if (contextMaintenance.calibrationProbeGranted) estimate
-                            else usageMeter.estimate(snapshot, estimate, contextEstimate)
-                        val dispatchInput = maxOf(lastContextTokens, planned.inputEstimate, estimate)
-                        val learnedLimit = durableOutputKey?.let { key ->
-                            runCatching { nmOutputLimitStore.load(key, currentProvider.model.id) }.getOrNull()
-                        }
-                        val pendingLimit = pendingOutput?.takeIf {
-                            it.provider === currentProvider && it.model == currentProvider.model.id && it.route == durableOutputKey
-                        }?.limit
-                        val proposedOutput = ai.tama.net.ProviderRecovery.clamp(
-                            ai.tama.net.ProviderRecovery.clamp(dynamicMaxTokens(currentProvider, lastContextTokens), learnedLimit),
-                            pendingLimit,
+                        // nanoMuse: a failed partial stream cannot confirm the next attempt's cap
+                        // or carry its finish reason, reasoning or usage into another provider.
+                        turnFinishReason = null
+                        turnReasoningBlob = null
+                        lastUsage = null
+                        lastRequestedOutput = 0
+                        // [T-android-enhanced-cache] Stamp the per-turn Enhanced
+                        // Cache flag onto the active provider here — the single
+                        // choke point every turn passes through, regardless of how
+                        // currentProvider was (re)assigned by the fallback loop.
+                        // Non-Anthropic providers ignore it (cast fails silently).
+                        (currentProvider as? com.openminis.app.provider.anthropic.AnthropicProvider)
+                            ?.enhancedCache = _enhancedCacheEnabled.value
+                        // [T-STALL-DIAG] First-chunk watchdog. The reported symptom
+                        // is "new session shows thinking… forever, UI empty, stop
+                        // button still armed" — which is indistinguishable, in the
+                        // current logs, between (a) the request never left, (b) it
+                        // left and the provider never answered, and (c) it answered
+                        // and the chunks were routed to the wrong session's UI.
+                        //
+                        // Stamp the request as it goes out, then have a detached
+                        // watchdog report every 10s while NOT ONE chunk has arrived.
+                        // Silence here + no network error = the request is hung
+                        // below the provider (DNS/TCP/TLS/read), which no existing
+                        // log covers. `firstChunkSeen` is flipped in the collector.
+                        val streamStartMs = android.os.SystemClock.elapsedRealtime()
+                        val firstChunkSeen = java.util.concurrent.atomic.AtomicBoolean(false)
+                        val diagSid = activeSessionId
+                        println(
+                            "[T-STALL-DIAG] stream REQUEST-OUT sid=$diagSid turn=$turn " +
+                                "provider=${currentProvider.javaClass.simpleName} " +
+                                "historySize=${agentHistory.size}",
                         )
-                        val output = TurnRequestPlanner.outputLimit(proposedOutput, requestBudgetLimit, dispatchInput, available)
-                        if (output == null) {
-                            if (autoCandidate != null && lowerForBudget(planned)) continue
-                            if (autoCandidate != null) throw AutoDispatchBlocked(autoCandidate.entryId,
-                                context.getString(R.string.nm_auto_reason_size))
-                            throw LLMError.ProviderError(context.getString(R.string.nm_router_budget_exhausted))
-                        }
-                        lastRequestedOutput = output
-                        if (autoCandidate != null && nmAutoTurn != null) {
-                            if (!AutoModelStore.enabled(context)) throw LLMError.ProviderError(
-                                context.getString(R.string.nm_auto_disabled_during_turn))
-                            val identity = checkNotNull(nmAutoIdentity)
-                            if (!ai.tama.router.AutomaticCostGuard.permits(context)) throw AutoDispatchBlocked(
-                                autoCandidate.entryId, context.getString(R.string.nm_auto_reason_unverified_cost))
-                            val config = providerRepository.config.value
-                            val entry = config.modelEntries.find { it.id == autoCandidate.entryId && it.model.id == currentProvider.model.id }
-                            val instance = entry?.let { e -> config.instances.find { it.id == e.providerInstanceId } }
-                            val valid = entry != null && instance != null && instance.isEnabled && !entry.isHidden &&
-                                AutoModelStore.identity(entry, instance) == identity && providerRepository.hasAnyCredential(instance) &&
-                                AutoModelStore.approved(context, identity) &&
-                                nmAutoClientAccountVersion == AutoModelRuntime.accountVersion(instance.id) &&
-                                nmRouteFingerprint(currentProvider) == AutoModelStore.historyFingerprint(context, instance) &&
-                                nmAutoCapabilities(entry, instance).containsAll(nmAutoNeeds(requestMessages))
-                            if (!valid) throw AutoDispatchBlocked(autoCandidate.entryId, context.getString(R.string.nm_auto_reason_consent))
-                            when (val reserved = nmAutoTurn.reserveWithOutputCap(
-                                autoCandidate.copy(tokensPerMinute = requestBudgetLimit.tokensPerMinute), dispatchInput, output)) {
-                                is ModelHealth.Reservation.Granted -> {
-                                    nmTicket = reserved.ticket
-                                    lastRequestedOutput = checkNotNull(reserved.outputTokens)
-                                }
-                                is ModelHealth.Reservation.Full -> {
-                                    // Another request consumed the remaining window after the snapshot.
-                                    // Try a genuinely lower profile before excluding this entry.
-                                    if (lowerForBudget(planned)) continue
-                                    throw AutoDispatchBlocked(autoCandidate.entryId,
-                                        "${context.getString(R.string.nm_auto_reason_minute)} · ${nmAutoWait(reserved.availableAtMillis)}")
-                                }
-                                is ModelHealth.Reservation.Blocked -> throw AutoDispatchBlocked(autoCandidate.entryId,
-                                    "${context.getString(R.string.nm_auto_reason_cooldown)} · ${nmAutoWait(reserved.cooldown.untilMillis)}")
-                            }
-                        } else {
-                            // Count manual calls too, without applying automatic-mode gates.
-                            val config = providerRepository.config.value
-                            val entry = config.modelEntries.find { it.id == _activeEntryId.value &&
-                                it.model.id == currentProvider.model.id && this@ChatViewModel.currentProvider === currentProvider }
-                            if (entry != null) {
-                                nmTicket = (AutoModelRuntime.health.reserve(entry.providerInstanceId,
-                                    dispatchInput.toLong() + output.toLong(), null) as ModelHealth.Reservation.Granted).ticket
-                            }
-                        }
-                        dispatch = DispatchPlan(planned, tools, snapshot, estimate)
-                    }
-                    val outbound = checkNotNull(dispatch)
-                    val planned = outbound.attempt
-                    val requestTools = outbound.tools
-                    val requestSnapshot = outbound.snapshot
-                    val requestEstimate = outbound.estimate
-                    if (!nmWarnedWithoutTools && Need.TOOLS in planned.route.needs && planned.route.profile == Profile.LEAN) {
-                        nmWarnedWithoutTools = true
-                        withContext(Dispatchers.Main) {
-                            appendSystemInfo(context.getString(
-                                if (planned.route.budgetLimited) R.string.nm_router_budget_limited
-                                else R.string.nm_router_lean_tool_notice,
-                            ), "info")
-                        }
-                    }
-                    // The debug observer sees only counts for the exact outbound view.
-                    val sizeObserver = if (com.openminis.app.BuildConfig.DEBUG) ai.tama.chat.PromptSizeTrace.observer else null
-                    if (sizeObserver != null) runCatching {
-                        val imageReady = runCatching { io.github.nanomuse.media.MediaModels.agentImageEndpoint(context) != null }.getOrNull()
-                        sizeObserver(ai.tama.chat.PromptSizeTrace.Event.System(planned.systemSizes, imageReady))
-                        sizeObserver(ai.tama.chat.PromptSizeTrace.Event.Tools(
-                            PromptSize.tools(originalAgentTools(), requestTools),
-                        ))
-                        sizeObserver(ai.tama.chat.PromptSizeTrace.Event.Request(planned.system.length))
-                    }
-                    var requestUsage: LLMUsage? = null
-                    // nanoMuse: the group, credentials or cost consent may have changed
-                    // while retrying or preparing the request. Refuse stale candidates.
-                    nmManualFallback?.let { candidate ->
-                        if (nmAutoTurn == null && (candidate.provider !== currentProvider ||
-                                this@ChatViewModel.currentProvider !== currentProvider ||
-                                _activeEntryId.value != candidate.entryId || !nmFallbackStillEligible(candidate))) {
-                            throw LLMError.ProviderError(context.getString(R.string.nm_auto_disabled_during_turn))
-                        }
-                    }
-                    // nanoMuse: recheck after all suspending preparation and the reservation.
-                    if (tamaV2Test && nmAutoTurn != null) {
-                        val active = checkNotNull(nmAutoCandidate)
-                        if (nmLoopSession != realSessionId.ifEmpty { sessionId } ||
-                            this@ChatViewModel.currentProvider !== currentProvider || _activeEntryId.value != active.entryId) {
-                            throw LLMError.ProviderError(context.getString(R.string.nm_auto_disabled_during_turn))
-                        }
-                        if (!ai.tama.router.AutomaticCostGuard.permits(context)) {
-                            throw AutoDispatchBlocked(active.entryId, context.getString(R.string.nm_auto_reason_unverified_cost))
-                        }
-                        if (nmAutoActiveChoice?.let(::nmAutoChoiceStillEligible) != true) {
-                            throw AutoDispatchBlocked(active.entryId, context.getString(R.string.nm_auto_reason_consent))
-                        }
-                    }
-                    nmLastSentRoute = nmRouteFingerprint(currentProvider)
-                    // nanoMuse: tag the result with the version that built this client,
-                    // never a replacement account read after the final eligibility check.
-                    nmDispatchAccountVersion = if (tamaV2Test) {
-                        nmAutoActiveChoice?.accountVersion ?: nmManualFallback?.accountVersion
-                    } else nmAutoCandidate?.providerId?.let { AutoModelRuntime.accountVersion(it) }
-                    nmDispatchAt = android.os.SystemClock.elapsedRealtime()
-                    // From here on a provider may have received the request, even on cancellation.
-                    nmDispatchStarted = true
-                    currentProvider.streamMessage(
-                        requestMessages,
-                        nmSystemPrompt, lastRequestedOutput,
-                        tools = requestTools,
-                        thinkingLevel = if (currentModelSupportsReasoning) _thinkingLevel.value else ThinkingLevel.OFF,
-                    ).collect { chunk ->
-                // [T-STALL-DIAG] Mark first byte back from the provider and log
-                // the time-to-first-chunk once per turn.
-                if (firstChunkSeen.compareAndSet(false, true)) {
-                    println(
-                        "[T-STALL-DIAG] stream FIRST-CHUNK sid=$diagSid turn=$turn " +
-                            "ttfbMs=${android.os.SystemClock.elapsedRealtime() - streamStartMs} " +
-                            "kind=${chunk.javaClass.simpleName}",
-                    )
-                }
-                when (chunk) {
-                    is LLMStreamChunk.ThinkingDelta -> {
-                        turnThinking.append(chunk.text)
-                        // Update thinking block in UI
-                        val thinkIdx = allToolBlocks.indexOfFirst { it.kind == "thinking" && it.id == "thinking_$turn" }
-                        if (thinkIdx < 0) {
-                            allToolBlocks.add(AssistantBlock(
-                                id = "thinking_$turn",
-                                kind = "thinking",
-                                content = turnThinking.toString(),
-                                toolTitle = "Thinking",
-                            ))
-                        } else {
-                            allToolBlocks[thinkIdx] = allToolBlocks[thinkIdx].copy(content = turnThinking.toString())
-                        }
-                        withContext(Dispatchers.Main) {
-                            updateAssistantMessage(assistantId, accumulatedText + turnTextSb.toString(), true, allToolBlocks)
-                        }
-                    }
-                    is LLMStreamChunk.Text -> {
-                        // [T-android-readaloud-stop-stale] First actual text of
-                        // this reply — stop the previous reply's Read Aloud so
-                        // old and new audio don't overlap. Deferred to here
-                        // rather than fired from send() on purpose: while the
-                        // model is still thinking there is nothing to supersede
-                        // the old speech with, so it keeps playing until real
-                        // new text arrives.
-                        if (!didStopStaleReadAloud) {
-                            didStopStaleReadAloud = true
-                            _stopStaleReadAloud.tryEmit(Unit)
-                        }
-                        // Mark thinking block as done when text starts flowing
-                        val thinkIdx = allToolBlocks.indexOfFirst { it.kind == "thinking" && it.id == "thinking_$turn" }
-                        if (thinkIdx >= 0 && allToolBlocks[thinkIdx].toolStatus != ToolBlockStatus.SUCCESS) {
-                            allToolBlocks[thinkIdx] = allToolBlocks[thinkIdx].copy(toolStatus = ToolBlockStatus.SUCCESS)
-                        }
-                        // T307: append-only on the StringBuilder; .toString()
-                        // is taken once below at flush time, not per delta.
-                        turnTextSb.append(chunk.text)
-                        // Append to the trailing text block — or open a new one if the last
-                        // block isn't a text block (i.e. a tool call or thinking was in between).
-                        // This preserves the chronological interleaving of text and tool calls
-                        // across a single assistant turn. The block's `content` field stays
-                        // immutable String — we keep a parallel StringBuilder for the active
-                        // block and materialise via .toString() only on flush.
-                        val lastIdx = allToolBlocks.lastIndex
-                        val monolithic = currentProvider.streamTextIsMonolithic
-                        val activeSb = if (monolithic && turnTextBlockIdx >= 0 && currentTextBlockSb != null) {
-                            // [T-android-tool-splits-reply-fix] Chat Completions
-                            // content is ONE string per response — a content
-                            // delta arriving after tool_calls deltas (qwen
-                            // chunking artifact) is still part of the same
-                            // pre-tool sentence. Merge it back instead of
-                            // fabricating a post-tool text block, which split
-                            // sentences mid-word in the chat UI. Scope: this
-                            // streamed response only (see turnTextBlockIdx).
-                            if (!loggedPostToolTextMerge &&
-                                allToolBlocks.subList(turnTextBlockIdx + 1, allToolBlocks.size).any { it.kind == "tool_use" }
-                            ) {
-                                loggedPostToolTextMerge = true
-                                AppLogger.info(
-                                    TAG_STREAM,
-                                    "[T-android-tool-splits-reply-fix] post-tool_calls content delta merged into pre-tool text block (model=${currentProvider.model.id})",
+                        val firstChunkWatchdog = viewModelScope.launch(Dispatchers.IO) {
+                            var waited = 0L
+                            while (!firstChunkSeen.get()) {
+                                kotlinx.coroutines.delay(10_000L)
+                                if (firstChunkSeen.get()) break
+                                waited += 10_000L
+                                println(
+                                    "[T-STALL-DIAG] stream NO-FIRST-CHUNK sid=$diagSid turn=$turn " +
+                                        "waitedMs=$waited provider=${currentProvider.javaClass.simpleName} " +
+                                        "— request sent, provider has returned NOTHING (not even message_start)",
                                 )
                             }
-                            currentTextBlockSb!!.append(chunk.text)
-                            currentTextBlockSb!!
-                        } else if (!monolithic && lastIdx >= 0 && allToolBlocks[lastIdx].kind == "text" && currentTextBlockSb != null) {
-                            currentTextBlockSb!!.append(chunk.text)
-                            currentTextBlockSb!!
-                        } else {
-                            // New text run — either first text after a tool_use/thinking
-                            // break, or first text in this turn. Open a fresh block AND
-                            // a fresh accumulator. The new block's content carries the
-                            // first delta verbatim; subsequent deltas append to the SB.
-                            val freshSb = StringBuilder(chunk.text)
-                            currentTextBlockSb = freshSb
-                            val block = AssistantBlock(
-                                id = "text_${turn}_${allToolBlocks.size}",
-                                kind = "text",
-                                content = chunk.text,
+                        }
+                        try {
+                        // Route through effectiveAgentHistory() so a populated
+                        // [_compactSummary] is prepended as a `<context-summary>`
+                        // user message. Falls through to the raw agentHistory when
+                        // no compact has happened, so the common path stays zero-copy.
+                        // nanoMuse: pair reported usage with this request, before any later tool output (#719).
+                        // nanoMuse: a fallback provider must rebuild its own budgeted view.
+                        alignContextEstimate()
+                        if (preparedMessages == null) {
+                            // nanoMuse: fallback may change provider, model vision and OAuth prefix.
+                            val preview = applyRequestImageBudget(nmRequestHistory(), preview = true)
+                            nmInstall(nmPlan(preview, nmBudgetFor(currentProvider))
+                                ?: checkNotNull(nmPlan(preview, ProviderBudget())))
+                            prepareContext()
+                            // nanoMuse: fallback to a smaller model must pass the same guard.
+                            when (inLoopContextCheck(contextMaintenance, requestBudget,
+                                ::measureContextTokens, ::measureProbeTokens, { prepareContext() },
+                                allowAutomaticCompaction = nmAutoTurn == null)) {
+                                ContextMaintenance.Action.PROCEED -> Unit
+                                ContextMaintenance.Action.COMPACTED -> {
+                                    resumeAfterCompaction()
+                                    return@streamBlock true
+                                }
+                                ContextMaintenance.Action.STOP -> throw LLMError.ProviderError(
+                                    context.getString(R.string.nm_context_limit_reached))
+                            }
+                        }
+                        val requestMessages = checkNotNull(preparedMessages)
+                        // Estimate the prepared history for each profile, including the account's
+                        // live window. A tool request may not silently fall to tool-less LEAN.
+                        val requestBudgetLimit = nmBudgetFor(currentProvider)
+                        val autoCandidate = if (nmAutoTurn != null) checkNotNull(nmAutoCandidate) else null
+                        val minimumProfile = if (autoCandidate != null && Need.TOOLS in nmAutoNeeds(requestMessages))
+                            Profile.BASIC else Profile.LEAN
+                        data class DispatchPlan(
+                            val attempt: TurnRequestPlanner.Attempt,
+                            val tools: List<AgentToolDefinition>,
+                            val snapshot: ContextUsageMeter.Request,
+                            val estimate: Int,
+                        )
+                        fun lowerForBudget(attempt: TurnRequestPlanner.Attempt): Boolean {
+                            val lower = TurnRouter.lower(attempt.route.profile) ?: return false
+                            if (lower < minimumProfile) return false
+                            nmRoute = attempt.route.copy(profile = lower, budgetLimited = true)
+                            return true
+                        }
+                        var dispatch: DispatchPlan? = null
+                        while (dispatch == null) {
+                            val health = autoCandidate?.let { AutoModelRuntime.health.snapshot(it.entryId, it.providerId) }
+                            if (health?.cooldown != null) throw AutoDispatchBlocked(checkNotNull(autoCandidate).entryId,
+                                "${context.getString(R.string.nm_auto_reason_cooldown)} · ${nmAutoWait(health.cooldown.untilMillis)}")
+                            val available = if (autoCandidate != null && health != null)
+                                TurnRequestPlanner.requestLimit(requestBudgetLimit, health.usedThisMinute, autoCandidate.contextLimit)
+                                else null
+                            val planned = nmPlan(requestMessages, requestBudgetLimit, available, minimumProfile)
+                            if (planned == null) {
+                                if (autoCandidate != null) {
+                                    val withoutWindow = nmPlan(requestMessages, requestBudgetLimit,
+                                        autoCandidate.contextLimit?.toLong(), minimumProfile)
+                                    val reason = when {
+                                        withoutWindow != null -> R.string.nm_auto_reason_minute
+                                        autoCandidate.contextLimit != null &&
+                                            nmPlan(requestMessages, requestBudgetLimit, null, minimumProfile) != null -> R.string.nm_auto_reason_context
+                                        else -> R.string.nm_auto_reason_size
+                                    }
+                                    throw AutoDispatchBlocked(autoCandidate.entryId, context.getString(reason))
+                                }
+                                throw LLMError.ProviderError(context.getString(R.string.nm_router_budget_exhausted))
+                            }
+                            nmInstall(planned)
+                            alignContextEstimate()
+                            val tools = nmRequestTools
+                            val snapshot = usageSnapshot(requestMessages)
+                            val estimate = ContextEstimate.request(requestMessages, nmSystemPrompt, tools,
+                                imageTokens = BPETokenizer::countImageTokens)
+                            // A calibration-only probe can use the raw estimate, but a live window
+                            // never treats a downward calibration as evidence of spare quota.
+                            lastContextTokens = if (contextMaintenance.calibrationProbeGranted) estimate
+                                else usageMeter.estimate(snapshot, estimate, contextEstimate)
+                            val dispatchInput = maxOf(lastContextTokens, planned.inputEstimate, estimate)
+                            val learnedLimit = durableOutputKey?.let { key ->
+                                runCatching { nmOutputLimitStore.load(key, currentProvider.model.id) }.getOrNull()
+                            }
+                            val pendingLimit = pendingOutput?.takeIf {
+                                it.provider === currentProvider && it.model == currentProvider.model.id && it.route == durableOutputKey
+                            }?.limit
+                            val proposedOutput = ai.tama.net.ProviderRecovery.clamp(
+                                ai.tama.net.ProviderRecovery.clamp(dynamicMaxTokens(currentProvider, lastContextTokens), learnedLimit),
+                                pendingLimit,
                             )
-                            if (monolithic) {
-                                // Single text block per response. If tool blocks
-                                // already arrived (content-after-tool_calls
-                                // chunking with no preface text), insert BEFORE
-                                // the first tool block of this turn so the
-                                // persisted order matches the canonical
-                                // {content, tool_calls} message shape.
-                                val firstToolIdx = (turnStartBlockIndex until allToolBlocks.size)
-                                    .firstOrNull { allToolBlocks[it].kind == "tool_use" }
-                                if (firstToolIdx != null) {
-                                    allToolBlocks.add(firstToolIdx, block)
-                                    turnTextBlockIdx = firstToolIdx
-                                } else {
-                                    allToolBlocks.add(block)
-                                    turnTextBlockIdx = allToolBlocks.lastIndex
+                            val output = TurnRequestPlanner.outputLimit(proposedOutput, requestBudgetLimit, dispatchInput, available)
+                            if (output == null) {
+                                if (autoCandidate != null && lowerForBudget(planned)) continue
+                                if (autoCandidate != null) throw AutoDispatchBlocked(autoCandidate.entryId,
+                                    context.getString(R.string.nm_auto_reason_size))
+                                throw LLMError.ProviderError(context.getString(R.string.nm_router_budget_exhausted))
+                            }
+                            lastRequestedOutput = output
+                            if (autoCandidate != null && nmAutoTurn != null) {
+                                if (!AutoModelStore.enabled(context)) throw LLMError.ProviderError(
+                                    context.getString(R.string.nm_auto_disabled_during_turn))
+                                val identity = checkNotNull(nmAutoIdentity)
+                                if (!ai.tama.router.AutomaticCostGuard.permits(context)) throw AutoDispatchBlocked(
+                                    autoCandidate.entryId, context.getString(R.string.nm_auto_reason_unverified_cost))
+                                val config = providerRepository.config.value
+                                val entry = config.modelEntries.find { it.id == autoCandidate.entryId && it.model.id == currentProvider.model.id }
+                                val instance = entry?.let { e -> config.instances.find { it.id == e.providerInstanceId } }
+                                val valid = entry != null && instance != null && instance.isEnabled && !entry.isHidden &&
+                                    AutoModelStore.identity(entry, instance) == identity && providerRepository.hasAnyCredential(instance) &&
+                                    AutoModelStore.approved(context, identity) &&
+                                    nmAutoClientAccountVersion == AutoModelRuntime.accountVersion(instance.id) &&
+                                    nmRouteFingerprint(currentProvider) == AutoModelStore.historyFingerprint(context, instance) &&
+                                    nmAutoCapabilities(entry, instance).containsAll(nmAutoNeeds(requestMessages))
+                                if (!valid) throw AutoDispatchBlocked(autoCandidate.entryId, context.getString(R.string.nm_auto_reason_consent))
+                                when (val reserved = nmAutoTurn.reserveWithOutputCap(
+                                    autoCandidate.copy(tokensPerMinute = requestBudgetLimit.tokensPerMinute), dispatchInput, output)) {
+                                    is ModelHealth.Reservation.Granted -> {
+                                        nmTicket = reserved.ticket
+                                        lastRequestedOutput = checkNotNull(reserved.outputTokens)
+                                    }
+                                    is ModelHealth.Reservation.Full -> {
+                                        // Another request consumed the remaining window after the snapshot.
+                                        // Try a genuinely lower profile before excluding this entry.
+                                        if (lowerForBudget(planned)) continue
+                                        throw AutoDispatchBlocked(autoCandidate.entryId,
+                                            "${context.getString(R.string.nm_auto_reason_minute)} · ${nmAutoWait(reserved.availableAtMillis)}")
+                                    }
+                                    is ModelHealth.Reservation.Blocked -> throw AutoDispatchBlocked(autoCandidate.entryId,
+                                        "${context.getString(R.string.nm_auto_reason_cooldown)} · ${nmAutoWait(reserved.cooldown.untilMillis)}")
                                 }
                             } else {
-                                allToolBlocks.add(block)
+                                // Count manual calls too, without applying automatic-mode gates.
+                                val config = providerRepository.config.value
+                                val entry = config.modelEntries.find { it.id == _activeEntryId.value &&
+                                    it.model.id == currentProvider.model.id && this@ChatViewModel.currentProvider === currentProvider }
+                                if (entry != null) {
+                                    nmTicket = (AutoModelRuntime.health.reserve(entry.providerInstanceId,
+                                        dispatchInput.toLong() + output.toLong(), null) as ModelHealth.Reservation.Granted).ticket
+                                }
                             }
-                            freshSb
+                            dispatch = DispatchPlan(planned, tools, snapshot, estimate)
                         }
-                        // T94 fix 2 + T256: tiered text-delta throttle. Mutate local
-                        // state every delta (above) so block boundaries stay correct
-                        // for ToolUseStart / ToolInputDelta which read allToolBlocks
-                        // directly. Only push to _messages when the length-aware gate
-                        // opens (or a newline lands during a short reply). Pending
-                        // text lives in `pendingChunkSb` so the stream-end final
-                        // flush at line ~3580 can drain it.
-                        pendingChunkSb.append(chunk.text)
-                        val len = turnTextSb.length
-                        val unflushed = len - lastFlushedLen
-                        val throttle = textDeltaThrottleMs(len)
-                        val newlineFlush = len < 5_000 && chunk.text.contains('\n') && unflushed >= 50
-                        val nowMs = System.currentTimeMillis()
-                        if (nowMs - lastUiUpdateMs >= throttle || newlineFlush) {
-                            lastUiUpdateMs = nowMs
-                            lastFlushedLen = len
-                            pendingChunkSb.setLength(0)
-                            // Materialise SB → String for both the active block's
-                            // content (so Compose sees an immutable snapshot) and
-                            // for the assistant message body. These are O(n) calls
-                            // but happen at throttled cadence, not per delta.
-                            // (activeSb === currentTextBlockSb by construction.)
-                            materializeActiveTextBlock()
-                            val turnSnap = turnTextSb.toString()
+                        val outbound = checkNotNull(dispatch)
+                        val planned = outbound.attempt
+                        val requestTools = outbound.tools
+                        val requestSnapshot = outbound.snapshot
+                        val requestEstimate = outbound.estimate
+                        if (!nmWarnedWithoutTools && Need.TOOLS in planned.route.needs && planned.route.profile == Profile.LEAN) {
+                            nmWarnedWithoutTools = true
                             withContext(Dispatchers.Main) {
-                                updateAssistantMessage(assistantId, accumulatedText + turnSnap, true, allToolBlocks)
+                                appendSystemInfo(context.getString(
+                                    if (planned.route.budgetLimited) R.string.nm_router_budget_limited
+                                    else R.string.nm_router_lean_tool_notice,
+                                ), "info")
                             }
                         }
-                    }
-                    is LLMStreamChunk.ToolUseStart -> {
-                        // [T-dedupe-toolcallid] Rewrite duplicate id ASAP — the
-                        // renamed value drives the AssistantBlock.id used by
-                        // ToolCallComplete / ToolInputDelta lookups and ends
-                        // up as the persisted tool_call_id on the next request.
-                        val toolUseId = dedupeToolStartId(chunk.id)
-                        // nanoMuse: tool ids and names are supplied by the provider.
-                        if (!tamaV2Test) android.util.Log.d("ToolChain[VM]", "[turn=$turn] ToolUseStart id=$toolUseId name=${chunk.name}")
-                        // Mark thinking block as done when tool use starts
-                        val thinkIdx = allToolBlocks.indexOfFirst { it.kind == "thinking" && it.id == "thinking_$turn" }
-                        if (thinkIdx >= 0 && allToolBlocks[thinkIdx].toolStatus != ToolBlockStatus.SUCCESS) {
-                            allToolBlocks[thinkIdx] = allToolBlocks[thinkIdx].copy(toolStatus = ToolBlockStatus.SUCCESS)
-                        }
-                        // T154: when the last few text deltas landed inside the 50ms throttle
-                        // window, the UI hadn't yet been pushed with the trailing text — and
-                        // adding the tool_use block before that push freezes the preceding
-                        // text fragment in StreamingMarkdownText (its `messageIsStreaming`
-                        // flag flips off the next layout pass) with chars chopped off the
-                        // end. Mirror iOS AnthropicAgentProvider.swift Step 1 / Step 2:
-                        // first push the latest accumulated text *unthrottled* so the text
-                        // block freezes at its complete value, yield to let Compose render
-                        // it, then add the tool_use block in a separate transaction. The
-                        // pendingChunkText/lastUiUpdateMs reset mirrors the throttle path
-                        // so the next text delta doesn't try to flush stale state.
-                        if (turnTextSb.isNotEmpty() && pendingChunkSb.isNotEmpty()) {
-                            pendingChunkSb.setLength(0)
-                            lastUiUpdateMs = System.currentTimeMillis()
-                            lastFlushedLen = turnTextSb.length
-                            // T307: pre-tool-use flush also materialises the
-                            // active text block + a turn-text snapshot.
-                            materializeActiveTextBlock()
-                            // [T-android-tool-splits-reply-fix] Ordered mode:
-                            // the tool block breaks the text run, so the next
-                            // text delta opens a new block. Monolithic mode
-                            // keeps the accumulator alive — same-response
-                            // content deltas arriving after tool_calls merge
-                            // back into the pre-tool text block instead.
-                            if (!currentProvider.streamTextIsMonolithic) {
-                                currentTextBlockSb = null
-                            }
-                            val turnSnap = turnTextSb.toString()
-                            withContext(Dispatchers.Main) {
-                                updateAssistantMessage(assistantId, accumulatedText + turnSnap, true, allToolBlocks)
-                            }
-                            yield()
-                        }
-                        // T256 tier 2: force the next ToolInputDelta to flush
-                        // immediately by zeroing both gate timestamps. iOS does the
-                        // same in .startToolUse (AIChatViewModel.swift:6075-6116) so
-                        // the user sees the pill name/title arrive without waiting
-                        // out the 1s/200ms gate.
-                        lastFileToolInputMs = 0L
-                        lastOtherToolInputMs = 0L
-                        // Guard: only add if not already present (prevent duplicate blocks from repeated ToolUseStart)
-                        if (allToolBlocks.none { it.id == toolUseId }) {
-                            allToolBlocks.add(AssistantBlock(
-                                id = toolUseId,
-                                kind = "tool_use",
-                                toolName = chunk.name,
-                                toolStatus = ToolBlockStatus.STREAMING,
-                                toolTitle = friendlyToolTitle(chunk.name),
-                                startTimeMs = System.currentTimeMillis(),
+                        // The debug observer sees only counts for the exact outbound view.
+                        val sizeObserver = if (com.openminis.app.BuildConfig.DEBUG) ai.tama.chat.PromptSizeTrace.observer else null
+                        if (sizeObserver != null) runCatching {
+                            val imageReady = runCatching { io.github.nanomuse.media.MediaModels.agentImageEndpoint(context) != null }.getOrNull()
+                            sizeObserver(ai.tama.chat.PromptSizeTrace.Event.System(planned.systemSizes, imageReady))
+                            sizeObserver(ai.tama.chat.PromptSizeTrace.Event.Tools(
+                                PromptSize.tools(originalAgentTools(), requestTools),
                             ))
+                            sizeObserver(ai.tama.chat.PromptSizeTrace.Event.Request(planned.system.length))
+                        }
+                        var requestUsage: LLMUsage? = null
+                        // nanoMuse: the group, credentials or cost consent may have changed
+                        // while retrying or preparing the request. Refuse stale candidates.
+                        nmManualFallback?.let { candidate ->
+                            if (nmAutoTurn == null && (candidate.provider !== currentProvider ||
+                                    this@ChatViewModel.currentProvider !== currentProvider ||
+                                    _activeEntryId.value != candidate.entryId || !nmFallbackStillEligible(candidate))) {
+                                throw LLMError.ProviderError(context.getString(R.string.nm_auto_disabled_during_turn))
+                            }
+                        }
+                        // nanoMuse: recheck after all suspending preparation and the reservation.
+                        if (tamaV2Test && nmAutoTurn != null) {
+                            val active = checkNotNull(nmAutoCandidate)
+                            if (nmLoopSession != realSessionId.ifEmpty { sessionId } ||
+                                this@ChatViewModel.currentProvider !== currentProvider || _activeEntryId.value != active.entryId) {
+                                throw LLMError.ProviderError(context.getString(R.string.nm_auto_disabled_during_turn))
+                            }
+                            if (!ai.tama.router.AutomaticCostGuard.permits(context)) {
+                                throw AutoDispatchBlocked(active.entryId, context.getString(R.string.nm_auto_reason_unverified_cost))
+                            }
+                            if (nmAutoActiveChoice?.let(::nmAutoChoiceStillEligible) != true) {
+                                throw AutoDispatchBlocked(active.entryId, context.getString(R.string.nm_auto_reason_consent))
+                            }
+                        }
+                        nmLastSentRoute = nmRouteFingerprint(currentProvider)
+                        // nanoMuse: tag the result with the version that built this client,
+                        // never a replacement account read after the final eligibility check.
+                        nmDispatchAccountVersion = if (tamaV2Test) {
+                            nmAutoActiveChoice?.accountVersion ?: nmManualFallback?.accountVersion
+                        } else nmAutoCandidate?.providerId?.let { AutoModelRuntime.accountVersion(it) }
+                        nmDispatchAt = android.os.SystemClock.elapsedRealtime()
+                        // From here on a provider may have received the request, even on cancellation.
+                        nmDispatchStarted = true
+                        currentProvider.streamMessage(
+                            requestMessages,
+                            nmSystemPrompt, lastRequestedOutput,
+                            tools = requestTools,
+                            thinkingLevel = if (currentModelSupportsReasoning) _thinkingLevel.value else ThinkingLevel.OFF,
+                        ).collect { chunk ->
+                    // [T-STALL-DIAG] Mark first byte back from the provider and log
+                    // the time-to-first-chunk once per turn.
+                    if (firstChunkSeen.compareAndSet(false, true)) {
+                        println(
+                            "[T-STALL-DIAG] stream FIRST-CHUNK sid=$diagSid turn=$turn " +
+                                "ttfbMs=${android.os.SystemClock.elapsedRealtime() - streamStartMs} " +
+                                "kind=${chunk.javaClass.simpleName}",
+                        )
+                    }
+                    when (chunk) {
+                        is LLMStreamChunk.ThinkingDelta -> {
+                            turnThinking.append(chunk.text)
+                            // Update thinking block in UI
+                            val thinkIdx = allToolBlocks.indexOfFirst { it.kind == "thinking" && it.id == "thinking_$turn" }
+                            if (thinkIdx < 0) {
+                                allToolBlocks.add(AssistantBlock(
+                                    id = "thinking_$turn",
+                                    kind = "thinking",
+                                    content = turnThinking.toString(),
+                                    toolTitle = "Thinking",
+                                ))
+                            } else {
+                                allToolBlocks[thinkIdx] = allToolBlocks[thinkIdx].copy(content = turnThinking.toString())
+                            }
                             withContext(Dispatchers.Main) {
                                 updateAssistantMessage(assistantId, accumulatedText + turnTextSb.toString(), true, allToolBlocks)
                             }
                         }
-                    }
-                    is LLMStreamChunk.ToolInputDelta -> {
-                        // [T-dedupe-toolcallid] Translate to the currently-in-flight
-                        // renamed id so the per-tool ring + block lookup match
-                        // the block that ToolUseStart created.
-                        val toolInputId = dedupeToolInputId(chunk.id)
-                        // nanoMuse: a tool id can itself contain private provider text.
-                        if (!tamaV2Test) android.util.Log.d("ToolChain[VM]", "[turn=$turn] ToolInputDelta id=$toolInputId len=${chunk.accumulated.length}")
-                        // Maintain a per-tool ring of the most recent `accumulated`
-                        // snapshots so the preflight validator below can dump them
-                        // when an empty/invalid call is detected. Cheap (single
-                        // append + bounded trim) and lives outside any throttle so
-                        // every delta lands here.
-                        val ring = toolInputChunkRings.getOrPut(toolInputId) { mutableListOf() }
-                        ring.add(chunk.accumulated)
-                        if (ring.size > TOOL_INPUT_CHUNK_RING_MAX) {
-                            // Drop from the front so we keep the most recent N.
-                            ring.subList(0, ring.size - TOOL_INPUT_CHUNK_RING_MAX).clear()
-                        }
-                        val idx = allToolBlocks.indexOfFirst { it.id == toolInputId }
-                        if (idx >= 0) {
-                            val prev = allToolBlocks[idx]
-                            // Stream-parse partial JSON (mirrors iOS extractPartialStringValue):
-                            //   - pull "tool_title" out early so the pill header updates live
-                            //   - keep the raw accumulated JSON in toolArgs so detail-sheet
-                            //     renderers (extractShellCommand, args.optString("command"), …)
-                            //     can pick up fields as they appear.
-                            //   - leave content empty during streaming (real output arrives
-                            //     after ToolCallComplete).
-                            val partialTitle = if (tamaV2Test && prev.toolName == ai.tama.tools.ImageGenerationTool.NAME) null
-                                else extractPartialStringValue("tool_title", chunk.accumulated)
-                            val liveTitle = when {
-                                !partialTitle.isNullOrEmpty() -> partialTitle
-                                prev.toolTitle.isNotEmpty() && prev.toolTitle != prev.toolName -> prev.toolTitle
-                                else -> friendlyToolTitle(prev.toolName)
+                        is LLMStreamChunk.Text -> {
+                            // [T-android-readaloud-stop-stale] First actual text of
+                            // this reply — stop the previous reply's Read Aloud so
+                            // old and new audio don't overlap. Deferred to here
+                            // rather than fired from send() on purpose: while the
+                            // model is still thinking there is nothing to supersede
+                            // the old speech with, so it keeps playing until real
+                            // new text arrives.
+                            if (!didStopStaleReadAloud) {
+                                didStopStaleReadAloud = true
+                                _stopStaleReadAloud.tryEmit(Unit)
                             }
-                            allToolBlocks[idx] = prev.copy(
-                                toolArgs = chunk.accumulated,
-                                toolTitle = liveTitle,
-                                content = "",
-                            )
-                            // nanoMuse: the words under the face follow the pill — as soon as the
-                            // model's tool_title is in, the status line says it (not only at dispatch).
-                            if (!partialTitle.isNullOrEmpty() && partialTitle != SessionActivityTracker.currentToolTitle.value) {
-                                SessionActivityTracker.updateToolStatus(
-                                    status = "Running: ${prev.toolName}",
-                                    toolName = prev.toolName,
-                                    isRunning = true,
-                                    toolTitle = partialTitle,
+                            // Mark thinking block as done when text starts flowing
+                            val thinkIdx = allToolBlocks.indexOfFirst { it.kind == "thinking" && it.id == "thinking_$turn" }
+                            if (thinkIdx >= 0 && allToolBlocks[thinkIdx].toolStatus != ToolBlockStatus.SUCCESS) {
+                                allToolBlocks[thinkIdx] = allToolBlocks[thinkIdx].copy(toolStatus = ToolBlockStatus.SUCCESS)
+                            }
+                            // T307: append-only on the StringBuilder; .toString()
+                            // is taken once below at flush time, not per delta.
+                            turnTextSb.append(chunk.text)
+                            // Append to the trailing text block — or open a new one if the last
+                            // block isn't a text block (i.e. a tool call or thinking was in between).
+                            // This preserves the chronological interleaving of text and tool calls
+                            // across a single assistant turn. The block's `content` field stays
+                            // immutable String — we keep a parallel StringBuilder for the active
+                            // block and materialise via .toString() only on flush.
+                            val lastIdx = allToolBlocks.lastIndex
+                            val monolithic = currentProvider.streamTextIsMonolithic
+                            val activeSb = if (monolithic && turnTextBlockIdx >= 0 && currentTextBlockSb != null) {
+                                // [T-android-tool-splits-reply-fix] Chat Completions
+                                // content is ONE string per response — a content
+                                // delta arriving after tool_calls deltas (qwen
+                                // chunking artifact) is still part of the same
+                                // pre-tool sentence. Merge it back instead of
+                                // fabricating a post-tool text block, which split
+                                // sentences mid-word in the chat UI. Scope: this
+                                // streamed response only (see turnTextBlockIdx).
+                                if (!loggedPostToolTextMerge &&
+                                    allToolBlocks.subList(turnTextBlockIdx + 1, allToolBlocks.size).any { it.kind == "tool_use" }
+                                ) {
+                                    loggedPostToolTextMerge = true
+                                    AppLogger.info(
+                                        TAG_STREAM,
+                                        "[T-android-tool-splits-reply-fix] post-tool_calls content delta merged into pre-tool text block (model=${currentProvider.model.id})",
+                                    )
+                                }
+                                currentTextBlockSb!!.append(chunk.text)
+                                currentTextBlockSb!!
+                            } else if (!monolithic && lastIdx >= 0 && allToolBlocks[lastIdx].kind == "text" && currentTextBlockSb != null) {
+                                currentTextBlockSb!!.append(chunk.text)
+                                currentTextBlockSb!!
+                            } else {
+                                // New text run — either first text after a tool_use/thinking
+                                // break, or first text in this turn. Open a fresh block AND
+                                // a fresh accumulator. The new block's content carries the
+                                // first delta verbatim; subsequent deltas append to the SB.
+                                val freshSb = StringBuilder(chunk.text)
+                                currentTextBlockSb = freshSb
+                                val block = AssistantBlock(
+                                    id = "text_${turn}_${allToolBlocks.size}",
+                                    kind = "text",
+                                    content = chunk.text,
                                 )
+                                if (monolithic) {
+                                    // Single text block per response. If tool blocks
+                                    // already arrived (content-after-tool_calls
+                                    // chunking with no preface text), insert BEFORE
+                                    // the first tool block of this turn so the
+                                    // persisted order matches the canonical
+                                    // {content, tool_calls} message shape.
+                                    val firstToolIdx = (turnStartBlockIndex until allToolBlocks.size)
+                                        .firstOrNull { allToolBlocks[it].kind == "tool_use" }
+                                    if (firstToolIdx != null) {
+                                        allToolBlocks.add(firstToolIdx, block)
+                                        turnTextBlockIdx = firstToolIdx
+                                    } else {
+                                        allToolBlocks.add(block)
+                                        turnTextBlockIdx = allToolBlocks.lastIndex
+                                    }
+                                } else {
+                                    allToolBlocks.add(block)
+                                }
+                                freshSb
                             }
-                            // T256 tier 2: gate UI push by tool kind. file_write/file_edit
-                            // pump multi-KB JSON through the SSE — pushing every delta
-                            // pegs the UI thread for no readable benefit (the user can't
-                            // skim a partial JSON blob anyway). Mirrors iOS
-                            // AIChatViewModel.swift:6229-6259 (1s file / 200ms other).
-                            // Local state above is mutated unconditionally so when the
-                            // gate eventually opens — or ToolCallComplete force-flushes —
-                            // the latest accumulated args are pushed.
-                            val toolName = prev.toolName
-                            val isHeavyFileTool = toolName == "file_write" || toolName == "file_edit"
-                            val gateMs = if (isHeavyFileTool) 1_000L else 200L
+                            // T94 fix 2 + T256: tiered text-delta throttle. Mutate local
+                            // state every delta (above) so block boundaries stay correct
+                            // for ToolUseStart / ToolInputDelta which read allToolBlocks
+                            // directly. Only push to _messages when the length-aware gate
+                            // opens (or a newline lands during a short reply). Pending
+                            // text lives in `pendingChunkSb` so the stream-end final
+                            // flush at line ~3580 can drain it.
+                            pendingChunkSb.append(chunk.text)
+                            val len = turnTextSb.length
+                            val unflushed = len - lastFlushedLen
+                            val throttle = textDeltaThrottleMs(len)
+                            val newlineFlush = len < 5_000 && chunk.text.contains('\n') && unflushed >= 50
                             val nowMs = System.currentTimeMillis()
-                            val lastTs = if (isHeavyFileTool) lastFileToolInputMs else lastOtherToolInputMs
-                            if (nowMs - lastTs >= gateMs) {
-                                if (isHeavyFileTool) lastFileToolInputMs = nowMs
-                                else lastOtherToolInputMs = nowMs
+                            if (nowMs - lastUiUpdateMs >= throttle || newlineFlush) {
+                                lastUiUpdateMs = nowMs
+                                lastFlushedLen = len
+                                pendingChunkSb.setLength(0)
+                                // Materialise SB → String for both the active block's
+                                // content (so Compose sees an immutable snapshot) and
+                                // for the assistant message body. These are O(n) calls
+                                // but happen at throttled cadence, not per delta.
+                                // (activeSb === currentTextBlockSb by construction.)
+                                materializeActiveTextBlock()
+                                val turnSnap = turnTextSb.toString()
+                                withContext(Dispatchers.Main) {
+                                    updateAssistantMessage(assistantId, accumulatedText + turnSnap, true, allToolBlocks)
+                                }
+                            }
+                        }
+                        is LLMStreamChunk.ToolUseStart -> {
+                            // [T-dedupe-toolcallid] Rewrite duplicate id ASAP — the
+                            // renamed value drives the AssistantBlock.id used by
+                            // ToolCallComplete / ToolInputDelta lookups and ends
+                            // up as the persisted tool_call_id on the next request.
+                            val toolUseId = dedupeToolStartId(chunk.id)
+                            // nanoMuse: tool ids and names are supplied by the provider.
+                            if (!tamaV2Test) android.util.Log.d("ToolChain[VM]", "[turn=$turn] ToolUseStart id=$toolUseId name=${chunk.name}")
+                            // Mark thinking block as done when tool use starts
+                            val thinkIdx = allToolBlocks.indexOfFirst { it.kind == "thinking" && it.id == "thinking_$turn" }
+                            if (thinkIdx >= 0 && allToolBlocks[thinkIdx].toolStatus != ToolBlockStatus.SUCCESS) {
+                                allToolBlocks[thinkIdx] = allToolBlocks[thinkIdx].copy(toolStatus = ToolBlockStatus.SUCCESS)
+                            }
+                            // T154: when the last few text deltas landed inside the 50ms throttle
+                            // window, the UI hadn't yet been pushed with the trailing text — and
+                            // adding the tool_use block before that push freezes the preceding
+                            // text fragment in StreamingMarkdownText (its `messageIsStreaming`
+                            // flag flips off the next layout pass) with chars chopped off the
+                            // end. Mirror iOS AnthropicAgentProvider.swift Step 1 / Step 2:
+                            // first push the latest accumulated text *unthrottled* so the text
+                            // block freezes at its complete value, yield to let Compose render
+                            // it, then add the tool_use block in a separate transaction. The
+                            // pendingChunkText/lastUiUpdateMs reset mirrors the throttle path
+                            // so the next text delta doesn't try to flush stale state.
+                            if (turnTextSb.isNotEmpty() && pendingChunkSb.isNotEmpty()) {
+                                pendingChunkSb.setLength(0)
+                                lastUiUpdateMs = System.currentTimeMillis()
+                                lastFlushedLen = turnTextSb.length
+                                // T307: pre-tool-use flush also materialises the
+                                // active text block + a turn-text snapshot.
+                                materializeActiveTextBlock()
+                                // [T-android-tool-splits-reply-fix] Ordered mode:
+                                // the tool block breaks the text run, so the next
+                                // text delta opens a new block. Monolithic mode
+                                // keeps the accumulator alive — same-response
+                                // content deltas arriving after tool_calls merge
+                                // back into the pre-tool text block instead.
+                                if (!currentProvider.streamTextIsMonolithic) {
+                                    currentTextBlockSb = null
+                                }
+                                val turnSnap = turnTextSb.toString()
+                                withContext(Dispatchers.Main) {
+                                    updateAssistantMessage(assistantId, accumulatedText + turnSnap, true, allToolBlocks)
+                                }
+                                yield()
+                            }
+                            // T256 tier 2: force the next ToolInputDelta to flush
+                            // immediately by zeroing both gate timestamps. iOS does the
+                            // same in .startToolUse (AIChatViewModel.swift:6075-6116) so
+                            // the user sees the pill name/title arrive without waiting
+                            // out the 1s/200ms gate.
+                            lastFileToolInputMs = 0L
+                            lastOtherToolInputMs = 0L
+                            // Guard: only add if not already present (prevent duplicate blocks from repeated ToolUseStart)
+                            if (allToolBlocks.none { it.id == toolUseId }) {
+                                allToolBlocks.add(AssistantBlock(
+                                    id = toolUseId,
+                                    kind = "tool_use",
+                                    toolName = chunk.name,
+                                    toolStatus = ToolBlockStatus.STREAMING,
+                                    toolTitle = friendlyToolTitle(chunk.name),
+                                    startTimeMs = System.currentTimeMillis(),
+                                ))
                                 withContext(Dispatchers.Main) {
                                     updateAssistantMessage(assistantId, accumulatedText + turnTextSb.toString(), true, allToolBlocks)
                                 }
                             }
                         }
-                    }
-                    is LLMStreamChunk.ToolCallComplete -> {
-                        // [T-dedupe-toolcallid] Rewrite duplicate id so the
-                        // persisted tool_calls list, the block lookup, and
-                        // the downstream tool-result join all key on the
-                        // same value (matches the rename applied at start).
-                        val toolCompleteId = dedupeToolCompleteId(chunk.id)
-                        val loggedToolArgs = if (chunk.name == ai.tama.tools.ImageGenerationTool.NAME) "<omitted>" else chunk.args.toString().take(300)
-                        // nanoMuse: no tool arguments or provider-supplied identifiers in parallel logcat.
-                        if (!tamaV2Test) android.util.Log.d("ToolChain[VM]", "[turn=$turn] ToolCallComplete id=$toolCompleteId name=${chunk.name} args=$loggedToolArgs")
-                        toolCalls.add(Triple(toolCompleteId, chunk.name, chunk.args))
-                        // [T-android-gemini3-thoughtsig / #179] Stash the Gemini
-                        // 3.x thought signature keyed by the (deduped) tool call id.
-                        chunk.thoughtSignature?.let { toolCallSignatures[toolCompleteId] = it }
-                        val idx = allToolBlocks.indexOfFirst { it.id == toolCompleteId }
-                        if (idx >= 0) {
-                            val providedTitle = if (tamaV2Test && chunk.name == ai.tama.tools.ImageGenerationTool.NAME) null
-                                else chunk.args.optString("tool_title", "").takeIf { it.isNotEmpty() }
-                            val title = providedTitle ?: friendlyToolTitle(chunk.name)
-                            // PENDING — JSON params fully received, waiting for execution
-                            // dispatcher to invoke the tool. executeTool() flips to RUNNING.
-                            allToolBlocks[idx] = allToolBlocks[idx].copy(
-                                toolStatus = ToolBlockStatus.PENDING,
-                                toolTitle = title,
-                                toolArgs = chunk.args.toString(),
-                                content = "", // Clear ToolInputDelta JSON accumulation before real output arrives
-                                // [T-android-gemini3-thoughtsig / #179] Persist the
-                                // signature onto the block so buildTurnParts (the DB
-                                // path) round-trips it. Preserve any prior value if
-                                // this chunk lacked one.
-                                thoughtSignature = chunk.thoughtSignature ?: allToolBlocks[idx].thoughtSignature,
-                            )
-                            withContext(Dispatchers.Main) {
-                                updateAssistantMessage(assistantId, accumulatedText + turnTextSb.toString(), true, allToolBlocks)
+                        is LLMStreamChunk.ToolInputDelta -> {
+                            // [T-dedupe-toolcallid] Translate to the currently-in-flight
+                            // renamed id so the per-tool ring + block lookup match
+                            // the block that ToolUseStart created.
+                            val toolInputId = dedupeToolInputId(chunk.id)
+                            // nanoMuse: a tool id can itself contain private provider text.
+                            if (!tamaV2Test) android.util.Log.d("ToolChain[VM]", "[turn=$turn] ToolInputDelta id=$toolInputId len=${chunk.accumulated.length}")
+                            // Maintain a per-tool ring of the most recent `accumulated`
+                            // snapshots so the preflight validator below can dump them
+                            // when an empty/invalid call is detected. Cheap (single
+                            // append + bounded trim) and lives outside any throttle so
+                            // every delta lands here.
+                            val ring = toolInputChunkRings.getOrPut(toolInputId) { mutableListOf() }
+                            ring.add(chunk.accumulated)
+                            if (ring.size > TOOL_INPUT_CHUNK_RING_MAX) {
+                                // Drop from the front so we keep the most recent N.
+                                ring.subList(0, ring.size - TOOL_INPUT_CHUNK_RING_MAX).clear()
+                            }
+                            val idx = allToolBlocks.indexOfFirst { it.id == toolInputId }
+                            if (idx >= 0) {
+                                val prev = allToolBlocks[idx]
+                                // Stream-parse partial JSON (mirrors iOS extractPartialStringValue):
+                                //   - pull "tool_title" out early so the pill header updates live
+                                //   - keep the raw accumulated JSON in toolArgs so detail-sheet
+                                //     renderers (extractShellCommand, args.optString("command"), …)
+                                //     can pick up fields as they appear.
+                                //   - leave content empty during streaming (real output arrives
+                                //     after ToolCallComplete).
+                                val partialTitle = if (tamaV2Test && prev.toolName == ai.tama.tools.ImageGenerationTool.NAME) null
+                                    else extractPartialStringValue("tool_title", chunk.accumulated)
+                                val liveTitle = when {
+                                    !partialTitle.isNullOrEmpty() -> partialTitle
+                                    prev.toolTitle.isNotEmpty() && prev.toolTitle != prev.toolName -> prev.toolTitle
+                                    else -> friendlyToolTitle(prev.toolName)
+                                }
+                                allToolBlocks[idx] = prev.copy(
+                                    toolArgs = chunk.accumulated,
+                                    toolTitle = liveTitle,
+                                    content = "",
+                                )
+                                // nanoMuse: the words under the face follow the pill — as soon as the
+                                // model's tool_title is in, the status line says it (not only at dispatch).
+                                if (!partialTitle.isNullOrEmpty() && partialTitle != SessionActivityTracker.currentToolTitle.value) {
+                                    SessionActivityTracker.updateToolStatus(
+                                        status = "Running: ${prev.toolName}",
+                                        toolName = prev.toolName,
+                                        isRunning = true,
+                                        toolTitle = partialTitle,
+                                    )
+                                }
+                                // T256 tier 2: gate UI push by tool kind. file_write/file_edit
+                                // pump multi-KB JSON through the SSE — pushing every delta
+                                // pegs the UI thread for no readable benefit (the user can't
+                                // skim a partial JSON blob anyway). Mirrors iOS
+                                // AIChatViewModel.swift:6229-6259 (1s file / 200ms other).
+                                // Local state above is mutated unconditionally so when the
+                                // gate eventually opens — or ToolCallComplete force-flushes —
+                                // the latest accumulated args are pushed.
+                                val toolName = prev.toolName
+                                val isHeavyFileTool = toolName == "file_write" || toolName == "file_edit"
+                                val gateMs = if (isHeavyFileTool) 1_000L else 200L
+                                val nowMs = System.currentTimeMillis()
+                                val lastTs = if (isHeavyFileTool) lastFileToolInputMs else lastOtherToolInputMs
+                                if (nowMs - lastTs >= gateMs) {
+                                    if (isHeavyFileTool) lastFileToolInputMs = nowMs
+                                    else lastOtherToolInputMs = nowMs
+                                    withContext(Dispatchers.Main) {
+                                        updateAssistantMessage(assistantId, accumulatedText + turnTextSb.toString(), true, allToolBlocks)
+                                    }
+                                }
                             }
                         }
-                    }
-                    is LLMStreamChunk.Usage -> {
-                        lastUsage = chunk.usage
-                        // Usage chunks may split input and output; retain the largest observed
-                        // values even if the stream is cancelled or later fails.
-                        nmMeasuredInput = maxOf(nmMeasuredInput, ContextEstimate.inputTokens(chunk.usage))
-                        nmMeasuredOutput = maxOf(nmMeasuredOutput, chunk.usage.outputTokens.coerceAtLeast(0))
-                        // nanoMuse: retain the last nonempty input count and observe it once.
-                        if (ContextEstimate.inputTokens(chunk.usage) > 0) requestUsage = chunk.usage
-                        // Update context token count for next turn's dynamicMaxTokens()
-                        // and publish to _lastTurnContextTokens so the ContextPolicy
-                        // gate in [checkContextBeforeSend] can see the latest pressure
-                        // without a DB round-trip.
-                        // nanoMuse: calibrate only input actually reported by this chunk (#719).
-                        val actualContextTokens =
-                            io.github.nanomuse.chat.ContextEstimate.inputTokens(chunk.usage)
-                        if (actualContextTokens > 0) {
-                            lastContextTokens = actualContextTokens
-                            _lastTurnContextTokens.value = lastContextTokens
+                        is LLMStreamChunk.ToolCallComplete -> {
+                            // [T-dedupe-toolcallid] Rewrite duplicate id so the
+                            // persisted tool_calls list, the block lookup, and
+                            // the downstream tool-result join all key on the
+                            // same value (matches the rename applied at start).
+                            val toolCompleteId = dedupeToolCompleteId(chunk.id)
+                            val loggedToolArgs = if (chunk.name == ai.tama.tools.ImageGenerationTool.NAME) "<omitted>" else chunk.args.toString().take(300)
+                            // nanoMuse: no tool arguments or provider-supplied identifiers in parallel logcat.
+                            if (!tamaV2Test) android.util.Log.d("ToolChain[VM]", "[turn=$turn] ToolCallComplete id=$toolCompleteId name=${chunk.name} args=$loggedToolArgs")
+                            toolCalls.add(Triple(toolCompleteId, chunk.name, chunk.args))
+                            // [T-android-gemini3-thoughtsig / #179] Stash the Gemini
+                            // 3.x thought signature keyed by the (deduped) tool call id.
+                            chunk.thoughtSignature?.let { toolCallSignatures[toolCompleteId] = it }
+                            val idx = allToolBlocks.indexOfFirst { it.id == toolCompleteId }
+                            if (idx >= 0) {
+                                val providedTitle = if (tamaV2Test && chunk.name == ai.tama.tools.ImageGenerationTool.NAME) null
+                                    else chunk.args.optString("tool_title", "").takeIf { it.isNotEmpty() }
+                                val title = providedTitle ?: friendlyToolTitle(chunk.name)
+                                // PENDING — JSON params fully received, waiting for execution
+                                // dispatcher to invoke the tool. executeTool() flips to RUNNING.
+                                allToolBlocks[idx] = allToolBlocks[idx].copy(
+                                    toolStatus = ToolBlockStatus.PENDING,
+                                    toolTitle = title,
+                                    toolArgs = chunk.args.toString(),
+                                    content = "", // Clear ToolInputDelta JSON accumulation before real output arrives
+                                    // [T-android-gemini3-thoughtsig / #179] Persist the
+                                    // signature onto the block so buildTurnParts (the DB
+                                    // path) round-trips it. Preserve any prior value if
+                                    // this chunk lacked one.
+                                    thoughtSignature = chunk.thoughtSignature ?: allToolBlocks[idx].thoughtSignature,
+                                )
+                                withContext(Dispatchers.Main) {
+                                    updateAssistantMessage(assistantId, accumulatedText + turnTextSb.toString(), true, allToolBlocks)
+                                }
+                            }
+                        }
+                        is LLMStreamChunk.Usage -> {
+                            lastUsage = chunk.usage
+                            // Usage chunks may split input and output; retain the largest observed
+                            // values even if the stream is cancelled or later fails.
+                            nmMeasuredInput = maxOf(nmMeasuredInput, ContextEstimate.inputTokens(chunk.usage))
+                            nmMeasuredOutput = maxOf(nmMeasuredOutput, chunk.usage.outputTokens.coerceAtLeast(0))
+                            // nanoMuse: retain the last nonempty input count and observe it once.
+                            if (ContextEstimate.inputTokens(chunk.usage) > 0) requestUsage = chunk.usage
+                            // Update context token count for next turn's dynamicMaxTokens()
+                            // and publish to _lastTurnContextTokens so the ContextPolicy
+                            // gate in [checkContextBeforeSend] can see the latest pressure
+                            // without a DB round-trip.
+                            // nanoMuse: calibrate only input actually reported by this chunk (#719).
+                            val actualContextTokens =
+                                io.github.nanomuse.chat.ContextEstimate.inputTokens(chunk.usage)
+                            if (actualContextTokens > 0) {
+                                lastContextTokens = actualContextTokens
+                                _lastTurnContextTokens.value = lastContextTokens
+                            }
+                        }
+                        is LLMStreamChunk.ReasoningContent -> {
+                            // Opaque reasoning blob (DeepSeek/Kimi reasoning_content) — record
+                            // on the last assistant turn so it echoes back on the next request.
+                            // Empty strings are preserved (DeepSeek V4 emits "" on non-thinking
+                            // turns and we must round-trip exactly that). No live UI surface;
+                            // the thinking panel is driven by ThinkingDelta events above.
+                            turnReasoningBlob = chunk.content
+                        }
+                        is LLMStreamChunk.Finished -> {
+                            // T321: stash for empty-turn diagnostic logging below.
+                            turnFinishReason = chunk.stopReason
+                        }
+                        is LLMStreamChunk.Started -> { /* no-op */ }
+                        is LLMStreamChunk.MediaAttachment -> {
+                            // [T-codex-gpt-image2-oauth-android] Model-generated
+                            // media (gpt-image-2 image). Inline chat display is out
+                            // of scope for this change — the image is delivered via
+                            // sendMessage→LLMResponse.mediaAttachments for the
+                            // minis-model-use CLI path. No-op here so the chat agent
+                            // loop compiles with the new chunk variant.
                         }
                     }
-                    is LLMStreamChunk.ReasoningContent -> {
-                        // Opaque reasoning blob (DeepSeek/Kimi reasoning_content) — record
-                        // on the last assistant turn so it echoes back on the next request.
-                        // Empty strings are preserved (DeepSeek V4 emits "" on non-thinking
-                        // turns and we must round-trip exactly that). No live UI surface;
-                        // the thinking panel is driven by ThinkingDelta events above.
-                        turnReasoningBlob = chunk.content
-                    }
-                    is LLMStreamChunk.Finished -> {
-                        // T321: stash for empty-turn diagnostic logging below.
-                        turnFinishReason = chunk.stopReason
-                    }
-                    is LLMStreamChunk.Started -> { /* no-op */ }
-                    is LLMStreamChunk.MediaAttachment -> {
-                        // [T-codex-gpt-image2-oauth-android] Model-generated
-                        // media (gpt-image-2 image). Inline chat display is out
-                        // of scope for this change — the image is delivered via
-                        // sendMessage→LLMResponse.mediaAttachments for the
-                        // minis-model-use CLI path. No-op here so the chat agent
-                        // loop compiles with the new chunk variant.
-                    }
-                }
-                    }  // end collect
-                    if (tamaV2Test && (turnFinishReason == null ||
-                            (toolCalls.isNotEmpty() && !ai.tama.router.GroupFallback.mayExecuteTools(turnFinishReason)))) {
-                        // nanoMuse: do not execute a tool assembled from a dropped, truncated
-                        // or refused response. A partial image call also consumes this turn's
-                        // image attempt so a retry cannot turn it into an unexpected POST.
-                        if (toolCalls.any { it.second == ai.tama.tools.ImageGenerationTool.NAME }) {
-                            nmImageGuard.consume(truncated = true)
+                        }  // end collect
+                        if (tamaV2Test && (turnFinishReason == null ||
+                                (toolCalls.isNotEmpty() && !ai.tama.router.GroupFallback.mayExecuteTools(turnFinishReason)))) {
+                            // nanoMuse: do not execute a tool assembled from a dropped, truncated
+                            // or refused response. A partial image call also consumes this turn's
+                            // image attempt so a retry cannot turn it into an unexpected POST.
+                            if (toolCalls.any { it.second == ai.tama.tools.ImageGenerationTool.NAME }) {
+                                nmImageGuard.consume(truncated = true)
+                            }
+                            val message = context.getString(R.string.nm_stream_unconfirmed)
+                            if (turnFinishReason == null) throw LLMError.TransientError(message)
+                            else throw LLMError.ProviderError(message)
                         }
-                        val message = context.getString(R.string.nm_stream_unconfirmed)
-                        if (turnFinishReason == null) throw LLMError.TransientError(message)
-                        else throw LLMError.ProviderError(message)
-                    }
-                    val nmCleanCompletion = ai.tama.router.GroupFallback.completed(
-                        turnFinishReason, turnTextSb.isNotBlank(), toolCalls.isNotEmpty(),
-                    )
-                    if (nmTicket != null && (if (tamaV2Test) nmCleanCompletion else turnFinishReason != null)) {
-                        val config = providerRepository.config.value
-                        val entry = config.modelEntries.find { it.id == _activeEntryId.value && it.model.id == currentProvider.model.id }
-                        if (entry != null) {
-                            val latency = (android.os.SystemClock.elapsedRealtime() - nmDispatchAt).coerceAtLeast(0L)
-                            // nanoMuse: generation check and health update must be atomic with
-                            // account invalidation; the selected client supplied the version.
-                            if (tamaV2Test && (nmAutoTurn != null || nmManualFallback != null)) {
-                                AutoModelRuntime.runIfCurrent(entry.providerInstanceId, nmDispatchAccountVersion) {
+                        val nmCleanCompletion = ai.tama.router.GroupFallback.completed(
+                            turnFinishReason, turnTextSb.isNotBlank(), toolCalls.isNotEmpty(),
+                        )
+                        if (nmTicket != null && (if (tamaV2Test) nmCleanCompletion else turnFinishReason != null)) {
+                            val config = providerRepository.config.value
+                            val entry = config.modelEntries.find { it.id == _activeEntryId.value && it.model.id == currentProvider.model.id }
+                            if (entry != null) {
+                                val latency = (android.os.SystemClock.elapsedRealtime() - nmDispatchAt).coerceAtLeast(0L)
+                                // nanoMuse: generation check and health update must be atomic with
+                                // account invalidation; the selected client supplied the version.
+                                if (tamaV2Test && (nmAutoTurn != null || nmManualFallback != null)) {
+                                    AutoModelRuntime.runIfCurrent(entry.providerInstanceId, nmDispatchAccountVersion) {
+                                        AutoModelRuntime.health.success(entry.id, entry.providerInstanceId, latency)
+                                    }
+                                } else if (nmAutoTurn == null ||
+                                    nmDispatchAccountVersion == AutoModelRuntime.accountVersion(entry.providerInstanceId)) {
                                     AutoModelRuntime.health.success(entry.id, entry.providerInstanceId, latency)
                                 }
-                            } else if (nmAutoTurn == null ||
-                                nmDispatchAccountVersion == AutoModelRuntime.accountVersion(entry.providerInstanceId)) {
-                                AutoModelRuntime.health.success(entry.id, entry.providerInstanceId, latency)
                             }
                         }
-                    }
-                    // nanoMuse: a clean tool request is intermediate. Persist only a final,
-                    // nonempty answer, and compare against the original DB binding atomically.
-                    if (nmFallbackCommit != null && ai.tama.router.GroupFallback.confirmsRoute(
-                            turnFinishReason, turnTextSb.isNotBlank(), toolCalls.isNotEmpty(),
-                        )) withContext(NonCancellable + Dispatchers.Main) {
-                        fun routeStillValid(): Boolean {
-                            val live = providerRepository.config.value
-                            val entry = live.modelEntries.find { it.id == _activeEntryId.value && it.model.id == currentProvider.model.id }
-                            val instance = entry?.let { found -> live.instances.find { it.id == found.providerInstanceId } }
+                        // nanoMuse: a clean tool request is intermediate. Persist only a final,
+                        // nonempty answer, and compare against the original DB binding atomically.
+                        if (nmFallbackCommit != null && ai.tama.router.GroupFallback.confirmsRoute(
+                                turnFinishReason, turnTextSb.isNotBlank(), toolCalls.isNotEmpty(),
+                            )) withContext(NonCancellable + Dispatchers.Main) {
+                            fun routeStillValid(): Boolean {
+                                val live = providerRepository.config.value
+                                val entry = live.modelEntries.find { it.id == _activeEntryId.value && it.model.id == currentProvider.model.id }
+                                val instance = entry?.let { found -> live.instances.find { it.id == found.providerInstanceId } }
+                                val selectedGroup = _selectedGroupId.value
+                                return entry != null && instance != null &&
+                                    ai.tama.router.GroupFallback.eligible(entry.isHidden, instance.isEnabled,
+                                        instance.providerType.isUsable, providerRepository.hasAnyCredential(instance),
+                                        AutoModelStore.approved(context, AutoModelStore.identity(entry, instance))) &&
+                                    (selectedGroup == null || live.modelGroups.any { it.id == selectedGroup }) &&
+                                    nmRouteFingerprint(currentProvider) == AutoModelStore.historyFingerprint(context, instance) &&
+                                    (nmAutoTurn == null || (nmDispatchAccountVersion == AutoModelRuntime.accountVersion(instance.id) &&
+                                        nmAutoActiveChoice?.let(::nmAutoChoiceStillEligible) == true)) &&
+                                    (nmManualFallback == null || nmFallbackStillEligible(checkNotNull(nmManualFallback)))
+                            }
+                            fun stillSelected() = nmFallbackCommit.shouldRestore(
+                                _activeEntryId.value, _selectedGroupId.value,
+                                sameClient = this@ChatViewModel.currentProvider === currentProvider,
+                                sameSession = nmLoopSession == realSessionId.ifEmpty { sessionId },
+                            )
+                            val expected = nmPersistedBinding
+                            val config = providerRepository.config.value
+                            val entry = config.modelEntries.find { it.id == _activeEntryId.value && it.model.id == currentProvider.model.id }
                             val selectedGroup = _selectedGroupId.value
-                            return entry != null && instance != null &&
-                                ai.tama.router.GroupFallback.eligible(entry.isHidden, instance.isEnabled,
-                                    instance.providerType.isUsable, providerRepository.hasAnyCredential(instance),
-                                    AutoModelStore.approved(context, AutoModelStore.identity(entry, instance))) &&
-                                (selectedGroup == null || live.modelGroups.any { it.id == selectedGroup }) &&
-                                nmRouteFingerprint(currentProvider) == AutoModelStore.historyFingerprint(context, instance) &&
-                                (nmAutoTurn == null || (nmDispatchAccountVersion == AutoModelRuntime.accountVersion(instance.id) &&
-                                    nmAutoActiveChoice?.let(::nmAutoChoiceStillEligible) == true)) &&
-                                (nmManualFallback == null || nmFallbackStillEligible(checkNotNull(nmManualFallback)))
-                        }
-                        fun stillSelected() = nmFallbackCommit.shouldRestore(
-                            _activeEntryId.value, _selectedGroupId.value,
-                            sameClient = this@ChatViewModel.currentProvider === currentProvider,
-                            sameSession = nmLoopSession == realSessionId.ifEmpty { sessionId },
-                        )
-                        val expected = nmPersistedBinding
-                        val config = providerRepository.config.value
-                        val entry = config.modelEntries.find { it.id == _activeEntryId.value && it.model.id == currentProvider.model.id }
-                        val selectedGroup = _selectedGroupId.value
-                        val group = selectedGroup?.let { id -> config.modelGroups.find { it.id == id } }
-                        if (expected != null && entry != null && nmLoopJob?.isActive == true &&
-                            stillSelected() && routeStillValid()) {
-                            val keepGroup = group != null && (entry.id in group.memberEntryIds || nmAutoTurn != null)
-                            val binding = if (keepGroup && group != null) {
-                                JSONObject().put("type", "group").put("groupId", group.id).put("lastEntryId", entry.id).apply {
-                                    // Keep the preferred group member when an automatic route is outside it.
-                                    if (nmAutoTurn != null) {
-                                        nmPreferredAutoEntryId?.takeIf { it in group.memberEntryIds }
-                                            ?.let { put("preferredEntryId", it) }
-                                        if (entry.id !in group.memberEntryIds) put("autoFallback", true)
+                            val group = selectedGroup?.let { id -> config.modelGroups.find { it.id == id } }
+                            if (expected != null && entry != null && nmLoopJob?.isActive == true &&
+                                stillSelected() && routeStillValid()) {
+                                val keepGroup = group != null && (entry.id in group.memberEntryIds || nmAutoTurn != null)
+                                val binding = if (keepGroup && group != null) {
+                                    JSONObject().put("type", "group").put("groupId", group.id).put("lastEntryId", entry.id).apply {
+                                        // Keep the preferred group member when an automatic route is outside it.
+                                        if (nmAutoTurn != null) {
+                                            nmPreferredAutoEntryId?.takeIf { it in group.memberEntryIds }
+                                                ?.let { put("preferredEntryId", it) }
+                                            if (entry.id !in group.memberEntryIds) put("autoFallback", true)
+                                        }
                                     }
-                                }
-                            } else JSONObject().put("type", "entry").put("entryId", entry.id)
-                            val replacement = ai.tama.chat.SessionBindingSnapshot(binding.toString(), entry.model.id)
-                            // nanoMuse: compensate even after cancellation or navigation, unless a newer write won.
-                            val confirmation = ai.tama.chat.FallbackBindingConfirmation.confirm(
-                                isCurrent = { nmLoopJob?.isActive == true && stillSelected() && routeStillValid() },
-                                write = {
-                                    try { chatRepository.nmTryFallbackBinding(nmLoopSession, expected, replacement) }
-                                    catch (_: Exception) { Log.w(TAG, "Fallback binding could not be saved"); null }
-                                },
-                                accept = {
-                                    nmFallbackCommit.confirmed(
-                                        finished = true, activeEntryId = _activeEntryId.value, activeGroupId = _selectedGroupId.value,
-                                        sameClient = this@ChatViewModel.currentProvider === currentProvider, sameRoute = true,
-                                        sameSession = nmLoopSession == realSessionId.ifEmpty { sessionId },
-                                    ) != null
-                                },
-                                restore = { version ->
-                                    try { chatRepository.nmRestoreFallbackBinding(nmLoopSession, version, replacement, expected) }
-                                    catch (_: Exception) { Log.w(TAG, "Fallback binding could not be restored"); false }
-                                },
-                            )
-                            if (confirmation == ai.tama.chat.FallbackBindingConfirmation.Outcome.CONFIRMED) {
-                                nmPersistedBinding = replacement
-                                if (!keepGroup) {
-                                    _selectedGroupId.value = null
-                                    _selectedGroupName.value = ""
-                                }
-                                if (nmAutoTurn == null) {
-                                    nmPreferredAutoEntryId = entry.id
-                                    val infoIndex = allToolBlocks.indexOfFirst { it.id == "fallback_info_$turn" }
-                                    val source = nmGroupSwitchSource
-                                    val reason = nmGroupSwitchReason
-                                    if (infoIndex >= 0 && source != null && reason != null) {
-                                        allToolBlocks[infoIndex] = allToolBlocks[infoIndex].copy(content = context.getString(
-                                            R.string.nm_auto_switch_reason, source, reason, entry.model.displayName,
-                                        ))
+                                } else JSONObject().put("type", "entry").put("entryId", entry.id)
+                                val replacement = ai.tama.chat.SessionBindingSnapshot(binding.toString(), entry.model.id)
+                                // nanoMuse: compensate even after cancellation or navigation, unless a newer write won.
+                                val confirmation = ai.tama.chat.FallbackBindingConfirmation.confirm(
+                                    isCurrent = { nmLoopJob?.isActive == true && stillSelected() && routeStillValid() },
+                                    write = {
+                                        try { chatRepository.nmTryFallbackBinding(nmLoopSession, expected, replacement) }
+                                        catch (_: Exception) { Log.w(TAG, "Fallback binding could not be saved"); null }
+                                    },
+                                    accept = {
+                                        nmFallbackCommit.confirmed(
+                                            finished = true, activeEntryId = _activeEntryId.value, activeGroupId = _selectedGroupId.value,
+                                            sameClient = this@ChatViewModel.currentProvider === currentProvider, sameRoute = true,
+                                            sameSession = nmLoopSession == realSessionId.ifEmpty { sessionId },
+                                        ) != null
+                                    },
+                                    restore = { version ->
+                                        try { chatRepository.nmRestoreFallbackBinding(nmLoopSession, version, replacement, expected) }
+                                        catch (_: Exception) { Log.w(TAG, "Fallback binding could not be restored"); false }
+                                    },
+                                )
+                                if (confirmation == ai.tama.chat.FallbackBindingConfirmation.Outcome.CONFIRMED) {
+                                    nmPersistedBinding = replacement
+                                    if (!keepGroup) {
+                                        _selectedGroupId.value = null
+                                        _selectedGroupName.value = ""
                                     }
+                                    if (nmAutoTurn == null) {
+                                        nmPreferredAutoEntryId = entry.id
+                                        val infoIndex = allToolBlocks.indexOfFirst { it.id == "fallback_info_$turn" }
+                                        val source = nmGroupSwitchSource
+                                        val reason = nmGroupSwitchReason
+                                        if (infoIndex >= 0 && source != null && reason != null) {
+                                            allToolBlocks[infoIndex] = allToolBlocks[infoIndex].copy(content = context.getString(
+                                                R.string.nm_auto_switch_reason, source, reason, entry.model.displayName,
+                                            ))
+                                        }
+                                    }
+                                    providerRepository.lastUsedEntryId = entry.id
+                                    nmConfirmedRoute = captureConfirmedRoute()
                                 }
-                                providerRepository.lastUsedEntryId = entry.id
-                                nmConfirmedRoute = captureConfirmedRoute()
                             }
                         }
-                    }
-                    // nanoMuse: only the actual cap of this completed response is confirmed;
-                    // the context budget might have lowered it further during the wait.
-                    pendingOutput?.takeIf {
-                        it.provider === currentProvider && it.model == currentProvider.model.id && it.route == durableOutputKey
-                    }?.let { accepted ->
-                        val confirmed = ai.tama.net.ProviderRecovery.confirmedOutput(
-                            accepted.limit, lastRequestedOutput, if (tamaV2Test) nmCleanCompletion else turnFinishReason != null,
-                        )
-                        if (confirmed != null) {
-                            accepted.route?.let { key ->
-                                runCatching { nmOutputLimitStore.save(key, accepted.model, confirmed) }
-                            }
-                            withContext(Dispatchers.Main) {
-                                appendSystemInfo(context.getString(R.string.nm_reach_output_adjusted, confirmed), "info")
-                            }
-                            pendingOutput = null
-                        }
-                    }
-                    // nanoMuse: persist one final input sample, never partial or failed requests.
-                    requestUsage?.let { usage ->
-                        usageMeter.observe(requestSnapshot, ContextEstimate.inputTokens(usage), requestEstimate)
-                        if (contextEstimate.observe(ContextEstimate.inputTokens(usage), requestEstimate)) {
-                            calibrationKey?.let { key ->
-                                nmCalibrationStore.save(key, currentProvider.model.id, contextEstimate)
-                            }
-                        }
-                    }
-                    // T94 fix 2: flush any text that landed in the throttle
-                    // window after the last UI tick. The retry-rollback /
-                    // turn-finalize paths below assume _messages reflects all
-                    // accumulated text-deltas, so we must not leave the last
-                    // 0-50ms worth on the floor.
-                    if (pendingChunkSb.isNotEmpty()) {
-                        pendingChunkSb.setLength(0)
-                        // T307: also flush the active text block's pending
-                        // tail and snapshot turnText.
-                        materializeActiveTextBlock()
-                        val turnSnap = turnTextSb.toString()
-                        withContext(Dispatchers.Main) {
-                            updateAssistantMessage(assistantId, accumulatedText + turnSnap, true, allToolBlocks)
-                        }
-                    }
-                    // T256: reset throttle bookkeeping for the next turn so the
-                    // first delta of the next assistant message fires immediately
-                    // rather than coalescing against this turn's stale baseline.
-                    lastFlushedLen = 0
-                    lastUiUpdateMs = 0L
-                    lastFileToolInputMs = 0L
-                    lastOtherToolInputMs = 0L
-                    collectDone = true
-                    // Stream completed without error — clear any lingering retry UI state.
-                    if (_autoRetryAttempt.value != 0 || _autoRetryCountdown.value != 0) {
-                        _autoRetryAttempt.value = 0
-                        _autoRetryCountdown.value = 0
-                    }
-                    } finally {
-                        // [T-STALL-DIAG] Always stop the first-chunk watchdog —
-                        // success, error, or cancellation — so it can never
-                        // outlive its turn and spam the log.
-                        firstChunkWatchdog.cancel()
-                        if (!firstChunkSeen.get()) {
-                            println(
-                                "[T-STALL-DIAG] stream ENDED-WITHOUT-CHUNK sid=$diagSid turn=$turn " +
-                                    "elapsedMs=${android.os.SystemClock.elapsedRealtime() - streamStartMs}",
+                        // nanoMuse: only the actual cap of this completed response is confirmed;
+                        // the context budget might have lowered it further during the wait.
+                        pendingOutput?.takeIf {
+                            it.provider === currentProvider && it.model == currentProvider.model.id && it.route == durableOutputKey
+                        }?.let { accepted ->
+                            val confirmed = ai.tama.net.ProviderRecovery.confirmedOutput(
+                                accepted.limit, lastRequestedOutput, if (tamaV2Test) nmCleanCompletion else turnFinishReason != null,
                             )
-                        }
-                    }
-                } catch (e: Exception) {
-                    // nanoMuse: a cancelled job must never start another request, even when
-                    // its CancellationException carries a cause; active flow wrappers may unwrap.
-                    if (e is CancellationException) {
-                        kotlinx.coroutines.currentCoroutineContext().ensureActive()
-                        if (e.cause == null) throw e
-                    }
-                    if (e is AutoDispatchBlocked && nmAutoTurn != null) {
-                        // Nothing was sent in this attempt. A concurrent chat may have
-                        // consumed the budget or the person may have revoked consent.
-                        nmAutoLocalBlocks[e.entryId] = e.explanation
-                        nmAutoTurn.exclude(e.entryId)
-                        nmAutoActivate(nmAutoSelect(null))
-                        preparedMessages = null
-                        pendingOutput = null
-                        outputRetried = false
-                        rateRetried = false
-                        retryAttempt = 0
-                        continue
-                    }
-                    val actual = unwrapFlowException(e)
-                    // nanoMuse: changing the cost guard cannot trigger retries or another provider.
-                    if (actual is ai.tama.pricing.ModelCostGuard.Blocked) throw actual
-                    if (nmAutoTurn != null && !AutoModelStore.enabled(context)) throw actual
-                    val isRateLimit = actual is com.openminis.app.data.model.LLMError.RateLimited
-                    // nanoMuse: a token count such as 5000 in a 400 is not an HTTP 500.
-                    val reach = (actual as? LLMError)?.nmProviderReach
-                    val is5xx = reach?.httpStatus?.let { it in 500..599 } ?: (
-                        actual is com.openminis.app.data.model.LLMError.ProviderError &&
-                            Regex("""(?:\[5\d\d\]|\bHTTP\s+5\d\d\b)""", RegexOption.IGNORE_CASE).containsMatchIn(actual.detail)
-                    )
-                    // Auto-retry on transient network/5xx/transient errors on the SAME provider
-                    // before considering a fallback (mirrors iOS streamWithAutoRetry).
-                    val sizeRejection = reach?.kind == io.github.nanomuse.net.ProviderReach.Kind.REQUEST_TOO_LARGE ||
-                        reach?.kind == io.github.nanomuse.net.ProviderReach.Kind.RESPONSE_LIMIT
-                    val isTransient = !sizeRejection && (actual is com.openminis.app.data.model.LLMError.NetworkError ||
-                        actual is com.openminis.app.data.model.LLMError.TransientError || is5xx)
-                    // nanoMuse: a real HTTP 413 descends the profile ladder before any
-                    // fallback. Retry only if the system and schema really got smaller;
-                    // the completed tool results in history are never executed again.
-                    val smallerProfile = if (reach?.httpStatus == 413 &&
-                        reach.kind == io.github.nanomuse.net.ProviderReach.Kind.REQUEST_TOO_LARGE) {
-                        nmAttempt?.let { rejected ->
-                            val history = preparedMessages ?: applyRequestImageBudget(nmRequestHistory(), preview = true)
-                            TurnRequestPlanner.smallerAfter413(
-                                rejected, nmCurrentInput, originalAgentTools(), nmProviderPrefix(),
-                            ) { prompt, tools ->
-                                val raw = ContextEstimate.request(history, prompt, tools, imageTokens = BPETokenizer::countImageTokens)
-                                maxOf(raw, contextEstimate.estimate(raw))
-                            }
-                        }
-                    } else null
-                    // nanoMuse: one server-overflow retry is allowed only after local work
-                    // measurably shrinks the same request. No blind resend of identical history.
-                    var recoveredContext = false
-                    if (smallerProfile == null && !contextOverflowRetried && isContextTooLargeError(actual)) {
-                        contextOverflowRetried = true
-                        val before = measureRawTokens()
-                        prepareContext(force = true)
-                        recoveredContext = measureRawTokens() < before
-                    }
-                    // nanoMuse: a verified upper bound changes the next request; a short 429
-                    // gets one bounded wait. Neither path repeats already executed tools.
-                    val outputRetry = ai.tama.net.ProviderRecovery.outputRetry(reach, lastRequestedOutput, outputRetried)
-                    val rateDelay = if (isRateLimit && nmAutoTurn == null)
-                        ai.tama.net.ProviderRecovery.rateDelay(reach, rateRetried) else null
-                    if (smallerProfile != null ||
-                        (((isTransient && nmAutoTurn == null) || recoveredContext || outputRetry != null || rateDelay != null) &&
-                            retryAttempt < AUTO_RETRY_DELAYS_SEC.size)) {
-                        if (smallerProfile != null) {
-                            nmInstall(smallerProfile)
-                            preparedMessages = null // recalculate the context view for this smaller shape
-                            withContext(Dispatchers.Main) {
-                                appendSystemInfo(context.getString(R.string.nm_router_retry_smaller), "info")
-                            }
-                        }
-                        if (outputRetry != null) {
-                            outputRetried = true
-                            pendingOutput = PendingOutputLimit(currentProvider, durableOutputKey, currentProvider.model.id, outputRetry)
-                        }
-                        if (rateDelay != null) rateRetried = true
-                        val delaySec = when {
-                            smallerProfile != null || recoveredContext || outputRetry != null -> 0
-                            rateDelay != null -> rateDelay
-                            else -> AUTO_RETRY_DELAYS_SEC[retryAttempt]
-                        }
-                        // Profile steps have their own finite ladder; they must not consume
-                        // or be suppressed by the unrelated transient retry counter.
-                        if (smallerProfile == null) retryAttempt += 1
-                        val errDesc = actual.message ?: actual.javaClass.simpleName
-                        if (tamaV2Test) Log.w(TAG, "Retrying provider request after a classified failure")
-                        else Log.w(TAG, "🔁 Transient error on ${currentProvider.model.displayName}, retry $retryAttempt/${AUTO_RETRY_DELAYS_SEC.size} in ${delaySec}s: $errDesc")
-                        withContext(Dispatchers.Main) {
-                            _autoRetryAttempt.value = retryAttempt
-                            // nanoMuse: the new retry paths state only what is actually happening.
-                            val status = when {
-                                smallerProfile != null -> context.getString(R.string.nm_router_retry_smaller)
-                                outputRetry != null -> context.getString(R.string.nm_reach_output_retry, outputRetry)
-                                rateDelay != null -> context.getString(R.string.nm_reach_rate_wait, delaySec)
-                                is5xx -> context.getString(R.string.nm_reach_server_retry)
-                                else -> "$errDesc — retrying ($retryAttempt/${AUTO_RETRY_DELAYS_SEC.size})…"
-                            }
-                            // nanoMuse: a retry in the parallel build is not yet a terminal error card.
-                            if (!tamaV2Test) setTransientInlineError(status)
-                        }
-                        try {
-                            for (remaining in delaySec downTo 1) {
-                                _autoRetryCountdown.value = remaining
-                                if (!tamaV2Test && rateDelay != null) withContext(Dispatchers.Main) {
-                                    setTransientInlineError(context.getString(R.string.nm_reach_rate_wait, remaining))
+                            if (confirmed != null) {
+                                accepted.route?.let { key ->
+                                    runCatching { nmOutputLimitStore.save(key, accepted.model, confirmed) }
                                 }
-                                kotlinx.coroutines.delay(1000)
+                                withContext(Dispatchers.Main) {
+                                    appendSystemInfo(context.getString(R.string.nm_reach_output_adjusted, confirmed), "info")
+                                }
+                                pendingOutput = null
                             }
-                        } finally {
+                        }
+                        // nanoMuse: persist one final input sample, never partial or failed requests.
+                        requestUsage?.let { usage ->
+                            usageMeter.observe(requestSnapshot, ContextEstimate.inputTokens(usage), requestEstimate)
+                            if (contextEstimate.observe(ContextEstimate.inputTokens(usage), requestEstimate)) {
+                                calibrationKey?.let { key ->
+                                    nmCalibrationStore.save(key, currentProvider.model.id, contextEstimate)
+                                }
+                            }
+                        }
+                        // T94 fix 2: flush any text that landed in the throttle
+                        // window after the last UI tick. The retry-rollback /
+                        // turn-finalize paths below assume _messages reflects all
+                        // accumulated text-deltas, so we must not leave the last
+                        // 0-50ms worth on the floor.
+                        if (pendingChunkSb.isNotEmpty()) {
+                            pendingChunkSb.setLength(0)
+                            // T307: also flush the active text block's pending
+                            // tail and snapshot turnText.
+                            materializeActiveTextBlock()
+                            val turnSnap = turnTextSb.toString()
+                            withContext(Dispatchers.Main) {
+                                updateAssistantMessage(assistantId, accumulatedText + turnSnap, true, allToolBlocks)
+                            }
+                        }
+                        // T256: reset throttle bookkeeping for the next turn so the
+                        // first delta of the next assistant message fires immediately
+                        // rather than coalescing against this turn's stale baseline.
+                        lastFlushedLen = 0
+                        lastUiUpdateMs = 0L
+                        lastFileToolInputMs = 0L
+                        lastOtherToolInputMs = 0L
+                        collectDone = true
+                        // Stream completed without error — clear any lingering retry UI state.
+                        if (_autoRetryAttempt.value != 0 || _autoRetryCountdown.value != 0) {
+                            _autoRetryAttempt.value = 0
                             _autoRetryCountdown.value = 0
                         }
-                        // Clear inline error so the retry attempt can start cleanly.
-                        withContext(Dispatchers.Main) {
-                            clearInlineError()
-                        }
-                        // Roll back partial blocks from the failed stream attempt so the retried
-                        // stream's deltas don't double-append on top of stale content. Previous
-                        // turns (everything before turnStartBlockIndex) are preserved.
-                        if (allToolBlocks.size > turnStartBlockIndex) {
-                            while (allToolBlocks.size > turnStartBlockIndex) {
-                                allToolBlocks.removeAt(allToolBlocks.size - 1)
+                        } finally {
+                            // [T-STALL-DIAG] Always stop the first-chunk watchdog —
+                            // success, error, or cancellation — so it can never
+                            // outlive its turn and spam the log.
+                            firstChunkWatchdog.cancel()
+                            if (!firstChunkSeen.get()) {
+                                println(
+                                    "[T-STALL-DIAG] stream ENDED-WITHOUT-CHUNK sid=$diagSid turn=$turn " +
+                                        "elapsedMs=${android.os.SystemClock.elapsedRealtime() - streamStartMs}",
+                                )
                             }
-                            // [T-android-fallback-text-rewind] Keep this turn's
-                            // already-streamed text on screen across the rollback.
-                            // `accumulatedText` only folds in `turnTextSb` after the
-                            // while loop completes successfully, so passing bare
-                            // `accumulatedText` here would visibly rewind everything
-                            // the user already read this turn. The next attempt
-                            // streams into a fresh `turnTextSb` and re-publishes
-                            // `accumulatedText + newTurnText`, so this transient
-                            // value is overwritten cleanly (no duplication).
+                        }
+                    } catch (e: Exception) {
+                        // nanoMuse: a cancelled job must never start another request, even when
+                        // its CancellationException carries a cause; active flow wrappers may unwrap.
+                        if (e is CancellationException) {
+                            kotlinx.coroutines.currentCoroutineContext().ensureActive()
+                            if (e.cause == null) throw e
+                        }
+                        if (e is AutoDispatchBlocked && nmAutoTurn != null) {
+                            // Nothing was sent in this attempt. A concurrent chat may have
+                            // consumed the budget or the person may have revoked consent.
+                            nmAutoLocalBlocks[e.entryId] = e.explanation
+                            nmAutoTurn.exclude(e.entryId)
+                            nmAutoActivate(nmAutoSelect(null))
+                            preparedMessages = null
+                            pendingOutput = null
+                            outputRetried = false
+                            rateRetried = false
+                            retryAttempt = 0
+                            continue
+                        }
+                        val actual = unwrapFlowException(e)
+                        // nanoMuse: changing the cost guard cannot trigger retries or another provider.
+                        if (actual is ai.tama.pricing.ModelCostGuard.Blocked) throw actual
+                        if (nmAutoTurn != null && !AutoModelStore.enabled(context)) throw actual
+                        val isRateLimit = actual is com.openminis.app.data.model.LLMError.RateLimited
+                        // nanoMuse: a token count such as 5000 in a 400 is not an HTTP 500.
+                        val reach = (actual as? LLMError)?.nmProviderReach
+                        val is5xx = reach?.httpStatus?.let { it in 500..599 } ?: (
+                            actual is com.openminis.app.data.model.LLMError.ProviderError &&
+                                Regex("""(?:\[5\d\d\]|\bHTTP\s+5\d\d\b)""", RegexOption.IGNORE_CASE).containsMatchIn(actual.detail)
+                        )
+                        // Auto-retry on transient network/5xx/transient errors on the SAME provider
+                        // before considering a fallback (mirrors iOS streamWithAutoRetry).
+                        val sizeRejection = reach?.kind == io.github.nanomuse.net.ProviderReach.Kind.REQUEST_TOO_LARGE ||
+                            reach?.kind == io.github.nanomuse.net.ProviderReach.Kind.RESPONSE_LIMIT
+                        val isTransient = !sizeRejection && (actual is com.openminis.app.data.model.LLMError.NetworkError ||
+                            actual is com.openminis.app.data.model.LLMError.TransientError || is5xx)
+                        // nanoMuse: a real HTTP 413 descends the profile ladder before any
+                        // fallback. Retry only if the system and schema really got smaller;
+                        // the completed tool results in history are never executed again.
+                        val smallerProfile = if (reach?.httpStatus == 413 &&
+                            reach.kind == io.github.nanomuse.net.ProviderReach.Kind.REQUEST_TOO_LARGE) {
+                            nmAttempt?.let { rejected ->
+                                val history = preparedMessages ?: applyRequestImageBudget(nmRequestHistory(), preview = true)
+                                TurnRequestPlanner.smallerAfter413(
+                                    rejected, nmCurrentInput, originalAgentTools(), nmProviderPrefix(),
+                                ) { prompt, tools ->
+                                    val raw = ContextEstimate.request(history, prompt, tools, imageTokens = BPETokenizer::countImageTokens)
+                                    maxOf(raw, contextEstimate.estimate(raw))
+                                }
+                            }
+                        } else null
+                        // nanoMuse: one server-overflow retry is allowed only after local work
+                        // measurably shrinks the same request. No blind resend of identical history.
+                        var recoveredContext = false
+                        if (smallerProfile == null && !contextOverflowRetried && isContextTooLargeError(actual)) {
+                            contextOverflowRetried = true
+                            val before = measureRawTokens()
+                            prepareContext(force = true)
+                            recoveredContext = measureRawTokens() < before
+                        }
+                        // nanoMuse: a verified upper bound changes the next request; a short 429
+                        // gets one bounded wait. Neither path repeats already executed tools.
+                        val outputRetry = ai.tama.net.ProviderRecovery.outputRetry(reach, lastRequestedOutput, outputRetried)
+                        val rateDelay = if (isRateLimit && nmAutoTurn == null)
+                            ai.tama.net.ProviderRecovery.rateDelay(reach, rateRetried) else null
+                        if (smallerProfile != null ||
+                            (((isTransient && nmAutoTurn == null) || recoveredContext || outputRetry != null || rateDelay != null) &&
+                                retryAttempt < AUTO_RETRY_DELAYS_SEC.size)) {
+                            if (smallerProfile != null) {
+                                nmInstall(smallerProfile)
+                                preparedMessages = null // recalculate the context view for this smaller shape
+                                withContext(Dispatchers.Main) {
+                                    appendSystemInfo(context.getString(R.string.nm_router_retry_smaller), "info")
+                                }
+                            }
+                            if (outputRetry != null) {
+                                outputRetried = true
+                                pendingOutput = PendingOutputLimit(currentProvider, durableOutputKey, currentProvider.model.id, outputRetry)
+                            }
+                            if (rateDelay != null) rateRetried = true
+                            val delaySec = when {
+                                smallerProfile != null || recoveredContext || outputRetry != null -> 0
+                                rateDelay != null -> rateDelay
+                                else -> AUTO_RETRY_DELAYS_SEC[retryAttempt]
+                            }
+                            // Profile steps have their own finite ladder; they must not consume
+                            // or be suppressed by the unrelated transient retry counter.
+                            if (smallerProfile == null) retryAttempt += 1
+                            val errDesc = actual.message ?: actual.javaClass.simpleName
+                            if (tamaV2Test) Log.w(TAG, "Retrying provider request after a classified failure")
+                            else Log.w(TAG, "🔁 Transient error on ${currentProvider.model.displayName}, retry $retryAttempt/${AUTO_RETRY_DELAYS_SEC.size} in ${delaySec}s: $errDesc")
+                            withContext(Dispatchers.Main) {
+                                _autoRetryAttempt.value = retryAttempt
+                                // nanoMuse: the new retry paths state only what is actually happening.
+                                val status = when {
+                                    smallerProfile != null -> context.getString(R.string.nm_router_retry_smaller)
+                                    outputRetry != null -> context.getString(R.string.nm_reach_output_retry, outputRetry)
+                                    rateDelay != null -> context.getString(R.string.nm_reach_rate_wait, delaySec)
+                                    is5xx -> context.getString(R.string.nm_reach_server_retry)
+                                    else -> "$errDesc — retrying ($retryAttempt/${AUTO_RETRY_DELAYS_SEC.size})…"
+                                }
+                                // nanoMuse: a retry in the parallel build is not yet a terminal error card.
+                                if (!tamaV2Test) setTransientInlineError(status)
+                            }
+                            try {
+                                for (remaining in delaySec downTo 1) {
+                                    _autoRetryCountdown.value = remaining
+                                    if (!tamaV2Test && rateDelay != null) withContext(Dispatchers.Main) {
+                                        setTransientInlineError(context.getString(R.string.nm_reach_rate_wait, remaining))
+                                    }
+                                    kotlinx.coroutines.delay(1000)
+                                }
+                            } finally {
+                                _autoRetryCountdown.value = 0
+                            }
+                            // Clear inline error so the retry attempt can start cleanly.
+                            withContext(Dispatchers.Main) {
+                                clearInlineError()
+                            }
+                            // Roll back partial blocks from the failed stream attempt so the retried
+                            // stream's deltas don't double-append on top of stale content. Previous
+                            // turns (everything before turnStartBlockIndex) are preserved.
+                            if (allToolBlocks.size > turnStartBlockIndex) {
+                                while (allToolBlocks.size > turnStartBlockIndex) {
+                                    allToolBlocks.removeAt(allToolBlocks.size - 1)
+                                }
+                                // [T-android-fallback-text-rewind] Keep this turn's
+                                // already-streamed text on screen across the rollback.
+                                // `accumulatedText` only folds in `turnTextSb` after the
+                                // while loop completes successfully, so passing bare
+                                // `accumulatedText` here would visibly rewind everything
+                                // the user already read this turn. The next attempt
+                                // streams into a fresh `turnTextSb` and re-publishes
+                                // `accumulatedText + newTurnText`, so this transient
+                                // value is overwritten cleanly (no duplication).
+                                withContext(Dispatchers.Main) {
+                                    updateAssistantMessage(assistantId, accumulatedText + turnTextSb.toString(), true, allToolBlocks)
+                                }
+                            }
+                            // T307: SB-based per-turn accumulators reset.
+                            turnTextSb.setLength(0)
+                            currentTextBlockSb = null
+                            // [T-android-tool-splits-reply-fix] The tracked turn
+                            // text block was just rolled back with the rest of
+                            // this turn's partial blocks.
+                            turnTextBlockIdx = -1
+                            turnThinking.clear()
+                            toolCalls.clear()
+                            toolCallSignatures.clear()  // [T-android-gemini3-thoughtsig / #179]
+                            // T94 fix 2 + T256: throttle bookkeeping is per-stream
+                            // attempt; reset alongside the partial-block rollback so
+                            // the next attempt's first delta fires through immediately
+                            // rather than coalescing against stale baselines.
+                            pendingChunkSb.setLength(0)
+                            lastUiUpdateMs = 0L
+                            lastFlushedLen = 0
+                            lastFileToolInputMs = 0L
+                            lastOtherToolInputMs = 0L
+                            continue  // retry on same provider
+                        }
+                        // nanoMuse: distinguish an exhausted LEAN request from a successful
+                        // downgrade; retain the original provider diagnostic on the error card.
+                        if (reach?.httpStatus == 413 && nmRoute.profile == Profile.LEAN) {
+                            withContext(Dispatchers.Main) {
+                                appendSystemInfo(context.getString(R.string.nm_router_lean_too_large), "info")
+                            }
+                        }
+                        // Retries exhausted or non-retryable — proceed to fallback / throw.
+                        _autoRetryAttempt.value = 0
+                        _autoRetryCountdown.value = 0
+                        // [T-android-timeout-while-running] Clear any transient
+                        // inline error from the prior retry attempts before we
+                        // either fall back (loop continues with a new provider)
+                        // or throw (terminal setInlineError below re-sets it
+                        // with the final non-retryable message). Without this,
+                        // a transient banner from the previous attempt could
+                        // linger as the new provider starts streaming — the
+                        // updateAssistantMessage(isStreaming=true) defense
+                        // catches it on the next delta, but clearing here
+                        // makes the intent explicit and avoids a one-frame
+                        // flash of the stale banner.
+                        withContext(Dispatchers.Main) { clearInlineError() }
+                        if (nmAutoTurn != null) {
+                            // A bug, malformed request, safety refusal or cancellation must not
+                            // silently trigger another potentially billable provider.
+                            val decision = ai.tama.router.AutoModelFailure.classify(
+                                actual, nmRequestTools.isNotEmpty(), switchOnAmbiguousAccessDenied = !tamaV2Test,
+                            ) ?: throw actual
+                            val failed = checkNotNull(nmAutoCandidate)
+                            val expectedVersion = nmDispatchAccountVersion
+                            // nanoMuse: checking a version and then recording separately permits
+                            // invalidation between them. Commit each result under the same lock.
+                            val recorded = if (tamaV2Test) when (decision) {
+                                is ai.tama.router.AutoModelFailure.Decision.Cooldown ->
+                                    AutoModelRuntime.runIfCurrent(failed.providerId, expectedVersion) {
+                                        nmAutoTurn.fail(failed.entryId, failed.providerId, decision.reason,
+                                            decision.retryAfterSeconds, decision.retryAfterPresent)
+                                    }
+                                ai.tama.router.AutoModelFailure.Decision.UnsupportedTools ->
+                                    nmAutoIdentity?.let { AutoModelStore.noteUnsupportedToolsIfCurrent(context, it, expectedVersion) } == true
+                            } else if (expectedVersion != null && expectedVersion == AutoModelRuntime.accountVersion(failed.providerId)) {
+                                when (decision) {
+                                    is ai.tama.router.AutoModelFailure.Decision.Cooldown ->
+                                        nmAutoTurn.fail(failed.entryId, failed.providerId, decision.reason,
+                                            decision.retryAfterSeconds, decision.retryAfterPresent)
+                                    ai.tama.router.AutoModelFailure.Decision.UnsupportedTools -> {
+                                        nmAutoIdentity?.let { AutoModelStore.noteUnsupportedTools(context, it) }
+                                        nmAutoLocalBlocks[failed.entryId] = context.getString(R.string.nm_auto_reason_capability)
+                                        nmAutoTurn.exclude(failed.entryId)
+                                    }
+                                }
+                                true
+                            } else false
+                            if (!recorded) {
+                                // Never transfer an old in-flight error to a replacement account.
+                                nmAutoLocalBlocks[failed.entryId] = context.getString(R.string.nm_auto_reason_consent)
+                                nmAutoTurn.exclude(failed.entryId)
+                            } else if (tamaV2Test && decision == ai.tama.router.AutoModelFailure.Decision.UnsupportedTools) {
+                                nmAutoLocalBlocks[failed.entryId] = context.getString(R.string.nm_auto_reason_capability)
+                                nmAutoTurn.exclude(failed.entryId)
+                            }
+                            // Only uncommitted stream fragments are discarded. Tool calls/results
+                            // from previous successful iterations remain in agentHistory.
+                            while (allToolBlocks.size > turnStartBlockIndex) allToolBlocks.removeAt(allToolBlocks.size - 1)
                             withContext(Dispatchers.Main) {
                                 updateAssistantMessage(assistantId, accumulatedText + turnTextSb.toString(), true, allToolBlocks)
                             }
+                            turnTextSb.setLength(0)
+                            currentTextBlockSb = null
+                            turnTextBlockIdx = -1
+                            turnThinking.clear()
+                            toolCalls.clear()
+                            toolCallSignatures.clear()
+                            pendingChunkSb.setLength(0)
+                            lastUiUpdateMs = 0L
+                            lastFlushedLen = 0
+                            lastFileToolInputMs = 0L
+                            lastOtherToolInputMs = 0L
+                            nmAutoActivate(nmAutoSelect(null))
+                            preparedMessages = null
+                            pendingOutput = null
+                            outputRetried = false
+                            rateRetried = false
+                            contextOverflowRetried = false
+                            retryAttempt = 0
+                            continue
                         }
-                        // T307: SB-based per-turn accumulators reset.
-                        turnTextSb.setLength(0)
-                        currentTextBlockSb = null
-                        // [T-android-tool-splits-reply-fix] The tracked turn
-                        // text block was just rolled back with the rest of
-                        // this turn's partial blocks.
-                        turnTextBlockIdx = -1
-                        turnThinking.clear()
-                        toolCalls.clear()
-                        toolCallSignatures.clear()  // [T-android-gemini3-thoughtsig / #179]
-                        // T94 fix 2 + T256: throttle bookkeeping is per-stream
-                        // attempt; reset alongside the partial-block rollback so
-                        // the next attempt's first delta fires through immediately
-                        // rather than coalescing against stale baselines.
-                        pendingChunkSb.setLength(0)
-                        lastUiUpdateMs = 0L
-                        lastFlushedLen = 0
-                        lastFileToolInputMs = 0L
-                        lastOtherToolInputMs = 0L
-                        continue  // retry on same provider
-                    }
-                    // nanoMuse: distinguish an exhausted LEAN request from a successful
-                    // downgrade; retain the original provider diagnostic on the error card.
-                    if (reach?.httpStatus == 413 && nmRoute.profile == Profile.LEAN) {
-                        withContext(Dispatchers.Main) {
-                            appendSystemInfo(context.getString(R.string.nm_router_lean_too_large), "info")
+                        // nanoMuse: never forward an unchanged size/output rejection to a group
+                        // model. Profile downgrade and an output-cap retry need their own guards.
+                        val shouldFallback = if (nmFallbackCommit != null) {
+                            // nanoMuse: even the "always" strategy must not forward a generic
+                            // 403, malformed request, safety refusal or cancellation.
+                            ai.tama.router.GroupFallback.canSwitch(
+                                ai.tama.router.AutoModelFailure.classify(actual, nmRequestTools.isNotEmpty(),
+                                    switchOnAmbiguousAccessDenied = false), sizeRejection,
+                            )
+                        } else !sizeRejection && (isRateLimit || is5xx ||
+                            fallbackStrategy == com.openminis.app.data.model.FallbackStrategy.always)
+                        if (nmFallbackCommit != null && this@ChatViewModel.currentProvider !== currentProvider) throw actual
+                        val nextCandidate = if (!shouldFallback) null else if (nmFallbackCommit == null) {
+                            remainingFallbacks.removeFirstOrNull()
+                        } else {
+                            // Candidates were captured before network retries. Do not dispatch to a
+                            // model hidden, removed, disabled or repointed while we were waiting.
+                            var eligible: FallbackCandidate? = null
+                            while (eligible == null && remainingFallbacks.isNotEmpty()) {
+                                val candidate = remainingFallbacks.removeAt(0)
+                                if (nmFallbackStillEligible(candidate)) eligible = candidate
+                            }
+                            eligible
                         }
-                    }
-                    // Retries exhausted or non-retryable — proceed to fallback / throw.
-                    _autoRetryAttempt.value = 0
-                    _autoRetryCountdown.value = 0
-                    // [T-android-timeout-while-running] Clear any transient
-                    // inline error from the prior retry attempts before we
-                    // either fall back (loop continues with a new provider)
-                    // or throw (terminal setInlineError below re-sets it
-                    // with the final non-retryable message). Without this,
-                    // a transient banner from the previous attempt could
-                    // linger as the new provider starts streaming — the
-                    // updateAssistantMessage(isStreaming=true) defense
-                    // catches it on the next delta, but clearing here
-                    // makes the intent explicit and avoids a one-frame
-                    // flash of the stale banner.
-                    withContext(Dispatchers.Main) { clearInlineError() }
-                    if (nmAutoTurn != null) {
-                        // A bug, malformed request, safety refusal or cancellation must not
-                        // silently trigger another potentially billable provider.
-                        val decision = ai.tama.router.AutoModelFailure.classify(
-                            actual, nmRequestTools.isNotEmpty(), switchOnAmbiguousAccessDenied = !tamaV2Test,
-                        ) ?: throw actual
-                        val failed = checkNotNull(nmAutoCandidate)
-                        val expectedVersion = nmDispatchAccountVersion
-                        // nanoMuse: checking a version and then recording separately permits
-                        // invalidation between them. Commit each result under the same lock.
-                        val recorded = if (tamaV2Test) when (decision) {
-                            is ai.tama.router.AutoModelFailure.Decision.Cooldown ->
-                                AutoModelRuntime.runIfCurrent(failed.providerId, expectedVersion) {
-                                    nmAutoTurn.fail(failed.entryId, failed.providerId, decision.reason,
-                                        decision.retryAfterSeconds, decision.retryAfterPresent)
+                        val next = nextCandidate?.provider
+                        if (next != null && nextCandidate != null) {
+                            val reason = if (nmFallbackCommit != null) context.getString(when {
+                                reach?.kind == io.github.nanomuse.net.ProviderReach.Kind.QUOTA -> R.string.nm_auto_failure_quota
+                                isRateLimit -> R.string.nm_auto_failure_rate
+                                is5xx -> R.string.nm_auto_failure_server
+                                else -> R.string.nm_group_switch_other
+                            }) else when {
+                                isRateLimit -> "Rate limited"
+                                actual is com.openminis.app.data.model.LLMError.ProviderError -> actual.detail
+                                else -> actual.message ?: "Error"
+                            }
+                            // [T-android-model-indicator-flash-on-endpoint-retry]
+                            // Same-model recovery is a TRANSPARENT retry, not a real
+                            // model switch. A model group can hold several entries
+                            // for the SAME modelId behind different provider
+                            // instances/endpoints (e.g. deepseek-v4-flash via a dead
+                            // hub.oaifree.com key + via api.deepseek.com). When the
+                            // first 401s, group-fallback moves to the next instance —
+                            // same modelId, different endpoint — which should recover
+                            // silently. Only flash the model capsule when the
+                            // resolved modelId ACTUALLY changes; an endpoint/instance-
+                            // only change must not surface to the UI.
+                            val isRealModelChange = next.model.id != currentProvider.model.id
+                            if (nmFallbackCommit != null) {
+                                nmGroupSwitchSource = currentProvider.model.displayName
+                                nmGroupSwitchReason = reason
+                            }
+                            fallbackReasons.add("⚠️ ${currentProvider.model.displayName}: $reason")
+                            // nanoMuse: provider/model labels can be user-supplied.
+                            if (!tamaV2Test) Log.i(TAG, "🔀 $reason on ${currentProvider.model.displayName}, switching to ${next.model.displayName} (realModelChange=$isRealModelChange)")
+                            // nanoMuse: a different route must not inherit a proposal or its one-shot flags.
+                            // The existing overall retry counter remains bounded across the group.
+                            pendingOutput = null
+                            outputRetried = false
+                            rateRetried = false
+                            // nanoMuse: selection belongs to the source session and must not
+                            // replace a newer user choice while a failed request was in flight.
+                            val fromClient = currentProvider
+                            val fromEntryId = _activeEntryId.value
+                            fun installFallback() {
+                                val newEntry = providerRepository.config.value.modelEntries.find {
+                                    it.id == nextCandidate.entryId
                                 }
-                            ai.tama.router.AutoModelFailure.Decision.UnsupportedTools ->
-                                nmAutoIdentity?.let { AutoModelStore.noteUnsupportedToolsIfCurrent(context, it, expectedVersion) } == true
-                        } else if (expectedVersion != null && expectedVersion == AutoModelRuntime.accountVersion(failed.providerId)) {
-                            when (decision) {
-                                is ai.tama.router.AutoModelFailure.Decision.Cooldown ->
-                                    nmAutoTurn.fail(failed.entryId, failed.providerId, decision.reason,
-                                        decision.retryAfterSeconds, decision.retryAfterPresent)
-                                ai.tama.router.AutoModelFailure.Decision.UnsupportedTools -> {
-                                    nmAutoIdentity?.let { AutoModelStore.noteUnsupportedTools(context, it) }
-                                    nmAutoLocalBlocks[failed.entryId] = context.getString(R.string.nm_auto_reason_capability)
-                                    nmAutoTurn.exclude(failed.entryId)
+                                if (nmFallbackCommit != null && newEntry == null) {
+                                    throw LLMError.ProviderError(context.getString(R.string.nm_auto_disabled_during_turn))
                                 }
-                            }
-                            true
-                        } else false
-                        if (!recorded) {
-                            // Never transfer an old in-flight error to a replacement account.
-                            nmAutoLocalBlocks[failed.entryId] = context.getString(R.string.nm_auto_reason_consent)
-                            nmAutoTurn.exclude(failed.entryId)
-                        } else if (tamaV2Test && decision == ai.tama.router.AutoModelFailure.Decision.UnsupportedTools) {
-                            nmAutoLocalBlocks[failed.entryId] = context.getString(R.string.nm_auto_reason_capability)
-                            nmAutoTurn.exclude(failed.entryId)
-                        }
-                        // Only uncommitted stream fragments are discarded. Tool calls/results
-                        // from previous successful iterations remain in agentHistory.
-                        while (allToolBlocks.size > turnStartBlockIndex) allToolBlocks.removeAt(allToolBlocks.size - 1)
-                        withContext(Dispatchers.Main) {
-                            updateAssistantMessage(assistantId, accumulatedText + turnTextSb.toString(), true, allToolBlocks)
-                        }
-                        turnTextSb.setLength(0)
-                        currentTextBlockSb = null
-                        turnTextBlockIdx = -1
-                        turnThinking.clear()
-                        toolCalls.clear()
-                        toolCallSignatures.clear()
-                        pendingChunkSb.setLength(0)
-                        lastUiUpdateMs = 0L
-                        lastFlushedLen = 0
-                        lastFileToolInputMs = 0L
-                        lastOtherToolInputMs = 0L
-                        nmAutoActivate(nmAutoSelect(null))
-                        preparedMessages = null
-                        pendingOutput = null
-                        outputRetried = false
-                        rateRetried = false
-                        contextOverflowRetried = false
-                        retryAttempt = 0
-                        continue
-                    }
-                    // nanoMuse: never forward an unchanged size/output rejection to a group
-                    // model. Profile downgrade and an output-cap retry need their own guards.
-                    val shouldFallback = if (nmFallbackCommit != null) {
-                        // nanoMuse: even the "always" strategy must not forward a generic
-                        // 403, malformed request, safety refusal or cancellation.
-                        ai.tama.router.GroupFallback.canSwitch(
-                            ai.tama.router.AutoModelFailure.classify(actual, nmRequestTools.isNotEmpty(),
-                                switchOnAmbiguousAccessDenied = false), sizeRejection,
-                        )
-                    } else !sizeRejection && (isRateLimit || is5xx ||
-                        fallbackStrategy == com.openminis.app.data.model.FallbackStrategy.always)
-                    if (nmFallbackCommit != null && this@ChatViewModel.currentProvider !== currentProvider) throw actual
-                    val nextCandidate = if (!shouldFallback) null else if (nmFallbackCommit == null) {
-                        remainingFallbacks.removeFirstOrNull()
-                    } else {
-                        // Candidates were captured before network retries. Do not dispatch to a
-                        // model hidden, removed, disabled or repointed while we were waiting.
-                        var eligible: FallbackCandidate? = null
-                        while (eligible == null && remainingFallbacks.isNotEmpty()) {
-                            val candidate = remainingFallbacks.removeAt(0)
-                            if (nmFallbackStillEligible(candidate)) eligible = candidate
-                        }
-                        eligible
-                    }
-                    val next = nextCandidate?.provider
-                    if (next != null && nextCandidate != null) {
-                        val reason = if (nmFallbackCommit != null) context.getString(when {
-                            reach?.kind == io.github.nanomuse.net.ProviderReach.Kind.QUOTA -> R.string.nm_auto_failure_quota
-                            isRateLimit -> R.string.nm_auto_failure_rate
-                            is5xx -> R.string.nm_auto_failure_server
-                            else -> R.string.nm_group_switch_other
-                        }) else when {
-                            isRateLimit -> "Rate limited"
-                            actual is com.openminis.app.data.model.LLMError.ProviderError -> actual.detail
-                            else -> actual.message ?: "Error"
-                        }
-                        // [T-android-model-indicator-flash-on-endpoint-retry]
-                        // Same-model recovery is a TRANSPARENT retry, not a real
-                        // model switch. A model group can hold several entries
-                        // for the SAME modelId behind different provider
-                        // instances/endpoints (e.g. deepseek-v4-flash via a dead
-                        // hub.oaifree.com key + via api.deepseek.com). When the
-                        // first 401s, group-fallback moves to the next instance —
-                        // same modelId, different endpoint — which should recover
-                        // silently. Only flash the model capsule when the
-                        // resolved modelId ACTUALLY changes; an endpoint/instance-
-                        // only change must not surface to the UI.
-                        val isRealModelChange = next.model.id != currentProvider.model.id
-                        if (nmFallbackCommit != null) {
-                            nmGroupSwitchSource = currentProvider.model.displayName
-                            nmGroupSwitchReason = reason
-                        }
-                        fallbackReasons.add("⚠️ ${currentProvider.model.displayName}: $reason")
-                        // nanoMuse: provider/model labels can be user-supplied.
-                        if (!tamaV2Test) Log.i(TAG, "🔀 $reason on ${currentProvider.model.displayName}, switching to ${next.model.displayName} (realModelChange=$isRealModelChange)")
-                        // nanoMuse: a different route must not inherit a proposal or its one-shot flags.
-                        // The existing overall retry counter remains bounded across the group.
-                        pendingOutput = null
-                        outputRetried = false
-                        rateRetried = false
-                        // nanoMuse: selection belongs to the source session and must not
-                        // replace a newer user choice while a failed request was in flight.
-                        val fromClient = currentProvider
-                        val fromEntryId = _activeEntryId.value
-                        fun installFallback() {
-                            val newEntry = providerRepository.config.value.modelEntries.find {
-                                it.id == nextCandidate.entryId
-                            }
-                            if (nmFallbackCommit != null && newEntry == null) {
-                                throw LLMError.ProviderError(context.getString(R.string.nm_auto_disabled_during_turn))
-                            }
-                            currentProvider = next
-                            // nanoMuse: remember the exact approved group candidate until dispatch.
-                            if (nmFallbackCommit != null) nmManualFallback = nextCandidate
-                            // Also update class-level provider so the next sendMessage() starts from here
-                            this@ChatViewModel.currentProvider = next
-                            // Update top bar model info + active entry. (For a same-
-                            // model endpoint recovery these are no-ops on the visible
-                            // model name, but still keep activeEntryId / provider name
-                            // in sync with the instance we actually used.)
-                            _modelName.value = currentProvider.model.displayName
-                            // Update activeEntryId so model picker reflects the switch.
-                            // [T-android-fallback-entry-identity] Look the entry up by
-                            // its OWN id, carried on the candidate. The previous
-                            // `find { it.model.id == currentProvider.model.id }` was
-                            // ambiguous: two instances can expose the same model id, so
-                            // it returned whichever entry sits earlier in modelEntries.
-                            // Observed in the field — falling back onto
-                            // `deepseek-v4-flash` served by "DeekSeak" showed the
-                            // provider as "Bailian OpenAI", because Bailian also has a
-                            // `deepseek-v4-flash` entry and happened to be found first.
-                            // That also poisoned activeEntryId and the persisted
-                            // binding, so re-entering the session resumed on the WRONG
-                            // instance.
-                            if (newEntry != null) {
-                                _activeEntryId.value = newEntry.id
-                                currentModel = newEntry.model
-                                val newInstance = providerRepository.instance(newEntry.providerInstanceId)
-                                if (newInstance != null) {
-                                    _providerName.value = newInstance.label.ifEmpty { newEntry.model.provider }
+                                currentProvider = next
+                                // nanoMuse: remember the exact approved group candidate until dispatch.
+                                if (nmFallbackCommit != null) nmManualFallback = nextCandidate
+                                // Also update class-level provider so the next sendMessage() starts from here
+                                this@ChatViewModel.currentProvider = next
+                                // Update top bar model info + active entry. (For a same-
+                                // model endpoint recovery these are no-ops on the visible
+                                // model name, but still keep activeEntryId / provider name
+                                // in sync with the instance we actually used.)
+                                _modelName.value = currentProvider.model.displayName
+                                // Update activeEntryId so model picker reflects the switch.
+                                // [T-android-fallback-entry-identity] Look the entry up by
+                                // its OWN id, carried on the candidate. The previous
+                                // `find { it.model.id == currentProvider.model.id }` was
+                                // ambiguous: two instances can expose the same model id, so
+                                // it returned whichever entry sits earlier in modelEntries.
+                                // Observed in the field — falling back onto
+                                // `deepseek-v4-flash` served by "DeekSeak" showed the
+                                // provider as "Bailian OpenAI", because Bailian also has a
+                                // `deepseek-v4-flash` entry and happened to be found first.
+                                // That also poisoned activeEntryId and the persisted
+                                // binding, so re-entering the session resumed on the WRONG
+                                // instance.
+                                if (newEntry != null) {
+                                    _activeEntryId.value = newEntry.id
+                                    currentModel = newEntry.model
+                                    val newInstance = providerRepository.instance(newEntry.providerInstanceId)
+                                    if (newInstance != null) {
+                                        _providerName.value = newInstance.label.ifEmpty { newEntry.model.provider }
+                                    }
+                                }
+                                // Flash ONLY on a genuine model switch — never on a
+                                // transparent same-model endpoint retry.
+                                if (isRealModelChange) _fallbackTrigger.value++
+                                val groupId = _selectedGroupId.value
+                                if (nmFallbackCommit != null && newEntry != null) {
+                                    nmFallbackCommit.switched(newEntry.id, groupId)
+                                } else if (groupId != null && newEntry != null) {
+                                    persistBinding("""{"type":"group","groupId":"$groupId","lastEntryId":"${newEntry.id}"}""")
+                                } else if (newEntry != null) {
+                                    persistBinding("""{"type":"entry","entryId":"${newEntry.id}"}""")
                                 }
                             }
-                            // Flash ONLY on a genuine model switch — never on a
-                            // transparent same-model endpoint retry.
-                            if (isRealModelChange) _fallbackTrigger.value++
-                            val groupId = _selectedGroupId.value
-                            if (nmFallbackCommit != null && newEntry != null) {
-                                nmFallbackCommit.switched(newEntry.id, groupId)
-                            } else if (groupId != null && newEntry != null) {
-                                persistBinding("""{"type":"group","groupId":"$groupId","lastEntryId":"${newEntry.id}"}""")
-                            } else if (newEntry != null) {
-                                persistBinding("""{"type":"entry","entryId":"${newEntry.id}"}""")
-                            }
-                        }
-                        if (nmFallbackCommit != null) withContext(Dispatchers.Main) {
-                            if (nmLoopSession != realSessionId.ifEmpty { sessionId } ||
-                                this@ChatViewModel.currentProvider !== fromClient || currentProvider !== fromClient ||
-                                _activeEntryId.value != fromEntryId || !nmFallbackStillEligible(nextCandidate)) {
-                                throw LLMError.ProviderError(context.getString(R.string.nm_auto_disabled_during_turn))
-                            }
-                            installFallback()
-                        } else installFallback()
-                        val infoText = if (nmFallbackCommit != null) context.getString(
-                            R.string.nm_group_switch_attempt, fallbackReasons.last(), currentProvider.model.displayName,
-                        ) else fallbackReasons.joinToString("\n") + "\n🔄 Switched to ${currentProvider.model.displayName}"
-                        allToolBlocks.removeAll { it.kind == "info" }
-                        allToolBlocks.add(0, AssistantBlock(
-                            id = "fallback_info_$turn",
-                            kind = "info",
-                            content = infoText,
-                            toolTitle = if (nmFallbackCommit != null) context.getString(R.string.nm_group_switch_title) else "Switched model",
-                            toolStatus = ToolBlockStatus.SUCCESS,
-                        ))
-                        // [T-android-fallback-text-rewind] Same as the retry-
-                        // rollback path above: preserve this turn's streamed text
-                        // (`turnTextSb`) on screen while we switch providers.
-                        // `accumulatedText` hasn't folded it in yet, so bare
-                        // `accumulatedText` would rewind the visible reply. The new
-                        // provider streams into a fresh `turnTextSb` (reset just
-                        // below) and re-publishes `accumulatedText + newTurnText`.
-                        withContext(Dispatchers.Main) {
-                            updateAssistantMessage(assistantId, accumulatedText + turnTextSb.toString(), true, allToolBlocks)
-                        }
-                        // Reset turn state for retry with new provider
-                        turnTextSb.setLength(0)
-                        currentTextBlockSb = null
-                        // [T-android-tool-splits-reply-fix] Fresh stream from a
-                        // different provider — and the add(0, info) above
-                        // shifted every block index anyway.
-                        turnTextBlockIdx = -1
-                        turnThinking.clear()
-                        toolCalls.clear()
-                        toolCallSignatures.clear()  // [T-android-gemini3-thoughtsig / #179]
-                        // loop continues — will retry collect with currentProvider
-                    } else {
-                        // All fallbacks exhausted. Surface the trail of tried
-                        // models AND the group members that were silently
-                        // skipped (disabled / not logged in / hidden) so the
-                        // user can see why fallback never reached them —
-                        // mirrors iOS streamWithGroupFallback exhausted path.
-                        if (shouldFallback && tamaV2Test) {
-                            // nanoMuse: do not mix raw provider text or untranslated member
-                            // states into the chat. Preserve the original diagnostic on the error.
+                            if (nmFallbackCommit != null) withContext(Dispatchers.Main) {
+                                if (nmLoopSession != realSessionId.ifEmpty { sessionId } ||
+                                    this@ChatViewModel.currentProvider !== fromClient || currentProvider !== fromClient ||
+                                    _activeEntryId.value != fromEntryId || !nmFallbackStillEligible(nextCandidate)) {
+                                    throw LLMError.ProviderError(context.getString(R.string.nm_auto_disabled_during_turn))
+                                }
+                                installFallback()
+                            } else installFallback()
+                            val infoText = if (nmFallbackCommit != null) context.getString(
+                                R.string.nm_group_switch_attempt, fallbackReasons.last(), currentProvider.model.displayName,
+                            ) else fallbackReasons.joinToString("\n") + "\n🔄 Switched to ${currentProvider.model.displayName}"
+                            allToolBlocks.removeAll { it.kind == "info" }
+                            allToolBlocks.add(0, AssistantBlock(
+                                id = "fallback_info_$turn",
+                                kind = "info",
+                                content = infoText,
+                                toolTitle = if (nmFallbackCommit != null) context.getString(R.string.nm_group_switch_title) else "Switched model",
+                                toolStatus = ToolBlockStatus.SUCCESS,
+                            ))
+                            // [T-android-fallback-text-rewind] Same as the retry-
+                            // rollback path above: preserve this turn's streamed text
+                            // (`turnTextSb`) on screen while we switch providers.
+                            // `accumulatedText` hasn't folded it in yet, so bare
+                            // `accumulatedText` would rewind the visible reply. The new
+                            // provider streams into a fresh `turnTextSb` (reset just
+                            // below) and re-publishes `accumulatedText + newTurnText`.
                             withContext(Dispatchers.Main) {
-                                appendSystemInfo(context.getString(R.string.nm_auto_none), "info")
+                                updateAssistantMessage(assistantId, accumulatedText + turnTextSb.toString(), true, allToolBlocks)
                             }
-                            throw actual
-                        }
-                        if (shouldFallback) {
-                            val skipped = unavailableGroupMembers()
-                            if (fallbackReasons.isNotEmpty() || skipped.isNotEmpty()) {
-                                val trail = (fallbackReasons + skipped).joinToString("\n")
-                                val finalDesc = actual.message ?: actual.toString()
-                                throw com.openminis.app.data.model.LLMError.ProviderError("$trail\n$finalDesc").apply {
-                                    // nanoMuse: carry only the final failing call's diagnostics.
-                                    nmProviderReach = (actual as? LLMError)?.nmProviderReach
-                                    nmRelayError = (actual as? LLMError)?.nmRelayError
+                            // Reset turn state for retry with new provider
+                            turnTextSb.setLength(0)
+                            currentTextBlockSb = null
+                            // [T-android-tool-splits-reply-fix] Fresh stream from a
+                            // different provider — and the add(0, info) above
+                            // shifted every block index anyway.
+                            turnTextBlockIdx = -1
+                            turnThinking.clear()
+                            toolCalls.clear()
+                            toolCallSignatures.clear()  // [T-android-gemini3-thoughtsig / #179]
+                            // loop continues — will retry collect with currentProvider
+                        } else {
+                            // All fallbacks exhausted. Surface the trail of tried
+                            // models AND the group members that were silently
+                            // skipped (disabled / not logged in / hidden) so the
+                            // user can see why fallback never reached them —
+                            // mirrors iOS streamWithGroupFallback exhausted path.
+                            if (shouldFallback && tamaV2Test) {
+                                // nanoMuse: do not mix raw provider text or untranslated member
+                                // states into the chat. Preserve the original diagnostic on the error.
+                                withContext(Dispatchers.Main) {
+                                    appendSystemInfo(context.getString(R.string.nm_auto_none), "info")
+                                }
+                                throw actual
+                            }
+                            if (shouldFallback) {
+                                val skipped = unavailableGroupMembers()
+                                if (fallbackReasons.isNotEmpty() || skipped.isNotEmpty()) {
+                                    val trail = (fallbackReasons + skipped).joinToString("\n")
+                                    val finalDesc = actual.message ?: actual.toString()
+                                    throw com.openminis.app.data.model.LLMError.ProviderError("$trail\n$finalDesc").apply {
+                                        // nanoMuse: carry only the final failing call's diagnostics.
+                                        nmProviderReach = (actual as? LLMError)?.nmProviderReach
+                                        nmRelayError = (actual as? LLMError)?.nmRelayError
+                                    }
                                 }
                             }
+                            throw actual  // re-throw unwrapped, all fallbacks exhausted
                         }
-                        throw actual  // re-throw unwrapped, all fallbacks exhausted
+                    } finally {
+                        nmTicket?.let { ticket ->
+                            if (nmDispatchStarted) AutoModelRuntime.health.finish(ticket, nmMeasuredInput, nmMeasuredOutput)
+                            else AutoModelRuntime.health.cancelBeforeDispatch(ticket)
+                        }
                     }
-                } finally {
-                    nmTicket?.let { ticket ->
-                        if (nmDispatchStarted) AutoModelRuntime.health.finish(ticket, nmMeasuredInput, nmMeasuredOutput)
-                        else AutoModelRuntime.health.cancelBeforeDispatch(ticket)
-                    }
-                }
-            }  // end while (!collectDone)
+                }  // end while (!collectDone)
+                false
+            }
+            if (nmRestartAgentTurn) continue@agentTurns
 
             // T307: materialise the per-turn StringBuilder ONCE at the
             // turn boundary. After this point everything is plain String
