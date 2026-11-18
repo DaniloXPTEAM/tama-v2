@@ -1554,4 +1554,11 @@
     <string name="nm_key_destination_body">Klucz wygląda na pochodzący od %1$s, ale zostanie wysłany do %2$s. Potwierdź tylko, jeśli ufasz temu celowi. To nie zezwala na opłaty.</string>
     <string name="nm_key_destination_blocked">Klucz i adres nie pasują do siebie. Otwórz ustawienia dostawcy i popraw lub potwierdź cel przed wysłaniem.</string>
     <string name="nm_key_destination_invalid">Adres jest nieprawidłowy lub nie używa HTTPS. Popraw go przed kontynuowaniem.</string>
+    <string name="nm_key_probe_button">Sprawdź klucz</string>
+    <string name="nm_key_probe_help">Wysyła klucz do oficjalnej listy modeli, bez wiadomości. Wynik nie gwarantuje dostępu ani kosztu.</string>
+    <string name="nm_key_probe_accepted">Dostawca przyjął zapytanie o listę modeli.</string>
+    <string name="nm_key_probe_rejected">Dostawca odrzucił klucz.</string>
+    <string name="nm_key_probe_denied">Dostawca odmówił dostępu; przyczyna jest nieznana.</string>
+    <string name="nm_key_probe_unavailable">Nie można sprawdzić klucza. Sprawdź połączenie.</string>
+    <string name="nm_key_probe_unsupported">Nie można sprawdzić klucza pod tym adresem. Klucz nie został wysłany.</string>
 </resources>

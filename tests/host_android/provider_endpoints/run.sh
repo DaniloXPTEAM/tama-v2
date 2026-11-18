@@ -67,5 +67,6 @@ kotlinc -nowarn -include-runtime -d "$OUT/endpoints.jar" \
   "$HERE"/stubs/*.kt "$OUT/Extracted.kt" "$OUT/EndpointHostTest.kt" \
   "$MAIN/ai/tama/providers/ProviderEndpoints.kt" \
   "$MAIN/ai/tama/providers/KeyDestinationGuard.kt" \
+  "$MAIN/ai/tama/providers/KeyProbePlan.kt" \
   "$MAIN/io/github/nanomuse/cloud/OwnKeyPresets.kt"
 java -jar "$OUT/endpoints.jar"

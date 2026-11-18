@@ -1550,4 +1550,11 @@
     <string name="nm_key_destination_body">Cheia pare să fie de la %1$s, dar va fi trimisă la %2$s. Confirmă doar dacă ai încredere în destinație. Aceasta nu autorizează costuri.</string>
     <string name="nm_key_destination_blocked">Cheia și adresa nu corespund. Deschide setările furnizorului și corectează sau confirmă destinația înainte de trimitere.</string>
     <string name="nm_key_destination_invalid">Adresa este invalidă sau nu folosește HTTPS. Corecteaz-o înainte de a continua.</string>
+    <string name="nm_key_probe_button">Testează cheia</string>
+    <string name="nm_key_probe_help">Trimite cheia la lista oficială de modele, fără mesaj. Rezultatul nu garantează accesul sau costul.</string>
+    <string name="nm_key_probe_accepted">Furnizorul a acceptat cererea listei de modele.</string>
+    <string name="nm_key_probe_rejected">Furnizorul a respins cheia.</string>
+    <string name="nm_key_probe_denied">Furnizorul a refuzat accesul; motivul nu este cunoscut.</string>
+    <string name="nm_key_probe_unavailable">Cheia nu a putut fi verificată. Verifică conexiunea.</string>
+    <string name="nm_key_probe_unsupported">Testarea cheii nu este disponibilă la această adresă. Nu a fost trimisă nicio cheie.</string>
 </resources>

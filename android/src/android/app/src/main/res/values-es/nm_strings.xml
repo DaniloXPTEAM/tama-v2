@@ -1546,4 +1546,11 @@
     <string name="nm_key_destination_body">La clave parece ser de %1$s, pero se enviará a %2$s. Confirme solo si confía en ese destino. Esto no autoriza cobros.</string>
     <string name="nm_key_destination_blocked">La clave y la dirección no coinciden. Abra los ajustes del proveedor y corrija o confirme el destino antes de enviar.</string>
     <string name="nm_key_destination_invalid">La dirección no es válida o no usa HTTPS. Corríjala antes de continuar.</string>
+    <string name="nm_key_probe_button">Probar clave</string>
+    <string name="nm_key_probe_help">Envía la clave a la lista oficial de modelos. No envía mensajes. El resultado no garantiza acceso ni coste.</string>
+    <string name="nm_key_probe_accepted">El proveedor aceptó la consulta de modelos.</string>
+    <string name="nm_key_probe_rejected">El proveedor rechazó la clave.</string>
+    <string name="nm_key_probe_denied">El proveedor denegó el acceso; se desconoce el motivo.</string>
+    <string name="nm_key_probe_unavailable">No se pudo probar la clave. Comprueba la conexión.</string>
+    <string name="nm_key_probe_unsupported">No se puede probar la clave en esta dirección. No se envió ninguna clave.</string>
 </resources>

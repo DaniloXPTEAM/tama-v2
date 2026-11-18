@@ -1542,4 +1542,11 @@
     <string name="nm_key_destination_body">คีย์ดูเหมือนมาจาก %1$s แต่จะส่งไปที่ %2$s ยืนยันเฉพาะเมื่อคุณเชื่อถือปลายทางนี้ การยืนยันนี้ไม่อนุญาตให้เกิดค่าใช้จ่าย</string>
     <string name="nm_key_destination_blocked">คีย์และที่อยู่ไม่ตรงกัน เปิดการตั้งค่าผู้ให้บริการแล้วแก้ไขหรือยืนยันปลายทางก่อนส่ง</string>
     <string name="nm_key_destination_invalid">ที่อยู่ไม่ถูกต้องหรือไม่ได้ใช้ HTTPS โปรดแก้ไขก่อนดำเนินการต่อ</string>
+    <string name="nm_key_probe_button">ทดสอบคีย์</string>
+    <string name="nm_key_probe_help">ส่งคีย์ไปยังรายการโมเดลทางการโดยไม่ส่งข้อความ ผลลัพธ์ไม่รับประกันการเข้าถึงหรือค่าใช้จ่าย</string>
+    <string name="nm_key_probe_accepted">ผู้ให้บริการยอมรับคำขอรายการโมเดล</string>
+    <string name="nm_key_probe_rejected">ผู้ให้บริการปฏิเสธคีย์</string>
+    <string name="nm_key_probe_denied">ผู้ให้บริการปฏิเสธการเข้าถึง โดยไม่ทราบสาเหตุ</string>
+    <string name="nm_key_probe_unavailable">ทดสอบคีย์ไม่ได้ โปรดตรวจสอบการเชื่อมต่อ</string>
+    <string name="nm_key_probe_unsupported">ไม่สามารถทดสอบคีย์สำหรับที่อยู่นี้ และไม่ได้ส่งคีย์</string>
 </resources>

@@ -146,3 +146,13 @@ A confirmação de rota, as guardas de custo e rejeições explícitas de capaci
 continuam independentes. Esta correção não prova que essa foi a causa do erro do
 Poco; não houve chamada real. `tests/host_android/free_import/run.sh` exercita a
 política com dublês, não a tela ou o transporte Android.
+
+## Testar chave no cadastro
+
+No paralelo, o botão envia um GET à lista oficial de modelos dos provedores
+OpenAI, Groq, OpenRouter, Anthropic, Gemini e xAI reconhecidos. A chave e o
+destino precisam passar pela revisão local; não há redirects ou repetição. A
+resposta 403 não é declarada chave inválida, e o sucesso não prova acesso a um
+modelo, preço ou saldo. Endereços personalizados não são testados. O teste host
+confere planejamento e respostas simuladas, sem executar HTTP; a tela, o
+transporte Android e contas reais não foram verificados.

@@ -1542,4 +1542,11 @@
     <string name="nm_key_destination_body">キーは%1$sのものと思われますが、%2$sに送信されます。送信先を信頼できる場合のみ確認してください。料金の許可にはなりません。</string>
     <string name="nm_key_destination_blocked">キーとアドレスが一致しません。送信前にプロバイダー設定で送信先を修正または確認してください。</string>
     <string name="nm_key_destination_invalid">アドレスが無効かHTTPSではありません。続行する前に修正してください。</string>
+    <string name="nm_key_probe_button">キーをテスト</string>
+    <string name="nm_key_probe_help">キーを公式のモデル一覧に送信します。メッセージは送信しません。利用や料金は保証されません。</string>
+    <string name="nm_key_probe_accepted">プロバイダーがモデル一覧の要求を受け付けました。</string>
+    <string name="nm_key_probe_rejected">プロバイダーがキーを拒否しました。</string>
+    <string name="nm_key_probe_denied">アクセスが拒否されました。理由は不明です。</string>
+    <string name="nm_key_probe_unavailable">キーを確認できませんでした。接続を確認してください。</string>
+    <string name="nm_key_probe_unsupported">このアドレスではテストできません。キーは送信されていません。</string>
 </resources>

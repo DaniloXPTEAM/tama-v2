@@ -1547,4 +1547,11 @@
     <string name="nm_key_destination_blocked">A chave e o endereço não correspondem. Abra as configurações do provedor e corrija ou confirme o destino antes de enviar.</string>
     <string name="nm_key_destination_invalid">O endereço é inválido ou não usa HTTPS. Corrija antes de continuar.</string>
     <string name="nm_loop_estimate_explanation">Estimativa desta conversa: o maior entre mensagens do assistente e blocos de ferramentas. Não é uma contagem exata de pedidos nem de cobranças.</string>
+    <string name="nm_key_probe_button">Testar chave</string>
+    <string name="nm_key_probe_help">Envia a chave à lista oficial de modelos. Não envia mensagem. O resultado não garante acesso aos modelos nem custo.</string>
+    <string name="nm_key_probe_accepted">O provedor aceitou a consulta da lista de modelos.</string>
+    <string name="nm_key_probe_rejected">O provedor recusou a chave.</string>
+    <string name="nm_key_probe_denied">O provedor negou o acesso; o motivo não é conhecido.</string>
+    <string name="nm_key_probe_unavailable">Não foi possível testar a chave. Confira a conexão e tente novamente.</string>
+    <string name="nm_key_probe_unsupported">O teste de chave não está disponível para este endereço. Nenhuma chave foi enviada.</string>
 </resources>

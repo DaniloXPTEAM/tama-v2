@@ -753,6 +753,44 @@ private fun ColumnScope.ApiKeyConfigSection(
         providerType, ai.tama.providers.ProviderEndpoints.storageBase(providerType, customBaseURL, appendV1Suffix), appendV1Suffix,
     ) else null
     val nmDestinationAllowed = if (nmParallel) ai.tama.providers.KeyDestinationReview(apiKey, nmDestination) else true
+    // nanoMuse: this opt-in probe sends only a GET to a known official model list.
+    // A changed input gets fresh state; a late reply cannot describe another key.
+    if (nmParallel) {
+        val plan = ai.tama.providers.KeyProbePlan.create(providerType, nmDestination)
+        val probeResult = remember(providerType, apiKey, nmDestination, autoSuggested) {
+            mutableStateOf<ai.tama.providers.KeyProbePlan.Outcome?>(null)
+        }
+        val probeRunning = remember(providerType, apiKey, nmDestination, autoSuggested) { mutableStateOf(false) }
+        val probeKey = apiKey.trim()
+        SettingsSection(footer = stringResource(R.string.nm_key_probe_help)) {
+            MinisButton(
+                onClick = {
+                    if (plan != null && !autoSuggested && nmDestinationAllowed &&
+                        ai.tama.providers.KeyDestinationGuard.permits(probeKey, nmDestination) &&
+                        ai.tama.providers.KeyProbePlan.validKey(probeKey)) {
+                        probeRunning.value = true
+                        probeResult.value = null
+                        scope.launch {
+                            try { probeResult.value = ai.tama.providers.KeyProbe.check(plan, probeKey) }
+                            finally { probeRunning.value = false }
+                        }
+                    }
+                },
+                enabled = plan != null && !autoSuggested && nmDestinationAllowed && !probeRunning.value &&
+                    ai.tama.providers.KeyProbePlan.validKey(probeKey),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+            ) { Text(stringResource(if (probeRunning.value) R.string.quicktest_testing else R.string.nm_key_probe_button)) }
+            val probeMessage = when {
+                plan == null -> R.string.nm_key_probe_unsupported
+                probeResult.value == ai.tama.providers.KeyProbePlan.Outcome.ACCEPTED -> R.string.nm_key_probe_accepted
+                probeResult.value == ai.tama.providers.KeyProbePlan.Outcome.REJECTED -> R.string.nm_key_probe_rejected
+                probeResult.value == ai.tama.providers.KeyProbePlan.Outcome.DENIED -> R.string.nm_key_probe_denied
+                probeResult.value == ai.tama.providers.KeyProbePlan.Outcome.UNAVAILABLE -> R.string.nm_key_probe_unavailable
+                else -> null
+            }
+            if (probeMessage != null) Text(stringResource(probeMessage), modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+        }
+    }
     // ── Save button (outside any section — terminal action) ────────────
     Spacer(Modifier.height(20.dp))
     MinisButton(

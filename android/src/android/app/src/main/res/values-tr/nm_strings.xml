@@ -1546,4 +1546,11 @@
     <string name="nm_key_destination_body">Anahtar %1$s sağlayıcısına ait görünüyor, ancak %2$s adresine gönderilecek. Yalnızca bu hedefe güveniyorsanız doğrulayın. Bu işlem ücretlere izin vermez.</string>
     <string name="nm_key_destination_blocked">Anahtar ve adres eşleşmiyor. Göndermeden önce sağlayıcı ayarlarını açıp hedefi düzeltin veya doğrulayın.</string>
     <string name="nm_key_destination_invalid">Adres geçersiz veya HTTPS kullanmıyor. Devam etmeden önce düzeltin.</string>
+    <string name="nm_key_probe_button">Anahtarı test et</string>
+    <string name="nm_key_probe_help">Anahtarı resmi model listesine gönderir, mesaj göndermez. Sonuç erişimi veya maliyeti garanti etmez.</string>
+    <string name="nm_key_probe_accepted">Sağlayıcı model listesi isteğini kabul etti.</string>
+    <string name="nm_key_probe_rejected">Sağlayıcı anahtarı reddetti.</string>
+    <string name="nm_key_probe_denied">Sağlayıcı erişimi reddetti; nedeni bilinmiyor.</string>
+    <string name="nm_key_probe_unavailable">Anahtar test edilemedi. Bağlantıyı kontrol edin.</string>
+    <string name="nm_key_probe_unsupported">Bu adres için anahtar testi kullanılamıyor. Anahtar gönderilmedi.</string>
 </resources>

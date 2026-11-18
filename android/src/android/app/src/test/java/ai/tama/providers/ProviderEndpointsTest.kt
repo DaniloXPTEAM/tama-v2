@@ -67,6 +67,23 @@ class ProviderEndpointsTest {
         assertTrue(KeyDestinationGuard.causedByBlock(IllegalStateException(KeyDestinationGuard.Blocked())))
     }
 
+    @Test fun `key probe targets only official model list endpoints and does not mislabel 403`() {
+        val groq = KeyProbePlan.create(ProviderType.openAI, "https://api.groq.com/openai/v1")
+        assertEquals("https://api.groq.com/openai/v1/models", groq?.url)
+        assertEquals("Authorization", groq?.header)
+        assertEquals("x-api-key", KeyProbePlan.create(ProviderType.anthropic, "https://api.anthropic.com")?.header)
+        assertEquals("x-goog-api-key", KeyProbePlan.create(ProviderType.gemini, "https://generativelanguage.googleapis.com/v1beta")?.header)
+        assertNull(KeyProbePlan.create(ProviderType.openAI, "http://api.groq.com/openai/v1"))
+        assertNull(KeyProbePlan.create(ProviderType.openAI, "https://api.groq.com.example/openai/v1"))
+        assertNull(KeyProbePlan.create(ProviderType.openAI, "https://api.groq.com/openai/v1?key=fixture"))
+        assertNull(KeyProbePlan.create(ProviderType.gemini, "https://api.groq.com/openai/v1"))
+        assertFalse(KeyProbePlan.validKey("fixture\nheader"))
+        assertEquals(KeyProbePlan.Outcome.ACCEPTED, KeyProbePlan.classify(200))
+        assertEquals(KeyProbePlan.Outcome.REJECTED, KeyProbePlan.classify(401))
+        assertEquals(KeyProbePlan.Outcome.DENIED, KeyProbePlan.classify(403))
+        assertEquals(KeyProbePlan.Outcome.UNAVAILABLE, KeyProbePlan.classify(429))
+    }
+
     @Test fun `no own key does not activate the key destination review`() {
         // This tests only the key guard, not Cloud initialization or a real conversation.
         for (base in listOf(null, "", "https://cloud.example.invalid/v1")) {

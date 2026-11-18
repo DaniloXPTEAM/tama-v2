@@ -1542,4 +1542,11 @@
     <string name="nm_key_destination_body">Kunci kelihatan daripada %1$s, tetapi akan dihantar ke %2$s. Sahkan hanya jika anda mempercayai destinasi ini. Ini tidak membenarkan caj.</string>
     <string name="nm_key_destination_blocked">Kunci dan alamat tidak sepadan. Buka tetapan penyedia dan betulkan atau sahkan destinasi sebelum menghantar.</string>
     <string name="nm_key_destination_invalid">Alamat tidak sah atau tidak menggunakan HTTPS. Betulkan sebelum meneruskan.</string>
+    <string name="nm_key_probe_button">Uji kunci</string>
+    <string name="nm_key_probe_help">Menghantar kunci ke senarai model rasmi tanpa mesej. Hasil tidak menjamin akses atau kos.</string>
+    <string name="nm_key_probe_accepted">Penyedia menerima permintaan senarai model.</string>
+    <string name="nm_key_probe_rejected">Penyedia menolak kunci.</string>
+    <string name="nm_key_probe_denied">Penyedia menolak akses; sebabnya tidak diketahui.</string>
+    <string name="nm_key_probe_unavailable">Kunci tidak dapat diuji. Semak sambungan.</string>
+    <string name="nm_key_probe_unsupported">Ujian kunci tidak tersedia untuk alamat ini. Tiada kunci dihantar.</string>
 </resources>

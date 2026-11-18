@@ -1512,4 +1512,11 @@
     <string name="nm_key_destination_body">金鑰似乎屬於%1$s，但將傳送至%2$s。只有信任此地址時才確認。此操作不授權收費。</string>
     <string name="nm_key_destination_blocked">金鑰和地址不相符。傳送前請開啟服務商設定，修改或確認目標地址。</string>
     <string name="nm_key_destination_invalid">地址無效或未使用HTTPS。請先修改再繼續。</string>
+    <string name="nm_key_probe_button">測試金鑰</string>
+    <string name="nm_key_probe_help">將金鑰傳送至官方模型清單，不傳送訊息。結果不保證模型存取或費用。</string>
+    <string name="nm_key_probe_accepted">服務商接受了模型清單請求。</string>
+    <string name="nm_key_probe_rejected">服務商拒絕了金鑰。</string>
+    <string name="nm_key_probe_denied">服務商拒絕存取，原因未知。</string>
+    <string name="nm_key_probe_unavailable">無法測試金鑰，請檢查網路連線。</string>
+    <string name="nm_key_probe_unsupported">此位址不支援金鑰測試，未傳送金鑰。</string>
 </resources>
