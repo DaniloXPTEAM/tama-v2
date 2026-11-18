@@ -342,3 +342,10 @@ mesmo código de produção passou. O workflow agora classifica falhas futuras e
 categorias fixas sem reproduzir texto do log na anotação. Isso não substitui a
 análise do log completo nem transforma uma hipótese de recurso ou rede em causa.
 O arquivo temporário do runner é removido; não há upload de APK ou log.
+
+A aprovação explícita em lote agora ignora identificadores de entrada duplicados
+em qualquer conta e modelos duplicados na conta, inclusive duplicatas ocultas;
+também recusa IDs duplicados de conta. Isso evita aprovar uma identidade ambígua
+após importações ou configurações inconsistentes. Não remove nem altera entradas;
+o usuário pode resolvê-las antes de aprovar. Os testes são sintéticos e não
+comprovam comportamento das preferências Android em um aparelho.

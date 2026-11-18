@@ -24,12 +24,16 @@ class FreeModelImportTest {
             FreeModelBulk.Entry("one", "a", "vendor/one:free", false),
             FreeModelBulk.Entry("two", "a", "vendor/two:free", false),
             FreeModelBulk.Entry("paid", "a", "vendor/paid:free", false),
-            FreeModelBulk.Entry("hidden", "a", "vendor/one:free", true),
+            FreeModelBulk.Entry("hidden", "a", "vendor/hidden:free", true),
             FreeModelBulk.Entry("other", "b", "vendor/one:free", false),
-            FreeModelBulk.Entry("one", "a", "vendor/one:free", false),
         )
         assertEquals(listOf("one", "two"), FreeModelBulk.select("a", setOf("vendor/one:free", "vendor/two:free"), rows))
         assertTrue(FreeModelBulk.select("a", emptySet(), rows).isEmpty())
+        val free = setOf("vendor/one:free", "vendor/two:free")
+        assertEquals(listOf("two"), FreeModelBulk.select("a", free, rows +
+            FreeModelBulk.Entry("duplicate", "a", "vendor/one:free", true)))
+        assertEquals(listOf("two"), FreeModelBulk.select("a", free, rows +
+            FreeModelBulk.Entry("one", "b", "vendor/other:free", false)))
     }
 
     @Test fun `free list is a reversible view and unknown evidence is not free`() {

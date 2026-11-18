@@ -18,15 +18,18 @@ fun main() {
         FreeModelBulk.Entry("one", "instance", "fixture/one:free", false),
         FreeModelBulk.Entry("two", "instance", "fixture/two:free", false),
         FreeModelBulk.Entry("paid", "instance", "fixture/paid:free", false),
-        FreeModelBulk.Entry("hidden", "instance", "fixture/one:free", true),
+        FreeModelBulk.Entry("hidden", "instance", "fixture/hidden:free", true),
         FreeModelBulk.Entry("other", "other", "fixture/one:free", false),
-        FreeModelBulk.Entry("one", "instance", "fixture/one:free", false),
-        FreeModelBulk.Entry("", "instance", "fixture/one:free", false),
+        FreeModelBulk.Entry("", "instance", "fixture/blank:free", false),
     )
     val freeIds = setOf("fixture/one:free", "fixture/two:free")
     check(FreeModelBulk.select("instance", freeIds, freeRows) == listOf("one", "two"))
     check(FreeModelBulk.select("instance", emptySet(), freeRows).isEmpty())
     check(FreeModelBulk.select("missing", freeIds, freeRows).isEmpty())
+    check(FreeModelBulk.select("instance", freeIds, freeRows +
+        FreeModelBulk.Entry("hiddenDuplicate", "instance", "fixture/one:free", true)) == listOf("two"))
+    check(FreeModelBulk.select("instance", freeIds, freeRows +
+        FreeModelBulk.Entry("one", "other", "fixture/other:free", false)) == listOf("two"))
     val original = listOf("fixture/one:free", "fixture/paid:free", "fixture/two:free")
     check(FreeModelList.filter(original, true, freeIds) { it } == listOf("fixture/one:free", "fixture/two:free"))
     check(FreeModelList.filter(original, true, null) { it }.isEmpty())
