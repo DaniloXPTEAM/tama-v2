@@ -1,6 +1,7 @@
 """Static integration checks only; no HTTP or Compose runtime."""
 from pathlib import Path
 import unittest
+from xml.etree import ElementTree
 
 MAIN = Path(__file__).resolve().parents[1] / "android/src/android/app/src/main/java"
 
@@ -24,6 +25,13 @@ class KeyProbeIntegration(unittest.TestCase):
             self.assertIn(text, probe)
         self.assertNotIn("Log.", probe)
         self.assertNotIn(".post(", probe)
+
+    def test_portuguese_success_does_not_claim_the_key_is_valid(self):
+        resources = MAIN.parent / "res/values-pt-rBR/nm_strings.xml"
+        root = ElementTree.parse(resources)
+        text = root.find("string[@name='nm_key_probe_accepted']").text
+        self.assertIn("não comprova", text)
+        self.assertIn("chave", text)
 
 
 if __name__ == "__main__":
