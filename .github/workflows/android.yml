@@ -91,6 +91,7 @@ jobs:
             --tests 'ai.tama.net.GroqHistoryPolicyTest' \
             --tests 'ai.tama.net.GroqHistoryWireTest' \
             --tests 'ai.tama.net.ProviderHistoryInteroperabilityTest' \
+            --tests 'ai.tama.net.AutomaticFailureWireTest' \
             --tests 'ai.tama.router.ModelRouteHistoryTest' \
             --tests 'ai.tama.router.AutoFailureSimulationTest' \
             --tests 'ai.tama.router.AutoModelFailureTest' \

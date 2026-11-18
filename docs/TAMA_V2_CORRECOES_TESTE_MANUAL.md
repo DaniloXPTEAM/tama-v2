@@ -303,3 +303,9 @@ modelo automático elegível de janela conhecida e estritamente maior antes de
 parar. A tentativa anterior pode já ter sido enviada e cobrada; a nova escolha
 não ignora autorizações. A ligação foi verificada estaticamente, mas ainda não
 foi exercitada em uma conversa Android com fallback real.
+
+Teste de transporte `AutomaticFailureWireTest` usa servidor loopback e respostas
+fictícias para verificar como o provedor OpenAI e o classificador automático
+tratam HTTP 429, 403, 500 e 403 dentro de SSE. Ele não executa o ViewModel,
+Room ou provedores reais. Foi acrescentado ao CI Android; o resultado do run
+correspondente deve ser verificado antes de considerá-lo aprovado.
