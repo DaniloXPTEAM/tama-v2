@@ -102,3 +102,14 @@ de custo podem barrar a operação antes de o provider produzir o novo aviso.
 particular, chamadas de mídia, passthrough, voz, logins OAuth, cabeçalhos substituídos e
 outras rotas diretas precisam de auditoria própria. Não tratar a mudança como proteção
 completa contra envio incorreto de credenciais ou cobrança.
+
+## Assinatura do pacote de teste
+
+A configuração aceita um keystore externo privado por variáveis de ambiente somente
+para `tamaTest`. No workflow, os valores opcionais vêm dos segredos do repositório; o
+arquivo temporário é removido ao final e não há etapa de upload. Sem configuração, o
+build usa a chave debug e emite aviso: isso **não garante assinatura estável**. Os
+segredos não foram criados nesta sessão: a consulta às permissões retornou HTTP 403.
+A compilação Android e o uso dos segredos no Actions não foram verificados. Mesmo com
+uma nova chave estável, atualizar o APK já instalado só é possível se o certificado for
+o mesmo da instalação anterior. Não desinstalar ou limpar dados para contornar isso.

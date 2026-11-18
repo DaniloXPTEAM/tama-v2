@@ -40,10 +40,33 @@ jobs:
           export GOROOT="$(go env GOROOT)" GOPATH="$(go env GOPATH)"
           export PATH="$GOPATH/bin:$PATH"
           bash scripts/android/build-natives.sh
+      # Optional private test signer. No key or APK is uploaded or cached.
+      - name: Prepare optional private test signer
+        env:
+          TEST_STORE: ${{ secrets.TAMA_TEST_KEYSTORE_BASE64 }}
+          TEST_STORE_PASSWORD: ${{ secrets.TAMA_TEST_STORE_PASSWORD }}
+          TEST_KEY_ALIAS: ${{ secrets.TAMA_TEST_KEY_ALIAS }}
+          TEST_KEY_PASSWORD: ${{ secrets.TAMA_TEST_KEY_PASSWORD }}
+        run: |
+          if [ -z "$TEST_STORE$TEST_STORE_PASSWORD$TEST_KEY_ALIAS$TEST_KEY_PASSWORD" ]; then
+            echo '::warning::No stable test signer configured; this build uses a temporary debug key.'
+            exit 0
+          fi
+          if [ -z "$TEST_STORE" ] || [ -z "$TEST_STORE_PASSWORD" ] || [ -z "$TEST_KEY_ALIAS" ] || [ -z "$TEST_KEY_PASSWORD" ]; then
+            echo '::error::Incomplete private test signing settings.'
+            exit 1
+          fi
+          umask 077
+          printf '%s' "$TEST_STORE" | base64 --decode > "$RUNNER_TEMP/tama-test-signing.jks"
       # Separate Gradle processes prevent two variant compilers sharing the same heap.
       - name: Assemble parallel test locally
         working-directory: android/src/android
+        env:
+          TAMA_TEST_STORE_PASSWORD: ${{ secrets.TAMA_TEST_STORE_PASSWORD }}
+          TAMA_TEST_KEY_ALIAS: ${{ secrets.TAMA_TEST_KEY_ALIAS }}
+          TAMA_TEST_KEY_PASSWORD: ${{ secrets.TAMA_TEST_KEY_PASSWORD }}
         run: |
+          if [ -f "$RUNNER_TEMP/tama-test-signing.jks" ]; then export TAMA_TEST_KEYSTORE_FILE="$RUNNER_TEMP/tama-test-signing.jks"; fi
           export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/$NDK_VERSION"
           ./gradlew :app:assembleTamaTest --max-workers=1 --console=plain --no-daemon \
             '-Dorg.gradle.jvmargs=-Xmx4608m -XX:MaxMetaspaceSize=768m -Dfile.encoding=UTF-8' \
@@ -57,7 +80,12 @@ jobs:
             -Pkotlin.compiler.execution.strategy=in-process -Pkotlin.incremental=false
       - name: Run parallel history tests
         working-directory: android/src/android
+        env:
+          TAMA_TEST_STORE_PASSWORD: ${{ secrets.TAMA_TEST_STORE_PASSWORD }}
+          TAMA_TEST_KEY_ALIAS: ${{ secrets.TAMA_TEST_KEY_ALIAS }}
+          TAMA_TEST_KEY_PASSWORD: ${{ secrets.TAMA_TEST_KEY_PASSWORD }}
         run: |
+          if [ -f "$RUNNER_TEMP/tama-test-signing.jks" ]; then export TAMA_TEST_KEYSTORE_FILE="$RUNNER_TEMP/tama-test-signing.jks"; fi
           export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/$NDK_VERSION"
           ./gradlew :app:testTamaTestUnitTest \
             --tests 'ai.tama.net.GroqHistoryPolicyTest' \
@@ -88,3 +116,6 @@ jobs:
             --apk android/src/android/app/build/outputs/apk/tamaTest/app-tamaTest.apk \
             --normal-apk android/src/android/app/build/outputs/apk/debug/app-debug.apk \
             --out-dir /tmp/tama-identity-check
+      - name: Remove private test signer
+        if: ${{ always() }}
+        run: rm -f "$RUNNER_TEMP/tama-test-signing.jks"

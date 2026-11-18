@@ -40,6 +40,20 @@ android {
     // keyPassword; git-ignored) and fall back to the debug key otherwise, so a
     // release APK can be built by anyone. One key for every version.
     signingConfigs {
+        // TAMA V2: an optional private signer is supplied from the environment,
+        // never committed. Without it the test build still uses the debug key;
+        // that fallback does not guarantee updates across machines or CI runs.
+        val tamaStore = System.getenv("TAMA_TEST_KEYSTORE_FILE")?.takeIf { it.isNotBlank() }
+        if (tamaStore != null) {
+            fun required(name: String): String = System.getenv(name)?.takeIf { it.isNotBlank() }
+                ?: error("Missing private test signing setting: $name")
+            create("tamaPrivateTest") {
+                storeFile = file(tamaStore)
+                storePassword = required("TAMA_TEST_STORE_PASSWORD")
+                keyAlias = required("TAMA_TEST_KEY_ALIAS")
+                keyPassword = required("TAMA_TEST_KEY_PASSWORD")
+            }
+        }
         val keystoreProperties = rootProject.file("../../keystore.properties")
         if (keystoreProperties.isFile) {
             val props = Properties()
@@ -98,7 +112,7 @@ android {
         create("tamaTest") {
             initWith(getByName("debug"))
             applicationIdSuffix = ".tamav2test"
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.findByName("tamaPrivateTest") ?: signingConfigs.getByName("debug")
             matchingFallbacks += listOf("debug")
         }
         release {
