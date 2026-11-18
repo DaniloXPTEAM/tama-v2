@@ -138,6 +138,13 @@ object ModelsDevApi {
         }
     }
 
+    // nanoMuse: for own-key catalogues, an identical ID on a different host
+    // is not a substitute for the configured provider's modalities.
+    internal fun enrichModelsForBase(models: List<LLMModel>, base: String?): List<LLMModel> {
+        val exact = bundledProvider(base)?.models ?: return models
+        return models.map { model -> exact[model.id]?.let { applyDevData(model, it) } ?: model }
+    }
+
     // MARK: - Apply models.dev data
 
     private fun applyDevData(model: LLMModel, devModel: ModelDevEntry): LLMModel {
@@ -429,6 +436,7 @@ object ModelsDevApi {
             reasoningEffortValues = reasoningEffortValues,
             declaresNoEffortTiers = declaresNoEffortTiers,
             releaseDate = obj.optString("release_date", "").ifEmpty { null },
+            toolCalls = (obj.opt("tool_call") as? Boolean),
             inputCost = obj.optJSONObject("cost")?.optDouble("input", Double.NaN)?.takeIf { it.isFinite() && it >= 0 },
             outputCost = obj.optJSONObject("cost")
                 ?.optDouble("output", Double.NaN)
@@ -544,5 +552,6 @@ object ModelsDevApi {
         // price (30 / 12 / 1.2) separates their tiers.
         val outputCost: Double?,
         val inputCost: Double? = null, // nanoMuse: bundled list-price hint, not account evidence
+        val toolCalls: Boolean? = null,
     )
 }

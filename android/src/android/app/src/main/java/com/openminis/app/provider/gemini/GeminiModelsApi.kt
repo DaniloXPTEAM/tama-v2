@@ -102,7 +102,10 @@ object GeminiModelsApi {
                 }
             }
             if (result.isEmpty()) return@withContext fallback
-            ModelsDevApi.enrichModels(result)
+            // nanoMuse: only the exact Developer API or the configured custom base.
+            if (com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test" && !isOAuth && apiKey.isNotBlank())
+                ModelsDevApi.enrichModelsForBase(result, baseURL ?: ai.tama.pricing.DocumentedFreeChat.GEMINI_BASE)
+            else ModelsDevApi.enrichModels(result)
         } catch (_: Exception) {
             return@withContext fallback
         }

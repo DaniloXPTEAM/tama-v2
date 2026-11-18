@@ -115,7 +115,9 @@ internal class FreeModelImportEvidence(
         if (current(gate, freeOnly, route, currentAccountVersion, nowMillis)?.contains(modelId) != true) return emptySet()
         return buildSet {
             add("chat")
-            if (prices.quotes[modelId]?.tools == true) add("tools")
+            val quote = prices.quotes[modelId]
+            if (quote?.tools == true) add("tools")
+            if (quote?.inputModalities?.contains("image") == true) add("vision")
         }
     }
 }

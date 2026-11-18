@@ -1414,7 +1414,9 @@ class ProviderRepository(private val context: Context) {
             // chat/tools, but does not approve a route or grant cost permission.
             val discovered = if (com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test" &&
                 io.github.nanomuse.cloud.NanoMuseCloud.instance(context)?.id != identity.providerId)
-                tamaFreeModelCapabilities(identity.providerId, identity.modelId) else emptySet()
+                _config.value.modelEntries.firstOrNull { it.id == identity.entryId }?.let { entry ->
+                    instance(identity.providerId)?.let { provider -> tamaModelMetadata(entry, provider)?.chatCapabilities }
+                }.orEmpty() else emptySet()
             ai.tama.router.AutoModelStore.capabilities(context, identity, catalogue + discovered)
         }
 
@@ -2525,6 +2527,22 @@ class ProviderRepository(private val context: Context) {
                 if (ai.tama.router.AutoModelStore.approveFreeChatBatch(context, identities)) identities.size else 0
             }
         }
+    }
+
+    // nanoMuse: exact bundled model metadata is independent of list price.
+    // An older free import may have fresher modalities than the saved row.
+    internal fun tamaModelMetadata(entry: ModelEntry, instance: ProviderInstance): ai.tama.providers.ModelModalities? {
+        if (tamaOwnApiKey(instance) == null || entry.providerInstanceId != instance.id || entry.model.id != entry.baseModel.id) return null
+        val exact = ModelsDevApi.bundledProvider(tamaModelBase(instance))?.models?.get(entry.model.id)
+        val inputs = entry.baseModel.inputModalities ?: exact?.inputModalities
+        val outputs = entry.baseModel.outputModalities ?: exact?.outputModalities
+        val imported = tamaFreeModelCapabilities(instance.id, entry.model.id)
+        return ai.tama.providers.ModelModalities.from(
+            inputs, outputs, exact?.toolCalls == true || "tools" in imported, "vision" in imported, "chat" in imported,
+            // Voice templates can infer saved legacy voice flags. Do not show
+            // these as confirmed audio or video in the chat badge.
+            exact?.inputModalities, exact?.outputModalities,
+        )
     }
 
     /** Fresh exact-model capabilities from this own-key provider's free import only. */

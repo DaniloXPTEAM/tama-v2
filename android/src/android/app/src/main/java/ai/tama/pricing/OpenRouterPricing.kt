@@ -31,6 +31,8 @@ internal object OpenRouterPricing {
         val tools: Boolean,
         val expiresAtMillis: Long?,
         val expiryMalformed: Boolean,
+        val inputModalities: Set<String>? = null,
+        val outputModalities: Set<String>? = null,
     )
 
     data class Catalogue(val fetchedAtMillis: Long, val quotes: Map<String, Quote>)
@@ -70,8 +72,12 @@ internal object OpenRouterPricing {
             }
             if ("prompt" !in values || "completion" !in values) malformed = true
             val arch = obj.optJSONObject("architecture")
-            val inputs = strings(arch?.optJSONArray("input_modalities"))
-            val outputs = strings(arch?.optJSONArray("output_modalities"))
+            val inputs = strings(arch?.optJSONArray("input_modalities"))?.mapTo(linkedSetOf()) {
+                it.lowercase().removeSuffix("_input")
+            }
+            val outputs = strings(arch?.optJSONArray("output_modalities"))?.mapTo(linkedSetOf()) {
+                it.lowercase().removeSuffix("_output")
+            }
             val endpoints = strings(obj.optJSONArray("endpoints"))
             val params = strings(obj.optJSONArray("supported_parameters"))
             val rawExpiry = obj.opt("expiration_date")
@@ -88,6 +94,7 @@ internal object OpenRouterPricing {
                 tools = params?.contains("tools") == true,
                 expiresAtMillis = expiry,
                 expiryMalformed = rawExpiry != null && rawExpiry != JSONObject.NULL && expiry == null,
+                inputModalities = inputs, outputModalities = outputs,
             )
         }
         return Catalogue(fetchedAtMillis, quotes.toMap())

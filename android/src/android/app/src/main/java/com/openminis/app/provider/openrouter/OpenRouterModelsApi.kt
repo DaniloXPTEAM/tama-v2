@@ -8,6 +8,7 @@ import com.openminis.app.provider.applyUserAgentOverride
 import com.openminis.app.provider.ProviderModelsCache
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONArray
@@ -16,6 +17,10 @@ import org.json.JSONObject
 object OpenRouterModelsApi {
     private val client = OkHttpClient.Builder().proxyAuthenticator(io.github.nanomuse.net.OwnProviderProxy.authenticator).build() // nanoMuse: Settings → Network, a proxy with a password
     private val cache = ProviderModelsCache("openrouter")
+    private val imageCatalogueClient by lazy {
+        client.newBuilder().followRedirects(false).followSslRedirects(false).retryOnConnectionFailure(false)
+            .callTimeout(8, java.util.concurrent.TimeUnit.SECONDS).build()
+    }
 
     /**
      * Fetch OpenRouter's model catalog. OpenRouter returns rich metadata
@@ -65,7 +70,15 @@ object OpenRouterModelsApi {
                 return@withContext emptyList()
             }
 
-            val enriched = ModelsDevApi.enrichModels(models)
+            val enriched = if (priceTicket == null) ModelsDevApi.enrichModels(models) else {
+                // nanoMuse: /models defaults to text output. An independent
+                // image query cannot erase a successful text catalogue.
+                val images = fetchFreeCatalogue(catalogueRequest(apiKey, "image"), imageCatalogueClient)
+                    ?.models.orEmpty().filter { "image" in it.outputModalities.orEmpty() }
+                ModelsDevApi.enrichModelsForBase(
+                    (images + models).distinctBy { it.id }, "https://openrouter.ai/api/v1",
+                )
+            }
             if (context != null) cache.save(context, cacheKey, enriched)
             if (priceTicket != null) {
                 ai.tama.pricing.OpenRouterCatalogueCapture.memory.finish(priceTicket, priceData)
@@ -108,8 +121,10 @@ object OpenRouterModelsApi {
         }
     }
 
-    internal fun catalogueRequest(apiKey: String): Request = Request.Builder() // nanoMuse: also verified by wire tests
-        .url("https://openrouter.ai/api/v1/models")
+    internal fun catalogueRequest(apiKey: String, outputModality: String? = null): Request = Request.Builder() // nanoMuse
+        .url("https://openrouter.ai/api/v1/models".toHttpUrl().newBuilder().apply {
+            if (outputModality != null) addQueryParameter("output_modalities", outputModality)
+        }.build())
         .header("Authorization", "Bearer $apiKey")
         .header("HTTP-Referer", "https://github.com/OpenMinis/OpenMinis")
         .header("X-Title", "TAMA AI App")

@@ -1,5 +1,6 @@
 package ai.tama.pricing
 
+import ai.tama.providers.ModelModalities
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -55,6 +56,28 @@ fun main() {
     check(caps("fixture/one:free", time = now + OpenRouterPricing.MAX_AGE_MILLIS + 1).isEmpty())
     gate.begin("instance", true, "route")
     check(caps("fixture/one:free").isEmpty())
+    val visionIds = listOf("google/gemma-4-31b-it:free", "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free")
+    val visionData = JSONArray()
+    visionIds.forEach { id ->
+        visionData.put(quote(id, "0", true).put("architecture", JSONObject()
+            .put("input_modalities", JSONArray().put("text").put("IMAGE_INPUT"))
+            .put("output_modalities", JSONArray().put("TEXT_OUTPUT"))))
+    }
+    val capTicket = gate.begin("instance", true, "route")
+    val vision = FreeModelImportEvidence(capTicket, 1, OpenRouterPricing.parse(visionData, now), visionIds.toSet())
+    visionIds.forEach { id ->
+        check(vision.currentCapabilities(gate, true, "route", 1, now, id) == setOf("chat", "vision", "tools"))
+    }
+    val imageReader = ModelModalities.from(listOf("text", "image"), listOf("text"))
+    check("vision" in imageReader.chatCapabilities && "image" !in imageReader.outputs.orEmpty())
+    val imageWriter = ModelModalities.from(listOf("text"), listOf("image"))
+    check("vision" !in imageWriter.chatCapabilities && "image" in imageWriter.outputs.orEmpty())
+    val textOnly = ModelModalities.from(listOf("text"), listOf("text"))
+    check(textOnly.chatCapabilities == setOf("chat"))
+    val oldVoiceGuess = ModelModalities.from(listOf("text"), listOf("audio"), exactOutput = null)
+    check("audio" !in oldVoiceGuess.outputs.orEmpty())
+    val exactOmni = ModelModalities.from(listOf("text", "audio", "video", "image"), listOf("text"))
+    check(exactOmni.inputs == setOf("text", "audio", "video", "image"))
     val review = java.time.Instant.parse("2026-11-18T00:00:00Z").toEpochMilli()
     val gemini = DocumentedFreeChat.GEMINI_BASE
     val gemma = "gemma-4-31b-it"

@@ -9470,7 +9470,7 @@ class ChatViewModel(
             // This never approves a route or bypasses either cost guard.
             val discovered = if (tamaV2Test &&
                 io.github.nanomuse.cloud.NanoMuseCloud.instance(context)?.id != instance.id)
-                providerRepository.tamaFreeModelCapabilities(instance.id, entry.model.id) else emptySet()
+                providerRepository.tamaModelMetadata(entry, instance)?.chatCapabilities.orEmpty() else emptySet()
             val caps = AutoModelStore.capabilities(context, identity,
                 vendor?.models?.get(entry.model.id)?.capabilities.orEmpty() + discovered).toMutableSet()
             val auth = vendor?.let { io.github.nanomuse.cloud.ProviderCatalogue.authOf(instance, it) }

@@ -213,7 +213,10 @@ object OpenAIModelsApi {
                 )
             }
             if (parsed.isEmpty()) return@withContext fallback
-            ModelsDevApi.enrichModels(parsed)
+            // nanoMuse: no capability inheritance from a different gateway.
+            if (com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test" && apiKey.isNotBlank())
+                ModelsDevApi.enrichModelsForBase(parsed, baseURL ?: "https://api.openai.com/v1")
+            else ModelsDevApi.enrichModels(parsed)
         } catch (_: Exception) {
             return@withContext fallback
         }

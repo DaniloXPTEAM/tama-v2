@@ -10,7 +10,7 @@ class ReviewCapabilities(unittest.TestCase):
         review = repo.split('internal fun nmAutoReviewCapabilities', 1)[1].split('internal fun nmSaveAutoReview', 1)[0]
         for part in ('nmIdentityIsCurrent(identity)', 'BuildConfig.APPLICATION_ID',
                      'NanoMuseCloud.instance(context)?.id != identity.providerId',
-                     'tamaFreeModelCapabilities(identity.providerId, identity.modelId)',
+                     'tamaModelMetadata(entry, provider)?.chatCapabilities',
                      'AutoModelStore.capabilities(context, identity, catalogue + discovered)'):
             self.assertIn(part, review)
         self.assertNotIn('saveReview(', review)

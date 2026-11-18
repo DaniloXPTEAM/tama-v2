@@ -36,3 +36,7 @@ Caminhos relativos a `android/src/android/app/src/main/java`. Não confundir rec
 | Cerebras | [Free Trial](https://inference-docs.cerebras.ai/support/rate-limits) é crédito com prazo, não tier gratuito permanente. Limites de Qwen 3.8 27B podem coincidir com o pago. |
 
 O app não pede declaração. `DocumentedFreeChat` separa Free, plano não confirmado, preço informado e cobrança recusada. `DocumentedChatDispatch` valida modelo/base/chave e conta no stream e de novo antes do envio; não altera a permissão global, a nuvem ou a consulta “Testar chave”. A evidência local expira para exigir revisão. A lista usa metadados, não uma inferência de teste: uma resposta 2xx ou um cabeçalho de limite não provam custo zero. Uma falta de crédito devolvida durante o chat remove a rota da lista gratuita daquela conta, sem inferir cobrança de outros usuários.
+
+### Modalidades
+
+A atualização da lista completa no Test consulta o catálogo de texto e solicita, separadamente, `output_modalities=image` ao OpenRouter. O segundo resultado não apaga o de texto em caso de erro. Entrada `image` deixa o modelo ler imagens; saída `image` descreve geração, mas não comprova que o endpoint do aplicativo é compatível ou gratuito. A cotação de chat guarda as modalidades do ID exato. O catálogo embutido da rota correspondente documenta entrada de imagem para Gemma 4 31B e Nemotron 3 Nano Omni; nome, variante irmã e modalidade de outro provedor não servem de evidência. Áudio/vídeo nas informações do modelo só são confirmados com metadados, sem modificar os atalhos legados de voz.
