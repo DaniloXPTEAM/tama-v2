@@ -238,3 +238,114 @@ Groq e continuar, repetir em Gemini e TAMA AI Cloud, verificando a resposta e a 
 histórico. Repetir quando houver chamadas de ferramentas, conferir custo e permissões antes de
 cada envio e registrar uma captura e o diagnóstico do turno. A forma de entrega privada ainda
 precisa ser combinada; não limpar ou desinstalar nenhum dos apps para contornar assinatura.
+
+## Autorização em lote de modelos anunciados gratuitos
+
+Na variante paralela, a tela do provedor OpenRouter com chave própria e a opção
+de importar somente gratuitos oferece uma ação para autorizar, para seleção
+automática de chat, os modelos visíveis reconhecidos como gratuitos na consulta
+recente. A ação não liga o modo automático, não altera a permissão separada de
+custo e não autoriza imagens. Modelos ocultos, de outras contas ou ausentes da
+evidência atual não são incluídos. A troca de chave, rota ou preferência invalida
+a evidência; atualize o catálogo antes de tentar novamente. O catálogo não
+garante ausência de cobrança ou serviços extras. Testes locais simulam a seleção,
+mas não comprovam a tela ou a persistência Android em aparelho.
+
+## Motivo de bloqueio antes da imagem
+
+Nos bloqueios locais conhecidos antes de enviar a solicitação de imagem, a
+instrução ao assistente deixa de sugerir cobrança. Para uma falha genérica,
+que pode ter ocorrido após o envio, o aviso de possível cobrança e a regra
+de não repetir automaticamente continuam. Teste local cobre a política de
+instrução; a apresentação real no chat ainda precisa ser verificada.
+
+## Repetir uma imagem que falhou
+
+Após falhar um pedido direto de imagem pelo atalho local, o paralelo pode
+perguntar se a pessoa quer tentar de novo. A resposta exata “sim” ou “tenta de
+novo” inicia uma nova tentativa pela mesma ferramenta, nunca uma repetição
+automática. A oferta fica apenas na memória, vale por até cinco minutos e é
+invalidada se a conversa ou a última mensagem mudar. Anexos, edição e turnos
+automáticos não usam o atalho. As mesmas verificações de custo e permissão
+continuam obrigatórias; isso não prova que a nova tentativa será gratuita.
+O teste local cobre a decisão, não o aparelho nem a geração real.
+
+## Limite de contexto no modo automático
+
+No paralelo, antes de parar por limite local de contexto, o roteador tenta
+um modelo com janela comprovadamente maior, desde que ele também passe pelas
+verificações de autorização, custo, capacidade e orçamento. Limites iguais ou
+desconhecidos não contam como maiores. Se não houver candidato, o aviso
+anterior permanece. A requisição é remontada e reavaliada; não se altera a
+permissão de custo. O teste local cobre o filtro de janela e verifica a ligação
+estática, não uma conversa Android completa.
+
+## Texto cru de ferramenta em pedidos de imagem
+
+No paralelo, em um pedido explícito de imagem, marcadores literais de ferramenta
+que chegam como texto são substituídos por uma explicação local. O filtro lida
+com marcadores divididos entre pedaços do fluxo e não executa texto como chamada;
+eventos nativos de ferramenta permanecem separados e passam pelos controles
+existentes. Um marcador sem fechamento é descartado até o fim da resposta. O
+teste local usa eventos fictícios e não cobre a tela real nem um provedor.
+
+## Lista de modelos anunciados gratuitos
+
+A tela da conta OpenRouter com chave própria pode mostrar apenas os modelos
+presentes na evidência recente de importação gratuita. Sem evidência atual,
+pede atualização em vez de tratar modelo desconhecido como grátis. O filtro é
+visual e reversível: não apaga modelos salvos, não altera o seletor de chat e
+não garante custo zero. Os testes locais verificam a filtragem e a ligação
+estática; ainda é necessário verificar a tela no Android.
+
+A checagem de capacidade durante a reconstrução após fallback também tenta um
+modelo automático elegível de janela conhecida e estritamente maior antes de
+parar. A tentativa anterior pode já ter sido enviada e cobrada; a nova escolha
+não ignora autorizações. A ligação foi verificada estaticamente, mas ainda não
+foi exercitada em uma conversa Android com fallback real.
+
+Teste de transporte `AutomaticFailureWireTest` usa servidor loopback e respostas
+fictícias para verificar como o provedor OpenAI e o classificador automático
+tratam HTTP 429, 403, 500 e 403 dentro de SSE. Ele não executa o ViewModel,
+Room ou provedores reais. Foi acrescentado ao CI Android; o resultado do run
+correspondente deve ser verificado antes de considerá-lo aprovado.
+
+A ficha individual no paralelo passa a consultar a mesma evidência temporária
+OpenRouter para capacidades de chat e ferramentas usada pela seleção automática,
+sem conceder aprovação ou permissão de custo. Ajustes explícitos e recusas
+aprendidas continuam prevalecendo. O teste verifica a política com dublês e a
+ligação estática, não a tela Android nem a precisão de um catálogo real.
+
+O teste loopback de transporte automático também exercita uma sequência sintética
+429 seguida de resposta por outra entrada aprovada da mesma conta, usando o
+seletor e o transporte reais. Compara o histórico recebido nas duas requisições
+e verifica que uma entrada não aprovada foi ignorada. Ele não executa o
+`ChatViewModel`, o banco, cobrança ou provedores reais; o resultado no CI deve
+ser conferido separadamente.
+
+## Folha de uso e contagem estimada
+
+No paralelo, antes do carregamento e quando não há nenhum registro válido de
+uso, os totais aparecem como traço, não como zero. O contexto também mostra
+traço quando não há valor positivo salvo. Os registros existentes podem conter
+zeros usados como padrão para campos não informados: não é possível distinguir
+todos esses casos retroativamente. Um aviso diz que os registros podem estar
+incompletos e não são fatura. O contexto vem do último valor positivo salvo na
+ordem da conversa; empates usam data e ID para estabilidade. A contagem de
+loops continua sendo uma aproximação, não uma contagem de chamadas ou cobranças.
+A consulta foi exercitada em SQLite local com linhas fictícias e isolamento
+entre sessões; Compose, Room e aparelho ainda precisam de verificação.
+
+Dois builds recentes falharam na etapa de montagem, mas a busca do log pelo
+ambiente retornou EOF; não há diagnóstico de causa. Um build posterior com o
+mesmo código de produção passou. O workflow agora classifica falhas futuras em
+categorias fixas sem reproduzir texto do log na anotação. Isso não substitui a
+análise do log completo nem transforma uma hipótese de recurso ou rede em causa.
+O arquivo temporário do runner é removido; não há upload de APK ou log.
+
+A aprovação explícita em lote agora ignora identificadores de entrada duplicados
+em qualquer conta e modelos duplicados na conta, inclusive duplicatas ocultas;
+também recusa IDs duplicados de conta. Isso evita aprovar uma identidade ambígua
+após importações ou configurações inconsistentes. Não remove nem altera entradas;
+o usuário pode resolvê-las antes de aprovar. Os testes são sintéticos e não
+comprovam comportamento das preferências Android em um aparelho.

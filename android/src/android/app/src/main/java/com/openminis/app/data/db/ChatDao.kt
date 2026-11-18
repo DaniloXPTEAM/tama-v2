@@ -218,6 +218,11 @@ interface ChatDao {
     @Query("SELECT token_usage FROM messages WHERE session_id = :sessionId AND token_usage IS NOT NULL")
     suspend fun tokenUsages(sessionId: String): List<String>
 
+    // nanoMuse: the parallel usage sheet needs the most recent positive context
+    // in conversation order, not whichever SQLite row happens to be returned last.
+    @Query("SELECT token_usage FROM messages WHERE session_id = :sessionId AND token_usage IS NOT NULL ORDER BY sort_order ASC, created_at ASC, id ASC")
+    suspend fun tokenUsagesInChatOrder(sessionId: String): List<String>
+
     /**
      * Fetch all token usage records joined with session model_id for aggregation.
      *

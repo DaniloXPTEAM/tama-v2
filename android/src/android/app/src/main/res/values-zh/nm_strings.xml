@@ -1515,4 +1515,27 @@
     <string name="nm_free_import_found">标称免费的模型 %1$d 个，新增 %2$d 个。尚未验证账户访问权限。</string>
     <string name="nm_provider_save_failed">无法保存。请检查设备存储空间后重试。</string>
     <string name="nm_useit_incomplete">部分所选用途未能设置。其他用途可能已经更改。请检查模型列表或重试。</string>
+    <string name="nm_key_destination_action">确认目标地址</string>
+    <string name="nm_key_destination_body">密钥似乎属于%1$s，但将发送到%2$s。只有信任此地址时才确认。此操作不授权收费。</string>
+    <string name="nm_key_destination_blocked">密钥和地址不匹配。发送前请打开服务商设置，修改或确认目标地址。</string>
+    <string name="nm_key_destination_invalid">地址无效或未使用HTTPS。请先修改再继续。</string>
+    <string name="nm_key_probe_button">测试密钥</string>
+    <string name="nm_key_probe_help">将密钥发送到官方模型列表，不发送消息。结果不能保证模型访问或费用。</string>
+    <string name="nm_key_probe_accepted">模型列表请求已被接受，但这不能证明密钥有效。</string>
+    <string name="nm_key_probe_rejected">服务商拒绝了密钥。</string>
+    <string name="nm_key_probe_denied">服务商拒绝访问，原因未知。</string>
+    <string name="nm_key_probe_unavailable">无法测试密钥，请检查网络连接。</string>
+    <string name="nm_key_probe_unsupported">此地址不支持密钥测试，未发送密钥。</string>
+    <string name="nm_free_bulk_button">允许所有标为免费的聊天模型</string>
+    <string name="nm_free_bulk_help">允许最新目录中标为免费且可见的模型用于自动聊天选择。不会开启自动模式或费用许可，也不会允许生成图片。价格和额外服务可能变化。</string>
+    <string name="nm_free_bulk_done">已允许的聊天路线：%1$d。其他资格和费用检查仍然有效。</string>
+    <string name="nm_free_bulk_retry">没有允许当前符合条件的模型。请刷新目录后重试。</string>
+    <string name="nm_image_retry_question">要再次尝试这张图片吗？请回复“是”或“重试”。</string>
+    <string name="nm_context_near_limit">上下文接近模型上限（%1$d / %2$d 个词元）。请开始新对话或使用 /compact，以便可靠地继续。</string>
+    <string name="nm_image_raw_tool_text">服务商将工具调用作为文本返回。该文本没有作为工具执行。</string>
+    <string name="nm_free_list_filter">仅显示标为免费的模型</string>
+    <string name="nm_free_list_help">仅筛选此列表，不删除模型，也不保证费用。关闭筛选可查看所有已保存的模型。</string>
+    <string name="nm_free_list_refresh">没有当前目录数据。请刷新模型列表或关闭筛选。</string>
+    <string name="nm_usage_reports_note">用量基于已保存的服务商报告，可能不完整。这不是账单，也不能证明没有费用。</string>
+    <string name="nm_loop_estimate_explanation">本对话的估算值取助手消息数和工具块数中的较大值，并非请求次数或收费次数的准确统计。</string>
 </resources>

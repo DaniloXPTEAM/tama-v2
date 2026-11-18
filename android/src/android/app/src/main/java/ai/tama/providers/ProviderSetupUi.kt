@@ -69,9 +69,45 @@ internal fun KnownProviderSection(onSelect: (VoiceProviderTemplate) -> Unit) {
 /** Suggest locally. Prefixes are hints, not proof of an account or recipient. */
 internal fun suggestedKeyProvider(context: android.content.Context, apiKey: String): VoiceProviderTemplate? {
     val providers = ProviderCatalogue.load(context).filter { it.takesKey }
-    val matchId = ProviderKeySuggestion.match(apiKey, providers.map { it.id to it.keyHint }) ?: return null
+    // nanoMuse: AQ. is only a local hint; confirmation is still required before saving.
+    val hints = providers.map { it.id to it.keyHint } + listOf("gemini" to "AQ.…")
+    val matchId = ProviderKeySuggestion.match(apiKey, hints) ?: return null
     val provider = providers.firstOrNull { it.id == matchId } ?: return null
     return OwnKeyPresets.template(provider, Region.mainland(context), ProviderCatalogue.chinese(context))
+}
+
+/** Local, process-only confirmation for a key whose prefix and destination differ. */
+@Composable
+internal fun KeyDestinationReview(key: String, endpoint: String?): Boolean {
+    var revision by remember(key, endpoint) { mutableStateOf(0) }
+    var showDialog by remember(key, endpoint) { mutableStateOf(false) }
+    // Reading revision makes a confirmation immediately update the Save button.
+    val allowed = remember(key, endpoint, revision) { KeyDestinationGuard.permits(key, endpoint) }
+    val review = KeyDestinationGuard.review(key, endpoint)
+    if (!allowed && review != null) {
+        val destination = review.destination
+        SettingsSection(footer = if (destination == null) stringResource(R.string.nm_key_destination_invalid)
+            else stringResource(R.string.nm_key_destination_body, review.provider, destination)) {
+            SettingsRow(
+                title = stringResource(R.string.nm_key_destination_action),
+                onClick = if (destination == null) null else ({ showDialog = true }),
+                showDivider = false,
+            )
+        }
+        if (showDialog && destination != null) {
+            com.openminis.app.ui.components.MinisAlertDialog(
+                onDismissRequest = { showDialog = false },
+                title = stringResource(R.string.nm_key_destination_action),
+                text = stringResource(R.string.nm_key_destination_body, review.provider, destination),
+                confirmText = stringResource(R.string.nm_key_destination_action),
+                onConfirm = {
+                    if (KeyDestinationGuard.confirm(key, endpoint)) revision += 1
+                    showDialog = false
+                },
+            )
+        }
+    }
+    return allowed
 }
 
 /** An inferred endpoint is displayed immediately, but cannot be saved without this tap. */

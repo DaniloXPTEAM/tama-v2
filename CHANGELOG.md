@@ -4,6 +4,32 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+- Clarified the parallel Android chat usage sheet when provider usage has not been reported.
+
+- Added a reversible free-catalogue view filter for own-key OpenRouter providers in the parallel Android test build.
+
+- Replaced literal tool-call markup in image replies with a localized notice in the parallel Android test build.
+
+- Added an automatic larger-context fallback at the local capacity stop in the parallel Android test build.
+
+- Used fresh free-catalogue evidence to rank automatic chat candidates within the selected own-key OpenRouter account in the parallel Android test build.
+
+- Added an explicit, short-lived retry offer after a failed standalone image request in the parallel Android test build.
+
+- Avoided suggesting an image charge for known preflight refusals in the parallel Android test build.
+
+- Added a one-touch chat-route approval for visible OpenRouter models advertised free in the current catalogue, in the parallel Android test build.
+
+- Show complete localized context-limit notices in the parallel Android test build.
+
+- Added an opt-in key check for selected official model-list endpoints in the parallel Android test build.
+
+- Used fresh own-key OpenRouter free-import metadata for automatic chat and tool capabilities in the parallel test build, without changing spending permissions.
+
+- Localized the model refresh row for configured own-key providers in the parallel Android test build.
+
+- In the parallel Android test build, asked for a local recipient review for selected key prefixes on covered provider and chat paths. Other transports remain unverified.
+
 - Split Android chat tool dispatch and stream handling out of the agent loop to reduce generated JVM method size.
 
 - In the side-by-side Android test build, serialized incoming Hub progress and terminal replies per call to prevent tested ordering and completion races. This does not fix relay misrouting.

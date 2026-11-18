@@ -1542,4 +1542,27 @@
     <string name="nm_free_import_found">%1$d modelos anunciados como gratuitos; %2$d añadidos. No se verificó el acceso de la cuenta.</string>
     <string name="nm_provider_save_failed">No se pudo guardar. Comprueba el almacenamiento del dispositivo e inténtalo de nuevo.</string>
     <string name="nm_useit_incomplete">No se pudieron configurar todos los usos seleccionados. Es posible que otros usos ya hayan cambiado. Revisa la lista de modelos o inténtalo de nuevo.</string>
+    <string name="nm_key_destination_action">Confirmar destino</string>
+    <string name="nm_key_destination_body">La clave parece ser de %1$s, pero se enviará a %2$s. Confirme solo si confía en ese destino. Esto no autoriza cobros.</string>
+    <string name="nm_key_destination_blocked">La clave y la dirección no coinciden. Abra los ajustes del proveedor y corrija o confirme el destino antes de enviar.</string>
+    <string name="nm_key_destination_invalid">La dirección no es válida o no usa HTTPS. Corríjala antes de continuar.</string>
+    <string name="nm_key_probe_button">Probar clave</string>
+    <string name="nm_key_probe_help">Envía la clave a la lista oficial de modelos. No envía mensajes. El resultado no garantiza acceso ni coste.</string>
+    <string name="nm_key_probe_accepted">Se aceptó la consulta de modelos. Esto no demuestra que la clave sea válida.</string>
+    <string name="nm_key_probe_rejected">El proveedor rechazó la clave.</string>
+    <string name="nm_key_probe_denied">El proveedor denegó el acceso; se desconoce el motivo.</string>
+    <string name="nm_key_probe_unavailable">No se pudo probar la clave. Comprueba la conexión.</string>
+    <string name="nm_key_probe_unsupported">No se puede probar la clave en esta dirección. No se envió ninguna clave.</string>
+    <string name="nm_free_bulk_button">Autorizar todos los modelos de chat anunciados gratis</string>
+    <string name="nm_free_bulk_help">Autoriza los modelos visibles anunciados gratis en el catálogo reciente para selección automática de chat. No activa el modo automático ni el permiso de costes y no autoriza imágenes. Los precios y servicios extra pueden cambiar.</string>
+    <string name="nm_free_bulk_done">Rutas de chat autorizadas: %1$d. Siguen vigentes las demás comprobaciones de elegibilidad y coste.</string>
+    <string name="nm_free_bulk_retry">No se autorizó ningún modelo elegible actual. Actualiza el catálogo y vuelve a intentarlo.</string>
+    <string name="nm_image_retry_question">¿Quieres intentar esta imagen de nuevo? Responde sí o pide reintentar.</string>
+    <string name="nm_context_near_limit">El contexto está cerca del límite del modelo (%1$d / %2$d tokens). Inicia una conversación nueva o usa /compact para continuar de forma fiable.</string>
+    <string name="nm_image_raw_tool_text">El proveedor devolvió una llamada a herramienta como texto. Ese texto no se ejecutó como herramienta.</string>
+    <string name="nm_free_list_filter">Mostrar solo modelos anunciados gratis</string>
+    <string name="nm_free_list_help">Filtra solo esta lista. No elimina modelos ni garantiza su coste. Desactiva el filtro para ver todos los modelos guardados.</string>
+    <string name="nm_free_list_refresh">No hay datos actuales del catálogo. Actualiza la lista o desactiva el filtro.</string>
+    <string name="nm_usage_reports_note">El uso se basa en informes guardados de proveedores y puede estar incompleto. No es una factura ni prueba de coste cero.</string>
+    <string name="nm_loop_estimate_explanation">Estimación de esta conversación: el mayor número entre mensajes del asistente y bloques de herramientas. No es un recuento exacto de solicitudes ni de cargos.</string>
 </resources>

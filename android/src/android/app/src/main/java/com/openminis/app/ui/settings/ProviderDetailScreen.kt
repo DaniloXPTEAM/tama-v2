@@ -230,6 +230,13 @@ fun ProviderDetailScreen(
         // ─── Credential / API Key ───────────────────────────────────
         val isOAuthProvider =
             instance.credentialType == com.openminis.app.data.model.ProviderCredential.oauth
+        // nanoMuse: review the saved route; editing the field does not change the live route yet.
+        val nmLiveDestination = if (nmParallel && !isOAuthProvider) ai.tama.providers.ProviderEndpoints.factoryBase(
+            instance.providerType, instance.customBaseURL, instance.appendV1Suffix,
+        ) else null
+        val nmReviewedKey = if (isEditingKey) editKeyValue else storedKey
+        val nmDestinationAllowed = if (nmParallel && !isOAuthProvider)
+            ai.tama.providers.KeyDestinationReview(nmReviewedKey, nmLiveDestination) else true
         SettingsSection(
             header = if (isOAuthProvider) stringResource(R.string.add_provider_credential) else stringResource(R.string.provider_list_api_key),
             footer = if (isOAuthProvider) {
@@ -263,6 +270,8 @@ fun ProviderDetailScreen(
                             keyVisible = false
                         },
                         onSave = {
+                            if (nmParallel && (!nmDestinationAllowed ||
+                                    !ai.tama.providers.KeyDestinationGuard.permits(editKeyValue, nmLiveDestination))) return@ApiKeyCredentialBlock
                             val nmFirstKey = storedKey.isBlank() && editKeyValue.isNotBlank() // nanoMuse
                             val saved = if (nmParallel) providerRepository.saveApiKeyChecked(instanceId, editKeyValue)
                                 else { providerRepository.saveApiKey(instanceId, editKeyValue); true }
@@ -299,6 +308,38 @@ fun ProviderDetailScreen(
                 },
                 status = statuses[instanceId],
             )
+            // nanoMuse: chat-route approval is not cost or image consent, and does not send a request.
+            if (instance.providerType == ProviderType.openRouter &&
+                instance.credentialType == com.openminis.app.data.model.ProviderCredential.apiKey &&
+                instance.tamaImportFreeOnly) {
+                var nmBulkBusy by remember(instanceId) { mutableStateOf(false) }
+                var nmBulkResult by remember(instanceId, statuses[instanceId], storedKey, instance.customBaseURL) { mutableStateOf<Int?>(null) }
+                SettingsSection(footer = stringResource(R.string.nm_free_bulk_help)) {
+                    MinisButton(
+                        onClick = {
+                            nmBulkBusy = true
+                            scope.launch {
+                                nmBulkResult = try {
+                                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                        providerRepository.tamaApproveFreeChatModels(instanceId)
+                                    }
+                                } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+                                catch (_: Exception) { 0 }
+                                nmBulkBusy = false
+                            }
+                        },
+                        enabled = !nmBulkBusy && statuses[instanceId] is ai.tama.pricing.FreeModelImportStatus.Complete,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                    ) { Text(stringResource(R.string.nm_free_bulk_button)) }
+                    nmBulkResult?.let { count ->
+                        Text(
+                            if (count > 0) stringResource(R.string.nm_free_bulk_done, count)
+                            else stringResource(R.string.nm_free_bulk_retry),
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        )
+                    }
+                }
+            }
         }
 
         // Manual Bearer Token (OAuth providers only — proxy override)
@@ -635,13 +676,40 @@ fun ProviderDetailScreen(
         ThinkingRulesSection(instance = instance, providerRepository = providerRepository)
 
         // ─── Models ─────────────────────────────────────────────────
+        // nanoMuse: this is a reversible view filter, not a change to saved entries,
+        // model selection or spending authorization.
+        val nmShowFreeFilter = nmParallel && instance.providerType == ProviderType.openRouter &&
+            instance.credentialType == com.openminis.app.data.model.ProviderCredential.apiKey && instance.tamaImportFreeOnly &&
+            io.github.nanomuse.cloud.NanoMuseCloud.instance(exportContext)?.id != instanceId
+        var nmFilterFree by remember(instanceId, instance.tamaImportFreeOnly) { mutableStateOf(instance.tamaImportFreeOnly) }
+        val nmImportStatuses by providerRepository.nmFreeImportStatus.collectAsState()
+        // Reading the status makes the view re-evaluate after a background refresh.
+        val nmImportStatus = nmImportStatuses[instanceId]
+        val nmFreeIds = if (nmShowFreeFilter && nmFilterFree && nmImportStatus !is ai.tama.pricing.FreeModelImportStatus.Checking)
+            providerRepository.tamaEligibleFreeModelIds(instanceId) else null
+        val nmDisplayedEntries = ai.tama.pricing.FreeModelList.filter(entries, nmShowFreeFilter && nmFilterFree, nmFreeIds) { it.model.id }
+        if (nmShowFreeFilter) {
+            SettingsSection(footer = stringResource(R.string.nm_free_list_help)) {
+                SettingsSwitchRow(title = stringResource(R.string.nm_free_list_filter), checked = nmFilterFree,
+                    onCheckedChange = { nmFilterFree = it }, showDivider = false)
+            }
+        }
         SettingsSection(
-            header = stringResource(R.string.provider_detail_models_count_header, entries.size),
+            header = stringResource(R.string.provider_detail_models_count_header, nmDisplayedEntries.size),
+            footer = if (nmShowFreeFilter && nmFilterFree && nmFreeIds == null)
+                stringResource(R.string.nm_free_list_refresh) else null,
         ) {
             // Refresh action sits as the first row, mirroring the iOS
             // tap-to-refresh affordance in the section header area.
             SettingsRow(
-                title = if (isRefreshing) "Refreshing…" else "Refresh model list",
+                // nanoMuse: localize only an own-key provider in the isolated build;
+                // keep the normal app and Cloud row unchanged.
+                title = if (nmParallel && storedKey.isNotBlank() &&
+                    instance.credentialType == com.openminis.app.data.model.ProviderCredential.apiKey &&
+                    io.github.nanomuse.cloud.NanoMuseCloud.instance(exportContext)?.id?.let { it != instanceId } == true) {
+                    if (isRefreshing) stringResource(R.string.nm_cloud_refreshing)
+                    else stringResource(R.string.provider_detail_refresh_models)
+                } else if (isRefreshing) "Refreshing…" else "Refresh model list",
                 onClick = if (isRefreshing) {
                     null
                 } else {
@@ -667,10 +735,10 @@ fun ProviderDetailScreen(
                         tint = MaterialTheme.colorScheme.primary,
                     )
                 },
-                showDivider = entries.isNotEmpty() || true,
+                showDivider = nmDisplayedEntries.isNotEmpty() || true,
             )
 
-            entries.forEachIndexed { idx, entry ->
+            nmDisplayedEntries.forEachIndexed { idx, entry ->
                 // Drive both tap and long-press from a Box wrapper so we
                 // don't have to expand SettingsRow's signature.
                 Box(
@@ -732,7 +800,7 @@ fun ProviderDetailScreen(
                         // wrapping Box owns both gestures.
                         onClick = null,
                         showChevron = true,
-                        showDivider = idx != entries.lastIndex,
+                        showDivider = idx != nmDisplayedEntries.lastIndex,
                         // [T-android-settings-ui-md3] #8 two-line row (name + id)
                         // uses the MD3 double-line height (72dp).
                         minHeight = 72.dp,

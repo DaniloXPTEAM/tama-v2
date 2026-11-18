@@ -1546,4 +1546,27 @@
     <string name="nm_free_import_found">%1$d modele anunțate gratuite, %2$d adăugate. Accesul contului nu a fost verificat.</string>
     <string name="nm_provider_save_failed">Nu s-a putut salva. Verifică spațiul de stocare al dispozitivului și încearcă din nou.</string>
     <string name="nm_useit_incomplete">Unele utilizări selectate nu au putut fi configurate. Alte opțiuni este posibil să se fi schimbat deja. Verifică lista de modele sau încearcă din nou.</string>
+    <string name="nm_key_destination_action">Confirmă destinația</string>
+    <string name="nm_key_destination_body">Cheia pare să fie de la %1$s, dar va fi trimisă la %2$s. Confirmă doar dacă ai încredere în destinație. Aceasta nu autorizează costuri.</string>
+    <string name="nm_key_destination_blocked">Cheia și adresa nu corespund. Deschide setările furnizorului și corectează sau confirmă destinația înainte de trimitere.</string>
+    <string name="nm_key_destination_invalid">Adresa este invalidă sau nu folosește HTTPS. Corecteaz-o înainte de a continua.</string>
+    <string name="nm_key_probe_button">Testează cheia</string>
+    <string name="nm_key_probe_help">Trimite cheia la lista oficială de modele, fără mesaj. Rezultatul nu garantează accesul sau costul.</string>
+    <string name="nm_key_probe_accepted">Cererea listei de modele a fost acceptată. Acest lucru nu dovedește că cheia este validă.</string>
+    <string name="nm_key_probe_rejected">Furnizorul a respins cheia.</string>
+    <string name="nm_key_probe_denied">Furnizorul a refuzat accesul; motivul nu este cunoscut.</string>
+    <string name="nm_key_probe_unavailable">Cheia nu a putut fi verificată. Verifică conexiunea.</string>
+    <string name="nm_key_probe_unsupported">Testarea cheii nu este disponibilă la această adresă. Nu a fost trimisă nicio cheie.</string>
+    <string name="nm_free_bulk_button">Autorizează toate modelele de chat anunțate gratuite</string>
+    <string name="nm_free_bulk_help">Autorizează modelele vizibile anunțate gratuite în catalogul recent pentru selectarea automată a chatului. Nu activează modul automat sau permisiunea de cost și nu autorizează imagini. Prețurile și serviciile suplimentare se pot schimba.</string>
+    <string name="nm_free_bulk_done">Rute de chat autorizate: %1$d. Celelalte verificări de eligibilitate și cost rămân valabile.</string>
+    <string name="nm_free_bulk_retry">Nu a fost autorizat niciun model eligibil actual. Actualizează catalogul și încearcă din nou.</string>
+    <string name="nm_image_retry_question">Vrei să încerci din nou această imagine? Răspunde da sau cere o nouă încercare.</string>
+    <string name="nm_context_near_limit">Contextul se apropie de limita modelului (%1$d / %2$d tokenuri). Începe o conversație nouă sau folosește /compact pentru a continua în siguranță.</string>
+    <string name="nm_image_raw_tool_text">Furnizorul a returnat un apel de instrument ca text. Textul nu a fost executat ca instrument.</string>
+    <string name="nm_free_list_filter">Afișează doar modelele anunțate gratuite</string>
+    <string name="nm_free_list_help">Filtrează doar această listă. Nu șterge modele și nu garantează costul. Dezactivează filtrul pentru a vedea toate modelele salvate.</string>
+    <string name="nm_free_list_refresh">Nu există date actuale din catalog. Actualizează lista sau dezactivează filtrul.</string>
+    <string name="nm_usage_reports_note">Utilizarea se bazează pe rapoartele salvate ale furnizorilor și poate fi incompletă. Nu este o factură sau o dovadă că nu există costuri.</string>
+    <string name="nm_loop_estimate_explanation">Estimare pentru această conversație: numărul mai mare dintre mesajele asistentului și blocurile de instrumente. Nu este numărul exact de cereri sau taxe.</string>
 </resources>

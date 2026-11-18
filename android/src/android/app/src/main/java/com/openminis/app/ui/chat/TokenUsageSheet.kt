@@ -77,12 +77,16 @@ fun TokenUsageSheet(
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
             val s = stats
+            // nanoMuse: unknown or not-yet-loaded usage is not a measured zero.
+            val parallelTest = com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test"
+            val usageKnown = !parallelTest || s?.hasReportedUsage == true
             val onText = stringResource(R.string.common_on)
             val offText = stringResource(R.string.common_off)
             val yesText = stringResource(R.string.common_yes)
             val noText = stringResource(R.string.common_no)
             StatSection(title = stringResource(R.string.token_usage_section_context)) {
-                StatRow(stringResource(R.string.token_usage_context_used), formatTokens(s?.context ?: 0))
+                StatRow(stringResource(R.string.token_usage_context_used),
+                    if (parallelTest && (s == null || s.context <= 0)) "—" else formatTokens(s?.context ?: 0))
                 contextWindow?.let { StatRow(stringResource(R.string.token_usage_context_window), formatTokens(it)) }
                 maxOutput?.let { StatRow(stringResource(R.string.token_usage_max_output), formatTokens(it)) }
             }
@@ -97,17 +101,30 @@ fun TokenUsageSheet(
 
             StatSection(title = stringResource(R.string.token_usage_section_tokens)) {
                 val inputTotal = (s?.input ?: 0L) + (s?.cacheRead ?: 0L) + (s?.cacheWrite ?: 0L)
-                StatRow(stringResource(R.string.token_usage_input_with_cache), formatTokens(inputTotal))
-                StatRow(stringResource(R.string.token_usage_output), formatTokens(s?.output ?: 0L))
+                StatRow(stringResource(R.string.token_usage_input_with_cache), if (usageKnown) formatTokens(inputTotal) else "—")
+                StatRow(stringResource(R.string.token_usage_output), if (usageKnown) formatTokens(s?.output ?: 0L) else "—")
+                if (parallelTest) Text(
+                    text = stringResource(R.string.nm_usage_reports_note),
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
 
             StatSection(title = stringResource(R.string.token_usage_section_cache)) {
-                StatRow(stringResource(R.string.token_usage_cache_read), formatTokens(s?.cacheRead ?: 0L))
-                StatRow(stringResource(R.string.token_usage_cache_write), formatTokens(s?.cacheWrite ?: 0L))
+                StatRow(stringResource(R.string.token_usage_cache_read), if (usageKnown) formatTokens(s?.cacheRead ?: 0L) else "—")
+                StatRow(stringResource(R.string.token_usage_cache_write), if (usageKnown) formatTokens(s?.cacheWrite ?: 0L) else "—")
             }
 
             StatSection(title = stringResource(R.string.token_usage_section_agent_loop)) {
-                StatRow(stringResource(R.string.token_usage_total_loops), (s?.loopCount ?: 0).toString())
+                StatRow(stringResource(R.string.token_usage_total_loops),
+                    if (parallelTest && s == null) "—" else (s?.loopCount ?: 0).toString())
+                if (parallelTest) {
+                    Text(
+                        text = stringResource(R.string.nm_loop_estimate_explanation),
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         }
     }

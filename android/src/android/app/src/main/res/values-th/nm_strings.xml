@@ -1538,4 +1538,27 @@
     <string name="nm_free_import_found">ระบุว่าฟรี %1$d โมเดล เพิ่มแล้ว %2$d โมเดล ยังไม่ได้ตรวจสอบสิทธิ์บัญชี</string>
     <string name="nm_provider_save_failed">บันทึกไม่ได้ ตรวจสอบพื้นที่เก็บข้อมูลในอุปกรณ์แล้วลองอีกครั้ง</string>
     <string name="nm_useit_incomplete">ไม่สามารถตั้งค่าการใช้งานบางรายการที่เลือกไว้ ตัวเลือกอื่นอาจเปลี่ยนไปแล้ว โปรดตรวจสอบรายการโมเดลหรือลองอีกครั้ง</string>
+    <string name="nm_key_destination_action">ยืนยันปลายทาง</string>
+    <string name="nm_key_destination_body">คีย์ดูเหมือนมาจาก %1$s แต่จะส่งไปที่ %2$s ยืนยันเฉพาะเมื่อคุณเชื่อถือปลายทางนี้ การยืนยันนี้ไม่อนุญาตให้เกิดค่าใช้จ่าย</string>
+    <string name="nm_key_destination_blocked">คีย์และที่อยู่ไม่ตรงกัน เปิดการตั้งค่าผู้ให้บริการแล้วแก้ไขหรือยืนยันปลายทางก่อนส่ง</string>
+    <string name="nm_key_destination_invalid">ที่อยู่ไม่ถูกต้องหรือไม่ได้ใช้ HTTPS โปรดแก้ไขก่อนดำเนินการต่อ</string>
+    <string name="nm_key_probe_button">ทดสอบคีย์</string>
+    <string name="nm_key_probe_help">ส่งคีย์ไปยังรายการโมเดลทางการโดยไม่ส่งข้อความ ผลลัพธ์ไม่รับประกันการเข้าถึงหรือค่าใช้จ่าย</string>
+    <string name="nm_key_probe_accepted">ยอมรับคำขอรายการโมเดลแล้ว แต่ไม่ได้พิสูจน์ว่าคีย์ถูกต้อง</string>
+    <string name="nm_key_probe_rejected">ผู้ให้บริการปฏิเสธคีย์</string>
+    <string name="nm_key_probe_denied">ผู้ให้บริการปฏิเสธการเข้าถึง โดยไม่ทราบสาเหตุ</string>
+    <string name="nm_key_probe_unavailable">ทดสอบคีย์ไม่ได้ โปรดตรวจสอบการเชื่อมต่อ</string>
+    <string name="nm_key_probe_unsupported">ไม่สามารถทดสอบคีย์สำหรับที่อยู่นี้ และไม่ได้ส่งคีย์</string>
+    <string name="nm_free_bulk_button">อนุญาตโมเดลแชตทั้งหมดที่ระบุว่าฟรี</string>
+    <string name="nm_free_bulk_help">อนุญาตโมเดลที่มองเห็นและระบุว่าฟรีในแค็ตตาล็อกล่าสุดสำหรับการเลือกแชตอัตโนมัติ โดยไม่เปิดโหมดอัตโนมัติหรือสิทธิ์ค่าใช้จ่าย และไม่อนุญาตการสร้างภาพ ราคาและบริการเพิ่มเติมอาจเปลี่ยนแปลง</string>
+    <string name="nm_free_bulk_done">เส้นทางแชตที่อนุญาต: %1$d ยังมีการตรวจสอบคุณสมบัติและค่าใช้จ่ายอื่น</string>
+    <string name="nm_free_bulk_retry">ไม่มีโมเดลที่เข้าเกณฑ์ปัจจุบันได้รับอนุญาต โปรดรีเฟรชแค็ตตาล็อกแล้วลองอีกครั้ง</string>
+    <string name="nm_image_retry_question">ต้องการลองสร้างภาพนี้อีกครั้งหรือไม่ ตอบว่าใช่หรือลองอีกครั้ง</string>
+    <string name="nm_context_near_limit">บริบทใกล้ถึงขีดจำกัดของโมเดล (%1$d / %2$d โทเค็น) เริ่มแชตใหม่หรือใช้ /compact เพื่อดำเนินการต่ออย่างปลอดภัย</string>
+    <string name="nm_image_raw_tool_text">ผู้ให้บริการส่งการเรียกเครื่องมือกลับมาเป็นข้อความ ข้อความนี้ไม่ได้ถูกเรียกใช้งานเป็นเครื่องมือ</string>
+    <string name="nm_free_list_filter">แสดงเฉพาะโมเดลที่ระบุว่าฟรี</string>
+    <string name="nm_free_list_help">กรองเฉพาะรายการนี้ ไม่ลบโมเดลหรือรับประกันค่าใช้จ่าย ปิดตัวกรองเพื่อดูโมเดลที่บันทึกทั้งหมด</string>
+    <string name="nm_free_list_refresh">ไม่มีข้อมูลแค็ตตาล็อกปัจจุบัน รีเฟรชรายการโมเดลหรือปิดตัวกรอง</string>
+    <string name="nm_usage_reports_note">การใช้งานอิงตามรายงานของผู้ให้บริการที่บันทึกไว้และอาจไม่ครบถ้วน ไม่ใช่ใบแจ้งหนี้หรือหลักฐานว่าไม่มีค่าใช้จ่าย</string>
+    <string name="nm_loop_estimate_explanation">ค่าประมาณของบทสนทนานี้ใช้จำนวนที่มากกว่าระหว่างข้อความผู้ช่วยกับบล็อกเครื่องมือ ไม่ใช่จำนวนคำขอหรือค่าบริการที่แน่นอน</string>
 </resources>

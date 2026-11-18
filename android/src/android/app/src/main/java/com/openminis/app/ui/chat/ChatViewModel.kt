@@ -1313,6 +1313,9 @@ class ChatViewModel(
         _nmProfileOverride.value = profile
     }
 
+    // nanoMuse: a failed standalone image can offer one short-lived, session-bound retry.
+    private val nmImageRetryOffer = ai.tama.router.ImageRetryOffer()
+
     // nanoMuse: recognize the common PT-BR "faz uma imagem" form only in the parallel app.
     private fun nmExplicitImageRequest(text: String): Boolean = ai.tama.router.ImageRequestIntent.explicit(
         text, portugueseMake = com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test",
@@ -1966,6 +1969,8 @@ class ChatViewModel(
         val cacheWrite: Long,
         val context: Int,
         val loopCount: Int,
+        // nanoMuse: zero is not evidence of reported usage when no usable row exists.
+        val hasReportedUsage: Boolean = false,
     )
 
     data class ThinkingInfo(
@@ -1993,15 +1998,24 @@ class ChatViewModel(
     suspend fun loadSessionTokenStats(): SessionTokenStats {
         val sid = realSessionId.ifEmpty { sessionId }
         if (sid.isEmpty()) return SessionTokenStats(0, 0, 0, 0, 0, 0)
-        val usages = chatRepository.sessionTokenUsages(sid)
+        // nanoMuse: context is the last reported positive value in chat order;
+        // preserve the upstream query in the normal application.
+        val usages = if (com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test")
+            chatRepository.sessionTokenUsagesInChatOrder(sid) else chatRepository.sessionTokenUsages(sid)
         var input = 0L
         var output = 0L
         var cacheRead = 0L
         var cacheWrite = 0L
         var context = 0
+        var hasReportedUsage = false
         for (json in usages) {
             try {
                 val obj = org.json.JSONObject(json)
+                // nanoMuse: malformed or absent counts must not be presented as measured zero.
+                val reportedInput = obj.opt("inputTokens") as? Number
+                val reportedOutput = obj.opt("outputTokens") as? Number
+                if (reportedInput != null && reportedOutput != null &&
+                    reportedInput.toLong() >= 0 && reportedOutput.toLong() >= 0) hasReportedUsage = true
                 input += obj.optLong("inputTokens", 0L)
                 output += obj.optLong("outputTokens", 0L)
                 cacheRead += obj.optLong("cacheReadTokens", 0L)
@@ -2015,7 +2029,7 @@ class ChatViewModel(
         val toolCalls = snapshot.filter { it.role == "assistant" }
             .sumOf { msg -> msg.toolBlocks.count { it.kind != "text" && it.kind != "info" } }
         val loops = maxOf(toolCalls, assistantCount)
-        return SessionTokenStats(input, output, cacheRead, cacheWrite, context, loops)
+        return SessionTokenStats(input, output, cacheRead, cacheWrite, context, loops, hasReportedUsage)
     }
 
     // [T-android-split-chat] toggleMemorySheet / dismissMemorySheet moved to ChatViewModelUiStateExt.kt.
@@ -3642,9 +3656,11 @@ class ChatViewModel(
             // on offer. Keep the existing advisory-and-proceed behaviour rather
             // than blocking the user out of their own chat.
             ContextPolicy.CheckResult.EXHAUSTED -> {
+                val tamaV2Test = com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test"
                 appendSystemInfo(
-                    text = "Context is near the model's limit ($tokens / $window tokens). Start a new chat or /compact to continue reliably.",
-                    iconKind = "compact",
+                    text = if (tamaV2Test) context.getString(R.string.nm_context_near_limit, tokens, window)
+                        else "Context is near the model's limit ($tokens / $window tokens). Start a new chat or /compact to continue reliably.",
+                    iconKind = if (tamaV2Test) "tama_context_notice" else "compact",
                 )
                 PreSendContextAction.PROCEED
             }
@@ -3729,7 +3745,8 @@ class ChatViewModel(
             AppLogger.info(TAG, "[AutoCompact] attempt=$attempt estimated=$tokens " +
                 "window=${budget.window} hardLimit=${budget.hardLimit}")
             appendSystemInfo(
-                context.getString(R.string.nm_context_compacting, tokens, budget.window), "compact",
+                context.getString(R.string.nm_context_compacting, tokens, budget.window),
+                if (com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test") "tama_context_notice" else "compact",
             )
             val installed = awaitCompaction()
             prepareAfterSummary()
@@ -6930,8 +6947,22 @@ class ChatViewModel(
         // nanoMuse: explicit device work is routed before any local model or avatar action.
         if (nmRemoteBridge.send(text, io.github.nanomuse.hub.Hub.others(context),
                 _attachments.value.isNotEmpty() || _pastedTexts.value.isNotEmpty(), _isCompacting.value,
-                onUserSaved = { id -> petGeneration?.let { io.github.nanomuse.pet.PetEvents.chat(context, id, it) } })) return
+                onUserSaved = { id -> petGeneration?.let { io.github.nanomuse.pet.PetEvents.chat(context, id, it) } })) {
+            nmImageRetryOffer.clear()
+            return
+        }
         if (_isStreaming.value) { nmEnqueuePrompt(text, petGeneration); return }
+        // nanoMuse: only an explicit answer to our own latest retry question can
+        // start a fresh image attempt. Existing cost and permission checks still apply.
+        if (com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test") {
+            val retry = nmImageRetryOffer.consume(
+                activeSessionId, _messages.value.lastOrNull { it.queuedPromptId == null }?.id, text,
+                eligible = petGeneration != null && !_isCompacting.value && _attachments.value.isEmpty() &&
+                    _pastedTexts.value.isEmpty() && _editingMessageId.value == null && !_hasInjectedShareContent.value,
+                nowMillis = android.os.SystemClock.elapsedRealtime(),
+            )
+            if (retry != null && petGeneration != null) { nmStartImageShortcut(text, petGeneration, retry); return }
+        }
         // nanoMuse: an automated prompt must not trigger a paid avatar request on its own.
         if (petGeneration != null && nmInterceptAvatar(text, petGeneration)) { nmCountableTurn = false; return }
         // Both branches are explicit so the same decision can be tested with a
@@ -7035,7 +7066,17 @@ class ChatViewModel(
                     nmRunImageShortcut(sid, image) { reply ->
                         if (!reply.success) SessionActivityTracker.markStreamError(sid, turnId)
                         _messages.value = _messages.value.filterNot { it.id == placeholderId }
-                        nmAppendAssistantLine(sid, reply.text)
+                        // nanoMuse: only offer a retry when this local question is
+                        // the next unanswered turn; never replay in the background.
+                        val offerRetry = com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test" &&
+                            !reply.success && _promptQueue.value.isEmpty() && activeSessionId == sid
+                        val shown = if (offerRetry) reply.text + "\n\n" + context.getString(R.string.nm_image_retry_question) else reply.text
+                        nmAppendAssistantLine(sid, shown)
+                        val last = _messages.value.lastOrNull()
+                        if (offerRetry && _promptQueue.value.isEmpty() && activeSessionId == sid &&
+                            last?.role == "assistant" && last.content == shown) {
+                            nmImageRetryOffer.offer(sid, last.id, image.prompt, android.os.SystemClock.elapsedRealtime())
+                        }
                         finished = true
                     }
                 } catch (e: CancellationException) {
@@ -7083,7 +7124,13 @@ class ChatViewModel(
                 portugueseMake = com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test",
             ),
         ) != null
-        if (localImage || currentProvider != null || AutoModelStore.enabled(context)) nmSendNextQueued()
+        // nanoMuse: a queued answer to our own retry question also works without a chat model.
+        val retryImage = com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test" &&
+            nmImageRetryOffer.matches(activeSessionId, _messages.value.lastOrNull { it.queuedPromptId == null }?.id,
+                next.text, eligible = next.petGeneration != null && next.attachments.isEmpty() &&
+                    _pastedTexts.value.isEmpty() && _editingMessageId.value == null && !_hasInjectedShareContent.value,
+                nowMillis = android.os.SystemClock.elapsedRealtime())
+        if (localImage || retryImage || currentProvider != null || AutoModelStore.enabled(context)) nmSendNextQueued()
         else _error.value = context.getString(R.string.nm_chat_no_model)
     }
 
@@ -8081,6 +8128,7 @@ class ChatViewModel(
         val localMessage = if (!parallel || llmError?.nmProviderReach != null || llmError?.nmRelayError != null) {
             actual.message ?: "Unknown error"
         } else when {
+            actual is ai.tama.providers.KeyDestinationGuard.Blocked -> context.getString(R.string.nm_key_destination_blocked)
             actual is ai.tama.pricing.ModelCostGuard.Blocked -> context.getString(R.string.nm_model_cost_blocked)
             detail == unconfirmed -> unconfirmed
             detail == disabled -> disabled
@@ -9245,6 +9293,7 @@ class ChatViewModel(
         // At most one native image call per explicit person turn. A failure can
         // still have been charged, so a model's retry must not dispatch again.
         val nmImageGuard = ai.tama.router.ImageTurnGuard(explicitImageRequest)
+        var nmIsImagePersonTurn = explicitImageRequest // nanoMuse: limit literal tool-text filtering to image requests.
         var nmWarnedWithoutTools = false
         var nmAttempt: TurnRequestPlanner.Attempt? = null
         // Captured at dispatch, not looked up later after a settings change.
@@ -9309,8 +9358,14 @@ class ChatViewModel(
                 io.github.nanomuse.cloud.ProviderCatalogue.load(context), instance,
             )
             val identity = AutoModelStore.identity(entry, instance)
+            // nanoMuse: the fresh, exact own-key free-import response can establish chat
+            // and tools capabilities even when the bundled catalogue lacks this model.
+            // This never approves a route or bypasses either cost guard.
+            val discovered = if (tamaV2Test &&
+                io.github.nanomuse.cloud.NanoMuseCloud.instance(context)?.id != instance.id)
+                providerRepository.tamaFreeModelCapabilities(instance.id, entry.model.id) else emptySet()
             val caps = AutoModelStore.capabilities(context, identity,
-                vendor?.models?.get(entry.model.id)?.capabilities.orEmpty()).toMutableSet()
+                vendor?.models?.get(entry.model.id)?.capabilities.orEmpty() + discovered).toMutableSet()
             val auth = vendor?.let { io.github.nanomuse.cloud.ProviderCatalogue.authOf(instance, it) }
             val authCaps = auth?.let { vendor?.authCapabilities?.get(it) }
             if (authCaps != null) {
@@ -9338,6 +9393,16 @@ class ChatViewModel(
                 config.modelGroups.find { it.id == id }?.memberEntryIds?.toList()
             } else null
             val groupMembers = selectedMembers?.distinct().orEmpty()
+            // nanoMuse: prefer a freshly advertised free entry only within the
+            // currently selected own-key OpenRouter account. A selected group,
+            // sticky choice, Cloud route and all cost checks retain their rules.
+            val activeEntry = config.modelEntries.find { it.id == _activeEntryId.value }
+            val activeInstance = config.instances.find { it.id == activeEntry?.providerInstanceId }
+            val freeRankInstance = activeInstance?.takeIf {
+                tamaV2Test && it.providerType == ProviderType.openRouter && it.credentialType == ProviderCredential.apiKey &&
+                    it.id != io.github.nanomuse.cloud.NanoMuseCloud.instance(context)?.id
+            }
+            val freeRankIds = freeRankInstance?.let { providerRepository.tamaEligibleFreeModelIds(it.id) }.orEmpty()
             return config.modelEntries.toList().mapNotNull { entry ->
                 val instance = config.instances.find { it.id == entry.providerInstanceId } ?: return@mapNotNull null
                 val identity = AutoModelStore.identity(entry, instance)
@@ -9364,6 +9429,8 @@ class ChatViewModel(
                     visible = !entry.isHidden, credentialed = credentialed,
                     automaticApproved = AutoModelStore.approved(context, identity),
                     automaticCostAllowed = ai.tama.router.AutomaticCostGuard.permits(context),
+                    // Catalogue ranking is not proof of a zero-cost request or spending permission.
+                    verifiedFree = instance.id == freeRankInstance?.id && entry.model.id in freeRankIds,
                     preference = preference,
                 )
                 AutoChoice(candidate, entry, instance, identity, model, AutoModelRuntime.accountVersion(instance.id),
@@ -9482,16 +9549,21 @@ class ChatViewModel(
             }
             return LLMError.ProviderError((listOf(context.getString(R.string.nm_auto_none)) + details).joinToString("\n"))
         }
-        suspend fun nmAutoSelect(stickyEntryId: String?): AutoChoice {
+        class NoLargerContext : Exception()
+        suspend fun nmAutoSelect(stickyEntryId: String?, largerThanWindow: Int? = null): AutoChoice {
             val turnState = checkNotNull(nmAutoTurn)
             while (true) {
                 if (!AutoModelStore.enabled(context)) throw LLMError.ProviderError(context.getString(R.string.nm_auto_disabled_during_turn))
                 val messages = applyRequestImageBudget(effectiveAgentHistory(), preview = true)
-                val choices = nmAutoCandidates()
+                // nanoMuse: unknown or equal windows are not evidence of a larger model.
+                val choices = nmAutoCandidates().filter {
+                    largerThanWindow == null || ai.tama.router.LargerContext.eligible(largerThanWindow, it.candidate.contextLimit)
+                }
                 when (val selection = turnState.pick(choices.map { it.candidate }, nmAutoNeeds(messages), stickyEntryId) { candidate, snapshot ->
                     nmAutoFit(choices.first { it.candidate === candidate }, messages, snapshot)
                 }) {
-                    is ModelRouter.Choice.None -> throw nmAutoNoCandidate(choices, selection)
+                    is ModelRouter.Choice.None -> if (largerThanWindow != null) throw NoLargerContext()
+                        else throw nmAutoNoCandidate(choices, selection)
                     is ModelRouter.Choice.Selected -> {
                         val selected = choices.first { it.entry.id == selection.candidate.entryId }
                         val why = when (val cause = ai.tama.router.AutoSwitchReason.forSwitch(
@@ -9842,6 +9914,22 @@ class ChatViewModel(
                     continue
                 }
                 ContextMaintenance.Action.STOP -> {
+                    // nanoMuse: in automatic mode try only an approved, cost-permitted
+                    // model with a known strictly larger window. No request has been
+                    // sent in this iteration; rebuild and recheck before dispatch.
+                    if (tamaV2Test && nmAutoTurn != null) {
+                        val prior = _activeEntryId.value
+                        if (prior != null && requestBudget.window > 0) {
+                            nmAutoLocalBlocks[prior] = context.getString(R.string.nm_auto_reason_context)
+                            val larger = try { nmAutoSelect(null, largerThanWindow = requestBudget.window) }
+                                catch (_: NoLargerContext) { null }
+                            if (larger != null) {
+                                nmAutoTurn.exclude(prior)
+                                nmAutoActivate(larger)
+                                continue@agentTurns
+                            }
+                        }
+                    }
                     // The loop cannot present a modal mid-flight, so stop
                     // safely: user-visible notice + resumable, without the
                     // turn-limit error overwrite.
@@ -9890,7 +9978,7 @@ class ChatViewModel(
                     appendSystemInfo(
                         // nanoMuse: this path now means the actual capacity reserve was reached (#719).
                         text = context.getString(R.string.nm_context_limit_reached),
-                        iconKind = "compact",
+                        iconKind = if (tamaV2Test) "tama_context_notice" else "compact",
                     )
                     // [T-android-group-pause-badge-restamp] A LIVE interruption just
                     // happened: this is a real entry into the paused state, so the
@@ -10096,8 +10184,26 @@ class ChatViewModel(
                                     resumeAfterCompaction()
                                     return@streamBlock true
                                 }
-                                ContextMaintenance.Action.STOP -> throw LLMError.ProviderError(
-                                    context.getString(R.string.nm_context_limit_reached))
+                                ContextMaintenance.Action.STOP -> {
+                                    // A fallback can introduce a smaller window. This candidate has
+                                    // not been sent the rebuilt request; earlier attempts may have
+                                    // been sent. Keep their completed history and recheck a larger
+                                    // approved candidate through the ordinary automatic selector.
+                                    if (tamaV2Test && nmAutoTurn != null) {
+                                        val prior = _activeEntryId.value
+                                        if (prior != null && requestBudget.window > 0) {
+                                            nmAutoLocalBlocks[prior] = context.getString(R.string.nm_auto_reason_context)
+                                            val larger = try { nmAutoSelect(null, largerThanWindow = requestBudget.window) }
+                                                catch (_: NoLargerContext) { null }
+                                            if (larger != null) {
+                                                nmAutoTurn.exclude(prior)
+                                                nmAutoActivate(larger)
+                                                return@streamBlock true
+                                            }
+                                        }
+                                    }
+                                    throw LLMError.ProviderError(context.getString(R.string.nm_context_limit_reached))
+                                }
                             }
                         }
                         val requestMessages = checkNotNull(preparedMessages)
@@ -10272,12 +10378,18 @@ class ChatViewModel(
                         nmDispatchAt = android.os.SystemClock.elapsedRealtime()
                         // From here on a provider may have received the request, even on cancellation.
                         nmDispatchStarted = true
-                        currentProvider.streamMessage(
+                        val sourceStream = currentProvider.streamMessage(
                             requestMessages,
                             nmSystemPrompt, lastRequestedOutput,
                             tools = requestTools,
                             thinkingLevel = if (currentModelSupportsReasoning) _thinkingLevel.value else ThinkingLevel.OFF,
-                        ).collect { chunk ->
+                        )
+                        // nanoMuse: text that merely looks like an image tool call is
+                        // never executed or shown raw. Real tool events pass unchanged.
+                        val visibleStream = if (tamaV2Test && nmIsImagePersonTurn)
+                            ai.tama.media.ImageToolStream.filter(sourceStream, context.getString(R.string.nm_image_raw_tool_text))
+                        else sourceStream
+                        visibleStream.collect { chunk ->
                     // [T-STALL-DIAG] Mark first byte back from the provider and log
                     // the time-to-first-chunk once per turn.
                     if (firstChunkSeen.compareAndSet(false, true)) {
@@ -10843,8 +10955,9 @@ class ChatViewModel(
                             continue
                         }
                         val actual = unwrapFlowException(e)
-                        // nanoMuse: changing the cost guard cannot trigger retries or another provider.
-                        if (actual is ai.tama.pricing.ModelCostGuard.Blocked) throw actual
+                        // nanoMuse: local recipient/cost refusals cannot trigger retries or another provider.
+                        if (actual is ai.tama.pricing.ModelCostGuard.Blocked ||
+                            actual is ai.tama.providers.KeyDestinationGuard.Blocked) throw actual
                         if (nmAutoTurn != null && !AutoModelStore.enabled(context)) throw actual
                         val isRateLimit = actual is com.openminis.app.data.model.LLMError.RateLimited
                         // nanoMuse: a token count such as 5000 in a 400 is not an HTTP 500.
@@ -11592,6 +11705,7 @@ class ChatViewModel(
                     nmCurrentInput = nmCapturePromptInput()
                     nmUsedTools = false
                     nmImageGuard.newTurn(handled.explicitImageRequest)
+                    nmIsImagePersonTurn = handled.explicitImageRequest // nanoMuse: queued message has its own intent.
                     nmWarnedWithoutTools = false
                     nmAutoTurn?.reset()
                     nmAutoLocalBlocks.clear()

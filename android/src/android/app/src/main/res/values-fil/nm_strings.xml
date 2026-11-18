@@ -1542,4 +1542,27 @@
     <string name="nm_free_import_found">%1$d model ang nakasaad na libre, %2$d ang naidagdag. Hindi nasuri ang access ng account.</string>
     <string name="nm_provider_save_failed">Hindi na-save. Suriin ang storage ng device at subukan muli.</string>
     <string name="nm_useit_incomplete">Hindi naitakda ang ilang piniling gamit. Maaaring nabago na ang iba pang pagpili. Suriin ang listahan ng mga modelo o subukan muli.</string>
+    <string name="nm_key_destination_action">Kumpirmahin ang patutunguhan</string>
+    <string name="nm_key_destination_body">Mukhang mula sa %1$s ang key, pero ipapadala ito sa %2$s. Kumpirmahin lamang kung pinagkakatiwalaan mo ang patutunguhan. Hindi nito pinapayagan ang singil.</string>
+    <string name="nm_key_destination_blocked">Hindi magkatugma ang key at address. Buksan ang setting ng provider at ayusin o kumpirmahin ang patutunguhan bago magpadala.</string>
+    <string name="nm_key_destination_invalid">Hindi valid ang address o hindi ito gumagamit ng HTTPS. Ayusin ito bago magpatuloy.</string>
+    <string name="nm_key_probe_button">Subukan ang key</string>
+    <string name="nm_key_probe_help">Ipinapadala ang key sa opisyal na listahan ng modelo, hindi ang mensahe. Hindi ginagarantiya ng resulta ang access o gastos.</string>
+    <string name="nm_key_probe_accepted">Tinanggap ang kahilingan sa listahan ng modelo. Hindi nito pinatutunayang valid ang key.</string>
+    <string name="nm_key_probe_rejected">Tinanggihan ng provider ang key.</string>
+    <string name="nm_key_probe_denied">Tinanggihan ng provider ang access; hindi alam ang dahilan.</string>
+    <string name="nm_key_probe_unavailable">Hindi masubukan ang key. Suriin ang koneksyon.</string>
+    <string name="nm_key_probe_unsupported">Hindi available ang pagsubok sa address na ito. Walang key na ipinadala.</string>
+    <string name="nm_free_bulk_button">Pahintulutan ang lahat ng nakalistang libreng chat model</string>
+    <string name="nm_free_bulk_help">Pinapahintulutan ang nakikitang modelong nakalistang libre sa kamakailang katalogo para sa awtomatikong pagpili sa chat. Hindi nito binubuksan ang awtomatikong mode o pahintulot sa gastos at hindi nito pinapahintulutan ang larawan. Maaaring magbago ang presyo at dagdag na serbisyo.</string>
+    <string name="nm_free_bulk_done">Mga pinahintulutang chat route: %1$d. May iba pang pagsusuri sa pagiging angkop at gastos.</string>
+    <string name="nm_free_bulk_retry">Walang kasalukuyang angkop na modelo ang pinahintulutan. I-refresh ang katalogo at subukan muli.</string>
+    <string name="nm_image_retry_question">Gusto mo bang subukang muli ang larawang ito? Sumagot ng oo o hilinging subukan muli.</string>
+    <string name="nm_context_near_limit">Malapit na ang konteksto sa limitasyon ng modelo (%1$d / %2$d token). Magsimula ng bagong chat o gamitin ang /compact para makapagpatuloy nang maayos.</string>
+    <string name="nm_image_raw_tool_text">Nagbalik ang provider ng tool call bilang text. Hindi isinagawa ang text na iyon bilang tool.</string>
+    <string name="nm_free_list_filter">Ipakita lamang ang mga modelong nakalistang libre</string>
+    <string name="nm_free_list_help">Ang listahang ito lang ang sinasala. Hindi nito binubura ang mga modelo o ginagarantiya ang gastos. Patayin ang filter para makita ang lahat ng naka-save na modelo.</string>
+    <string name="nm_free_list_refresh">Walang kasalukuyang datos ng katalogo. I-refresh ang listahan o patayin ang filter.</string>
+    <string name="nm_usage_reports_note">Batay ang paggamit sa mga naka-save na ulat ng provider at maaaring hindi kumpleto. Hindi ito bill o patunay na walang gastos.</string>
+    <string name="nm_loop_estimate_explanation">Tantiya sa usapang ito: ang mas mataas sa bilang ng mensahe ng assistant o mga bloke ng tool. Hindi ito eksaktong bilang ng request o bayarin.</string>
 </resources>

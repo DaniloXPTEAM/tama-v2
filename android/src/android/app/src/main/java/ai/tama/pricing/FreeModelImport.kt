@@ -102,4 +102,20 @@ internal class FreeModelImportEvidence(
             OpenRouterPricing.chatStatus(prices, it, nowMillis) == OpenRouterPricing.Status.ADVERTISED_FREE
         }
     }
+
+    /** Exact fresh catalogue capabilities only; never an approval or a cost permission. */
+    fun currentCapabilities(
+        gate: ModelRefreshGate,
+        freeOnly: Boolean,
+        route: String,
+        currentAccountVersion: Long,
+        nowMillis: Long,
+        modelId: String,
+    ): Set<String> {
+        if (current(gate, freeOnly, route, currentAccountVersion, nowMillis)?.contains(modelId) != true) return emptySet()
+        return buildSet {
+            add("chat")
+            if (prices.quotes[modelId]?.tools == true) add("tools")
+        }
+    }
 }

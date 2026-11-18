@@ -1,0 +1,7 @@
+package ai.tama.pricing
+
+/** A view-only filter. Null evidence is unknown, not evidence that any model is free. */
+internal object FreeModelList {
+    fun <T> filter(entries: List<T>, enabled: Boolean, advertisedFree: Set<String>?, modelId: (T) -> String): List<T> =
+        if (!enabled) entries else entries.filter { modelId(it) in advertisedFree.orEmpty() }
+}

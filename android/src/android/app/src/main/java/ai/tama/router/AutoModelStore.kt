@@ -171,6 +171,25 @@ object AutoModelStore {
         advanceReview(identity.providerId)
     }
 
+    /**
+     * Explicit one-touch chat approval. The caller holds the config and credential
+     * locks and has revalidated fresh free-catalogue evidence for every identity.
+     * Does not change automatic mode, cost permission, image approval or overrides.
+     */
+    @Synchronized
+    internal fun approveFreeChatBatch(context: Context, identities: List<Identity>): Boolean {
+        if (identities.isEmpty()) return false
+        val provider = identities.first().providerId
+        val route = identities.first().route
+        if (identities.any { it.providerId != provider || it.route != route }) return false
+        synchronizeRoute(context, provider, route)
+        val editor = prefs(context).edit()
+        identities.distinct().forEach { editor.putBoolean(prefix(it) + "approved", true) }
+        if (!editor.commit()) return false
+        advanceReview(provider)
+        return true
+    }
+
     /** Image endpoints can charge per picture; chat consent alone never authorizes them. */
     @Synchronized
     fun imageApproved(context: Context, identity: Identity): Boolean {

@@ -1538,4 +1538,27 @@
     <string name="nm_free_import_found">%1$d model diiklankan percuma, %2$d ditambah. Akses akaun belum disahkan.</string>
     <string name="nm_provider_save_failed">Tidak dapat menyimpan. Semak storan peranti dan cuba lagi.</string>
     <string name="nm_useit_incomplete">Sesetengah kegunaan yang dipilih tidak dapat ditetapkan. Pilihan lain mungkin telah berubah. Semak senarai model atau cuba lagi.</string>
+    <string name="nm_key_destination_action">Sahkan destinasi</string>
+    <string name="nm_key_destination_body">Kunci kelihatan daripada %1$s, tetapi akan dihantar ke %2$s. Sahkan hanya jika anda mempercayai destinasi ini. Ini tidak membenarkan caj.</string>
+    <string name="nm_key_destination_blocked">Kunci dan alamat tidak sepadan. Buka tetapan penyedia dan betulkan atau sahkan destinasi sebelum menghantar.</string>
+    <string name="nm_key_destination_invalid">Alamat tidak sah atau tidak menggunakan HTTPS. Betulkan sebelum meneruskan.</string>
+    <string name="nm_key_probe_button">Uji kunci</string>
+    <string name="nm_key_probe_help">Menghantar kunci ke senarai model rasmi tanpa mesej. Hasil tidak menjamin akses atau kos.</string>
+    <string name="nm_key_probe_accepted">Permintaan senarai model diterima. Ini tidak membuktikan kunci sah.</string>
+    <string name="nm_key_probe_rejected">Penyedia menolak kunci.</string>
+    <string name="nm_key_probe_denied">Penyedia menolak akses; sebabnya tidak diketahui.</string>
+    <string name="nm_key_probe_unavailable">Kunci tidak dapat diuji. Semak sambungan.</string>
+    <string name="nm_key_probe_unsupported">Ujian kunci tidak tersedia untuk alamat ini. Tiada kunci dihantar.</string>
+    <string name="nm_free_bulk_button">Benarkan semua model sembang yang disenaraikan percuma</string>
+    <string name="nm_free_bulk_help">Membenarkan model yang kelihatan dan disenaraikan percuma dalam katalog terkini untuk pilihan sembang automatik. Tidak menghidupkan mod automatik atau kebenaran kos dan tidak membenarkan imej. Harga dan perkhidmatan tambahan mungkin berubah.</string>
+    <string name="nm_free_bulk_done">Laluan sembang dibenarkan: %1$d. Semakan kelayakan dan kos lain masih terpakai.</string>
+    <string name="nm_free_bulk_retry">Tiada model layak semasa dibenarkan. Muat semula katalog dan cuba lagi.</string>
+    <string name="nm_image_retry_question">Mahu cuba imej ini lagi? Jawab ya atau minta cuba lagi.</string>
+    <string name="nm_context_near_limit">Konteks menghampiri had model (%1$d / %2$d token). Mulakan sembang baharu atau gunakan /compact untuk meneruskan dengan lancar.</string>
+    <string name="nm_image_raw_tool_text">Penyedia memulangkan panggilan alat sebagai teks. Teks itu tidak dijalankan sebagai alat.</string>
+    <string name="nm_free_list_filter">Tunjukkan hanya model yang disenaraikan percuma</string>
+    <string name="nm_free_list_help">Menapis senarai ini sahaja. Tidak memadam model atau menjamin kosnya. Matikan penapis untuk melihat semua model tersimpan.</string>
+    <string name="nm_free_list_refresh">Tiada data katalog terkini. Muat semula senarai model atau matikan penapis.</string>
+    <string name="nm_usage_reports_note">Penggunaan berdasarkan laporan penyedia yang disimpan dan mungkin tidak lengkap. Ini bukan bil atau bukti tiada caj.</string>
+    <string name="nm_loop_estimate_explanation">Anggaran untuk perbualan ini: jumlah yang lebih besar antara mesej pembantu dan blok alat. Ini bukan bilangan tepat permintaan atau caj.</string>
 </resources>

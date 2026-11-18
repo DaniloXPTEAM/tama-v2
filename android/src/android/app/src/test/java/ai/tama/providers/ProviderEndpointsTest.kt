@@ -46,6 +46,53 @@ class ProviderEndpointsTest {
         )) assertFalse(base, ProviderEndpoints.isOfficialOpenAIBase(base))
     }
 
+    @Test fun `mismatched key needs exact process confirmation without changing the normal app`() {
+        val key = "gsk_test_only"
+        val otherKey = "gsk_test_other"
+        val groq = "https://api.groq.com/openai/v1"
+        val openai = ProviderEndpoints.factoryBase(ProviderType.openAI, null, true)
+        assertNull(KeyDestinationGuard.review(key, groq))
+        assertFalse(KeyDestinationGuard.permits(key, openai))
+        assertFalse(KeyDestinationGuard.confirm(key, "http://example.invalid/v1"))
+        try {
+            KeyDestinationGuard.requireAllowed(true, key, openai)
+            fail("expected a local refusal")
+        } catch (_: KeyDestinationGuard.Blocked) { }
+        KeyDestinationGuard.requireAllowed(false, key, openai)
+        assertTrue(KeyDestinationGuard.confirm(key, openai))
+        assertTrue(KeyDestinationGuard.permits(key, openai))
+        assertFalse(KeyDestinationGuard.permits(otherKey, openai))
+        assertFalse(KeyDestinationGuard.permits(key, "https://example.invalid/v1"))
+        assertFalse(KeyDestinationGuard.permits("sk-or-test-only", groq))
+        assertTrue(KeyDestinationGuard.causedByBlock(IllegalStateException(KeyDestinationGuard.Blocked())))
+    }
+
+    @Test fun `key probe targets only official model list endpoints and does not mislabel 403`() {
+        val groq = KeyProbePlan.create(ProviderType.openAI, "https://api.groq.com/openai/v1")
+        assertEquals("https://api.groq.com/openai/v1/models", groq?.url)
+        assertEquals("Authorization", groq?.header)
+        assertEquals("x-api-key", KeyProbePlan.create(ProviderType.anthropic, "https://api.anthropic.com")?.header)
+        assertEquals("x-goog-api-key", KeyProbePlan.create(ProviderType.gemini, "https://generativelanguage.googleapis.com/v1beta")?.header)
+        assertNull(KeyProbePlan.create(ProviderType.openAI, "http://api.groq.com/openai/v1"))
+        assertNull(KeyProbePlan.create(ProviderType.openAI, "https://api.groq.com.example/openai/v1"))
+        assertNull(KeyProbePlan.create(ProviderType.openAI, "https://api.groq.com/openai/v1?key=fixture"))
+        assertNull(KeyProbePlan.create(ProviderType.gemini, "https://api.groq.com/openai/v1"))
+        assertFalse(KeyProbePlan.validKey("fixture\nheader"))
+        assertEquals(KeyProbePlan.Outcome.ACCEPTED, KeyProbePlan.classify(200))
+        assertEquals(KeyProbePlan.Outcome.REJECTED, KeyProbePlan.classify(401))
+        assertEquals(KeyProbePlan.Outcome.DENIED, KeyProbePlan.classify(403))
+        assertEquals(KeyProbePlan.Outcome.UNAVAILABLE, KeyProbePlan.classify(429))
+    }
+
+    @Test fun `no own key does not activate the key destination review`() {
+        // This tests only the key guard, not Cloud initialization or a real conversation.
+        for (base in listOf(null, "", "https://cloud.example.invalid/v1")) {
+            assertNull(KeyDestinationGuard.review(null, base))
+            assertTrue(KeyDestinationGuard.permits(null, base))
+            KeyDestinationGuard.requireAllowed(true, null, base)
+        }
+    }
+
     @Test fun `only unique informative hints match and manual endpoints are never overwritten`() {
         val hints = listOf(
             "router" to "sk-or-v1-…", "groq" to "gsk_…", "one" to "sk-…",

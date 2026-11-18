@@ -51,6 +51,17 @@ internal object ProviderEndpoints {
         ProviderType.antigravity, ProviderType.unsupported -> null
     }
 
+    /** The actual factory base for a stored configuration, including legacy empty strings. */
+    fun factoryBase(type: ProviderType, stored: String?, appendV1: Boolean): String? {
+        if (type == ProviderType.openRouter) return OPENROUTER
+        val base = stored?.trimEnd('/')
+        if (base != null) return if (appendV1 && !base.endsWith("/v1")) "$base/v1" else base
+        return when (type) {
+            ProviderType.anthropic -> "https://api.anthropic.com"
+            else -> defaultEffective(type)
+        }
+    }
+
     /**
      * Keep the built-in route as null. This matters for Anthropic: treating its
      * official address as a custom proxy changes x-api-key to Bearer auth.
@@ -77,7 +88,8 @@ internal object ProviderKeySuggestion {
             // prefixes such as sk- and JWT eyJ are shared and cannot identify a
             // provider. Even a longer match is only a suggestion, not proof.
             val marker = hint?.indexOf('…') ?: -1
-            if (marker < 4) return@mapNotNull null
+            // AQ. is a short, explicitly curated Gemini hint, not proof of origin.
+            if (marker < 4 && !(id == "gemini" && hint == "AQ.…")) return@mapNotNull null
             val prefix = hint!!.substring(0, marker)
             if (prefix.any { it.isWhitespace() } || !pasted.startsWith(prefix)) null else id
         }.distinct()

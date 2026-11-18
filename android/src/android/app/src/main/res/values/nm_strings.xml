@@ -1521,4 +1521,27 @@
     <string name="nm_free_import_found">%1$d models advertised as free, %2$d added. Account access was not verified.</string>
     <string name="nm_provider_save_failed">Could not save. Check device storage and try again.</string>
     <string name="nm_useit_incomplete">Some selected uses could not be set. Other choices may already have changed. Check the model list or try again.</string>
+    <string name="nm_key_destination_action">Confirm destination</string>
+    <string name="nm_key_destination_body">This key looks like %1$s, but will be sent to %2$s. Confirm only if you trust this destination. This does not authorize charges.</string>
+    <string name="nm_key_destination_blocked">The key and address do not match. Open provider settings and correct or confirm the destination before sending.</string>
+    <string name="nm_key_destination_invalid">The address is invalid or does not use HTTPS. Correct it before continuing.</string>
+    <string name="nm_loop_estimate_explanation">Estimated from this session: the larger of assistant messages or tool blocks. It is not an exact count of requests or charges.</string>
+    <string name="nm_key_probe_button">Test key</string>
+    <string name="nm_key_probe_help">Sends the key to the official model list. No message is sent. A result does not guarantee model access or cost.</string>
+    <string name="nm_key_probe_accepted">The model list request was accepted. This does not prove the key is valid.</string>
+    <string name="nm_key_probe_rejected">The provider rejected the key.</string>
+    <string name="nm_key_probe_denied">The provider denied access; the reason is not known.</string>
+    <string name="nm_key_probe_unavailable">Could not check the key. Check the connection and try again.</string>
+    <string name="nm_key_probe_unsupported">Key testing is unavailable for this address. No key was sent.</string>
+    <string name="nm_context_near_limit">Context is near the model limit (%1$d / %2$d tokens). Start a new chat or use /compact to continue reliably.</string>
+    <string name="nm_free_bulk_button">Approve all listed free chat models</string>
+    <string name="nm_free_bulk_help">Approves visible models advertised as free in the latest catalogue for automatic chat selection. Does not turn on automatic mode or cost permission, and does not approve image generation. Prices and extra services may change.</string>
+    <string name="nm_free_bulk_done">Approved chat routes: %1$d. Other eligibility and cost checks still apply.</string>
+    <string name="nm_free_bulk_retry">No current eligible models were approved. Refresh the catalogue and try again.</string>
+    <string name="nm_image_retry_question">Would you like to try this image again? Reply yes or ask to try again.</string>
+    <string name="nm_image_raw_tool_text">The provider returned a tool call as text. That text was not executed as a tool.</string>
+    <string name="nm_free_list_filter">Show only models advertised as free</string>
+    <string name="nm_free_list_help">This filters this list only. It does not delete models or guarantee their cost. Turn it off to see all saved entries.</string>
+    <string name="nm_free_list_refresh">No current catalogue evidence. Refresh the model list or turn off the filter.</string>
+    <string name="nm_usage_reports_note">Usage is based on stored provider reports and may be incomplete. It is not a bill or proof of zero cost.</string>
 </resources>

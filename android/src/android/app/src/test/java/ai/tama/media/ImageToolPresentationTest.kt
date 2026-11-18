@@ -49,6 +49,15 @@ class ImageToolPresentationTest {
         assertEquals("Sem modelo", missing.getString("message"))
         assertEquals("minis://settings/media", missing.getString("settings"))
         assertEquals(true, missing.getString("tell_user").contains("Do not retry"))
+        assertEquals(false, missing.getString("tell_user").contains("charged"))
+        for (code in listOf("no_approved_image_model", "automatic_image_cost_unverified", "image_cost_unverified",
+            "image_authorization_changed", "permission_denied", "automatic_image_edit_unavailable",
+            "invalid_image_request", "media_model_change_blocked")) {
+            val preflight = org.json.JSONObject(ImageToolPresentation.sanitizedFailure(
+                """{"error":"$code"}""", messages, "Falhou",
+            ))
+            assertEquals(code, false, preflight.getString("tell_user").contains("charged"))
+        }
         val plain = org.json.JSONObject(ImageToolPresentation.sanitizedFailure("private provider text", messages, "Falhou"))
         assertEquals("image_failed", plain.getString("error"))
         assertEquals("Falhou", plain.getString("message"))

@@ -1508,4 +1508,27 @@
     <string name="nm_free_import_found">標示免費的模型 %1$d 個，新增 %2$d 個。尚未驗證帳戶存取權。</string>
     <string name="nm_provider_save_failed">無法儲存。請檢查裝置儲存空間後重試。</string>
     <string name="nm_useit_incomplete">部分選取的用途無法設定。其他用途可能已經變更。請檢查模型清單或再試一次。</string>
+    <string name="nm_key_destination_action">確認目標地址</string>
+    <string name="nm_key_destination_body">金鑰似乎屬於%1$s，但將傳送至%2$s。只有信任此地址時才確認。此操作不授權收費。</string>
+    <string name="nm_key_destination_blocked">金鑰和地址不相符。傳送前請開啟服務商設定，修改或確認目標地址。</string>
+    <string name="nm_key_destination_invalid">地址無效或未使用HTTPS。請先修改再繼續。</string>
+    <string name="nm_key_probe_button">測試金鑰</string>
+    <string name="nm_key_probe_help">將金鑰傳送至官方模型清單，不傳送訊息。結果不保證模型存取或費用。</string>
+    <string name="nm_key_probe_accepted">模型清單請求已被接受，但這不能證明金鑰有效。</string>
+    <string name="nm_key_probe_rejected">服務商拒絕了金鑰。</string>
+    <string name="nm_key_probe_denied">服務商拒絕存取，原因未知。</string>
+    <string name="nm_key_probe_unavailable">無法測試金鑰，請檢查網路連線。</string>
+    <string name="nm_key_probe_unsupported">此位址不支援金鑰測試，未傳送金鑰。</string>
+    <string name="nm_free_bulk_button">允許所有標為免費的聊天模型</string>
+    <string name="nm_free_bulk_help">允許最新目錄中標為免費且可見的模型用於自動聊天選擇。不會開啟自動模式或費用許可，也不會允許產生圖片。價格和額外服務可能變動。</string>
+    <string name="nm_free_bulk_done">已允許的聊天路徑：%1$d。其他資格和費用檢查仍然有效。</string>
+    <string name="nm_free_bulk_retry">沒有允許目前符合條件的模型。請重新整理目錄後再試。</string>
+    <string name="nm_image_retry_question">要再次嘗試這張圖片嗎？請回覆「是」或「重試」。</string>
+    <string name="nm_context_near_limit">上下文接近模型上限（%1$d / %2$d 個詞元）。請開始新對話或使用 /compact，以便可靠地繼續。</string>
+    <string name="nm_image_raw_tool_text">服務商將工具呼叫作為文字傳回。該文字沒有作為工具執行。</string>
+    <string name="nm_free_list_filter">僅顯示標為免費的模型</string>
+    <string name="nm_free_list_help">僅篩選此清單，不刪除模型，也不保證費用。關閉篩選可查看所有已儲存的模型。</string>
+    <string name="nm_free_list_refresh">沒有目前的目錄資料。請重新整理模型清單或關閉篩選。</string>
+    <string name="nm_usage_reports_note">用量依據已儲存的服務供應商報告，可能不完整。這不是帳單，也不能證明沒有費用。</string>
+    <string name="nm_loop_estimate_explanation">本對話的估算值取助理訊息數和工具區塊數中的較大值，並非請求次數或收費次數的準確統計。</string>
 </resources>

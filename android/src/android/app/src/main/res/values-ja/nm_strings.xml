@@ -1538,4 +1538,27 @@
     <string name="nm_free_import_found">無料と表示されたモデル %1$d 件、追加 %2$d 件。アカウントのアクセスは確認していません。</string>
     <string name="nm_provider_save_failed">保存できませんでした。端末のストレージを確認して、もう一度お試しください。</string>
     <string name="nm_useit_incomplete">選択した用途の一部を設定できませんでした。他の選択は既に変更された可能性があります。モデル一覧を確認するか、もう一度お試しください。</string>
+    <string name="nm_key_destination_action">送信先を確認</string>
+    <string name="nm_key_destination_body">キーは%1$sのものと思われますが、%2$sに送信されます。送信先を信頼できる場合のみ確認してください。料金の許可にはなりません。</string>
+    <string name="nm_key_destination_blocked">キーとアドレスが一致しません。送信前にプロバイダー設定で送信先を修正または確認してください。</string>
+    <string name="nm_key_destination_invalid">アドレスが無効かHTTPSではありません。続行する前に修正してください。</string>
+    <string name="nm_key_probe_button">キーをテスト</string>
+    <string name="nm_key_probe_help">キーを公式のモデル一覧に送信します。メッセージは送信しません。利用や料金は保証されません。</string>
+    <string name="nm_key_probe_accepted">モデル一覧の要求が受け付けられました。キーが有効である証明にはなりません。</string>
+    <string name="nm_key_probe_rejected">プロバイダーがキーを拒否しました。</string>
+    <string name="nm_key_probe_denied">アクセスが拒否されました。理由は不明です。</string>
+    <string name="nm_key_probe_unavailable">キーを確認できませんでした。接続を確認してください。</string>
+    <string name="nm_key_probe_unsupported">このアドレスではテストできません。キーは送信されていません。</string>
+    <string name="nm_free_bulk_button">無料と掲載されたチャットモデルをすべて許可</string>
+    <string name="nm_free_bulk_help">最新のカタログで無料と掲載された表示中のモデルを、チャットの自動選択に許可します。自動モードや費用の許可は有効にならず、画像生成も許可されません。価格や追加サービスは変更される場合があります。</string>
+    <string name="nm_free_bulk_done">許可されたチャット経路: %1$d。その他の利用条件と費用の確認は引き続き適用されます。</string>
+    <string name="nm_free_bulk_retry">現在利用条件を満たすモデルは許可されませんでした。カタログを更新して再試行してください。</string>
+    <string name="nm_image_retry_question">この画像をもう一度試しますか？ はい、またはもう一度と返信してください。</string>
+    <string name="nm_context_near_limit">コンテキストがモデルの上限に近づいています（%1$d / %2$d トークン）。安定して続けるには新しいチャットを始めるか、/compact を使用してください。</string>
+    <string name="nm_image_raw_tool_text">プロバイダーがツール呼び出しをテキストで返しました。この部分はツールとして実行されていません。</string>
+    <string name="nm_free_list_filter">無料と掲載されたモデルのみ表示</string>
+    <string name="nm_free_list_help">この一覧だけを絞り込みます。モデルは削除されず、費用は保証されません。すべての保存済みモデルを見るにはフィルターをオフにしてください。</string>
+    <string name="nm_free_list_refresh">現在のカタログ情報がありません。モデル一覧を更新するか、フィルターをオフにしてください。</string>
+    <string name="nm_usage_reports_note">使用量は保存されたプロバイダーの報告に基づき、不完全な場合があります。請求書でも無料の証明でもありません。</string>
+    <string name="nm_loop_estimate_explanation">この会話の推定値です。アシスタントのメッセージ数とツールブロック数の多い方で、リクエスト数や請求数の正確な値ではありません。</string>
 </resources>

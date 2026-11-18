@@ -118,11 +118,15 @@ object OwnTurns {
                 g.finished = true
                 return response
             } catch (e: CancellationException) {
-                costBlocked = ai.tama.pricing.ModelCostGuard.causedByBlock(e)
+                costBlocked = ai.tama.pricing.ModelCostGuard.causedByBlock(e) ||
+                    (com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test" &&
+                        ai.tama.providers.KeyDestinationGuard.causedByBlock(e)) // nanoMuse: no record for a locally refused recipient
                 g.ended = "aborted"
                 throw e
             } catch (e: Throwable) {
-                costBlocked = ai.tama.pricing.ModelCostGuard.causedByBlock(e)
+                costBlocked = ai.tama.pricing.ModelCostGuard.causedByBlock(e) ||
+                    (com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test" &&
+                        ai.tama.providers.KeyDestinationGuard.causedByBlock(e)) // nanoMuse: no record for a locally refused recipient
                 g.ended = "error"
                 throw e
             } finally {
@@ -145,11 +149,15 @@ object OwnTurns {
                     emit(chunk)
                 }
             } catch (e: CancellationException) {
-                costBlocked = ai.tama.pricing.ModelCostGuard.causedByBlock(e)
+                costBlocked = ai.tama.pricing.ModelCostGuard.causedByBlock(e) ||
+                    (com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test" &&
+                        ai.tama.providers.KeyDestinationGuard.causedByBlock(e)) // nanoMuse: no record for a locally refused recipient
                 g.ended = "aborted"
                 throw e
             } catch (e: Throwable) {
-                costBlocked = ai.tama.pricing.ModelCostGuard.causedByBlock(e)
+                costBlocked = ai.tama.pricing.ModelCostGuard.causedByBlock(e) ||
+                    (com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test" &&
+                        ai.tama.providers.KeyDestinationGuard.causedByBlock(e)) // nanoMuse: no record for a locally refused recipient
                 g.ended = "error"
                 throw e
             } finally {

@@ -1542,4 +1542,27 @@
     <string name="nm_free_import_found">Ücretsiz olarak belirtilen %1$d model, eklenen %2$d model. Hesap erişimi doğrulanmadı.</string>
     <string name="nm_provider_save_failed">Kaydedilemedi. Cihaz depolamasını kontrol edip yeniden deneyin.</string>
     <string name="nm_useit_incomplete">Seçilen kullanımlardan bazıları ayarlanamadı. Diğer seçimler zaten değişmiş olabilir. Model listesini kontrol edin veya yeniden deneyin.</string>
+    <string name="nm_key_destination_action">Hedefi doğrula</string>
+    <string name="nm_key_destination_body">Anahtar %1$s sağlayıcısına ait görünüyor, ancak %2$s adresine gönderilecek. Yalnızca bu hedefe güveniyorsanız doğrulayın. Bu işlem ücretlere izin vermez.</string>
+    <string name="nm_key_destination_blocked">Anahtar ve adres eşleşmiyor. Göndermeden önce sağlayıcı ayarlarını açıp hedefi düzeltin veya doğrulayın.</string>
+    <string name="nm_key_destination_invalid">Adres geçersiz veya HTTPS kullanmıyor. Devam etmeden önce düzeltin.</string>
+    <string name="nm_key_probe_button">Anahtarı test et</string>
+    <string name="nm_key_probe_help">Anahtarı resmi model listesine gönderir, mesaj göndermez. Sonuç erişimi veya maliyeti garanti etmez.</string>
+    <string name="nm_key_probe_accepted">Model listesi isteği kabul edildi. Bu, anahtarın geçerli olduğunu kanıtlamaz.</string>
+    <string name="nm_key_probe_rejected">Sağlayıcı anahtarı reddetti.</string>
+    <string name="nm_key_probe_denied">Sağlayıcı erişimi reddetti; nedeni bilinmiyor.</string>
+    <string name="nm_key_probe_unavailable">Anahtar test edilemedi. Bağlantıyı kontrol edin.</string>
+    <string name="nm_key_probe_unsupported">Bu adres için anahtar testi kullanılamıyor. Anahtar gönderilmedi.</string>
+    <string name="nm_free_bulk_button">Ücretsiz listelenen tüm sohbet modellerine izin ver</string>
+    <string name="nm_free_bulk_help">Son katalogda ücretsiz listelenen görünür modellerin otomatik sohbet seçimine izin verir. Otomatik modu veya maliyet iznini açmaz ve görsel üretimine izin vermez. Fiyatlar ve ek hizmetler değişebilir.</string>
+    <string name="nm_free_bulk_done">İzin verilen sohbet yolları: %1$d. Diğer uygunluk ve maliyet kontrolleri geçerlidir.</string>
+    <string name="nm_free_bulk_retry">Güncel uygun modellerden hiçbirine izin verilmedi. Kataloğu yenileyip tekrar deneyin.</string>
+    <string name="nm_image_retry_question">Bu görseli yeniden denemek ister misin? Evet yanıtını ver veya tekrar denemeyi iste.</string>
+    <string name="nm_context_near_limit">Bağlam model sınırına yaklaşıyor (%1$d / %2$d token). Güvenilir biçimde devam etmek için yeni sohbet başlatın veya /compact kullanın.</string>
+    <string name="nm_image_raw_tool_text">Sağlayıcı bir araç çağrısını metin olarak döndürdü. Bu metin araç olarak çalıştırılmadı.</string>
+    <string name="nm_free_list_filter">Yalnızca ücretsiz listelenen modelleri göster</string>
+    <string name="nm_free_list_help">Yalnızca bu listeyi filtreler. Modelleri silmez veya maliyeti garanti etmez. Kayıtlı tüm modelleri görmek için filtreyi kapatın.</string>
+    <string name="nm_free_list_refresh">Güncel katalog verisi yok. Model listesini yenileyin veya filtreyi kapatın.</string>
+    <string name="nm_usage_reports_note">Kullanım, kaydedilmiş sağlayıcı raporlarına dayanır ve eksik olabilir. Fatura veya ücret olmadığının kanıtı değildir.</string>
+    <string name="nm_loop_estimate_explanation">Bu konuşma için tahmin: asistan mesajları ile araç bloklarından sayısı daha büyük olan. Tam istek veya ücret sayısı değildir.</string>
 </resources>

@@ -19,6 +19,32 @@ class FreeModelImportTest {
         .put("endpoints", JSONArray().put("/api/v1/chat/completions"))
     private fun model(id: String) = LLMModel(id, id, "Fixture")
 
+    @Test fun `bulk route selection excludes other accounts hidden entries and paid ids`() {
+        val rows = listOf(
+            FreeModelBulk.Entry("one", "a", "vendor/one:free", false),
+            FreeModelBulk.Entry("two", "a", "vendor/two:free", false),
+            FreeModelBulk.Entry("paid", "a", "vendor/paid:free", false),
+            FreeModelBulk.Entry("hidden", "a", "vendor/hidden:free", true),
+            FreeModelBulk.Entry("other", "b", "vendor/one:free", false),
+        )
+        assertEquals(listOf("one", "two"), FreeModelBulk.select("a", setOf("vendor/one:free", "vendor/two:free"), rows))
+        assertTrue(FreeModelBulk.select("a", emptySet(), rows).isEmpty())
+        val free = setOf("vendor/one:free", "vendor/two:free")
+        assertEquals(listOf("two"), FreeModelBulk.select("a", free, rows +
+            FreeModelBulk.Entry("duplicate", "a", "vendor/one:free", true)))
+        assertEquals(listOf("two"), FreeModelBulk.select("a", free, rows +
+            FreeModelBulk.Entry("one", "b", "vendor/other:free", false)))
+    }
+
+    @Test fun `free list is a reversible view and unknown evidence is not free`() {
+        val original = listOf("vendor/one:free", "vendor/paid", "vendor/two:free")
+        val free = setOf("vendor/one:free", "vendor/two:free")
+        assertEquals(listOf("vendor/one:free", "vendor/two:free"), FreeModelList.filter(original, true, free) { it })
+        assertTrue(FreeModelList.filter(original, true, null) { it }.isEmpty())
+        assertEquals(original, FreeModelList.filter(original, false, null) { it })
+        assertEquals(3, original.size)
+    }
+
     @Test fun `only fresh evidence for exact free variants is eligible`() {
         val raw = JSONArray().put(quote("vendor/a:free")).put(quote("openrouter/free"))
             .put(quote("vendor/paid:free", "0.01"))
@@ -70,6 +96,28 @@ class FreeModelImportTest {
         gate.invalidateAll()
         assertFalse(gate.isCurrent(laterA, true, "route-a"))
         assertFalse(gate.isCurrent(other, true, "route-a"))
+    }
+
+    @Test fun `fresh exact free import supplies chat and declared tools but never unknown or stale models`() {
+        val gate = ModelRefreshGate()
+        val ticket = gate.begin("one", true, "route-a")
+        val withTools = quote("vendor/tools:free").put("supported_parameters", JSONArray().put("tools"))
+        val withoutTools = quote("vendor/simple:free")
+        val paid = quote("vendor/paid:free", "0.1").put("supported_parameters", JSONArray().put("tools"))
+        val catalogue = OpenRouterPricing.parse(JSONArray().put(withTools).put(withoutTools).put(paid), now)
+        val evidence = FreeModelImportEvidence(ticket, 7, catalogue,
+            setOf("vendor/tools:free", "vendor/simple:free", "vendor/paid:free"))
+        fun caps(id: String, time: Long = now, version: Long = 7, route: String = "route-a", enabled: Boolean = true) =
+            evidence.currentCapabilities(gate, enabled, route, version, time, id)
+        assertEquals(setOf("chat", "tools"), caps("vendor/tools:free"))
+        assertEquals(setOf("chat"), caps("vendor/simple:free"))
+        for (id in listOf("vendor/paid:free", "vendor/missing:free", "vendor/tools")) assertTrue(caps(id).isEmpty())
+        assertTrue(caps("vendor/tools:free", time = now + OpenRouterPricing.MAX_AGE_MILLIS + 1).isEmpty())
+        assertTrue(caps("vendor/tools:free", version = 8).isEmpty())
+        assertTrue(caps("vendor/tools:free", route = "other").isEmpty())
+        assertTrue(caps("vendor/tools:free", enabled = false).isEmpty())
+        gate.invalidate("one")
+        assertTrue(caps("vendor/tools:free").isEmpty())
     }
 
     @Test fun `post import candidates require current route account mode and fresh exact evidence`() {

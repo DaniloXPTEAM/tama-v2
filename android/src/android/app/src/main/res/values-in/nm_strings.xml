@@ -1538,4 +1538,27 @@
     <string name="nm_free_import_found">%1$d model dinyatakan gratis, %2$d ditambahkan. Akses akun belum diverifikasi.</string>
     <string name="nm_provider_save_failed">Tidak dapat menyimpan. Periksa penyimpanan perangkat dan coba lagi.</string>
     <string name="nm_useit_incomplete">Beberapa penggunaan yang dipilih tidak dapat diatur. Pilihan lain mungkin sudah berubah. Periksa daftar model atau coba lagi.</string>
+    <string name="nm_key_destination_action">Konfirmasi tujuan</string>
+    <string name="nm_key_destination_body">Kunci tampaknya dari %1$s, tetapi akan dikirim ke %2$s. Konfirmasikan hanya jika tujuan ini tepercaya. Ini tidak mengizinkan biaya.</string>
+    <string name="nm_key_destination_blocked">Kunci dan alamat tidak cocok. Buka pengaturan penyedia dan perbaiki atau konfirmasi tujuan sebelum mengirim.</string>
+    <string name="nm_key_destination_invalid">Alamat tidak valid atau tidak menggunakan HTTPS. Perbaiki sebelum melanjutkan.</string>
+    <string name="nm_key_probe_button">Uji kunci</string>
+    <string name="nm_key_probe_help">Mengirim kunci ke daftar model resmi, tanpa pesan. Hasil tidak menjamin akses atau biaya.</string>
+    <string name="nm_key_probe_accepted">Permintaan daftar model diterima. Ini tidak membuktikan kunci valid.</string>
+    <string name="nm_key_probe_rejected">Penyedia menolak kunci.</string>
+    <string name="nm_key_probe_denied">Penyedia menolak akses; alasannya tidak diketahui.</string>
+    <string name="nm_key_probe_unavailable">Kunci tidak dapat diuji. Periksa koneksi.</string>
+    <string name="nm_key_probe_unsupported">Pengujian kunci tidak tersedia untuk alamat ini. Tidak ada kunci yang dikirim.</string>
+    <string name="nm_free_bulk_button">Izinkan semua model chat yang tercantum gratis</string>
+    <string name="nm_free_bulk_help">Mengizinkan model terlihat yang tercantum gratis di katalog terbaru untuk pemilihan chat otomatis. Tidak mengaktifkan mode otomatis atau izin biaya dan tidak mengizinkan pembuatan gambar. Harga dan layanan tambahan dapat berubah.</string>
+    <string name="nm_free_bulk_done">Rute chat diizinkan: %1$d. Pemeriksaan kelayakan dan biaya lain tetap berlaku.</string>
+    <string name="nm_free_bulk_retry">Tidak ada model yang memenuhi syarat saat ini. Perbarui katalog dan coba lagi.</string>
+    <string name="nm_image_retry_question">Ingin mencoba gambar ini lagi? Jawab ya atau minta coba lagi.</string>
+    <string name="nm_context_near_limit">Konteks mendekati batas model (%1$d / %2$d token). Mulai chat baru atau gunakan /compact agar dapat melanjutkan dengan andal.</string>
+    <string name="nm_image_raw_tool_text">Penyedia mengembalikan panggilan alat sebagai teks. Teks itu tidak dijalankan sebagai alat.</string>
+    <string name="nm_free_list_filter">Tampilkan hanya model yang tercantum gratis</string>
+    <string name="nm_free_list_help">Hanya memfilter daftar ini. Tidak menghapus model atau menjamin biaya. Matikan filter untuk melihat semua model tersimpan.</string>
+    <string name="nm_free_list_refresh">Tidak ada data katalog terbaru. Perbarui daftar model atau matikan filter.</string>
+    <string name="nm_usage_reports_note">Penggunaan berdasarkan laporan penyedia yang tersimpan dan mungkin tidak lengkap. Ini bukan tagihan atau bukti tanpa biaya.</string>
+    <string name="nm_loop_estimate_explanation">Perkiraan percakapan ini: jumlah terbesar antara pesan asisten dan blok alat. Ini bukan jumlah pasti permintaan atau biaya.</string>
 </resources>

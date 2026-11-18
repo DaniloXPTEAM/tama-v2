@@ -78,7 +78,9 @@ fun ModelEntryDetailScreen(
             )?.models?.get(entry.model.id)?.capabilities
         }.orEmpty()
     }
-    val knownCapabilities = remember(autoIdentity, catalogueCapabilities) {
+    // nanoMuse: refresh changes ephemeral catalogue evidence without changing the entry.
+    val nmImportStatuses by providerRepository.nmFreeImportStatus.collectAsState()
+    val knownCapabilities = remember(autoIdentity, catalogueCapabilities, nmImportStatuses[instanceId]) {
         autoIdentity?.let {
             if (nmParallel) providerRepository.nmAutoReviewCapabilities(it, catalogueCapabilities)
             else AutoModelStore.capabilities(context, it, catalogueCapabilities)

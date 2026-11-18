@@ -1542,4 +1542,27 @@
     <string name="nm_free_import_found">%1$d als kostenlos angegebene Modelle, %2$d hinzugefügt. Der Kontozugriff wurde nicht geprüft.</string>
     <string name="nm_provider_save_failed">Speichern fehlgeschlagen. Prüfe den Gerätespeicher und versuche es erneut.</string>
     <string name="nm_useit_incomplete">Einige ausgewählte Verwendungen konnten nicht eingestellt werden. Andere Einstellungen wurden möglicherweise bereits geändert. Prüfe die Modellliste oder versuche es erneut.</string>
+    <string name="nm_key_destination_action">Ziel bestätigen</string>
+    <string name="nm_key_destination_body">Der Schlüssel scheint von %1$s zu stammen, wird aber an %2$s gesendet. Bestätigen Sie nur, wenn Sie diesem Ziel vertrauen. Dies erlaubt keine Kosten.</string>
+    <string name="nm_key_destination_blocked">Schlüssel und Adresse passen nicht zusammen. Öffnen Sie die Anbietereinstellungen und korrigieren oder bestätigen Sie das Ziel vor dem Senden.</string>
+    <string name="nm_key_destination_invalid">Die Adresse ist ungültig oder verwendet kein HTTPS. Korrigieren Sie sie vor dem Fortfahren.</string>
+    <string name="nm_key_probe_button">Schlüssel testen</string>
+    <string name="nm_key_probe_help">Sendet den Schlüssel an die offizielle Modellliste. Keine Nachricht wird gesendet. Das Ergebnis garantiert weder Zugriff noch Kosten.</string>
+    <string name="nm_key_probe_accepted">Die Modellabfrage wurde akzeptiert. Dies beweist nicht, dass der Schlüssel gültig ist.</string>
+    <string name="nm_key_probe_rejected">Der Anbieter hat den Schlüssel abgelehnt.</string>
+    <string name="nm_key_probe_denied">Der Anbieter hat den Zugriff verweigert; der Grund ist unbekannt.</string>
+    <string name="nm_key_probe_unavailable">Der Schlüssel konnte nicht geprüft werden. Verbindung prüfen.</string>
+    <string name="nm_key_probe_unsupported">An dieser Adresse ist kein Schlüsseltest verfügbar. Es wurde kein Schlüssel gesendet.</string>
+    <string name="nm_free_bulk_button">Alle als kostenlos angebotenen Chatmodelle zulassen</string>
+    <string name="nm_free_bulk_help">Lässt sichtbare, im aktuellen Katalog als kostenlos angebotene Modelle für die automatische Chatauswahl zu. Aktiviert weder Automatik noch Kostenerlaubnis und erlaubt keine Bilder. Preise und Zusatzdienste können sich ändern.</string>
+    <string name="nm_free_bulk_done">Zugelassene Chatrouten: %1$d. Weitere Eignungs- und Kostenprüfungen gelten weiterhin.</string>
+    <string name="nm_free_bulk_retry">Keine aktuell geeigneten Modelle zugelassen. Katalog aktualisieren und erneut versuchen.</string>
+    <string name="nm_image_retry_question">Möchtest du dieses Bild erneut versuchen? Antworte mit Ja oder bitte um einen neuen Versuch.</string>
+    <string name="nm_context_near_limit">Der Kontext nähert sich dem Modelllimit (%1$d / %2$d Tokens). Beginne einen neuen Chat oder nutze /compact, um zuverlässig fortzufahren.</string>
+    <string name="nm_image_raw_tool_text">Der Anbieter hat einen Werkzeugaufruf als Text zurückgegeben. Dieser Text wurde nicht als Werkzeug ausgeführt.</string>
+    <string name="nm_free_list_filter">Nur als kostenlos angebotene Modelle anzeigen</string>
+    <string name="nm_free_list_help">Filtert nur diese Liste. Löscht keine Modelle und garantiert keine Kosten. Schalte den Filter aus, um alle gespeicherten Modelle zu sehen.</string>
+    <string name="nm_free_list_refresh">Keine aktuellen Katalogdaten. Aktualisiere die Modellliste oder schalte den Filter aus.</string>
+    <string name="nm_usage_reports_note">Die Nutzung basiert auf gespeicherten Anbieterangaben und kann unvollständig sein. Sie ist keine Rechnung und kein Nachweis für kostenlose Nutzung.</string>
+    <string name="nm_loop_estimate_explanation">Schätzung für diese Unterhaltung: der höhere Wert aus Assistentennachrichten und Werkzeugblöcken. Keine genaue Anzahl von Anfragen oder Kosten.</string>
 </resources>
