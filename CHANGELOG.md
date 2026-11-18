@@ -4,6 +4,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+- Avoided suggesting an image charge for known preflight refusals in the parallel Android test build.
+
 - Added a one-touch chat-route approval for visible OpenRouter models advertised free in the current catalogue, in the parallel Android test build.
 
 - Show complete localized context-limit notices in the parallel Android test build.

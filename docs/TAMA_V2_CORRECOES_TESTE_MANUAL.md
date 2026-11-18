@@ -250,3 +250,11 @@ evidência atual não são incluídos. A troca de chave, rota ou preferência in
 a evidência; atualize o catálogo antes de tentar novamente. O catálogo não
 garante ausência de cobrança ou serviços extras. Testes locais simulam a seleção,
 mas não comprovam a tela ou a persistência Android em aparelho.
+
+## Motivo de bloqueio antes da imagem
+
+Nos bloqueios locais conhecidos antes de enviar a solicitação de imagem, a
+instrução ao assistente deixa de sugerir cobrança. Para uma falha genérica,
+que pode ter ocorrido após o envio, o aviso de possível cobrança e a regra
+de não repetir automaticamente continuam. Teste local cobre a política de
+instrução; a apresentação real no chat ainda precisa ser verificada.

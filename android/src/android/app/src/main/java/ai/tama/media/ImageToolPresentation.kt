@@ -64,11 +64,7 @@ internal object ImageToolPresentation {
         // The result is sent back to the agent, not just displayed. Reconstruct
         // the no-retry instruction locally instead of dropping it or trusting an
         // untrusted `tell_user` field supplied by a provider.
-        val instruction = if (safeCode == "image_failed") {
-            "Explain the message. The request may have been charged. Do not retry or use another image model without a new user request."
-        } else {
-            "Explain the message and any settings link. Do not retry automatically. Requests already sent may still be charged."
-        }
+        val instruction = ImageFailureInstruction.forCode(safeCode)
         return JSONObject().put("ok", false).put("error", safeCode).put("message", message).apply {
             if (settings != null) put("settings", settings)
             put("tell_user", instruction)

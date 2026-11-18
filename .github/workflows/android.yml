@@ -98,6 +98,7 @@ jobs:
             --tests 'ai.tama.router.AutomaticCostGuardTest' \
             --tests 'ai.tama.pricing.FreeModelImportTest' \
             --tests 'ai.tama.pricing.OpenRouterPricingTest' \
+            --tests 'ai.tama.media.ImageToolPresentationTest' \
             --tests 'ai.tama.providers.ProviderEndpointsTest' \
             --max-workers=1 --console=plain --no-daemon \
             '-Dorg.gradle.jvmargs=-Xmx4608m -XX:MaxMetaspaceSize=768m -Dfile.encoding=UTF-8' \
