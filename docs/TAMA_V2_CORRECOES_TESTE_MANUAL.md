@@ -315,3 +315,10 @@ OpenRouter para capacidades de chat e ferramentas usada pela seleção automáti
 sem conceder aprovação ou permissão de custo. Ajustes explícitos e recusas
 aprendidas continuam prevalecendo. O teste verifica a política com dublês e a
 ligação estática, não a tela Android nem a precisão de um catálogo real.
+
+O teste loopback de transporte automático também exercita uma sequência sintética
+429 seguida de resposta por outra entrada aprovada da mesma conta, usando o
+seletor e o transporte reais. Compara o histórico recebido nas duas requisições
+e verifica que uma entrada não aprovada foi ignorada. Ele não executa o
+`ChatViewModel`, o banco, cobrança ou provedores reais; o resultado no CI deve
+ser conferido separadamente.

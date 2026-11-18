@@ -2,7 +2,11 @@ package ai.tama.net
 
 import ai.tama.pricing.ModelCostGuard
 import ai.tama.router.AutoModelFailure
+import ai.tama.router.AutoModelTurn
 import ai.tama.router.ModelHealth
+import ai.tama.router.ModelRouter
+import ai.tama.router.Need
+import ai.tama.router.Profile
 import com.openminis.app.data.model.LLMError
 import com.openminis.app.data.model.LLMMessage
 import com.openminis.app.data.model.LLMModel
@@ -53,6 +57,65 @@ class AutomaticFailureWireTest {
                 }
             }
             assertEquals(cases.size, server.requestCount)
+        } finally { server.shutdown() }
+    }
+
+    @Test fun rateLimitFallbackUsesRealWireAndPreservesTheHistory() = runBlocking {
+        val server = MockWebServer()
+        server.start()
+        try {
+            server.enqueue(MockResponse().setResponseCode(429).setHeader("Retry-After", "7")
+                .setBody("{\"error\":{\"message\":\"Rate limit reached\"}}"))
+            server.enqueue(MockResponse().setHeader("Content-Type", "text/event-stream").setBody(
+                "data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"fixture answer\"}}]}\n\n" +
+                    "data: {\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\n" +
+                    "data: [DONE]\n\n",
+            ))
+            val health = ModelHealth { 1_000L }
+            val turn = AutoModelTurn(health, modelScopedRateLimits = true)
+            fun candidate(id: String, approved: Boolean, order: Int) = ModelRouter.Candidate(
+                entryId = id, providerId = "fixture-account", capabilities = setOf(Need.CHAT),
+                profile = Profile.LEAN, inputTokens = 100, outputTokens = 32,
+                automaticApproved = approved, automaticCostAllowed = true, preference = order,
+            )
+            val first = candidate("first", true, 0)
+            val unapproved = candidate("unapproved", false, 1)
+            val second = candidate("second", true, 2)
+            val candidates = listOf(first, unapproved, second)
+            fun pick(sticky: String?) = (turn.pick(candidates, setOf(Need.CHAT), sticky) as ModelRouter.Choice.Selected).candidate
+            val history = listOf(LLMMessage(LLMMessage.Role.USER, "prior question"),
+                LLMMessage(LLMMessage.Role.ASSISTANT, "prior answer"), LLMMessage(LLMMessage.Role.USER, "continue"))
+            val base = server.url("/v1").toString().trimEnd('/')
+            fun provider(id: String) = OpenAIProvider("fixture-key", LLMModel.gpt4oMini.copy(id = id), base)
+            val chosen = pick("first")
+            assertEquals("first", chosen.entryId)
+            val firstTicket = (turn.reserve(chosen, 100, 32) as ModelHealth.Reservation.Granted).ticket
+            val thrown = try {
+                provider(chosen.entryId).sendMessage(history, null, 32)
+                throw AssertionError("Expected a rate limit")
+            } catch (error: Exception) { error }
+            health.finish(firstTicket)
+            var cause: Throwable? = thrown
+            while (cause != null && cause !is LLMError) cause = cause.cause
+            val decision = AutoModelFailure.classify(checkNotNull(cause), false, switchOnAmbiguousAccessDenied = false)
+                as AutoModelFailure.Decision.Cooldown
+            assertEquals(ModelHealth.Failure.RATE_LIMIT, decision.reason)
+            turn.fail(chosen.entryId, chosen.providerId, decision.reason, decision.retryAfterSeconds, decision.retryAfterPresent)
+            val fallback = pick(null)
+            assertEquals("second", fallback.entryId)
+            assertEquals(8_000L, health.snapshot("first", "fixture-account").cooldown?.untilMillis)
+            val secondTicket = (turn.reserve(fallback, 100, 32) as ModelHealth.Reservation.Granted).ticket
+            val response = try { provider(fallback.entryId).sendMessage(history, null, 32) }
+                finally { health.finish(secondTicket) }
+            assertEquals("fixture answer", response.text)
+            assertEquals(2, server.requestCount)
+            val firstBody = org.json.JSONObject(server.takeRequest().body.readUtf8())
+            val secondBody = org.json.JSONObject(server.takeRequest().body.readUtf8())
+            assertEquals("first", firstBody.getString("model"))
+            assertEquals("second", secondBody.getString("model"))
+            assertEquals(firstBody.getJSONArray("messages").toString(), secondBody.getJSONArray("messages").toString())
+            assertEquals("continue", secondBody.getJSONArray("messages").getJSONObject(2).getString("content"))
+            assertEquals(3, history.size) // transport did not mutate the caller's history
         } finally { server.shutdown() }
     }
 
