@@ -50,4 +50,15 @@ class KeyProbeSectionInstrumentedTest {
         button.assertIsNotEnabled()
         compose.onNodeWithText(context.getString(R.string.nm_key_probe_no_credit)).assertDoesNotExist()
     }
+
+    @Test fun noKeyKeepsTheCheckDisabled() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        compose.setContent {
+            MinisTheme {
+                KeyProbeSection(ProviderType.openRouter, "", "https://openrouter.ai/api/v1", allowed = true,
+                    check = { _, _ -> error("Checking must not run without a key") }, onResult = {})
+            }
+        }
+        compose.onNodeWithText(context.getString(R.string.nm_key_probe_button)).assertIsNotEnabled()
+    }
 }

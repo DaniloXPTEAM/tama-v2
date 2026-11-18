@@ -1486,9 +1486,9 @@
     <string name="nm_video_authorization_changed">影片服務商、帳號、設定或工作階段已變更。影片任務未傳送。其他已傳送的請求仍可能產生費用。</string>
 
     <!-- TAMA: provider setup and free-only import in the parallel test build. -->
-    <string name="nm_provider_known_title">已知供應商</string>
-    <string name="nm_provider_known_help">選擇金鑰所屬的供應商以填入端點。有些供應商依地區使用不同地址。</string>
-    <string name="nm_provider_show_all">顯示所有供應商</string>
+    <string name="nm_provider_known_title">已知服務商</string>
+    <string name="nm_provider_known_help">選擇金鑰所屬的服務商以填入端點。有些服務商依地區使用不同地址。</string>
+    <string name="nm_provider_show_all">顯示所有服務商</string>
     <string name="nm_key_autofill_confirm">建議的服務商：%1$s</string>
     <string name="nm_key_autofill_help">前綴只是提示。只有點選建議時才會更改地址。</string>
     <string name="nm_endpoint_region">端點地區</string>
@@ -1497,10 +1497,10 @@
     <string name="nm_endpoint_mainland">中國大陸</string>
     <string name="nm_endpoint_effective">儲存後使用的端點：%1$s</string>
     <string name="nm_endpoint_fixed_help">OpenRouter 使用此固定地址。</string>
-    <string name="nm_endpoint_auto_help">地址來自所選供應商。你可以修改；貼上金鑰不會取代自訂地址。</string>
+    <string name="nm_endpoint_auto_help">地址來自所選服務商。你可以修改；貼上金鑰不會取代自訂地址。</string>
     <string name="nm_free_import_title">只使用免費模型</string>
     <string name="nm_free_import_help">只匯入目前 OpenRouter 目錄中標示免費的聊天模型。既有模型會保留。這不會授權請求或防止收費；價格和額外服務可能變更。</string>
-    <string name="nm_free_import_unsupported">這裡無法驗證此供應商和帳戶的價格。開啟時不會匯入新模型。關閉後可匯入完整清單。</string>
+    <string name="nm_free_import_unsupported">這裡無法驗證此服務商和帳戶的價格。開啟時不會匯入新模型。關閉後可匯入完整清單。</string>
     <string name="nm_free_import_checking">正在查詢目錄...</string>
     <string name="nm_free_import_missing_key">請先加入金鑰，再查詢目錄。</string>
     <string name="nm_free_import_failed">無法查詢目錄，沒有匯入新模型。請檢查連線和金鑰，再重新整理。</string>
@@ -1529,7 +1529,7 @@
     <string name="nm_free_list_filter">僅顯示標為免費的模型</string>
     <string name="nm_free_list_help">僅篩選此清單，不刪除模型，也不保證費用。關閉篩選可查看所有已儲存的模型。</string>
     <string name="nm_free_list_refresh">沒有目前的目錄資料。請重新整理模型清單或關閉篩選。</string>
-    <string name="nm_usage_reports_note">用量依據已儲存的服務供應商報告，可能不完整。這不是帳單，也不能證明沒有費用。</string>
+    <string name="nm_usage_reports_note">用量依據已儲存的服務服務商報告，可能不完整。這不是帳單，也不能證明沒有費用。</string>
     <string name="nm_loop_estimate_explanation">本對話的估算值取助理訊息數和工具區塊數中的較大值，並非請求次數或收費次數的準確統計。</string>
     <string name="nm_free_chat_choose">請選擇免費模型，或在服務商設定中更新模型清單。</string>
     <string name="nm_key_probe_no_credit">服務商回報額度不足。</string>

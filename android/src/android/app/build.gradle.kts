@@ -150,6 +150,9 @@ android {
         }
     }
 
+    // nanoMuse: opt in to installing the instrumentation APK beside the normal app.
+    if (providers.gradleProperty("tamaTestInstrumentation").orNull == "true") testBuildType = "tamaTest"
+
     testOptions {
         unitTests.isReturnDefaultValues = true
     }
@@ -378,6 +381,9 @@ dependencies {
     androidTestImplementation(composeBom)
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
+    if (providers.gradleProperty("tamaTestInstrumentation").orNull == "true") {
+        add("tamaTestImplementation", "androidx.compose.ui:ui-test-manifest")
+    }
     androidTestImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
     androidTestImplementation("junit:junit:4.13.2")
 }
