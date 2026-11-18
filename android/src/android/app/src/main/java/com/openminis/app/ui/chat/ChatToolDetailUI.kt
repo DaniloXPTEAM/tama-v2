@@ -316,6 +316,8 @@ internal fun ToolDetailSheet(
             ai.tama.media.ImageToolPresentation.Summary.ALREADY_HANDLED -> R.string.nm_image_guard_repeat
             ai.tama.media.ImageToolPresentation.Summary.INVALID -> R.string.nm_image_guard_invalid
             ai.tama.media.ImageToolPresentation.Summary.FAILED -> R.string.nm_image_detail_failed
+            ai.tama.media.ImageToolPresentation.Summary.NO_CONFIRMED_GENERATOR -> R.string.nm_own_image_no_generator
+            ai.tama.media.ImageToolPresentation.Summary.NO_VERIFIED_FREE_GENERATOR -> R.string.nm_own_image_no_verified_free
         }
         imageContext.getString(resource)
     } else block.content

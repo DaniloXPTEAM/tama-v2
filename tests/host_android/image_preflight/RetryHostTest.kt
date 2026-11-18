@@ -1,6 +1,13 @@
 package ai.tama.router
 
 fun main() {
+    for (verb in listOf("faz", "cria", "gera", "desenha")) {
+        val text = "$verb uma imagem de uma praia ao entardecer"
+        var prompt: String? = null
+        ImageShortcutEligibility.dispatch(text, ImageShortcutContext(person = true, portugueseMake = true),
+            image = { prompt = it.prompt }, chat = { error("Chamou chat para pedido de imagem") })
+        check(prompt == "uma praia ao entardecer")
+    }
     val r = ImageRetryOffer()
     fun offer() = r.offer("session", "reply", "a blue cat", 1_000)
     offer()

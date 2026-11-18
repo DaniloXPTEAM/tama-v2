@@ -7,7 +7,7 @@ ROOT = Path(__file__).resolve().parents[1] / 'android/src/android/app/src/main/j
 class ImageRawWiring(unittest.TestCase):
     def test_parallel_image_turn_only_and_native_tool_events_untouched(self):
         vm = (ROOT / 'com/openminis/app/ui/chat/ChatViewModel.kt').read_text()
-        self.assertIn('if (tamaV2Test && nmIsImagePersonTurn)', vm)
+        self.assertIn('if (tamaV2Test && (nmIsImagePersonTurn || nmOwnKeyTurn))', vm)
         self.assertIn('ImageToolStream.filter(sourceStream', vm)
         self.assertIn('nmIsImagePersonTurn = handled.explicitImageRequest', vm)
         stream = (ROOT / 'ai/tama/media/ImageToolStream.kt').read_text()

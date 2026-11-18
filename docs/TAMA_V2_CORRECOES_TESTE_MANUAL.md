@@ -348,3 +348,15 @@ gratuitos para aquela chave enquanto a observação estiver ativa. Se não houve
 rota elegível, mostra a explicação em português em vez do código HTTP. Catálogos
 sem evidência compatível não são tratados como gratuitos. Esta opção não altera
 a nuvem TAMA, o app normal, a voz nem os seletores de mídia.
+
+### Retorno para pedido de imagem com chave própria (T4)
+
+O atalho de imagem já reconhece “faz/cria/gera/desenha uma imagem de …”. No
+paralelo com chave própria, uma recusa de custo agora distingue a falta de um
+modelo com geração confirmada da falta de uma rota com preço zero comprovado.
+Visão (ler uma foto) e `:free` no chat não comprovam geração de imagens de graça.
+Nenhuma rota de imagem deste build comprova gratuidade no despacho; com cobrança
+bloqueada, não enviamos a geração. Não foi criado um veto novo para mídia nem
+alterados a seleção, a permissão por imagem, a nuvem ou o app normal. Falha sem
+sinal de cobrança não exibe uma suposição de cobrança. “Sim” e “tenta de novo” só
+repetem o pedido após o convite do app na mesma conversa e revalidam os controles.

@@ -29,7 +29,7 @@ object ImageGenerationTool {
         propertyOrdering = listOf("prompt", "size"),
     )
 
-    suspend fun execute(argsJson: String, sessionId: String, context: Context): ToolExecutionResult {
+    suspend fun execute(argsJson: String, sessionId: String, context: Context, ownKeyChat: Boolean = false): ToolExecutionResult {
         val parallel = com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test"
         val title = context.getString(R.string.nm_models_image_title)
         val result = try {
@@ -46,12 +46,16 @@ object ImageGenerationTool {
         // The provider may echo the person's prompt or a credential in any error.
         // Only locally authored text and fixed settings links enter history or the model.
         return result.copy(output = ai.tama.media.ImageToolPresentation.sanitizedFailure(
-            result.output, failureMessages(context), context.getString(R.string.nm_image_request_failed),
+            result.output, failureMessages(context, ownKeyChat), context.getString(
+                if (ownKeyChat) R.string.nm_image_detail_failed else R.string.nm_image_request_failed,
+            ),
+            neutralCharge = ownKeyChat,
+            explainCostRefusal = if (ownKeyChat) ({ ai.tama.media.OwnKeyChatImage.costFailureCode(context) }) else null,
         ))
     }
 
     /** Localized fixed text shared by the native tool and its shortcut presentation. */
-    internal fun failureMessages(context: Context): Map<String, String> = mapOf(
+    internal fun failureMessages(context: Context, ownKeyChat: Boolean = false): Map<String, String> = mapOf(
         "no_image_model" to context.getString(R.string.nm_image_provider_missing),
         "no_approved_image_model" to context.getString(R.string.nm_auto_image_missing),
         "automatic_image_cost_unverified" to context.getString(R.string.nm_auto_reason_unverified_cost),
@@ -61,7 +65,9 @@ object ImageGenerationTool {
         "automatic_image_edit_unavailable" to context.getString(R.string.nm_auto_image_edit_blocked),
         "media_model_change_blocked" to context.getString(R.string.nm_media_model_change_blocked),
         "invalid_image_request" to context.getString(R.string.nm_image_guard_invalid),
-        "image_failed" to context.getString(R.string.nm_image_request_failed),
+        "no_confirmed_image_generator" to context.getString(R.string.nm_own_image_no_generator),
+        "no_verified_free_image_generator" to context.getString(R.string.nm_own_image_no_verified_free),
+        "image_failed" to context.getString(if (ownKeyChat) R.string.nm_image_detail_failed else R.string.nm_image_request_failed),
     )
 
     /** Injectable edge for tests; no client is created unless all arguments are valid. */

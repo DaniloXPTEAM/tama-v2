@@ -7017,6 +7017,15 @@ class ChatViewModel(
         )
     }
 
+    // nanoMuse: no change for stock Cloud, keyless gateways or the normal app.
+    private fun nmOwnKeyImageRequest(): Boolean {
+        if (com.openminis.app.BuildConfig.APPLICATION_ID != "ai.tama.assistant.tamav2test") return false
+        currentProvider?.let { return nmOwnKeyFallbackTurn(it) }
+        if (providerRepository.config.value.instances.none { providerRepository.tamaOwnApiKey(it) != null }) return false
+        val ownImageProvider = io.github.nanomuse.avatar.ImageGen.endpoint(context)?.instance ?: return false
+        return providerRepository.tamaOwnApiKey(ownImageProvider) != null
+    }
+
     /** Runs the native tool and retains Stop ownership until its reply is saved. */
     private suspend fun nmRunImageShortcut(
         sid: String,
@@ -7026,15 +7035,18 @@ class ChatViewModel(
         val owner = kotlin.coroutines.coroutineContext[Job]
         nmActiveImageShortcutCall = owner
         try {
+            val ownKeyChat = nmOwnKeyImageRequest()
             val reply = ai.tama.media.ImageShortcutRunner.run(
                 prompt = image.prompt,
-                failureMessage = context.getString(R.string.nm_image_request_failed),
+                failureMessage = context.getString(
+                    if (ownKeyChat) R.string.nm_image_detail_failed else R.string.nm_image_request_failed,
+                ),
                 settingsLabel = context.getString(R.string.nm_drawer_settings),
                 safeFailureMessages = if (com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test")
                     ai.tama.tools.ImageGenerationTool.failureMessages(context) else null,
             ) { prompt ->
                 ai.tama.tools.ImageGenerationTool.execute(
-                    JSONObject().put("prompt", prompt).toString(), sid, context,
+                    JSONObject().put("prompt", prompt).toString(), sid, context, ownKeyChat = ownKeyChat,
                 )
             }
             kotlin.coroutines.coroutineContext.ensureActive()
@@ -10459,7 +10471,9 @@ class ChatViewModel(
                         )
                         // nanoMuse: text that merely looks like an image tool call is
                         // never executed or shown raw. Real tool events pass unchanged.
-                        val visibleStream = if (tamaV2Test && nmIsImagePersonTurn)
+                        // nanoMuse: an escaped/compound image prompt may not have matched the shortcut.
+                        // Hide raw tool syntax in the personal-key stream without rewriting its opaque history.
+                        val visibleStream = if (tamaV2Test && (nmIsImagePersonTurn || nmOwnKeyTurn))
                             ai.tama.media.ImageToolStream.filter(sourceStream, context.getString(R.string.nm_image_raw_tool_text))
                         else sourceStream
                         visibleStream.collect { chunk ->
@@ -11960,7 +11974,7 @@ class ChatViewModel(
             // /var/minis/{workspace,attachments,offloads,browser} files.
             ReadImageTool.NAME -> executeReadImageTool(argsJson)
             ai.tama.tools.ImageGenerationTool.NAME ->
-                ai.tama.tools.ImageGenerationTool.execute(argsJson, activeSessionId, context)
+                ai.tama.tools.ImageGenerationTool.execute(argsJson, activeSessionId, context, ownKeyChat = nmOwnKeyImageRequest())
             "shell_execute" -> executeShellCommand(argsJson, toolId, toolBlocks, assistantId, currentText)
             "browser_use" -> executeBrowserUseTool(argsJson)
             "memory_write" -> executeMemoryWriteTool(argsJson)

@@ -7,6 +7,7 @@ internal object ImageToolPresentation {
     enum class Summary {
         PREPARING, GENERATED, NO_MODEL, NO_APPROVAL, UNVERIFIED_COST, MODEL_COST_UNVERIFIED,
         AUTHORIZATION_CHANGED, PERMISSION_DENIED, EDIT_UNAVAILABLE, MODEL_CHANGE_BLOCKED, AMBIGUOUS, ALREADY_HANDLED, INVALID, FAILED,
+        NO_CONFIRMED_GENERATOR, NO_VERIFIED_FREE_GENERATOR,
     }
 
     fun summary(
@@ -26,6 +27,8 @@ internal object ImageToolPresentation {
         if (success && json.optBoolean("ok", false)) return Summary.GENERATED
         return when (json.optString("error", "")) {
             "no_image_model" -> Summary.NO_MODEL
+            "no_confirmed_image_generator" -> Summary.NO_CONFIRMED_GENERATOR
+            "no_verified_free_image_generator" -> Summary.NO_VERIFIED_FREE_GENERATOR
             "no_approved_image_model" -> Summary.NO_APPROVAL
             "automatic_image_cost_unverified" -> Summary.UNVERIFIED_COST
             "image_cost_unverified" -> Summary.MODEL_COST_UNVERIFIED
@@ -39,13 +42,20 @@ internal object ImageToolPresentation {
     }
 
     /** Rebuild a failed tool result without copying any provider-supplied message or URL. */
-    fun sanitizedFailure(raw: String, messages: Map<String, String>, fallback: String): String {
+    fun sanitizedFailure(
+        raw: String,
+        messages: Map<String, String>,
+        fallback: String,
+        neutralCharge: Boolean = false,
+        explainCostRefusal: (() -> String)? = null,
+    ): String {
         val parsed = runCatching { JSONObject(raw) }.getOrNull()
         val code = parsed?.optString("error", "").orEmpty()
         val safeCode = when (code) {
             "no_image_model", "no_approved_image_model", "automatic_image_cost_unverified", "image_cost_unverified",
             "image_authorization_changed", "permission_denied", "automatic_image_edit_unavailable", "invalid_image_request",
-            "media_model_change_blocked", "image_failed" -> code
+            "media_model_change_blocked", "image_failed", "no_confirmed_image_generator",
+            "no_verified_free_image_generator" -> code
             else -> if (raw in setOf(
                     "Invalid generate_image arguments; no image was requested.",
                     "Unsupported generate_image parameter; no image was requested.",
@@ -53,9 +63,14 @@ internal object ImageToolPresentation {
                     "Image size must be WIDTHxHEIGHT, each from 128 to 4096; no image was requested.",
                 )) "invalid_image_request" else "image_failed"
         }
-        val message = messages[safeCode] ?: fallback
-        val settings = when (safeCode) {
-            "no_image_model", "media_model_change_blocked" -> "minis://settings/media"
+        val explainedCode = if (safeCode in setOf("image_cost_unverified", "automatic_image_cost_unverified"))
+            explainCostRefusal?.invoke()?.takeIf {
+                it == "no_confirmed_image_generator" || it == "no_verified_free_image_generator"
+            } ?: safeCode else safeCode
+        val message = messages[explainedCode] ?: fallback
+        val settings = when (explainedCode) {
+            "no_image_model", "media_model_change_blocked", "no_confirmed_image_generator",
+            "no_verified_free_image_generator" -> "minis://settings/media"
             "no_approved_image_model", "automatic_image_cost_unverified", "image_cost_unverified",
             "image_authorization_changed", "automatic_image_edit_unavailable" -> "minis://settings/models"
             "permission_denied" -> "minis://settings/permissions"
@@ -64,8 +79,8 @@ internal object ImageToolPresentation {
         // The result is sent back to the agent, not just displayed. Reconstruct
         // the no-retry instruction locally instead of dropping it or trusting an
         // untrusted `tell_user` field supplied by a provider.
-        val instruction = ImageFailureInstruction.forCode(safeCode)
-        return JSONObject().put("ok", false).put("error", safeCode).put("message", message).apply {
+        val instruction = ImageFailureInstruction.forCode(explainedCode, neutralCharge)
+        return JSONObject().put("ok", false).put("error", explainedCode).put("message", message).apply {
             if (settings != null) put("settings", settings)
             put("tell_user", instruction)
         }.toString()

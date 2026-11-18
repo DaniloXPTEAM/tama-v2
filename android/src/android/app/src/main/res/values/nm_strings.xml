@@ -1546,4 +1546,6 @@
     <string name="nm_usage_reports_note">Usage is based on stored provider reports and may be incomplete. It is not a bill or proof of zero cost.</string>
     <string name="nm_free_chat_choose">Choose a free model or refresh the provider’s model list.</string>
     <string name="nm_key_probe_no_credit">The provider reported insufficient credit.</string>
+    <string name="nm_own_image_no_generator">No registered model is confirmed to generate images on a compatible route. No image request was sent.</string>
+    <string name="nm_own_image_no_verified_free">There is no verified free image generation route for this request. No image request was sent.</string>
 </resources>

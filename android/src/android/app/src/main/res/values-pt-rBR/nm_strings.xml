@@ -1567,4 +1567,6 @@
     <string name="nm_usage_reports_note">O uso se baseia nos relatórios salvos dos provedores e pode estar incompleto. Não é uma fatura nem prova de custo zero.</string>
     <string name="nm_free_chat_choose">Escolha um modelo gratuito ou atualize a lista nas configurações do provedor.</string>
     <string name="nm_key_probe_no_credit">O provedor informou que não há crédito suficiente.</string>
+    <string name="nm_own_image_no_generator">Nenhum modelo cadastrado tem geração de imagens confirmada por uma rota compatível. O pedido de imagem não foi enviado.</string>
+    <string name="nm_own_image_no_verified_free">Não há uma rota de geração de imagens com gratuidade comprovada para este pedido. O pedido de imagem não foi enviado.</string>
 </resources>
