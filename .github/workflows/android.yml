@@ -1,48 +1,74 @@
-name: TAMA V2 Kotlin compiler diagnosis
+name: Android verification without uploads
 
 on:
   pull_request:
     types: [synchronize]
 
 permissions:
-  actions: read
   contents: read
 
+env:
+  NDK_VERSION: 27.2.12479018
+
 jobs:
-  diagnose-compiler:
-    if: github.event.pull_request.number == 1 && github.head_ref == 'arena/4f0fb56f-tamaaiv2' && github.event.pull_request.head.repo.full_name == github.repository
+  android-check:
+    if: github.head_ref == 'arena/4f0fb56f-tamaaiv2'
     runs-on: ubuntu-24.04
-    timeout-minutes: 8
+    timeout-minutes: 80
     steps:
-      - name: Extract sanitized Kotlin compiler errors
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache-jdk: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.26'
+          cache: false
+      - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+        with:
+          packages: platforms;android-36 build-tools;35.0.0 cmake;3.22.1 ndk;${{ env.NDK_VERSION }}
+      - name: Build required native dependencies locally
         env:
-          GH_TOKEN: ${{ github.token }}
-          EXPECTED_PARENT: 04554774245fb407a5d64b211d32477245ab6d09
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          GOTOOLCHAIN: auto
         run: |
-          set -euo pipefail
-          parent=$(gh api "repos/DaniloXPTEAM/tamaaiv2/commits/$HEAD_SHA" --jq '.parents[0].sha')
-          test "$parent" = "$EXPECTED_PARENT"
-          if ! gh run view 44227188298 --repo DaniloXPTEAM/tamaaiv2 --log-failed >"$RUNNER_TEMP/kotlin.log" 2>/dev/null; then
-            echo '::error title=Kotlin diagnosis::Previous job log could not be read.'
-            exit 1
-          fi
-          python3 - "$RUNNER_TEMP/kotlin.log" <<'PY'
-          import re, sys
-          raw = open(sys.argv[1], encoding='utf-8', errors='replace').read().splitlines()
-          lines = []
-          for line in raw:
-              line = line.split('\t')[-1]
-              line = re.sub(r'^\d{4}-\d{2}-\d{2}T\S+\s*', '', line).strip()
-              lines.append(line)
-          pat = re.compile(r'(?i)(\be:\s|error:|exception|caused by:|outofmemory|kotlin\.backend|file being compiled|\.kt:\d+|internal compiler error|not enough memory|compilation failure|BUILD FAILED)')
-          chosen = [line for line in lines if pat.search(line)][-100:]
-          if not chosen: chosen = ['No compiler-specific lines could be extracted.']
-          chunks = []
-          for line in chosen:
-              line = re.sub(r'https?://[^\s]+', '[URL]', line)
-              line = re.sub(r'(?i)\b(token|password|secret|authorization|api[_-]?key)\s*[:=]\s*\S+', r'\1=[redacted]', line)
-              chunks.append(line[:600])
-          message = '\n'.join(chunks)[:12000].replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
-          print('::notice title=Kotlin compiler details::' + message)
-          PY
+          export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/$NDK_VERSION"
+          export GOROOT="$(go env GOROOT)" GOPATH="$(go env GOPATH)"
+          export PATH="$GOPATH/bin:$PATH"
+          bash scripts/android/build-natives.sh
+      - name: Assemble both debug variants locally
+        working-directory: android/src/android
+        run: |
+          export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/$NDK_VERSION"
+          ./gradlew :app:assembleDebug :app:assembleTamaTest --console=plain --no-daemon
+      - name: Run parallel history tests
+        working-directory: android/src/android
+        run: |
+          export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/$NDK_VERSION"
+          ./gradlew :app:testTamaTestUnitTest \
+            --tests 'ai.tama.net.GroqHistoryPolicyTest' \
+            --tests 'ai.tama.net.GroqHistoryWireTest' \
+            --tests 'ai.tama.net.ProviderHistoryInteroperabilityTest' \
+            --tests 'ai.tama.router.ModelRouteHistoryTest' \
+            --console=plain --no-daemon
+      - name: Run normal debug isolation tests
+        working-directory: android/src/android
+        run: |
+          export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/$NDK_VERSION"
+          ./gradlew :app:testDebugUnitTest \
+            --tests 'ai.tama.net.GroqHistoryPolicyTest' \
+            --tests 'ai.tama.net.GroqNormalHistoryWireTest' \
+            --tests 'ai.tama.router.ModelRouteHistoryTest' \
+            --console=plain --no-daemon
+      - name: Verify separate APK identities locally
+        run: |
+          python3 scripts/android/verify-parallel-apk.py \
+            --aapt "$ANDROID_HOME/build-tools/35.0.0/aapt" \
+            --apksigner "$ANDROID_HOME/build-tools/35.0.0/apksigner" \
+            --apk android/src/android/app/build/outputs/apk/tamaTest/app-tamaTest.apk \
+            --normal-apk android/src/android/app/build/outputs/apk/debug/app-debug.apk \
+            --out-dir /tmp/tama-identity-check
