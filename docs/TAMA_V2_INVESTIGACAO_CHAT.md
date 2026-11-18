@@ -182,3 +182,11 @@ timeout. Um 403 genérico ou recusa de política não é tratado como falta de c
 A troca só usa candidatas elegíveis e autorizadas. As guardas de custo continuam
 independentes: o catálogo não é autorização de cobrança. Testes com dados
 fictícios não identificam qual resposta de fato ocorreu no Poco.
+
+O cliente de chat com chave própria carrega também a geração da credencial usada
+na sua criação. Se a rota ou a conta mudou, não reutiliza o cliente antigo, nem
+em A → B → A. O filtro por conta vale na seleção e no reenvio, inclusive quando
+um turno começou por outra rota e passou a usar uma chave própria. “Usar todos
+os gratuitos” não inicia uma nova consulta com uma chave que substituiu a chave
+da ação. A tela do teste de chave salva confirma conta e destinatário antes do
+GET e novamente antes de aceitar seu retorno.

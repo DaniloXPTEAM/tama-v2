@@ -912,25 +912,37 @@ class ProviderRepository(private val context: Context) {
     }
 
     // nanoMuse: do not replace the user's existing entries or their group pins.
-    fun setTamaImportFreeOnly(instanceId: String, enabled: Boolean): Boolean = synchronized(configLock) {
-        if (com.openminis.app.BuildConfig.APPLICATION_ID != "ai.tama.assistant.tamav2test") return@synchronized false
+    fun setTamaImportFreeOnly(instanceId: String, enabled: Boolean): Boolean =
+        setTamaImportFreeOnly(instanceId, enabled, null)
+
+    private fun setTamaImportFreeOnly(instanceId: String, enabled: Boolean, expected: OAuthKeySnapshot?): Boolean =
+        synchronized(configLock) {
+            if (expected == null) writeTamaImportFreeOnly(instanceId, enabled)
+            else ai.tama.router.AutoModelStore.credentialTransaction {
+                expected.providerId == instanceId && nmOAuthKeyStillCurrent(expected) && writeTamaImportFreeOnly(instanceId, enabled)
+            }
+        }
+
+    // nanoMuse: caller holds configLock; a bulk action also holds the credential lock.
+    private fun writeTamaImportFreeOnly(instanceId: String, enabled: Boolean): Boolean {
+        if (com.openminis.app.BuildConfig.APPLICATION_ID != "ai.tama.assistant.tamav2test") return false
         ensureConfigLoaded()
         val config = workingCopy()
         val index = config.instances.indexOfFirst { it.id == instanceId }
-        if (index < 0) return@synchronized false
+        if (index < 0) return false
         val live = config.instances[index]
-        if (tamaOwnApiKey(live) == null || (!enabled && tamaZeroSpendLimit(live))) return@synchronized false
-        if (live.tamaImportFreeOnly == enabled) return@synchronized true
+        if (tamaOwnApiKey(live) == null || (!enabled && tamaZeroSpendLimit(live))) return false
+        if (live.tamaImportFreeOnly == enabled) return true
         nmRefreshGate.invalidate(instanceId)
         nmFreeEvidence.remove(instanceId)
         config.instances[index] = config.instances[index].copy(tamaImportFreeOnly = enabled)
         if (!saveConfigChecked(config)) {
             _nmFreeImportStatus.value = _nmFreeImportStatus.value + (instanceId to FreeModelImportStatus.SaveFailed)
-            return@synchronized false
+            return false
         }
         _nmFreeImportStatus.value = _nmFreeImportStatus.value - instanceId
         invalidateModelCache(instanceId)
-        true
+        return true
     }
 
     fun removeInstance(instanceId: String): Unit = synchronized(configLock) {
@@ -2391,8 +2403,8 @@ class ProviderRepository(private val context: Context) {
     internal suspend fun tamaUseAllFreeChatModels(instanceId: String, key: OAuthKeySnapshot): Int {
         val live = instance(instanceId) ?: return 0
         if (key.providerId != instanceId || live.providerType != ProviderType.openRouter ||
-            !live.isEnabled || !nmOAuthKeyStillCurrent(key) || !setTamaImportFreeOnly(instanceId, true)) return 0
-        if (tamaEligibleFreeModelIds(instanceId) == null) refreshModels(live)
+            !live.isEnabled || !setTamaImportFreeOnly(instanceId, true, key)) return 0
+        if (tamaEligibleFreeModelIds(instanceId) == null) nmBeginRefresh(instanceId, key)?.let { nmRunRefresh(it) }
         return tamaApproveFreeChatModels(instanceId, key)
     }
 
@@ -2438,7 +2450,7 @@ class ProviderRepository(private val context: Context) {
         }
     }
 
-    private fun nmBeginRefresh(instanceId: String): NmRefresh? {
+    private fun nmBeginRefresh(instanceId: String, expected: OAuthKeySnapshot? = null): NmRefresh? {
         try {
             encryptedPrefs // nanoMuse: initialize the keystore before either lock
             return synchronized(configLock) {
@@ -2448,6 +2460,8 @@ class ProviderRepository(private val context: Context) {
                 // Capture the route and credential together. A scheduled old
                 // route must not pick up a newer account's key when it starts.
                 val key = nmOAuthKeySnapshot(copy.id)
+                if (expected != null && (key.providerId != expected.providerId || key.version != expected.version ||
+                        key.key != expected.key)) return@synchronized null
                 val route = ai.tama.router.AutoModelStore.routeFingerprint(copy)
                 val ticket = nmRefreshGate.begin(copy.id, nmFreeRefreshMode(copy), route)
                 nmFreeEvidence.remove(copy.id)
@@ -3108,13 +3122,17 @@ class ProviderRepository(private val context: Context) {
     internal fun tamaOwnApiKey(instance: ProviderInstance): String? {
         if (com.openminis.app.BuildConfig.APPLICATION_ID != "ai.tama.assistant.tamav2test" ||
             instance.credentialType != ProviderCredential.apiKey) return null
-        val cloud = io.github.nanomuse.cloud.NanoMuseCloud.instance(context)
         val key = loadApiKey(instance.id)
-        return key.takeIf {
-            ai.tama.providers.OwnKeyScope.active(true, true, it,
-                managedRelay = cloud?.id == instance.id ||
-                    instance.effectiveBaseURL?.let(io.github.nanomuse.net.OwnProviderProxy::isRelay) == true)
-        }
+        return key.takeIf { tamaOwnKeyMaterial(instance, it) }
+    }
+
+    // nanoMuse: classify an already-built client even if its stored key has since changed.
+    internal fun tamaOwnKeyMaterial(instance: ProviderInstance, key: String?): Boolean {
+        if (com.openminis.app.BuildConfig.APPLICATION_ID != "ai.tama.assistant.tamav2test" ||
+            instance.credentialType != ProviderCredential.apiKey || key.isNullOrBlank()) return false
+        val cloud = io.github.nanomuse.cloud.NanoMuseCloud.instance(context)
+        return ai.tama.providers.OwnKeyScope.active(true, true, key, managedRelay = cloud?.id == instance.id ||
+            instance.effectiveBaseURL?.let(io.github.nanomuse.net.OwnProviderProxy::isRelay) == true)
     }
 
     fun deleteApiKey(instanceId: String) {

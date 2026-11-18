@@ -1216,10 +1216,28 @@ class ChatViewModel(
     private val nmProviderRoutes = java.util.Collections.synchronizedMap(
         java.util.WeakHashMap<LLMProvider, String>(),
     )
+    private class NmOwnClient(val providerId: String, val accountVersion: Long?)
+    private val nmOwnClients = java.util.Collections.synchronizedMap(
+        java.util.WeakHashMap<LLMProvider, NmOwnClient>(),
+    )
     private fun nmCreateProvider(instance: ProviderInstance, key: String, model: LLMModel): LLMProvider {
         val snapshot = instance.copy()
+        val own = if (providerRepository.tamaOwnKeyMaterial(snapshot, key)) {
+            val saved = providerRepository.nmOAuthKeySnapshot(snapshot.id)
+            NmOwnClient(snapshot.id, saved.version.takeIf { saved.key == key })
+        } else null
         val fingerprint = AutoModelStore.historyFingerprint(context, snapshot)
-        return ProviderFactory.create(snapshot, key, model, context).also { nmProviderRoutes[it] = fingerprint }
+        return ProviderFactory.create(snapshot, key, model, context).also {
+            nmProviderRoutes[it] = fingerprint
+            if (own != null) nmOwnClients[it] = own
+        }
+    }
+
+    private fun nmOwnClientCurrent(client: LLMProvider): Boolean {
+        val own = nmOwnClients[client] ?: return true
+        val instance = providerRepository.instance(own.providerId) ?: return false
+        return instance.isEnabled && own.accountVersion == AutoModelRuntime.accountVersion(own.providerId) &&
+            nmRouteFingerprint(client) == AutoModelStore.historyFingerprint(context, instance)
     }
 
     // nanoMuse: keep a refresh result private and bind it to the captured account/key.
@@ -5405,14 +5423,8 @@ class ChatViewModel(
         return ai.tama.providers.KeyDestinationGuard.permits(key, base)
     }
 
-    private fun nmOwnKeyFallbackTurn(client: LLMProvider): Boolean {
-        if (this.currentProvider !== client) return false // no one-shot or Cloud retry
-        val entryId = _activeEntryId.value ?: return false
-        val entry = providerRepository.config.value.modelEntries.find { it.id == entryId } ?: return false
-        val instance = providerRepository.instance(entry.providerInstanceId) ?: return false
-        return providerRepository.tamaOwnApiKey(instance) != null &&
-            nmRouteFingerprint(client) == AutoModelStore.historyFingerprint(context, instance)
-    }
+    private fun nmOwnKeyFallbackTurn(client: LLMProvider): Boolean =
+        this.currentProvider === client && nmOwnClients[client] != null // no one-shot or Cloud retry
 
     /** Learn only from a response bound to the same saved account and recipient. */
     private suspend fun nmLearnZeroSpendLimit(
@@ -5440,8 +5452,8 @@ class ChatViewModel(
         val group = config.modelGroups.find { it.id == groupId } ?: return false
         val entry = config.modelEntries.find { it.id == candidate.entryId } ?: return false
         val instance = config.instances.find { it.id == entry.providerInstanceId } ?: return false
-        if (candidate.ownKeyFallback && (!nmOwnKeyRecipientAllowed(instance) ||
-                !providerRepository.tamaAllowsChatModel(instance, entry.model.id, requireFree))) return false
+        if (!providerRepository.tamaAllowsChatModel(instance, entry.model.id, requireFree) ||
+            (candidate.ownKeyFallback && !nmOwnKeyRecipientAllowed(instance))) return false
         return ai.tama.router.GroupFallback.eligible(
             hidden = entry.isHidden,
             enabled = instance.isEnabled,
@@ -8192,6 +8204,7 @@ class ChatViewModel(
             actual is ai.tama.pricing.FreeModelList.Blocked -> context.getString(R.string.nm_free_chat_choose)
             detail == unconfirmed -> unconfirmed
             detail == disabled -> disabled
+            detail == context.getString(R.string.nm_own_context_limit) -> detail
             detail == none || detail?.startsWith("$none\n") == true -> none
             else -> context.getString(R.string.nm_error_private_generic)
         }
@@ -9286,15 +9299,21 @@ class ChatViewModel(
                 _modelName.value, _providerName.value, groupId, _selectedGroupName.value, groupMember)
         }
         var nmConfirmedRoute = if (tamaV2Test) captureConfirmedRoute() else null
-        val nmOwnKeyOrigin = nmConfirmedRoute?.providerId?.takeIf { nmOwnKeyTurn }
+        val nmOwnKeyOrigin = nmOwnClients[provider]?.providerId?.takeIf { nmOwnKeyTurn }
         var nmForceFreeRemainder = false
-        fun nmRequireFree(): Boolean = nmForceFreeRemainder ||
-            nmOwnKeyOrigin?.let { providerRepository.instance(it)?.let(providerRepository::tamaFreeChatOnly) } == true
+        fun nmRequireFree(): Boolean {
+            if (nmOwnKeyOrigin?.let { providerRepository.instance(it)?.let(providerRepository::tamaFreeChatOnly) } == true) {
+                nmForceFreeRemainder = true
+            }
+            return nmForceFreeRemainder
+        }
+        nmRequireFree() // nanoMuse: relaxing the preference cannot widen an already-started turn.
         fun nmFreeChatAllows(client: LLMProvider): Boolean {
-            if (!nmOwnKeyTurn || this@ChatViewModel.currentProvider !== client) return true
+            if (!tamaV2Test || this@ChatViewModel.currentProvider !== client) return true
             val entry = providerRepository.config.value.modelEntries.find { it.id == _activeEntryId.value }
             val instance = entry?.let { providerRepository.instance(it.providerInstanceId) }
-            return instance == null || providerRepository.tamaAllowsChatModel(instance, client.model.id, nmRequireFree())
+            return instance?.let { providerRepository.tamaAllowsChatModel(it, client.model.id, nmRequireFree()) }
+                ?: (nmOwnClients[client] == null && !nmRequireFree())
         }
         fun restoreConfirmedRoute() {
             val snapshot = nmConfirmedRoute
@@ -9475,7 +9494,7 @@ class ChatViewModel(
             }
             val freeRankIds = freeRankInstance?.let { providerRepository.tamaEligibleFreeModelIds(it.id) }.orEmpty()
             val requiresFree = nmRequireFree()
-            val allowedFreeByAccount = if (!nmOwnKeyTurn) emptyMap() else config.instances.associate { instance ->
+            val allowedFreeByAccount = if (!tamaV2Test) emptyMap() else config.instances.associate { instance ->
                 instance.id to when {
                     !requiresFree && !providerRepository.tamaFreeChatOnly(instance) -> null
                     providerRepository.tamaOwnApiKey(instance) == null -> emptySet()
@@ -9539,8 +9558,8 @@ class ChatViewModel(
                 !providerRepository.hasAnyCredential(instance) || AutoModelStore.identity(entry, instance) != choice.identity ||
                 AutoModelRuntime.accountVersion(instance.id) != choice.accountVersion) return false
             if (!AutoModelStore.approved(context, choice.identity) ||
-                (nmOwnKeyTurn && (!nmOwnKeyRecipientAllowed(instance) ||
-                    !providerRepository.tamaAllowsChatModel(instance, entry.model.id, nmRequireFree())))) return false
+                !providerRepository.tamaAllowsChatModel(instance, entry.model.id, nmRequireFree()) ||
+                (nmOwnKeyTurn && !nmOwnKeyRecipientAllowed(instance))) return false
             val capabilities = nmAutoCapabilities(entry, instance)
             return capabilities == choice.candidate.capabilities && nmAutoModel(entry, capabilities) == choice.model
         }
@@ -10462,13 +10481,17 @@ class ChatViewModel(
                                 throw AutoDispatchBlocked(active.entryId, context.getString(R.string.nm_auto_reason_consent))
                             }
                         }
+                        // nanoMuse: an old account must not dispatch again, even after A → B → A.
+                        if (!nmOwnClientCurrent(currentProvider) || (nmOwnKeyTurn && !nmOwnClientCurrent(provider))) {
+                            throw LLMError.ProviderError(context.getString(R.string.nm_auto_disabled_during_turn))
+                        }
                         if (!nmFreeChatAllows(currentProvider)) throw ai.tama.pricing.FreeModelList.Blocked()
                         nmLastSentRoute = nmRouteFingerprint(currentProvider)
                         // nanoMuse: tag the result with the version that built this client,
                         // never a replacement account read after the final eligibility check.
                         nmDispatchAccountVersion = if (tamaV2Test) {
                             nmAutoActiveChoice?.accountVersion ?: nmManualFallback?.accountVersion
-                                ?: nmConfirmedRoute?.takeIf { nmOwnKeyTurn && it.client === currentProvider }?.accountVersion
+                                ?: nmOwnClients[currentProvider]?.accountVersion
                         } else nmAutoCandidate?.providerId?.let { AutoModelRuntime.accountVersion(it) }
                         nmDispatchAt = android.os.SystemClock.elapsedRealtime()
                         // From here on a provider may have received the request, even on cancellation.
@@ -10897,7 +10920,7 @@ class ChatViewModel(
                                     nmRouteFingerprint(currentProvider) == AutoModelStore.historyFingerprint(context, instance) &&
                                     (nmAutoTurn == null || (nmDispatchAccountVersion == AutoModelRuntime.accountVersion(instance.id) &&
                                         nmAutoActiveChoice?.let(::nmAutoChoiceStillEligible) == true)) &&
-                                    (nmManualFallback == null || nmFallbackStillEligible(checkNotNull(nmManualFallback)))
+                                    (nmManualFallback == null || nmFallbackStillEligible(checkNotNull(nmManualFallback), nmRequireFree()))
                             }
                             fun stillSelected() = nmFallbackCommit.shouldRestore(
                                 _activeEntryId.value, _selectedGroupId.value,
@@ -11066,7 +11089,8 @@ class ChatViewModel(
                         val isRateLimit = actual is com.openminis.app.data.model.LLMError.RateLimited
                         // nanoMuse: a token count such as 5000 in a 400 is not an HTTP 500.
                         val reach = (actual as? LLMError)?.nmProviderReach
-                        if (nmOwnKeyTurn && nmLearnZeroSpendLimit(currentProvider, nmDispatchAccountVersion, reach)) {
+                        if (tamaV2Test && nmOwnClients[currentProvider] != null &&
+                            nmLearnZeroSpendLimit(currentProvider, nmDispatchAccountVersion, reach)) {
                             nmForceFreeRemainder = true
                         }
                         val freeOnlyBlocked = actual is ai.tama.pricing.FreeModelList.Blocked

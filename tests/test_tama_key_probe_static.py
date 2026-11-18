@@ -12,7 +12,9 @@ class KeyProbeIntegration(unittest.TestCase):
         self.assertIn("KeyProbeSection(providerType, apiKey, nmDestination, nmDestinationAllowed)", ui)
         self.assertIn("onApiKeyChange = onApiKeyChange", ui)
         detail = (MAIN / "com/openminis/app/ui/settings/ProviderDetailScreen.kt").read_text()
-        self.assertIn("KeyProbeSection(instance.providerType, storedKey, nmLiveDestination, nmDestinationAllowed, version)", detail)
+        self.assertIn("instance.providerType, storedKey, nmLiveDestination,", detail)
+        self.assertIn("nmDestinationAllowed && snapshot.key == storedKey, version", detail)
+        self.assertIn("providerRepository.nmOAuthKeyStillCurrent(snapshot)", detail)
         code = (MAIN / "ai/tama/providers/KeyProbeSection.kt").read_text()
         for text in ("key(type, apiKey, destination, allowed, generation)", "rememberCoroutineScope()",
                      "plan != null && allowed && KeyProbePlan.validKey(probeKey)", "KeyProbe::check"):

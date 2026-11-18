@@ -302,8 +302,18 @@ fun ProviderDetailScreen(
 
         // nanoMuse: the saved route can be checked here as well as on the add form.
         if (nmHasOwnKey && !isEditingKey) {
-            val version = ai.tama.router.AutoModelRuntime.accountVersion(instanceId)
-            ai.tama.providers.KeyProbeSection(instance.providerType, storedKey, nmLiveDestination, nmDestinationAllowed, version) { result ->
+            val snapshot = providerRepository.nmOAuthKeySnapshot(instanceId)
+            val version = snapshot.version
+            val route = ai.tama.router.AutoModelStore.routeFingerprint(instance)
+            ai.tama.providers.KeyProbeSection(
+                instance.providerType, storedKey, nmLiveDestination,
+                nmDestinationAllowed && snapshot.key == storedKey, version,
+                current = {
+                    providerRepository.instance(instanceId)?.let { live ->
+                        ai.tama.router.AutoModelStore.routeFingerprint(live) == route
+                    } == true && providerRepository.nmOAuthKeyStillCurrent(snapshot)
+                },
+            ) { result ->
                 val isZero = result?.zeroSpendLimit
                 if (isZero != null && providerRepository.tamaRecordZeroSpendLimit(instanceId, version, isZero) &&
                     isZero && providerRepository.tamaEligibleFreeModelIds(instanceId) == null) {

@@ -17,6 +17,7 @@ import com.openminis.app.R
 import com.openminis.app.data.model.ProviderType
 import com.openminis.app.ui.components.MinisButton
 import com.openminis.app.ui.settings.SettingsSection
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 
 /** The add and edit forms share an explicit read-only check. Never probe while typing. */
@@ -27,6 +28,7 @@ internal fun KeyProbeSection(
     destination: String?,
     allowed: Boolean,
     generation: Long? = null,
+    current: () -> Boolean = { true },
     check: suspend (KeyProbePlan.Plan, String) -> KeyProbePlan.Result = KeyProbe::check,
     onResult: (KeyProbePlan.Result?) -> Unit,
 ): Unit = key(type, apiKey, destination, allowed, generation) {
@@ -40,15 +42,19 @@ internal fun KeyProbeSection(
     SettingsSection(footer = stringResource(R.string.nm_key_probe_help)) {
         MinisButton(
             onClick = {
-                if (plan != null && enabled && KeyDestinationGuard.permits(probeKey, destination)) {
+                if (plan != null && enabled && current() && KeyDestinationGuard.permits(probeKey, destination)) {
                     running = true
                     result = null
                     onResult(null)
                     scope.launch {
                         try {
+                            if (!current()) return@launch
                             val checked = check(plan, probeKey)
-                            result = checked
-                            onResult(checked)
+                            ensureActive()
+                            if (current()) {
+                                result = checked
+                                onResult(checked)
+                            }
                         } finally { running = false }
                     }
                 }

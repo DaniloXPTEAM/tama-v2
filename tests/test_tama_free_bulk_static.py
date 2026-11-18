@@ -25,9 +25,12 @@ class FreeBulkIntegration(unittest.TestCase):
         self.assertIn("nmParallel &&", ui)
         self.assertIn("tamaUseAllFreeChatModels(instanceId, key)", ui)
         bulk = repo.split("internal suspend fun tamaUseAllFreeChatModels", 1)[1].split("private fun tamaApproveFreeChatModels", 1)[0]
-        self.assertIn("setTamaImportFreeOnly(instanceId, true)", bulk)
-        self.assertIn("refreshModels(live)", bulk)
+        self.assertIn("setTamaImportFreeOnly(instanceId, true, key)", bulk)
+        self.assertIn("nmBeginRefresh(instanceId, key)", bulk)
         self.assertNotIn("setAllowUnverifiedAutomaticCost", bulk)
+        refresh = repo.split("private fun nmBeginRefresh", 1)[1].split("private fun nmRefreshCurrent", 1)[0]
+        self.assertIn("key.version != expected.version", refresh)
+        self.assertLess(refresh.index("key.version != expected.version"), refresh.index("nmRefreshGate.begin("))
 
 
 if __name__ == "__main__":

@@ -15,7 +15,10 @@ class FreeListWiring(unittest.TestCase):
         self.assertIn('storedKey.isNotBlank() && providerRepository.tamaOwnApiKey(instance) != null', text)
         chat = (ROOT / 'com/openminis/app/ui/chat/ChatViewModel.kt').read_text()
         self.assertIn('if (!nmFreeChatAllows(currentProvider)) throw ai.tama.pricing.FreeModelList.Blocked()', chat)
-        self.assertIn('if (!nmOwnKeyTurn || this@ChatViewModel.currentProvider !== client) return true', chat)
+        self.assertIn('if (!tamaV2Test || this@ChatViewModel.currentProvider !== client) return true', chat)
+        self.assertIn('nmOwnClientCurrent(currentProvider)', chat)
+        self.assertIn('own.accountVersion == AutoModelRuntime.accountVersion(own.providerId)', chat)
+        self.assertIn('nmForceFreeRemainder = true', chat)
         self.assertNotIn('removeEntry(', view)
         self.assertNotIn('setAllowUnverifiedAutomaticCost(', view)
 
