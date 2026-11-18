@@ -9282,6 +9282,7 @@ class ChatViewModel(
         // At most one native image call per explicit person turn. A failure can
         // still have been charged, so a model's retry must not dispatch again.
         val nmImageGuard = ai.tama.router.ImageTurnGuard(explicitImageRequest)
+        var nmIsImagePersonTurn = explicitImageRequest // nanoMuse: limit literal tool-text filtering to image requests.
         var nmWarnedWithoutTools = false
         var nmAttempt: TurnRequestPlanner.Attempt? = null
         // Captured at dispatch, not looked up later after a settings change.
@@ -10348,12 +10349,18 @@ class ChatViewModel(
                         nmDispatchAt = android.os.SystemClock.elapsedRealtime()
                         // From here on a provider may have received the request, even on cancellation.
                         nmDispatchStarted = true
-                        currentProvider.streamMessage(
+                        val sourceStream = currentProvider.streamMessage(
                             requestMessages,
                             nmSystemPrompt, lastRequestedOutput,
                             tools = requestTools,
                             thinkingLevel = if (currentModelSupportsReasoning) _thinkingLevel.value else ThinkingLevel.OFF,
-                        ).collect { chunk ->
+                        )
+                        // nanoMuse: text that merely looks like an image tool call is
+                        // never executed or shown raw. Real tool events pass unchanged.
+                        val visibleStream = if (tamaV2Test && nmIsImagePersonTurn)
+                            ai.tama.media.ImageToolStream.filter(sourceStream, context.getString(R.string.nm_image_raw_tool_text))
+                        else sourceStream
+                        visibleStream.collect { chunk ->
                     // [T-STALL-DIAG] Mark first byte back from the provider and log
                     // the time-to-first-chunk once per turn.
                     if (firstChunkSeen.compareAndSet(false, true)) {
@@ -11669,6 +11676,7 @@ class ChatViewModel(
                     nmCurrentInput = nmCapturePromptInput()
                     nmUsedTools = false
                     nmImageGuard.newTurn(handled.explicitImageRequest)
+                    nmIsImagePersonTurn = handled.explicitImageRequest // nanoMuse: queued message has its own intent.
                     nmWarnedWithoutTools = false
                     nmAutoTurn?.reset()
                     nmAutoLocalBlocks.clear()

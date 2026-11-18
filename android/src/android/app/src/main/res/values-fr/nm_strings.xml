@@ -1560,4 +1560,5 @@
     <string name="nm_free_bulk_retry">Aucun modèle admissible actuel autorisé. Actualisez le catalogue et réessayez.</string>
     <string name="nm_image_retry_question">Voulez-vous réessayer cette image ? Répondez oui ou demandez un nouvel essai.</string>
     <string name="nm_context_near_limit">Le contexte approche de la limite du modèle (%1$d / %2$d jetons). Démarrez une nouvelle conversation ou utilisez /compact pour continuer de manière fiable.</string>
+    <string name="nm_image_raw_tool_text">Le fournisseur a renvoyé un appel à un outil sous forme de texte. Ce texte n’a pas été exécuté comme outil.</string>
 </resources>

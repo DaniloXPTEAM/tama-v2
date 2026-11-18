@@ -279,3 +279,12 @@ desconhecidos não contam como maiores. Se não houver candidato, o aviso
 anterior permanece. A requisição é remontada e reavaliada; não se altera a
 permissão de custo. O teste local cobre o filtro de janela e verifica a ligação
 estática, não uma conversa Android completa.
+
+## Texto cru de ferramenta em pedidos de imagem
+
+No paralelo, em um pedido explícito de imagem, marcadores literais de ferramenta
+que chegam como texto são substituídos por uma explicação local. O filtro lida
+com marcadores divididos entre pedaços do fluxo e não executa texto como chamada;
+eventos nativos de ferramenta permanecem separados e passam pelos controles
+existentes. Um marcador sem fechamento é descartado até o fim da resposta. O
+teste local usa eventos fictícios e não cobre a tela real nem um provedor.

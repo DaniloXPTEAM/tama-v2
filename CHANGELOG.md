@@ -4,6 +4,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+- Replaced literal tool-call markup in image replies with a localized notice in the parallel Android test build.
+
 - Added an automatic larger-context fallback at the local capacity stop in the parallel Android test build.
 
 - Used fresh free-catalogue evidence to rank automatic chat candidates within the selected own-key OpenRouter account in the parallel Android test build.

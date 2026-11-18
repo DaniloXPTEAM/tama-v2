@@ -1539,4 +1539,5 @@
     <string name="nm_free_bulk_done">Approved chat routes: %1$d. Other eligibility and cost checks still apply.</string>
     <string name="nm_free_bulk_retry">No current eligible models were approved. Refresh the catalogue and try again.</string>
     <string name="nm_image_retry_question">Would you like to try this image again? Reply yes or ask to try again.</string>
+    <string name="nm_image_raw_tool_text">The provider returned a tool call as text. That text was not executed as a tool.</string>
 </resources>

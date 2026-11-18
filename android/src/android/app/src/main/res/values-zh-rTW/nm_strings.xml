@@ -1525,4 +1525,5 @@
     <string name="nm_free_bulk_retry">沒有允許目前符合條件的模型。請重新整理目錄後再試。</string>
     <string name="nm_image_retry_question">要再次嘗試這張圖片嗎？請回覆「是」或「重試」。</string>
     <string name="nm_context_near_limit">上下文接近模型上限（%1$d / %2$d 個詞元）。請開始新對話或使用 /compact，以便可靠地繼續。</string>
+    <string name="nm_image_raw_tool_text">服務商將工具呼叫作為文字傳回。該文字沒有作為工具執行。</string>
 </resources>

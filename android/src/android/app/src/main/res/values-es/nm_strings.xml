@@ -1559,4 +1559,5 @@
     <string name="nm_free_bulk_retry">No se autorizó ningún modelo elegible actual. Actualiza el catálogo y vuelve a intentarlo.</string>
     <string name="nm_image_retry_question">¿Quieres intentar esta imagen de nuevo? Responde sí o pide reintentar.</string>
     <string name="nm_context_near_limit">El contexto está cerca del límite del modelo (%1$d / %2$d tokens). Inicia una conversación nueva o usa /compact para continuar de forma fiable.</string>
+    <string name="nm_image_raw_tool_text">El proveedor devolvió una llamada a herramienta como texto. Ese texto no se ejecutó como herramienta.</string>
 </resources>

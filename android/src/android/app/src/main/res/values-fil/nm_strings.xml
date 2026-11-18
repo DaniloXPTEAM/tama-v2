@@ -1559,4 +1559,5 @@
     <string name="nm_free_bulk_retry">Walang kasalukuyang angkop na modelo ang pinahintulutan. I-refresh ang katalogo at subukan muli.</string>
     <string name="nm_image_retry_question">Gusto mo bang subukang muli ang larawang ito? Sumagot ng oo o hilinging subukan muli.</string>
     <string name="nm_context_near_limit">Malapit na ang konteksto sa limitasyon ng modelo (%1$d / %2$d token). Magsimula ng bagong chat o gamitin ang /compact para makapagpatuloy nang maayos.</string>
+    <string name="nm_image_raw_tool_text">Nagbalik ang provider ng tool call bilang text. Hindi isinagawa ang text na iyon bilang tool.</string>
 </resources>
