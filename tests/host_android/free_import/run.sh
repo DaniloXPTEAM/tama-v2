@@ -8,5 +8,7 @@ OUT=$(mktemp -d)
 trap 'rm -rf "$OUT"' EXIT
 kotlinc -nowarn -include-runtime -d "$OUT/check.jar" \
   "$HERE/JsonStubs.kt" "$HERE/ModelStubs.kt" "$HERE/FreeImportHostTest.kt" \
-  "$MAIN/OpenRouterPricing.kt" "$MAIN/FreeModelImport.kt" "$MAIN/FreeModelBulk.kt" "$MAIN/FreeModelList.kt"
+  "$MAIN/OpenRouterPricing.kt" "$MAIN/FreeModelImport.kt" "$MAIN/FreeModelBulk.kt" "$MAIN/FreeModelList.kt" "$MAIN/DocumentedFreeChat.kt" \
+  "$MAIN/DocumentedChatDispatch.kt" "$MAIN/ModelCostGuard.kt" \
+  "$HERE/../model_use_direct/stubs/BuildConfig.kt"
 java -jar "$OUT/check.jar"

@@ -113,6 +113,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -7812,7 +7813,13 @@ class ChatViewModel(
             }
         } else null
         if (initialProvider == null) {
-            _error.value = context.getString(if (AutoModelStore.enabled(context)) R.string.nm_auto_none else R.string.nm_chat_no_model)
+            val automatic = AutoModelStore.enabled(context)
+            _error.value = context.getString(when {
+                automatic && com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test" &&
+                    providerRepository.config.value.instances.any { providerRepository.tamaOwnApiKey(it) != null } -> R.string.nm_auto_no_routes
+                automatic -> R.string.nm_auto_none
+                else -> R.string.nm_chat_no_model
+            })
             return
         }
         var provider: LLMProvider = initialProvider
@@ -8179,6 +8186,8 @@ class ChatViewModel(
         }
     }
 
+    private class LocalAutoNoCandidate(val explanation: String) : Exception()
+
     // nanoMuse: carry the diagnostic on the exception, including through wrapped Flow errors.
     private fun setInlineError(error: Throwable) {
         val actual = unwrapFlowException(error)
@@ -8201,7 +8210,8 @@ class ChatViewModel(
         } else when {
             actual is ai.tama.providers.KeyDestinationGuard.Blocked -> context.getString(R.string.nm_key_destination_blocked)
             actual is ai.tama.pricing.ModelCostGuard.Blocked -> context.getString(R.string.nm_model_cost_blocked)
-            actual is ai.tama.pricing.FreeModelList.Blocked -> context.getString(R.string.nm_free_chat_choose)
+            actual is ai.tama.pricing.FreeModelList.Blocked -> context.getString(ai.tama.pricing.freeStatusAction(actual.status))
+            actual is LocalAutoNoCandidate -> actual.explanation
             detail == unconfirmed -> unconfirmed
             detail == disabled -> disabled
             detail == context.getString(R.string.nm_own_context_limit) -> detail
@@ -9510,7 +9520,9 @@ class ChatViewModel(
                 val onlyFree = allowedFreeByAccount[instance.id]
                 val freeAllowed = onlyFree == null || entry.model.id in onlyFree
                 if (!recipientAllowed) nmAutoLocalBlocks[entry.id] = context.getString(R.string.nm_key_destination_blocked)
-                else if (!freeAllowed) nmAutoLocalBlocks[entry.id] = context.getString(R.string.nm_free_chat_choose)
+                else if (!freeAllowed) nmAutoLocalBlocks[entry.id] = context.getString(
+                    ai.tama.pricing.freeStatusAction(providerRepository.tamaFreeChatStatus(instance, entry.model.id)),
+                )
                 val credentialed = recipientAllowed && freeAllowed && providerRepository.hasAnyCredential(instance) &&
                     instance.providerType !in setOf(ProviderType.antigravity, ProviderType.unsupported)
                 val budget = nmBudgetForEntry(entry.id, entry.model.id)
@@ -9642,7 +9654,7 @@ class ChatViewModel(
             val remaining = (until - android.os.SystemClock.elapsedRealtime()).coerceAtLeast(0L)
             context.getString(R.string.nm_auto_wait_seconds, ((remaining + 999L) / 1000L).coerceAtMost(Int.MAX_VALUE.toLong()).toInt())
         }
-        fun nmAutoNoCandidate(choices: List<AutoChoice>, none: ModelRouter.Choice.None): LLMError.ProviderError {
+        fun nmAutoNoCandidate(choices: List<AutoChoice>, none: ModelRouter.Choice.None): Exception {
             val labels = choices.associate { it.entry.id to it.entry.model.displayName }
             val byEntry = nmAutoTurn?.failureRecords().orEmpty().associateBy { it.entryId }
             val details = none.rejected.map { rejected ->
@@ -9652,8 +9664,12 @@ class ChatViewModel(
                     else if (rejected.reason == ModelRouter.Reason.COOLDOWN)
                         "${nmAutoReason(rejected.reason)} · ${nmAutoWait(rejected.untilMillis)}"
                     else nmAutoReason(rejected.reason)
-                "• ${labels[rejected.entryId] ?: rejected.entryId}: $reason"
+                if (tamaV2Test && nmOwnKeyTurn) "• $reason" else "• ${labels[rejected.entryId] ?: rejected.entryId}: $reason"
             }
+            if (tamaV2Test && nmOwnKeyTurn) return LocalAutoNoCandidate(
+                (listOf(context.getString(R.string.nm_auto_none)) +
+                    details.distinct().ifEmpty { listOf(context.getString(R.string.nm_auto_no_routes)) }).joinToString("\n"),
+            )
             return LLMError.ProviderError((listOf(context.getString(R.string.nm_auto_none)) + details).joinToString("\n"))
         }
         class NoLargerContext : Exception()
@@ -10485,7 +10501,24 @@ class ChatViewModel(
                         if (!nmOwnClientCurrent(currentProvider) || (nmOwnKeyTurn && !nmOwnClientCurrent(provider))) {
                             throw LLMError.ProviderError(context.getString(R.string.nm_auto_disabled_during_turn))
                         }
-                        if (!nmFreeChatAllows(currentProvider)) throw ai.tama.pricing.FreeModelList.Blocked()
+                        val own = nmOwnClients[currentProvider]
+                        val ownInstance = own?.let { providerRepository.instance(it.providerId) }
+                        if (ownInstance != null && !nmOwnKeyRecipientAllowed(ownInstance)) {
+                            throw ai.tama.providers.KeyDestinationGuard.Blocked()
+                        }
+                        val freeChat = own?.let {
+                            providerRepository.tamaFreeChatTicket(it.providerId, it.accountVersion,
+                                nmRouteFingerprint(currentProvider), currentProvider.model.id)
+                        }
+                        if (!nmFreeChatAllows(currentProvider)) throw ai.tama.pricing.FreeModelList.Blocked(
+                            ownInstance?.let { providerRepository.tamaFreeChatStatus(it, currentProvider.model.id) },
+                        )
+                        if (freeChat == null && ownInstance != null && !ai.tama.pricing.ModelCostGuard.permits()) {
+                            val status = providerRepository.tamaFreeChatStatus(ownInstance, currentProvider.model.id)
+                            if (status != ai.tama.pricing.DocumentedFreeChat.Status.FREE) {
+                                throw ai.tama.pricing.FreeModelList.Blocked(status)
+                            }
+                        }
                         nmLastSentRoute = nmRouteFingerprint(currentProvider)
                         // nanoMuse: tag the result with the version that built this client,
                         // never a replacement account read after the final eligibility check.
@@ -10496,12 +10529,13 @@ class ChatViewModel(
                         nmDispatchAt = android.os.SystemClock.elapsedRealtime()
                         // From here on a provider may have received the request, even on cancellation.
                         nmDispatchStarted = true
-                        val sourceStream = currentProvider.streamMessage(
+                        val providerStream = currentProvider.streamMessage(
                             requestMessages,
                             nmSystemPrompt, lastRequestedOutput,
                             tools = requestTools,
                             thinkingLevel = if (currentModelSupportsReasoning) _thinkingLevel.value else ThinkingLevel.OFF,
                         )
+                        val sourceStream = if (freeChat == null) providerStream else providerStream.flowOn(freeChat)
                         // nanoMuse: text that merely looks like an image tool call is
                         // never executed or shown raw. Real tool events pass unchanged.
                         // nanoMuse: an escaped/compound image prompt may not have matched the shortcut.
@@ -11089,6 +11123,11 @@ class ChatViewModel(
                         val isRateLimit = actual is com.openminis.app.data.model.LLMError.RateLimited
                         // nanoMuse: a token count such as 5000 in a 400 is not an HTTP 500.
                         val reach = (actual as? LLMError)?.nmProviderReach
+                        if (tamaV2Test && nmDispatchStarted && reach?.kind == io.github.nanomuse.net.ProviderReach.Kind.NO_CREDIT) {
+                            nmOwnClients[currentProvider]?.let {
+                                providerRepository.tamaRecordPaymentRefusal(it.providerId, currentProvider.model.id, nmDispatchAccountVersion)
+                            }
+                        }
                         if (tamaV2Test && nmOwnClients[currentProvider] != null &&
                             nmLearnZeroSpendLimit(currentProvider, nmDispatchAccountVersion, reach)) {
                             nmForceFreeRemainder = true

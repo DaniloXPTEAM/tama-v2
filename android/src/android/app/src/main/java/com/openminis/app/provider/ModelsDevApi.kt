@@ -260,8 +260,8 @@ object ModelsDevApi {
         }
 
         // 4. Bundled fallback
-        val bundled = loadBundledRegistry()
-        if (bundled != null) {
+        val bundled = bundledRegistrySnapshot()
+        if (bundled.isNotEmpty()) {
             cachedRegistry = bundled
             cacheTimestamp = System.currentTimeMillis()
             scheduleBackgroundRefresh()
@@ -429,6 +429,7 @@ object ModelsDevApi {
             reasoningEffortValues = reasoningEffortValues,
             declaresNoEffortTiers = declaresNoEffortTiers,
             releaseDate = obj.optString("release_date", "").ifEmpty { null },
+            inputCost = obj.optJSONObject("cost")?.optDouble("input", Double.NaN)?.takeIf { it.isFinite() && it >= 0 },
             outputCost = obj.optJSONObject("cost")
                 ?.optDouble("output", Double.NaN)
                 ?.takeIf { !it.isNaN() },
@@ -436,6 +437,28 @@ object ModelsDevApi {
     }
 
     // MARK: - Bundled Fallback
+
+    private var bundled: Map<String, ProviderEntry>? = null
+
+    // nanoMuse: never use another provider's price or a newer live catalog as
+    // the bundled reference. This lookup isn't a billing or availability check.
+    @Synchronized
+    internal fun bundledRegistrySnapshot(): Map<String, ProviderEntry> =
+        bundled ?: loadBundledRegistry()?.also { bundled = it }.orEmpty()
+
+    internal fun bundledProvider(base: String?): ProviderEntry? {
+        val url = base?.trimEnd('/') ?: return null
+        val providers = bundledRegistrySnapshot()
+        val candidates = normalizedCandidates(url)
+        return providers.values.firstOrNull { it.api?.trimEnd('/') in candidates } ?: when (url) {
+            "https://api.groq.com/openai/v1" -> providers["groq"]
+            "https://generativelanguage.googleapis.com/v1beta", "https://generativelanguage.googleapis.com/v1beta/openai" -> providers["google"]
+            "https://api.cerebras.ai/v1" -> providers["cerebras"]
+            "https://api.openai.com/v1" -> providers["openai"]
+            "https://api.mistral.ai/v1" -> providers["mistral"]
+            else -> null
+        }
+    }
 
     private fun loadBundledRegistry(): Map<String, ProviderEntry>? {
         val ctx = appContext ?: return null
@@ -518,5 +541,6 @@ object ModelsDevApi {
         // for same-day releases: sol/terra/luna all shipped 2026-07-09 and only
         // price (30 / 12 / 1.2) separates their tiers.
         val outputCost: Double?,
+        val inputCost: Double? = null, // nanoMuse: bundled list-price hint, not account evidence
     )
 }

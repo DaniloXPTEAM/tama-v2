@@ -55,5 +55,22 @@ fun main() {
     check(caps("fixture/one:free", time = now + OpenRouterPricing.MAX_AGE_MILLIS + 1).isEmpty())
     gate.begin("instance", true, "route")
     check(caps("fixture/one:free").isEmpty())
+    val review = java.time.Instant.parse("2026-11-18T00:00:00Z").toEpochMilli()
+    val gemini = DocumentedFreeChat.GEMINI_BASE
+    val gemma = "gemma-4-31b-it"
+    check(DocumentedFreeChat.status(gemini, gemma, review, false) == DocumentedFreeChat.Status.FREE)
+    check(DocumentedFreeChat.status(gemini, "gemini-2.5-flash-image", review, true) == DocumentedFreeChat.Status.PAID)
+    check(DocumentedFreeChat.status("https://api.groq.com/openai/v1", "openai/gpt-oss-120b", review, true) ==
+        DocumentedFreeChat.Status.FREE_PLAN_UNCONFIRMED)
+    var valid = true
+    val grant = DocumentedChatDispatch(gemma, "fixture-key") { valid }
+    DocumentedChatDispatch.checkGemini(grant, gemini, "fixture-key", gemma, true, review)
+    check(!ModelCostGuard.permits())
+    check(runCatching { DocumentedChatDispatch.checkGemini(grant, gemini, "other-fixture", gemma, true, review) }
+        .exceptionOrNull() is ModelCostGuard.Blocked)
+    valid = false
+    check(runCatching { DocumentedChatDispatch.checkGemini(grant, gemini, "fixture-key", gemma, true, review) }
+        .exceptionOrNull() is ModelCostGuard.Blocked)
+    println("PASSOU: oferta exclusiva sem preco, pago conhecido, rota exata e conta revista")
     println("PASSOU: capacidades de catálogo filtradas por rota, conta, tempo e preço")
 }

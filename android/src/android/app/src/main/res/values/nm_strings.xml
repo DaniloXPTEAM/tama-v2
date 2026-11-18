@@ -1553,4 +1553,15 @@
     <string name="nm_confirmed_reply_steps_title">Reply steps</string>
     <string name="nm_confirmed_reply_steps_total">Completed steps</string>
     <string name="nm_confirmed_reply_steps_note">Counts only completed responses saved since this update. Failed attempts are not counted. This is not a billing total.</string>
+    <string name="nm_free_direct_help">Shows only confirmed free models. The provider may enforce usage limits. A listed free plan does not verify your key’s plan.</string>
+    <string name="nm_free_no_confirmed">No confirmed free models for this key and address. Refresh the list or choose a provider with verified free models.</string>
+    <string name="nm_free_status_limited">Free, subject to usage limits</string>
+    <string name="nm_free_status_priced">Price listed</string>
+    <string name="nm_free_status_plan_unconfirmed">Free plan available, key’s plan not confirmed</string>
+    <string name="nm_free_status_payment">Provider requires payment or credit on this route</string>
+    <string name="nm_free_status_unknown">Price not confirmed</string>
+    <string name="nm_free_paid_action">This route has a listed charge or the provider requires payment. Choose a confirmed free model in Providers.</string>
+    <string name="nm_free_plan_action">The provider lists a free plan, but this API does not confirm your key’s plan. Choose a confirmed free model in Providers.</string>
+    <string name="nm_free_unknown_action">There is no confirmed free price for this model. Refresh the list in Providers or choose a confirmed free model.</string>
+    <string name="nm_auto_no_routes">In Providers, add a confirmed free model and approve it for automatic selection.</string>
 </resources>

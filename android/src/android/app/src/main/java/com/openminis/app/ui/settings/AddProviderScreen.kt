@@ -519,7 +519,10 @@ private fun ConfigureProviderScreen(
         }
 
         // nanoMuse: this preference is only for a personal key, not OAuth or keyless gateways.
-        if (nmParallel && credentialType == ProviderCredential.apiKey && apiKey.isNotBlank()) {
+        if (nmParallel && credentialType == ProviderCredential.apiKey && apiKey.isNotBlank() &&
+            (providerType == ProviderType.openRouter ||
+                ai.tama.providers.ProviderEndpoints.effective(providerType, customBaseURL, appendV1Suffix) in
+                    ai.tama.pricing.DocumentedFreeChat.offeredBases)) {
             ai.tama.providers.FreeModelImportSection(
                 type = providerType,
                 checked = importFreeOnly,

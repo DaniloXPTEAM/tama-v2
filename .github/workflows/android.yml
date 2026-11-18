@@ -143,6 +143,7 @@ jobs:
             --tests 'ai.tama.router.LargerContextTest' \
             --tests 'ai.tama.router.AutomaticCostGuardTest' \
             --tests 'ai.tama.pricing.FreeModelImportTest' \
+            --tests 'ai.tama.pricing.DocumentedFreeChatTest' \
             --tests 'ai.tama.pricing.OpenRouterPricingTest' \
             --tests 'ai.tama.media.ImageToolPresentationTest' \
             --tests 'ai.tama.media.ImageRawToolFilterTest' \

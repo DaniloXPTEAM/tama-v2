@@ -4,6 +4,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+- Distinguished confirmed free chat offers from unverified account plans and prices in the Android Test build, without asking users to declare a plan.
+
 - Prevented a read-only Android test key check from sending the key again after an HTTP 503 that requests an immediate retry.
 
 - Adjusted the parallel Android test build’s chat header, model picker, avatar footer and Hands setup, with PT-BR labels.

@@ -323,7 +323,8 @@ fun ProviderDetailScreen(
         }
 
         // nanoMuse: one per-key choice, no deletion and no changes to spending permissions.
-        if (nmHasOwnKey) {
+        val nmHasFreeCatalogue = nmHasOwnKey && providerRepository.tamaHasFreeCatalogue(instance)
+        if (nmHasFreeCatalogue || nmOnlyFree) {
             ai.tama.providers.FreeModelImportSection(
                 type = instance.providerType,
                 checked = nmOnlyFree,
@@ -336,7 +337,7 @@ fun ProviderDetailScreen(
             )
             // nanoMuse: one tap enables the filter, fetches catalogue metadata if needed,
             // and approves the visible free chat routes. It does not run inference.
-            if (instance.providerType == ProviderType.openRouter && instance.isEnabled) {
+            if (nmHasFreeCatalogue && instance.isEnabled) {
                 var nmBulkBusy by remember(instanceId) { mutableStateOf(false) }
                 var nmBulkResult by remember(instanceId, storedKey, instance.customBaseURL) { mutableStateOf<Int?>(null) }
                 SettingsSection(footer = stringResource(R.string.nm_free_bulk_help)) {
@@ -715,10 +716,14 @@ fun ProviderDetailScreen(
         val nmFreeIds = if (nmOnlyFree && nmImportStatus !is ai.tama.pricing.FreeModelImportStatus.Checking)
             providerRepository.tamaEligibleFreeModelIds(instanceId) else null
         val nmDisplayedEntries = ai.tama.pricing.FreeModelList.filter(entries, nmOnlyFree, nmFreeIds) { it.model.id }
+        val nmPaymentRefusals by providerRepository.tamaPaymentRefusals.collectAsState()
         SettingsSection(
             header = stringResource(R.string.provider_detail_models_count_header, nmDisplayedEntries.size),
-            footer = if (nmOnlyFree && nmFreeIds == null)
-                stringResource(R.string.nm_free_list_refresh) else null,
+            footer = when {
+                nmOnlyFree && nmFreeIds == null -> stringResource(R.string.nm_free_list_refresh)
+                nmOnlyFree && nmFreeIds?.isEmpty() == true -> stringResource(R.string.nm_free_no_confirmed)
+                else -> null
+            },
         ) {
             // Refresh action sits as the first row, mirroring the iOS
             // tap-to-refresh affordance in the section header area.
@@ -808,10 +813,16 @@ fun ProviderDetailScreen(
                     val outputModalities = entry.model.outputModalities.orEmpty()
                     val hasBadge = inputModalities.any { it in modalityIconKeys } ||
                         outputModalities.any { it in modalityOutputIconKeys }
+                    // nanoMuse: plan availability and list prices are separate.
+                    val priceStatus = remember(entry.model.id, instance, nmPaymentRefusals, nmFreeIds, nmHasOwnKey) {
+                        if (nmHasOwnKey) providerRepository.tamaFreeChatStatus(instance, entry.model.id) else null
+                    }
+                    val priceHint = priceStatus?.let { stringResource(ai.tama.pricing.freeStatusLabel(it)) }
                     SettingsRow(
                         title = entry.model.displayName,
                         subtitle = buildString {
                             append(entry.model.id)
+                            if (priceHint != null) append("\n").append(priceHint)
                             if (entry.isHidden) append(" • Hidden")
                         },
                         // onClick = null so SettingsRow doesn't add a second

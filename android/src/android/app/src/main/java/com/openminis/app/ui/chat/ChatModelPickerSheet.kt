@@ -362,7 +362,8 @@ internal fun ModelPickerSheet(
     // nanoMuse: the chat list follows the per-key filter and live account metadata.
     val nmCatalogueStatuses by providerRepository.nmFreeImportStatus.collectAsState()
     val nmSpendLimits by providerRepository.tamaZeroSpendLimits.collectAsState()
-    val allInstancesWithEntries = remember(config, searchText, nmCatalogueStatuses, nmSpendLimits) {
+    val nmPaymentRefusals by providerRepository.tamaPaymentRefusals.collectAsState()
+    val allInstancesWithEntries = remember(config, searchText, nmCatalogueStatuses, nmSpendLimits, nmPaymentRefusals) {
         val t0 = System.nanoTime()
         var totalCount = 0
         val result = config.instances

@@ -17,6 +17,7 @@ import com.openminis.app.provider.LLMProvider
 import com.openminis.app.provider.safeOptString
 import ai.tama.net.singleUseImageBody
 import ai.tama.net.singleUseImageClient
+import ai.tama.pricing.DocumentedChatDispatch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.awaitClose
@@ -131,8 +132,10 @@ class GeminiProvider(
         if (com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test") {
             ai.tama.providers.KeyDestinationGuard.requireAllowed(true, apiKey, basePath)
         }
-        // nanoMuse: block unknown-cost streams before building the outbound request.
-        ai.tama.pricing.ModelCostGuard.requireAllowed()
+        // nanoMuse: a documented free-only Gemini model has a chat-scoped ticket.
+        // No other caller (image, tool/offload, probe) inherits this permission.
+        val costTicket = DocumentedChatDispatch.ticket(coroutineContext)
+        DocumentedChatDispatch.checkGemini(coroutineContext, basePath, apiKey, model.id, textOnly = true)
         val body = buildRequestBody(messages, systemPrompt, maxTokens, temperature, imageParts, tools, thinkingLevel)
         // nanoMuse: snapshot the model in the URL before the request starts.
         val requestModel = model.id
@@ -141,7 +144,7 @@ class GeminiProvider(
         val requestBody = body.toString().toRequestBody("application/json".toMediaType())
         val request = Request.Builder()
             .url(url)
-            .post(if (singleUseImageRequest) requestBody.singleUseImageBody() else requestBody)
+            .post(if (singleUseImageRequest || costTicket != null) requestBody.singleUseImageBody() else requestBody)
             // [T-android-default-ua] same intent as the non-streaming
             // branch above — brand outbound requests with Minis/<version>.
             .applyUserAgentOverride(null)
@@ -151,8 +154,12 @@ class GeminiProvider(
         val credentials = requestCredentials(request)
         // nanoMuse: the guards may have changed while the request was prepared.
         beforeDirectRequest?.invoke()
-        ai.tama.pricing.ModelCostGuard.requireAllowed()
-        val requestClient = if (singleUseImageRequest) client.singleUseImageClient() else client
+        DocumentedChatDispatch.checkGemini(
+            coroutineContext, basePath, apiKey, requestModel,
+            textOnly = body.optJSONObject("generationConfig")?.has("responseModalities") != true &&
+                !body.has("cachedContent"),
+        )
+        val requestClient = if (singleUseImageRequest || costTicket != null) client.singleUseImageClient() else client
         val response = requestClient.newCall(request).execute()
         if (!response.isSuccessful) {
             val errorBody = response.body?.string() ?: ""

@@ -3,6 +3,10 @@ package com.openminis.app.data.repository
 import android.content.Context
 import android.content.SharedPreferences
 import android.util.Base64
+import ai.tama.pricing.DocumentedChatDispatch
+import ai.tama.pricing.DocumentedFreeChat
+import ai.tama.router.AutoModelRuntime
+import ai.tama.router.AutoModelStore
 import ai.tama.pricing.FreeModelImport // nanoMuse: free-only import is separate from cost permission
 import ai.tama.pricing.FreeModelImportStatus
 import ai.tama.pricing.FreeModelImportEvidence
@@ -2364,7 +2368,82 @@ class ProviderRepository(private val context: Context) {
     }
 
     private fun nmFreeRefreshMode(instance: ProviderInstance): Boolean =
-        instance.tamaImportFreeOnly || tamaZeroSpendLimit(instance)
+        FreeModelImport.supports(instance.providerType) && (instance.tamaImportFreeOnly || tamaZeroSpendLimit(instance))
+
+    // nanoMuse: limited to this process and to the account generation that
+    // actually got the payment refusal. Never label the model globally as paid.
+    private val _tamaPaymentRefusals = MutableStateFlow<Map<Pair<String, String>, Long>>(emptyMap())
+    internal val tamaPaymentRefusals = _tamaPaymentRefusals.asStateFlow()
+
+    internal fun tamaRecordPaymentRefusal(instanceId: String, modelId: String, account: Long?): Unit = synchronized(configLock) {
+        val live = instance(instanceId) ?: return@synchronized
+        if (tamaOwnApiKey(live) == null || account == null) return@synchronized
+        AutoModelRuntime.runIfCurrent(instanceId, account) {
+            val next = _tamaPaymentRefusals.value.toMutableMap()
+            next[instanceId to modelId] = account
+            _tamaPaymentRefusals.value = next.entries.toList().takeLast(512).associate { it.toPair() }
+        }
+    }
+
+    private fun tamaPaymentRefused(instanceId: String, modelId: String): Boolean =
+        _tamaPaymentRefusals.value[instanceId to modelId] == AutoModelRuntime.accountVersion(instanceId)
+
+    private fun tamaModelBase(instance: ProviderInstance): String? = if (instance.azureMode) null else
+        ai.tama.providers.ProviderEndpoints.factoryBase(instance.providerType, instance.customBaseURL, instance.appendV1Suffix)
+
+    // nanoMuse: don't offer the OpenRouter filter on the OpenAI form. A saved
+    // legacy filter can still be turned off in the provider's detail screen.
+    internal fun tamaHasFreeCatalogue(instance: ProviderInstance): Boolean =
+        instance.providerType == ProviderType.openRouter || tamaModelBase(instance) in DocumentedFreeChat.offeredBases
+
+    private fun tamaDocumentedStatus(instance: ProviderInstance, modelId: String, listedPricePositive: Boolean): DocumentedFreeChat.Status {
+        val base = tamaModelBase(instance)?.takeUnless {
+            it == DocumentedFreeChat.GEMINI_BASE && instance.providerType != ProviderType.gemini
+        }
+        return DocumentedFreeChat.status(base, modelId, System.currentTimeMillis(), listedPricePositive)
+    }
+
+    internal fun tamaFreeChatStatus(instance: ProviderInstance, modelId: String): DocumentedFreeChat.Status {
+        if (tamaOwnApiKey(instance) == null) return DocumentedFreeChat.Status.UNKNOWN
+        if (tamaPaymentRefused(instance.id, modelId)) return DocumentedFreeChat.Status.PAYMENT_REQUIRED
+        if (instance.providerType == ProviderType.openRouter && modelId in tamaEligibleFreeModelIds(instance.id).orEmpty()) {
+            return DocumentedFreeChat.Status.FREE
+        }
+        val quote = ModelsDevApi.bundledProvider(tamaModelBase(instance))?.models?.get(modelId)
+        val priced = (quote?.inputCost ?: 0.0) > 0 || (quote?.outputCost ?: 0.0) > 0
+        return tamaDocumentedStatus(instance, modelId, priced)
+    }
+
+    private fun tamaDocumentedFreeIds(instance: ProviderInstance): Set<String> =
+        _config.value.modelEntries.asSequence().filter { it.providerInstanceId == instance.id &&
+            !tamaPaymentRefused(instance.id, it.model.id) &&
+            tamaDocumentedStatus(instance, it.model.id, false) == DocumentedFreeChat.Status.FREE
+        }.map { it.model.id }.toSet()
+
+    internal fun tamaDocumentedChatAllowed(instance: ProviderInstance, modelId: String): Boolean =
+        tamaOwnApiKey(instance) != null && !tamaPaymentRefused(instance.id, modelId) &&
+            tamaDocumentedStatus(instance, modelId, false) == DocumentedFreeChat.Status.FREE
+
+    /** Capture the client identity with the saved credential, then recheck just before I/O. */
+    internal fun tamaFreeChatTicket(
+        instanceId: String, account: Long?, route: String?, modelId: String,
+    ): DocumentedChatDispatch? = synchronized(configLock) {
+        if (account == null || route == null) return@synchronized null
+        val live = _config.value.instances.singleOrNull { it.id == instanceId } ?: return@synchronized null
+        if (!live.isEnabled || !tamaDocumentedChatAllowed(live, modelId)) return@synchronized null
+        val saved = nmOAuthKeySnapshot(instanceId)
+        val key = saved.key ?: return@synchronized null
+        if (saved.version != account || AutoModelStore.historyFingerprint(context, live) != route) return@synchronized null
+        DocumentedChatDispatch(modelId, key) {
+            synchronized(configLock) {
+                AutoModelStore.credentialTransaction {
+                    val current = _config.value.instances.singleOrNull { it.id == instanceId }
+                    current != null && current.isEnabled && AutoModelStore.historyFingerprint(context, current) == route &&
+                        nmOAuthKeyStillCurrent(saved) && tamaDocumentedChatAllowed(current, modelId)
+                }
+            }
+        }
+    }
 
     internal fun tamaFreeChatOnly(instance: ProviderInstance): Boolean =
         ai.tama.pricing.FreeModelList.restricted(
@@ -2386,12 +2465,14 @@ class ProviderRepository(private val context: Context) {
      */
     internal fun tamaEligibleFreeModelIds(instanceId: String): Set<String>? = synchronized(configLock) {
         val live = _config.value.instances.firstOrNull { it.id == instanceId } ?: return@synchronized null
+        if (tamaOwnApiKey(live) == null) return@synchronized null
+        if (live.providerType != ProviderType.openRouter) return@synchronized tamaDocumentedFreeIds(live)
         val evidence = nmFreeEvidence[instanceId] ?: return@synchronized null
         ai.tama.router.AutoModelStore.credentialTransaction {
             evidence.current(
                 nmRefreshGate, nmFreeRefreshMode(live), ai.tama.router.AutoModelStore.routeFingerprint(live),
                 ai.tama.router.AutoModelRuntime.accountVersion(instanceId), System.currentTimeMillis(),
-            )
+            )?.filterNot { tamaPaymentRefused(instanceId, it) }?.toSet()
         }
     }
 
@@ -2402,9 +2483,8 @@ class ProviderRepository(private val context: Context) {
      */
     internal suspend fun tamaUseAllFreeChatModels(instanceId: String, key: OAuthKeySnapshot): Int {
         val live = instance(instanceId) ?: return 0
-        if (key.providerId != instanceId || live.providerType != ProviderType.openRouter ||
-            !live.isEnabled || !setTamaImportFreeOnly(instanceId, true, key)) return 0
-        if (tamaEligibleFreeModelIds(instanceId) == null) nmBeginRefresh(instanceId, key)?.let { nmRunRefresh(it) }
+        if (key.providerId != instanceId || !live.isEnabled || !setTamaImportFreeOnly(instanceId, true, key)) return 0
+        if (tamaEligibleFreeModelIds(instanceId).isNullOrEmpty()) nmBeginRefresh(instanceId, key)?.let { nmRunRefresh(it) }
         return tamaApproveFreeChatModels(instanceId, key)
     }
 
@@ -2416,17 +2496,21 @@ class ProviderRepository(private val context: Context) {
             // nanoMuse: a duplicated provider id cannot identify the account whose routes are approved.
             val matchingInstances = _config.value.instances.filter { it.id == instanceId }
             val live = matchingInstances.singleOrNull() ?: return@synchronized 0
-            if (!live.isEnabled || !tamaFreeChatOnly(live) || live.providerType != ProviderType.openRouter ||
-                live.credentialType != ProviderCredential.apiKey ||
+            if (!live.isEnabled || !tamaFreeChatOnly(live) || live.credentialType != ProviderCredential.apiKey ||
                 io.github.nanomuse.cloud.NanoMuseCloud.instance(context)?.id == instanceId) return@synchronized 0
-            val evidence = nmFreeEvidence[instanceId] ?: return@synchronized 0
             ai.tama.router.AutoModelStore.credentialTransaction {
                 if (secrets.getString("apikey_$instanceId", null).isNullOrBlank() ||
                     !nmOAuthKeyStillCurrent(expectedKey)) return@credentialTransaction 0
-                val free = evidence.current(
-                    nmRefreshGate, nmFreeRefreshMode(live), ai.tama.router.AutoModelStore.routeFingerprint(live),
-                    ai.tama.router.AutoModelRuntime.accountVersion(instanceId), System.currentTimeMillis(),
-                ) ?: return@credentialTransaction 0
+                val free = if (live.providerType == ProviderType.openRouter) {
+                    val evidence = nmFreeEvidence[instanceId] ?: return@credentialTransaction 0
+                    evidence.current(
+                        nmRefreshGate, nmFreeRefreshMode(live), AutoModelStore.routeFingerprint(live),
+                        AutoModelRuntime.accountVersion(instanceId), System.currentTimeMillis(),
+                    )?.filterNot { tamaPaymentRefused(instanceId, it) }?.toSet() ?: return@credentialTransaction 0
+                } else {
+                    if (!ai.tama.providers.KeyDestinationGuard.permits(expectedKey.key, tamaModelBase(live))) return@credentialTransaction 0
+                    tamaDocumentedFreeIds(live)
+                }
                 val entries = _config.value.modelEntries
                 val ids = ai.tama.pricing.FreeModelBulk.select(instanceId, free, entries.map {
                     ai.tama.pricing.FreeModelBulk.Entry(it.id, it.providerInstanceId, it.model.id, it.isHidden)

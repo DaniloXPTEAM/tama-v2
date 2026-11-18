@@ -1574,4 +1574,15 @@
     <string name="nm_confirmed_reply_steps_title">Etapas de resposta</string>
     <string name="nm_confirmed_reply_steps_total">Etapas concluídas</string>
     <string name="nm_confirmed_reply_steps_note">Conta só as respostas concluídas e salvas a partir desta versão. Tentativas que falharam não entram na conta. Este número não indica cobranças.</string>
+    <string name="nm_free_direct_help">Mostra só modelos com gratuidade confirmada. O provedor pode limitar o uso. Um plano anunciado não confirma o plano da chave.</string>
+    <string name="nm_free_no_confirmed">Nenhum modelo gratuito confirmado para esta chave e este endereço. Atualize a lista ou escolha um provedor com opções confirmadas.</string>
+    <string name="nm_free_status_limited">Gratuito, com limite de uso</string>
+    <string name="nm_free_status_priced">Preço de tabela informado</string>
+    <string name="nm_free_status_plan_unconfirmed">Tem plano gratuito, mas o plano da chave não foi confirmado</string>
+    <string name="nm_free_status_payment">O provedor exige pagamento ou crédito nesta rota</string>
+    <string name="nm_free_status_unknown">Preço não confirmado</string>
+    <string name="nm_free_paid_action">Esta rota tem preço de tabela ou o provedor exige pagamento. Escolha um modelo gratuito confirmado em Provedores.</string>
+    <string name="nm_free_plan_action">O provedor anuncia um plano gratuito, mas a API não confirma o plano da chave. Escolha um modelo gratuito confirmado em Provedores.</string>
+    <string name="nm_free_unknown_action">Não há preço gratuito confirmado para este modelo. Atualize a lista em Provedores ou escolha um modelo gratuito confirmado.</string>
+    <string name="nm_auto_no_routes">Adicione um modelo gratuito confirmado em Provedores e autorize seu uso na seleção automática.</string>
 </resources>
