@@ -1561,4 +1561,8 @@
     <string name="nm_key_probe_denied">Dostawca odmówił dostępu; przyczyna jest nieznana.</string>
     <string name="nm_key_probe_unavailable">Nie można sprawdzić klucza. Sprawdź połączenie.</string>
     <string name="nm_key_probe_unsupported">Nie można sprawdzić klucza pod tym adresem. Klucz nie został wysłany.</string>
+    <string name="nm_free_bulk_button">Zezwól na wszystkie modele czatu oznaczone jako darmowe</string>
+    <string name="nm_free_bulk_help">Zezwala na widoczne modele oznaczone jako darmowe w aktualnym katalogu do automatycznego wyboru czatu. Nie włącza trybu automatycznego ani zgody na koszty i nie zezwala na obrazy. Ceny i dodatkowe usługi mogą się zmienić.</string>
+    <string name="nm_free_bulk_done">Dozwolone trasy czatu: %1$d. Pozostałe kontrole dostępności i kosztów nadal obowiązują.</string>
+    <string name="nm_free_bulk_retry">Nie zezwolono na żaden aktualnie dostępny model. Odśwież katalog i spróbuj ponownie.</string>
 </resources>

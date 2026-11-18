@@ -1549,4 +1549,8 @@
     <string name="nm_key_probe_denied">Penyedia menolak akses; sebabnya tidak diketahui.</string>
     <string name="nm_key_probe_unavailable">Kunci tidak dapat diuji. Semak sambungan.</string>
     <string name="nm_key_probe_unsupported">Ujian kunci tidak tersedia untuk alamat ini. Tiada kunci dihantar.</string>
+    <string name="nm_free_bulk_button">Benarkan semua model sembang yang disenaraikan percuma</string>
+    <string name="nm_free_bulk_help">Membenarkan model yang kelihatan dan disenaraikan percuma dalam katalog terkini untuk pilihan sembang automatik. Tidak menghidupkan mod automatik atau kebenaran kos dan tidak membenarkan imej. Harga dan perkhidmatan tambahan mungkin berubah.</string>
+    <string name="nm_free_bulk_done">Laluan sembang dibenarkan: %1$d. Semakan kelayakan dan kos lain masih terpakai.</string>
+    <string name="nm_free_bulk_retry">Tiada model layak semasa dibenarkan. Muat semula katalog dan cuba lagi.</string>
 </resources>

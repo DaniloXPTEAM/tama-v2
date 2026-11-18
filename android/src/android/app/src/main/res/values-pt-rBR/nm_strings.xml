@@ -1555,4 +1555,8 @@
     <string name="nm_key_probe_unavailable">Não foi possível testar a chave. Confira a conexão e tente novamente.</string>
     <string name="nm_key_probe_unsupported">O teste de chave não está disponível para este endereço. Nenhuma chave foi enviada.</string>
     <string name="nm_context_near_limit">O contexto está perto do limite do modelo (%1$d / %2$d tokens). Inicie uma nova conversa ou use /compact para continuar com mais segurança.</string>
+    <string name="nm_free_bulk_button">Autorizar todos os modelos de chat anunciados como grátis</string>
+    <string name="nm_free_bulk_help">Autoriza os modelos visíveis anunciados como grátis no catálogo recente para seleção automática de chat. Não liga o modo automático nem a permissão de custo e não autoriza geração de imagem. Preços e serviços extras podem mudar.</string>
+    <string name="nm_free_bulk_done">Rotas de chat autorizadas: %1$d. As demais verificações de elegibilidade e custo continuam valendo.</string>
+    <string name="nm_free_bulk_retry">Nenhum modelo elegível atual foi autorizado. Atualize o catálogo e tente novamente.</string>
 </resources>

@@ -1526,4 +1526,8 @@
     <string name="nm_key_probe_denied">服务商拒绝访问，原因未知。</string>
     <string name="nm_key_probe_unavailable">无法测试密钥，请检查网络连接。</string>
     <string name="nm_key_probe_unsupported">此地址不支持密钥测试，未发送密钥。</string>
+    <string name="nm_free_bulk_button">允许所有标为免费的聊天模型</string>
+    <string name="nm_free_bulk_help">允许最新目录中标为免费且可见的模型用于自动聊天选择。不会开启自动模式或费用许可，也不会允许生成图片。价格和额外服务可能变化。</string>
+    <string name="nm_free_bulk_done">已允许的聊天路线：%1$d。其他资格和费用检查仍然有效。</string>
+    <string name="nm_free_bulk_retry">没有允许当前符合条件的模型。请刷新目录后重试。</string>
 </resources>

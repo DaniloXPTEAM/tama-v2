@@ -2342,6 +2342,39 @@ class ProviderRepository(private val context: Context) {
         }
     }
 
+    /**
+     * One explicit action approves chat routes from current free-only evidence.
+     * This never turns on automatic mode or its separate cost permission. A
+     * changed account, route, refresh or disabled import invalidates the evidence.
+     */
+    internal fun tamaApproveFreeChatModels(instanceId: String): Int {
+        if (com.openminis.app.BuildConfig.APPLICATION_ID != "ai.tama.assistant.tamav2test") return 0
+        val secrets = encryptedPrefs // initialize before acquiring either lock
+        return synchronized(configLock) {
+            ensureConfigLoaded()
+            val live = _config.value.instances.firstOrNull { it.id == instanceId } ?: return@synchronized 0
+            if (!live.isEnabled || !live.tamaImportFreeOnly || live.providerType != ProviderType.openRouter ||
+                live.credentialType != ProviderCredential.apiKey ||
+                io.github.nanomuse.cloud.NanoMuseCloud.instance(context)?.id == instanceId) return@synchronized 0
+            val evidence = nmFreeEvidence[instanceId] ?: return@synchronized 0
+            ai.tama.router.AutoModelStore.credentialTransaction {
+                if (secrets.getString("apikey_$instanceId", null).isNullOrBlank()) return@credentialTransaction 0
+                val free = evidence.current(
+                    nmRefreshGate, live.tamaImportFreeOnly, ai.tama.router.AutoModelStore.routeFingerprint(live),
+                    ai.tama.router.AutoModelRuntime.accountVersion(instanceId), System.currentTimeMillis(),
+                ) ?: return@credentialTransaction 0
+                val entries = _config.value.modelEntries
+                val ids = ai.tama.pricing.FreeModelBulk.select(instanceId, free, entries.map {
+                    ai.tama.pricing.FreeModelBulk.Entry(it.id, it.providerInstanceId, it.model.id, it.isHidden)
+                }).toSet()
+                val identities = entries.filter {
+                    it.id in ids && it.providerInstanceId == instanceId && !it.isHidden && it.model.id in free
+                }.map { ai.tama.router.AutoModelStore.identity(it, live) }.distinct()
+                if (ai.tama.router.AutoModelStore.approveFreeChatBatch(context, identities)) identities.size else 0
+            }
+        }
+    }
+
     /** Fresh exact-model capabilities from this own-key provider's free import only. */
     internal fun tamaFreeModelCapabilities(instanceId: String, modelId: String): Set<String> = synchronized(configLock) {
         val live = _config.value.instances.firstOrNull { it.id == instanceId } ?: return@synchronized emptySet()

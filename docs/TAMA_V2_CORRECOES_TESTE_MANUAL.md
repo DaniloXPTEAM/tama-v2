@@ -238,3 +238,15 @@ Groq e continuar, repetir em Gemini e TAMA AI Cloud, verificando a resposta e a 
 histórico. Repetir quando houver chamadas de ferramentas, conferir custo e permissões antes de
 cada envio e registrar uma captura e o diagnóstico do turno. A forma de entrega privada ainda
 precisa ser combinada; não limpar ou desinstalar nenhum dos apps para contornar assinatura.
+
+## Autorização em lote de modelos anunciados gratuitos
+
+Na variante paralela, a tela do provedor OpenRouter com chave própria e a opção
+de importar somente gratuitos oferece uma ação para autorizar, para seleção
+automática de chat, os modelos visíveis reconhecidos como gratuitos na consulta
+recente. A ação não liga o modo automático, não altera a permissão separada de
+custo e não autoriza imagens. Modelos ocultos, de outras contas ou ausentes da
+evidência atual não são incluídos. A troca de chave, rota ou preferência invalida
+a evidência; atualize o catálogo antes de tentar novamente. O catálogo não
+garante ausência de cobrança ou serviços extras. Testes locais simulam a seleção,
+mas não comprovam a tela ou a persistência Android em aparelho.

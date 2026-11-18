@@ -19,6 +19,19 @@ class FreeModelImportTest {
         .put("endpoints", JSONArray().put("/api/v1/chat/completions"))
     private fun model(id: String) = LLMModel(id, id, "Fixture")
 
+    @Test fun `bulk route selection excludes other accounts hidden entries and paid ids`() {
+        val rows = listOf(
+            FreeModelBulk.Entry("one", "a", "vendor/one:free", false),
+            FreeModelBulk.Entry("two", "a", "vendor/two:free", false),
+            FreeModelBulk.Entry("paid", "a", "vendor/paid:free", false),
+            FreeModelBulk.Entry("hidden", "a", "vendor/one:free", true),
+            FreeModelBulk.Entry("other", "b", "vendor/one:free", false),
+            FreeModelBulk.Entry("one", "a", "vendor/one:free", false),
+        )
+        assertEquals(listOf("one", "two"), FreeModelBulk.select("a", setOf("vendor/one:free", "vendor/two:free"), rows))
+        assertTrue(FreeModelBulk.select("a", emptySet(), rows).isEmpty())
+    }
+
     @Test fun `only fresh evidence for exact free variants is eligible`() {
         val raw = JSONArray().put(quote("vendor/a:free")).put(quote("openrouter/free"))
             .put(quote("vendor/paid:free", "0.01"))

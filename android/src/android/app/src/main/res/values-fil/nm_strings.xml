@@ -1553,4 +1553,8 @@
     <string name="nm_key_probe_denied">Tinanggihan ng provider ang access; hindi alam ang dahilan.</string>
     <string name="nm_key_probe_unavailable">Hindi masubukan ang key. Suriin ang koneksyon.</string>
     <string name="nm_key_probe_unsupported">Hindi available ang pagsubok sa address na ito. Walang key na ipinadala.</string>
+    <string name="nm_free_bulk_button">Pahintulutan ang lahat ng nakalistang libreng chat model</string>
+    <string name="nm_free_bulk_help">Pinapahintulutan ang nakikitang modelong nakalistang libre sa kamakailang katalogo para sa awtomatikong pagpili sa chat. Hindi nito binubuksan ang awtomatikong mode o pahintulot sa gastos at hindi nito pinapahintulutan ang larawan. Maaaring magbago ang presyo at dagdag na serbisyo.</string>
+    <string name="nm_free_bulk_done">Mga pinahintulutang chat route: %1$d. May iba pang pagsusuri sa pagiging angkop at gastos.</string>
+    <string name="nm_free_bulk_retry">Walang kasalukuyang angkop na modelo ang pinahintulutan. I-refresh ang katalogo at subukan muli.</string>
 </resources>

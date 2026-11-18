@@ -1554,4 +1554,8 @@
     <string name="nm_key_probe_denied">Le fournisseur a refusé l’accès ; la raison est inconnue.</string>
     <string name="nm_key_probe_unavailable">Impossible de tester la clé. Vérifiez la connexion.</string>
     <string name="nm_key_probe_unsupported">Le test de clé est indisponible pour cette adresse. Aucune clé envoyée.</string>
+    <string name="nm_free_bulk_button">Autoriser tous les modèles de chat annoncés gratuits</string>
+    <string name="nm_free_bulk_help">Autorise les modèles visibles annoncés gratuits dans le catalogue récent pour la sélection automatique du chat. Ne active ni le mode automatique ni les frais et ne autorise pas les images. Les prix et services supplémentaires peuvent changer.</string>
+    <string name="nm_free_bulk_done">Routes de chat autorisées : %1$d. Les autres contrôles de disponibilité et de coût restent actifs.</string>
+    <string name="nm_free_bulk_retry">Aucun modèle admissible actuel autorisé. Actualisez le catalogue et réessayez.</string>
 </resources>

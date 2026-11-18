@@ -1553,4 +1553,8 @@
     <string name="nm_key_probe_denied">El proveedor denegó el acceso; se desconoce el motivo.</string>
     <string name="nm_key_probe_unavailable">No se pudo probar la clave. Comprueba la conexión.</string>
     <string name="nm_key_probe_unsupported">No se puede probar la clave en esta dirección. No se envió ninguna clave.</string>
+    <string name="nm_free_bulk_button">Autorizar todos los modelos de chat anunciados gratis</string>
+    <string name="nm_free_bulk_help">Autoriza los modelos visibles anunciados gratis en el catálogo reciente para selección automática de chat. No activa el modo automático ni el permiso de costes y no autoriza imágenes. Los precios y servicios extra pueden cambiar.</string>
+    <string name="nm_free_bulk_done">Rutas de chat autorizadas: %1$d. Siguen vigentes las demás comprobaciones de elegibilidad y coste.</string>
+    <string name="nm_free_bulk_retry">No se autorizó ningún modelo elegible actual. Actualiza el catálogo y vuelve a intentarlo.</string>
 </resources>

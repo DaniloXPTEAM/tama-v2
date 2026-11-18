@@ -1519,4 +1519,8 @@
     <string name="nm_key_probe_denied">服務商拒絕存取，原因未知。</string>
     <string name="nm_key_probe_unavailable">無法測試金鑰，請檢查網路連線。</string>
     <string name="nm_key_probe_unsupported">此位址不支援金鑰測試，未傳送金鑰。</string>
+    <string name="nm_free_bulk_button">允許所有標為免費的聊天模型</string>
+    <string name="nm_free_bulk_help">允許最新目錄中標為免費且可見的模型用於自動聊天選擇。不會開啟自動模式或費用許可，也不會允許產生圖片。價格和額外服務可能變動。</string>
+    <string name="nm_free_bulk_done">已允許的聊天路徑：%1$d。其他資格和費用檢查仍然有效。</string>
+    <string name="nm_free_bulk_retry">沒有允許目前符合條件的模型。請重新整理目錄後再試。</string>
 </resources>

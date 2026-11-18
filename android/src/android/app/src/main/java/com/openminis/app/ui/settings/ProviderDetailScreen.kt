@@ -308,6 +308,38 @@ fun ProviderDetailScreen(
                 },
                 status = statuses[instanceId],
             )
+            // nanoMuse: chat-route approval is not cost or image consent, and does not send a request.
+            if (instance.providerType == ProviderType.openRouter &&
+                instance.credentialType == com.openminis.app.data.model.ProviderCredential.apiKey &&
+                instance.tamaImportFreeOnly) {
+                var nmBulkBusy by remember(instanceId) { mutableStateOf(false) }
+                var nmBulkResult by remember(instanceId, statuses[instanceId], storedKey, instance.customBaseURL) { mutableStateOf<Int?>(null) }
+                SettingsSection(footer = stringResource(R.string.nm_free_bulk_help)) {
+                    MinisButton(
+                        onClick = {
+                            nmBulkBusy = true
+                            scope.launch {
+                                nmBulkResult = try {
+                                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                        providerRepository.tamaApproveFreeChatModels(instanceId)
+                                    }
+                                } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+                                catch (_: Exception) { 0 }
+                                nmBulkBusy = false
+                            }
+                        },
+                        enabled = !nmBulkBusy && statuses[instanceId] is ai.tama.pricing.FreeModelImportStatus.Complete,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                    ) { Text(stringResource(R.string.nm_free_bulk_button)) }
+                    nmBulkResult?.let { count ->
+                        Text(
+                            if (count > 0) stringResource(R.string.nm_free_bulk_done, count)
+                            else stringResource(R.string.nm_free_bulk_retry),
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        )
+                    }
+                }
+            }
         }
 
         // Manual Bearer Token (OAuth providers only — proxy override)

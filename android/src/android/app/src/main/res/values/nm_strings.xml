@@ -1534,4 +1534,8 @@
     <string name="nm_key_probe_unavailable">Could not check the key. Check the connection and try again.</string>
     <string name="nm_key_probe_unsupported">Key testing is unavailable for this address. No key was sent.</string>
     <string name="nm_context_near_limit">Context is near the model limit (%1$d / %2$d tokens). Start a new chat or use /compact to continue reliably.</string>
+    <string name="nm_free_bulk_button">Approve all listed free chat models</string>
+    <string name="nm_free_bulk_help">Approves visible models advertised as free in the latest catalogue for automatic chat selection. Does not turn on automatic mode or cost permission, and does not approve image generation. Prices and extra services may change.</string>
+    <string name="nm_free_bulk_done">Approved chat routes: %1$d. Other eligibility and cost checks still apply.</string>
+    <string name="nm_free_bulk_retry">No current eligible models were approved. Refresh the catalogue and try again.</string>
 </resources>

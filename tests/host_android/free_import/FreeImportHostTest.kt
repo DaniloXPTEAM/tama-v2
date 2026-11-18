@@ -14,6 +14,19 @@ fun main() {
         .put("supported_parameters", if (tools) JSONArray().put("tools") else JSONArray())
     val prices = OpenRouterPricing.parse(JSONArray().put(quote("fixture/one:free", "0", true))
         .put(quote("fixture/two:free", "0", false)).put(quote("fixture/paid:free", "1", true)), now)
+    val freeRows = listOf(
+        FreeModelBulk.Entry("one", "instance", "fixture/one:free", false),
+        FreeModelBulk.Entry("two", "instance", "fixture/two:free", false),
+        FreeModelBulk.Entry("paid", "instance", "fixture/paid:free", false),
+        FreeModelBulk.Entry("hidden", "instance", "fixture/one:free", true),
+        FreeModelBulk.Entry("other", "other", "fixture/one:free", false),
+        FreeModelBulk.Entry("one", "instance", "fixture/one:free", false),
+        FreeModelBulk.Entry("", "instance", "fixture/one:free", false),
+    )
+    val freeIds = setOf("fixture/one:free", "fixture/two:free")
+    check(FreeModelBulk.select("instance", freeIds, freeRows) == listOf("one", "two"))
+    check(FreeModelBulk.select("instance", emptySet(), freeRows).isEmpty())
+    check(FreeModelBulk.select("missing", freeIds, freeRows).isEmpty())
     val gate = ModelRefreshGate()
     val ticket = gate.begin("instance", true, "route")
     val evidence = FreeModelImportEvidence(ticket, 1, prices,

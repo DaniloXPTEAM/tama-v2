@@ -1553,4 +1553,8 @@
     <string name="nm_key_probe_denied">Sağlayıcı erişimi reddetti; nedeni bilinmiyor.</string>
     <string name="nm_key_probe_unavailable">Anahtar test edilemedi. Bağlantıyı kontrol edin.</string>
     <string name="nm_key_probe_unsupported">Bu adres için anahtar testi kullanılamıyor. Anahtar gönderilmedi.</string>
+    <string name="nm_free_bulk_button">Ücretsiz listelenen tüm sohbet modellerine izin ver</string>
+    <string name="nm_free_bulk_help">Son katalogda ücretsiz listelenen görünür modellerin otomatik sohbet seçimine izin verir. Otomatik modu veya maliyet iznini açmaz ve görsel üretimine izin vermez. Fiyatlar ve ek hizmetler değişebilir.</string>
+    <string name="nm_free_bulk_done">İzin verilen sohbet yolları: %1$d. Diğer uygunluk ve maliyet kontrolleri geçerlidir.</string>
+    <string name="nm_free_bulk_retry">Güncel uygun modellerden hiçbirine izin verilmedi. Kataloğu yenileyip tekrar deneyin.</string>
 </resources>

@@ -1553,4 +1553,8 @@
     <string name="nm_key_probe_denied">Der Anbieter hat den Zugriff verweigert; der Grund ist unbekannt.</string>
     <string name="nm_key_probe_unavailable">Der Schlüssel konnte nicht geprüft werden. Verbindung prüfen.</string>
     <string name="nm_key_probe_unsupported">An dieser Adresse ist kein Schlüsseltest verfügbar. Es wurde kein Schlüssel gesendet.</string>
+    <string name="nm_free_bulk_button">Alle als kostenlos angebotenen Chatmodelle zulassen</string>
+    <string name="nm_free_bulk_help">Lässt sichtbare, im aktuellen Katalog als kostenlos angebotene Modelle für die automatische Chatauswahl zu. Aktiviert weder Automatik noch Kostenerlaubnis und erlaubt keine Bilder. Preise und Zusatzdienste können sich ändern.</string>
+    <string name="nm_free_bulk_done">Zugelassene Chatrouten: %1$d. Weitere Eignungs- und Kostenprüfungen gelten weiterhin.</string>
+    <string name="nm_free_bulk_retry">Keine aktuell geeigneten Modelle zugelassen. Katalog aktualisieren und erneut versuchen.</string>
 </resources>

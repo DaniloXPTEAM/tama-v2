@@ -1557,4 +1557,8 @@
     <string name="nm_key_probe_denied">Furnizorul a refuzat accesul; motivul nu este cunoscut.</string>
     <string name="nm_key_probe_unavailable">Cheia nu a putut fi verificată. Verifică conexiunea.</string>
     <string name="nm_key_probe_unsupported">Testarea cheii nu este disponibilă la această adresă. Nu a fost trimisă nicio cheie.</string>
+    <string name="nm_free_bulk_button">Autorizează toate modelele de chat anunțate gratuite</string>
+    <string name="nm_free_bulk_help">Autorizează modelele vizibile anunțate gratuite în catalogul recent pentru selectarea automată a chatului. Nu activează modul automat sau permisiunea de cost și nu autorizează imagini. Prețurile și serviciile suplimentare se pot schimba.</string>
+    <string name="nm_free_bulk_done">Rute de chat autorizate: %1$d. Celelalte verificări de eligibilitate și cost rămân valabile.</string>
+    <string name="nm_free_bulk_retry">Nu a fost autorizat niciun model eligibil actual. Actualizează catalogul și încearcă din nou.</string>
 </resources>

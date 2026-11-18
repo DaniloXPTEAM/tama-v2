@@ -1549,4 +1549,8 @@
     <string name="nm_key_probe_denied">アクセスが拒否されました。理由は不明です。</string>
     <string name="nm_key_probe_unavailable">キーを確認できませんでした。接続を確認してください。</string>
     <string name="nm_key_probe_unsupported">このアドレスではテストできません。キーは送信されていません。</string>
+    <string name="nm_free_bulk_button">無料と掲載されたチャットモデルをすべて許可</string>
+    <string name="nm_free_bulk_help">最新のカタログで無料と掲載された表示中のモデルを、チャットの自動選択に許可します。自動モードや費用の許可は有効にならず、画像生成も許可されません。価格や追加サービスは変更される場合があります。</string>
+    <string name="nm_free_bulk_done">許可されたチャット経路: %1$d。その他の利用条件と費用の確認は引き続き適用されます。</string>
+    <string name="nm_free_bulk_retry">現在利用条件を満たすモデルは許可されませんでした。カタログを更新して再試行してください。</string>
 </resources>
