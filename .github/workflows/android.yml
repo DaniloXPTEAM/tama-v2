@@ -28,6 +28,17 @@ jobs:
           submodules: recursive
           persist-credentials: false
           ref: ${{ github.sha }}
+      - name: Check parallel Android wiring and local SQLite fixture
+        run: |
+          PYTHONPATH=tests python3 -m unittest \
+            test_tama_usage_order test_tama_larger_context_static \
+            test_tama_free_list_static test_tama_free_bulk_static \
+            test_tama_free_rank_static test_tama_capability_review_static \
+            test_tama_image_raw_static test_tama_image_retry_static \
+            test_tama_context_notice test_tama_provider_refresh_label \
+            test_tama_key_probe_static test_tama_destination_audit \
+            test_tama_test_signing_config test_tama_build_failure_summary \
+            test_tama_private_drive test_tama_parallel_screens
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: temurin
@@ -48,7 +59,7 @@ jobs:
           export GOROOT="$(go env GOROOT)" GOPATH="$(go env GOPATH)"
           export PATH="$GOPATH/bin:$PATH"
           bash scripts/android/build-natives.sh
-      # Optional private test signer. No key or APK is uploaded or cached.
+      # The signer is optional for verification and mandatory for manual private delivery.
       - name: Prepare optional private test signer
         env:
           TEST_STORE: ${{ secrets.TAMA_TEST_KEYSTORE_BASE64 }}
@@ -81,9 +92,18 @@ jobs:
         run: |
           if [ -f "$RUNNER_TEMP/tama-test-signing.jks" ]; then export TAMA_TEST_KEYSTORE_FILE="$RUNNER_TEMP/tama-test-signing.jks"; fi
           export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/$NDK_VERSION"
-          ./gradlew :app:assembleTamaTest --max-workers=1 --console=plain --no-daemon \
+          # Preserve the failing exit code; the summary contains fixed labels only, not logs.
+          set -o pipefail
+          if ./gradlew :app:assembleTamaTest --max-workers=1 --console=plain --no-daemon \
             '-Dorg.gradle.jvmargs=-Xmx4608m -XX:MaxMetaspaceSize=768m -Dfile.encoding=UTF-8' \
-            -Pkotlin.compiler.execution.strategy=in-process -Pkotlin.incremental=false
+            -Pkotlin.compiler.execution.strategy=in-process -Pkotlin.incremental=false 2>&1 | tee "$RUNNER_TEMP/tama-assemble.log"; then
+            rm -f "$RUNNER_TEMP/tama-assemble.log"
+          else
+            status=$?
+            python3 ../../../scripts/android/summarize-build-failure.py "$RUNNER_TEMP/tama-assemble.log" "$status" || true
+            rm -f "$RUNNER_TEMP/tama-assemble.log"
+            exit "$status"
+          fi
       - name: Assemble normal debug locally for identity check
         working-directory: android/src/android
         run: |
@@ -165,4 +185,4 @@ jobs:
           python3 scripts/android/deliver-private-drive.py android/src/android/app/build/outputs/apk/tamaTest/app-tamaTest.apk
       - name: Remove private test signer
         if: ${{ always() }}
-        run: rm -f "$RUNNER_TEMP/tama-test-signing.jks"
+        run: rm -f "$RUNNER_TEMP/tama-test-signing.jks" "$RUNNER_TEMP/tama-assemble.log"
