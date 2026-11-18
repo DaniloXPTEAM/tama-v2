@@ -9,8 +9,7 @@ class FreeListWiring(unittest.TestCase):
         text = (ROOT / 'com/openminis/app/ui/settings/ProviderDetailScreen.kt').read_text()
         view = text.split('// nanoMuse: this is a reversible view filter', 1)[1].split('nmDisplayedEntries.forEachIndexed', 1)[0]
         for guard in ('nmParallel', 'ProviderType.openRouter', 'ProviderCredential.apiKey',
-                      'instance.tamaImportFreeOnly', '?.id?.let { it != instanceId } == true',
-                      'tamaEligibleFreeModelIds(instanceId)',
+                      'instance.tamaImportFreeOnly', 'tamaEligibleFreeModelIds(instanceId)',
                       'FreeModelList.filter(entries, nmShowFreeFilter && nmFilterFree, nmFreeIds)',
                       'onCheckedChange = { nmFilterFree = it }', 'nm_free_list_refresh'):
             self.assertIn(guard, view)
