@@ -6,6 +6,16 @@ MAIN = Path(__file__).resolve().parents[1] / "android/src/android/app/src/main/j
 
 
 class FreeBulkIntegration(unittest.TestCase):
+    def test_documented_offers_can_be_imported_on_the_first_refresh(self):
+        repo = (MAIN / "com/openminis/app/data/repository/ProviderRepository.kt").read_text()
+        mode = repo.split("private fun nmFreeRefreshMode", 1)[1].split("// nanoMuse:", 1)[0]
+        self.assertIn("instance.tamaImportFreeOnly || tamaZeroSpendLimit(instance)", mode)
+        refresh = repo.split("private suspend fun nmRefreshFreeModels", 1)[1].split("private fun nmRefreshCanStart", 1)[0]
+        for guard in ("ModelsDevApi.bundledModels(tamaModelBase(instance))", "nmWithCurrentFreeRefresh(refresh, keySnapshot)",
+                      "models.filter { tamaDocumentedChatAllowed(instance, it.id) }", "FreeModelImport.additions("):
+            self.assertIn(guard, refresh)
+        self.assertNotIn("replaceEntries(", refresh)
+
     def test_revalidated_and_cost_policy_is_not_changed(self):
         repo = (MAIN / "com/openminis/app/data/repository/ProviderRepository.kt").read_text()
         section = repo.split("private fun tamaApproveFreeChatModels", 1)[1].split("/** Fresh exact-model", 1)[0]

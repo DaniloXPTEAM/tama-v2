@@ -9453,6 +9453,13 @@ class ChatViewModel(
                     part is AgentContentPart.ImageData || (part is AgentContentPart.ToolResult && part.imageData != null)
                 } }) add(Need.VISION)
         }
+        // nanoMuse: only the main chat transport can spend this scoped proof.
+        // All other automatic call sites retain the separate cost guard.
+        fun nmAutoChatCostAllowed(entry: ModelEntry?, instance: ProviderInstance?): Boolean =
+            (tamaV2Test && instance != null && entry != null &&
+                providerRepository.tamaDocumentedChatAllowed(instance, entry.model.id)) ||
+                ai.tama.router.AutomaticCostGuard.permits(context)
+
         fun nmAutoCapabilities(entry: ModelEntry, instance: ProviderInstance): Set<Need> {
             val vendor = io.github.nanomuse.cloud.ProviderCatalogue.match(
                 io.github.nanomuse.cloud.ProviderCatalogue.load(context), instance,
@@ -9518,7 +9525,8 @@ class ChatViewModel(
                 val model = nmAutoModel(entry, caps)
                 val recipientAllowed = !nmOwnKeyTurn || nmOwnKeyRecipientAllowed(instance)
                 val onlyFree = allowedFreeByAccount[instance.id]
-                val freeAllowed = onlyFree == null || entry.model.id in onlyFree
+                val freeAllowed = !providerRepository.tamaPaymentRefused(instance.id, entry.model.id) &&
+                    (onlyFree == null || entry.model.id in onlyFree)
                 if (!recipientAllowed) nmAutoLocalBlocks[entry.id] = context.getString(R.string.nm_key_destination_blocked)
                 else if (!freeAllowed) nmAutoLocalBlocks[entry.id] = context.getString(
                     ai.tama.pricing.freeStatusAction(providerRepository.tamaFreeChatStatus(instance, entry.model.id)),
@@ -9543,7 +9551,7 @@ class ChatViewModel(
                     tokensPerMinute = budget.tokensPerMinute, enabled = instance.isEnabled,
                     visible = !entry.isHidden, credentialed = credentialed,
                     automaticApproved = AutoModelStore.approved(context, identity),
-                    automaticCostAllowed = ai.tama.router.AutomaticCostGuard.permits(context),
+                    automaticCostAllowed = nmAutoChatCostAllowed(entry, instance),
                     // Catalogue ranking is not proof of a zero-cost request or spending permission.
                     verifiedFree = instance.id == freeRankInstance?.id && entry.model.id in freeRankIds,
                     preference = preference,
@@ -9556,8 +9564,7 @@ class ChatViewModel(
         // nanoMuse: a refresh or request preparation can suspend while settings change.
         // Re-read the live configuration before touching consent or installing a client.
         fun nmAutoChoiceStillEligible(choice: AutoChoice): Boolean {
-            if (!AutoModelStore.enabled(context) || _selectedGroupId.value != choice.groupId ||
-                !ai.tama.router.AutomaticCostGuard.permits(context)) return false
+            if (!AutoModelStore.enabled(context) || _selectedGroupId.value != choice.groupId) return false
             val live = providerRepository.config.value
             if (choice.groupId != null) {
                 val group = live.modelGroups.find { it.id == choice.groupId } ?: return false
@@ -9565,7 +9572,7 @@ class ChatViewModel(
             }
             val entry = live.modelEntries.find { it.id == choice.entry.id } ?: return false
             val instance = live.instances.find { it.id == entry.providerInstanceId } ?: return false
-            if (entry.model != choice.entry.model || entry.isHidden || !instance.isEnabled ||
+            if (!nmAutoChatCostAllowed(entry, instance) || entry.model != choice.entry.model || entry.isHidden || !instance.isEnabled ||
                 !instance.providerType.isUsable || instance.providerType == ProviderType.antigravity ||
                 !providerRepository.hasAnyCredential(instance) || AutoModelStore.identity(entry, instance) != choice.identity ||
                 AutoModelRuntime.accountVersion(instance.id) != choice.accountVersion) return false
@@ -10409,11 +10416,11 @@ class ChatViewModel(
                                 if (!AutoModelStore.enabled(context)) throw LLMError.ProviderError(
                                     context.getString(R.string.nm_auto_disabled_during_turn))
                                 val identity = checkNotNull(nmAutoIdentity)
-                                if (!ai.tama.router.AutomaticCostGuard.permits(context)) throw AutoDispatchBlocked(
-                                    autoCandidate.entryId, context.getString(R.string.nm_auto_reason_unverified_cost))
                                 val config = providerRepository.config.value
                                 val entry = config.modelEntries.find { it.id == autoCandidate.entryId && it.model.id == currentProvider.model.id }
                                 val instance = entry?.let { e -> config.instances.find { it.id == e.providerInstanceId } }
+                                if (!nmAutoChatCostAllowed(entry, instance)) throw AutoDispatchBlocked(
+                                    autoCandidate.entryId, context.getString(R.string.nm_auto_reason_unverified_cost))
                                 val valid = entry != null && instance != null && instance.isEnabled && !entry.isHidden &&
                                     AutoModelStore.identity(entry, instance) == identity && providerRepository.hasAnyCredential(instance) &&
                                     AutoModelStore.approved(context, identity) &&
@@ -10490,7 +10497,8 @@ class ChatViewModel(
                                 this@ChatViewModel.currentProvider !== currentProvider || _activeEntryId.value != active.entryId) {
                                 throw LLMError.ProviderError(context.getString(R.string.nm_auto_disabled_during_turn))
                             }
-                            if (!ai.tama.router.AutomaticCostGuard.permits(context)) {
+                            val liveEntry = providerRepository.config.value.modelEntries.find { it.id == active.entryId }
+                            if (!nmAutoChatCostAllowed(liveEntry, providerRepository.instance(active.providerId))) {
                                 throw AutoDispatchBlocked(active.entryId, context.getString(R.string.nm_auto_reason_unverified_cost))
                             }
                             if (nmAutoActiveChoice?.let(::nmAutoChoiceStillEligible) != true) {
@@ -10509,6 +10517,9 @@ class ChatViewModel(
                         val freeChat = own?.let {
                             providerRepository.tamaFreeChatTicket(it.providerId, it.accountVersion,
                                 nmRouteFingerprint(currentProvider), currentProvider.model.id)
+                        }
+                        if (ownInstance != null && providerRepository.tamaDocumentedChatAllowed(ownInstance, currentProvider.model.id) && freeChat == null) {
+                            throw ai.tama.pricing.ModelCostGuard.Blocked()
                         }
                         if (!nmFreeChatAllows(currentProvider)) throw ai.tama.pricing.FreeModelList.Blocked(
                             ownInstance?.let { providerRepository.tamaFreeChatStatus(it, currentProvider.model.id) },

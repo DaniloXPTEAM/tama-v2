@@ -120,7 +120,8 @@ fun UseItForScreen(instanceId: String, onDone: () -> Unit) {
         }
         if (freeOnly) { // nanoMuse: keep the limits visible beside the choice
             Text(
-                text = stringResource(R.string.nm_free_import_help),
+                text = stringResource(if (ai.tama.pricing.FreeModelImport.supports(inst.providerType))
+                    R.string.nm_free_import_help else R.string.nm_free_direct_help),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 16.dp).padding(top = 12.dp),

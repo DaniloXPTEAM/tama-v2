@@ -2368,7 +2368,7 @@ class ProviderRepository(private val context: Context) {
     }
 
     private fun nmFreeRefreshMode(instance: ProviderInstance): Boolean =
-        FreeModelImport.supports(instance.providerType) && (instance.tamaImportFreeOnly || tamaZeroSpendLimit(instance))
+        instance.tamaImportFreeOnly || tamaZeroSpendLimit(instance)
 
     // nanoMuse: limited to this process and to the account generation that
     // actually got the payment refusal. Never label the model globally as paid.
@@ -2385,7 +2385,7 @@ class ProviderRepository(private val context: Context) {
         }
     }
 
-    private fun tamaPaymentRefused(instanceId: String, modelId: String): Boolean =
+    internal fun tamaPaymentRefused(instanceId: String, modelId: String): Boolean =
         _tamaPaymentRefusals.value[instanceId to modelId] == AutoModelRuntime.accountVersion(instanceId)
 
     private fun tamaModelBase(instance: ProviderInstance): String? = if (instance.azureMode) null else
@@ -2409,6 +2409,9 @@ class ProviderRepository(private val context: Context) {
         if (instance.providerType == ProviderType.openRouter && modelId in tamaEligibleFreeModelIds(instance.id).orEmpty()) {
             return DocumentedFreeChat.Status.FREE
         }
+        if (instance.providerType == ProviderType.openRouter && OpenRouterPricing.chatStatus(
+                ai.tama.pricing.OpenRouterCatalogueCapture.memory.snapshot(), modelId, System.currentTimeMillis(),
+            ) == OpenRouterPricing.Status.PAID) return DocumentedFreeChat.Status.PAID
         val quote = ModelsDevApi.bundledProvider(tamaModelBase(instance))?.models?.get(modelId)
         val priced = (quote?.inputCost ?: 0.0) > 0 || (quote?.outputCost ?: 0.0) > 0
         return tamaDocumentedStatus(instance, modelId, priced)
@@ -2455,7 +2458,8 @@ class ProviderRepository(private val context: Context) {
     /** This check excludes unknown/paid routes. It cannot grant either cost permission. */
     internal fun tamaAllowsChatModel(instance: ProviderInstance, modelId: String, requireFree: Boolean = false): Boolean {
         val restricted = requireFree || tamaFreeChatOnly(instance)
-        return !restricted || (tamaOwnApiKey(instance) != null && modelId in tamaEligibleFreeModelIds(instance.id).orEmpty())
+        return !tamaPaymentRefused(instance.id, modelId) &&
+            (!restricted || (tamaOwnApiKey(instance) != null && modelId in tamaEligibleFreeModelIds(instance.id).orEmpty()))
     }
 
     /**
@@ -2612,15 +2616,6 @@ class ProviderRepository(private val context: Context) {
 
     private suspend fun nmRefreshFreeModels(refresh: NmRefresh) {
         val instance = refresh.instance
-        if (!FreeModelImport.supports(instance.providerType)) {
-            synchronized(configLock) {
-                if (nmRefreshCurrent(refresh)) {
-                    _nmFreeImportStatus.value = _nmFreeImportStatus.value + (instance.id to FreeModelImportStatus.Unsupported)
-                    markInstanceFetched(instance.id)
-                }
-            }
-            return
-        }
         // OpenRouter OAuth yields a permanent API key too. Pair it with the
         // account generation so a late result cannot follow a key rotation.
         val keySnapshot = refresh.key
@@ -2628,6 +2623,26 @@ class ProviderRepository(private val context: Context) {
         if (key.isNullOrBlank()) {
             nmWithCurrentFreeRefresh(refresh, keySnapshot) {
                 _nmFreeImportStatus.value = _nmFreeImportStatus.value + (instance.id to FreeModelImportStatus.MissingKey)
+            }
+            return
+        }
+        if (!FreeModelImport.supports(instance.providerType)) {
+            // Exact documented offers only. No inference, and a missing row in
+            // the bundled catalogue is not itself evidence of zero price.
+            val models = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                ModelsDevApi.bundledModels(tamaModelBase(instance))
+            }
+            kotlinx.coroutines.currentCoroutineContext().ensureActive()
+            nmWithCurrentFreeRefresh(refresh, keySnapshot) {
+                val eligible = models.filter { tamaDocumentedChatAllowed(instance, it.id) }
+                val config = workingCopy()
+                val additions = FreeModelImport.additions(instance.id, config.modelEntries, eligible)
+                config.modelEntries.addAll(additions)
+                _nmFreeImportStatus.value = _nmFreeImportStatus.value + (instance.id to
+                    if (additions.isEmpty() || saveConfigChecked(config)) {
+                        markInstanceFetched(instance.id)
+                        FreeModelImportStatus.Complete(eligible.size, additions.size)
+                    } else FreeModelImportStatus.SaveFailed)
             }
             return
         }

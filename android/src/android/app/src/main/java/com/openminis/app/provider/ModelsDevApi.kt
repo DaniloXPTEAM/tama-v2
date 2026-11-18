@@ -460,6 +460,8 @@ object ModelsDevApi {
         }
     }
 
+    internal fun bundledModels(base: String?): List<LLMModel> = bundledProvider(base)?.let(::buildModels).orEmpty()
+
     private fun loadBundledRegistry(): Map<String, ProviderEntry>? {
         val ctx = appContext ?: return null
         return try {

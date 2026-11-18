@@ -10,7 +10,7 @@ class FreeRankWiring(unittest.TestCase):
         for item in ('tamaV2Test &&', 'ProviderType.openRouter', 'ProviderCredential.apiKey',
                      'NanoMuseCloud.instance(context)?.id', 'tamaEligibleFreeModelIds(it.id)',
                      'instance.id == freeRankInstance?.id && entry.model.id in freeRankIds',
-                     'AutomaticCostGuard.permits(context)', 'preference = preference'):
+                     'nmAutoChatCostAllowed(entry, instance)', 'preference = preference'):
             self.assertIn(item, source)
 
 if __name__ == '__main__':
