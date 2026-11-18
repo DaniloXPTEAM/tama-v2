@@ -536,7 +536,7 @@ internal fun FallbackInfoBlock(
         // Compress squeeze. Other system rows (legacy compact notices that
         // pre-date the dedicated compactor) keep the squeeze for backward
         // visual continuity if any old sessions still hold them.
-        "compact" -> Icons.Default.CloseFullscreen
+        "compact", "tama_context_notice" -> Icons.Default.CloseFullscreen
         "memory" -> Icons.Default.Psychology
         "thinking" -> Icons.Default.Lightbulb
         else -> Icons.Default.Info
@@ -586,7 +586,7 @@ internal fun FallbackInfoBlock(
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Medium,
                     color = fg,
-                    maxLines = 1,
+                    maxLines = if (block.toolName == "tama_context_notice") Int.MAX_VALUE else 1,
                     overflow = TextOverflow.Ellipsis,
                     // weight(1f, fill=false) lets the text take just what it
                     // needs but lose space first when the row gets tight,

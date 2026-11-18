@@ -3642,9 +3642,11 @@ class ChatViewModel(
             // on offer. Keep the existing advisory-and-proceed behaviour rather
             // than blocking the user out of their own chat.
             ContextPolicy.CheckResult.EXHAUSTED -> {
+                val tamaV2Test = com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test"
                 appendSystemInfo(
-                    text = "Context is near the model's limit ($tokens / $window tokens). Start a new chat or /compact to continue reliably.",
-                    iconKind = "compact",
+                    text = if (tamaV2Test) context.getString(R.string.nm_context_near_limit, tokens, window)
+                        else "Context is near the model's limit ($tokens / $window tokens). Start a new chat or /compact to continue reliably.",
+                    iconKind = if (tamaV2Test) "tama_context_notice" else "compact",
                 )
                 PreSendContextAction.PROCEED
             }
@@ -3729,7 +3731,8 @@ class ChatViewModel(
             AppLogger.info(TAG, "[AutoCompact] attempt=$attempt estimated=$tokens " +
                 "window=${budget.window} hardLimit=${budget.hardLimit}")
             appendSystemInfo(
-                context.getString(R.string.nm_context_compacting, tokens, budget.window), "compact",
+                context.getString(R.string.nm_context_compacting, tokens, budget.window),
+                if (com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test") "tama_context_notice" else "compact",
             )
             val installed = awaitCompaction()
             prepareAfterSummary()
@@ -9897,7 +9900,7 @@ class ChatViewModel(
                     appendSystemInfo(
                         // nanoMuse: this path now means the actual capacity reserve was reached (#719).
                         text = context.getString(R.string.nm_context_limit_reached),
-                        iconKind = "compact",
+                        iconKind = if (tamaV2Test) "tama_context_notice" else "compact",
                     )
                     // [T-android-group-pause-badge-restamp] A LIVE interruption just
                     // happened: this is a real entry into the paused state, so the

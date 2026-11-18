@@ -1554,4 +1554,5 @@
     <string name="nm_key_probe_denied">O provedor negou o acesso; o motivo não é conhecido.</string>
     <string name="nm_key_probe_unavailable">Não foi possível testar a chave. Confira a conexão e tente novamente.</string>
     <string name="nm_key_probe_unsupported">O teste de chave não está disponível para este endereço. Nenhuma chave foi enviada.</string>
+    <string name="nm_context_near_limit">O contexto está perto do limite do modelo (%1$d / %2$d tokens). Inicie uma nova conversa ou use /compact para continuar com mais segurança.</string>
 </resources>
