@@ -1388,7 +1388,13 @@ class ProviderRepository(private val context: Context) {
     internal fun nmAutoReviewCapabilities(identity: ai.tama.router.AutoModelStore.Identity, catalogue: Set<String>): Set<ai.tama.router.Need> =
         synchronized(configLock) {
             ensureConfigLoaded()
-            if (nmIdentityIsCurrent(identity)) ai.tama.router.AutoModelStore.capabilities(context, identity, catalogue) else emptySet()
+            if (!nmIdentityIsCurrent(identity)) return@synchronized emptySet()
+            // Match the automatic chat selector: fresh import evidence may describe
+            // chat/tools, but does not approve a route or grant cost permission.
+            val discovered = if (com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test" &&
+                io.github.nanomuse.cloud.NanoMuseCloud.instance(context)?.id != identity.providerId)
+                tamaFreeModelCapabilities(identity.providerId, identity.modelId) else emptySet()
+            ai.tama.router.AutoModelStore.capabilities(context, identity, catalogue + discovered)
         }
 
     internal fun nmSaveAutoReview(

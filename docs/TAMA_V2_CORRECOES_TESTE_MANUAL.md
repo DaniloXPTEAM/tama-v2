@@ -309,3 +309,9 @@ fictícias para verificar como o provedor OpenAI e o classificador automático
 tratam HTTP 429, 403, 500 e 403 dentro de SSE. Ele não executa o ViewModel,
 Room ou provedores reais. Foi acrescentado ao CI Android; o resultado do run
 correspondente deve ser verificado antes de considerá-lo aprovado.
+
+A ficha individual no paralelo passa a consultar a mesma evidência temporária
+OpenRouter para capacidades de chat e ferramentas usada pela seleção automática,
+sem conceder aprovação ou permissão de custo. Ajustes explícitos e recusas
+aprendidas continuam prevalecendo. O teste verifica a política com dublês e a
+ligação estática, não a tela Android nem a precisão de um catálogo real.
