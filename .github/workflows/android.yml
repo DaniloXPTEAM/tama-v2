@@ -29,7 +29,7 @@ jobs:
             tests.test_tama_image_raw_static tests.test_tama_image_retry_static \
             tests.test_tama_context_notice tests.test_tama_provider_refresh_label \
             tests.test_tama_key_probe_static tests.test_tama_destination_audit \
-            tests.test_tama_test_signing_config
+            tests.test_tama_test_signing_config tests.test_tama_build_failure_summary
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: temurin
@@ -78,9 +78,18 @@ jobs:
         run: |
           if [ -f "$RUNNER_TEMP/tama-test-signing.jks" ]; then export TAMA_TEST_KEYSTORE_FILE="$RUNNER_TEMP/tama-test-signing.jks"; fi
           export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/$NDK_VERSION"
-          ./gradlew :app:assembleTamaTest --max-workers=1 --console=plain --no-daemon \
+          # Preserve the failing exit code; the summary contains fixed labels only, not logs.
+          set -o pipefail
+          if ./gradlew :app:assembleTamaTest --max-workers=1 --console=plain --no-daemon \
             '-Dorg.gradle.jvmargs=-Xmx4608m -XX:MaxMetaspaceSize=768m -Dfile.encoding=UTF-8' \
-            -Pkotlin.compiler.execution.strategy=in-process -Pkotlin.incremental=false
+            -Pkotlin.compiler.execution.strategy=in-process -Pkotlin.incremental=false 2>&1 | tee "$RUNNER_TEMP/tama-assemble.log"; then
+            rm -f "$RUNNER_TEMP/tama-assemble.log"
+          else
+            status=$?
+            python3 ../../../scripts/android/summarize-build-failure.py "$RUNNER_TEMP/tama-assemble.log" "$status" || true
+            rm -f "$RUNNER_TEMP/tama-assemble.log"
+            exit "$status"
+          fi
       - name: Assemble normal debug locally for identity check
         working-directory: android/src/android
         run: |
@@ -139,4 +148,4 @@ jobs:
             --out-dir /tmp/tama-identity-check
       - name: Remove private test signer
         if: ${{ always() }}
-        run: rm -f "$RUNNER_TEMP/tama-test-signing.jks"
+        run: rm -f "$RUNNER_TEMP/tama-test-signing.jks" "$RUNNER_TEMP/tama-assemble.log"

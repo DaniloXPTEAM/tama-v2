@@ -335,3 +335,10 @@ ordem da conversa; empates usam data e ID para estabilidade. A contagem de
 loops continua sendo uma aproximação, não uma contagem de chamadas ou cobranças.
 A consulta foi exercitada em SQLite local com linhas fictícias e isolamento
 entre sessões; Compose, Room e aparelho ainda precisam de verificação.
+
+Dois builds recentes falharam na etapa de montagem, mas a busca do log pelo
+ambiente retornou EOF; não há diagnóstico de causa. Um build posterior com o
+mesmo código de produção passou. O workflow agora classifica falhas futuras em
+categorias fixas sem reproduzir texto do log na anotação. Isso não substitui a
+análise do log completo nem transforma uma hipótese de recurso ou rede em causa.
+O arquivo temporário do runner é removido; não há upload de APK ou log.
