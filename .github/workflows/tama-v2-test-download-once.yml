@@ -49,28 +49,34 @@ jobs:
           export GOROOT="$(go env GOROOT)" GOPATH="$(go env GOPATH)"
           export PATH="$GOPATH/bin:$PATH"
           bash scripts/android/build-natives.sh
-      - name: Assemble and verify only the requested Test APK
-        id: build
+      - name: Assemble only the parallel variant with debug signing
         working-directory: android/src/android
+        env:
+          ANDROID_USER_HOME: ${{ runner.temp }}/tama-debug-home
         run: |
           set -euo pipefail
           export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/$NDK_VERSION"
-          signing_dir=$(mktemp -d "$RUNNER_TEMP/tama-signing.XXXXXX")
-          export TAMA_TEST_KEYSTORE_FILE="$signing_dir/temporary.jks"
-          trap 'rm -f -- "$TAMA_TEST_KEYSTORE_FILE"; rmdir -- "$signing_dir"' EXIT
-          export TAMA_TEST_KEY_ALIAS=tama-test-temporary
-          TAMA_TEST_STORE_PASSWORD=$(openssl rand -hex 24)
-          export TAMA_TEST_STORE_PASSWORD
-          export TAMA_TEST_KEY_PASSWORD="$TAMA_TEST_STORE_PASSWORD"
-          keytool -genkeypair -storetype JKS -keystore "$TAMA_TEST_KEYSTORE_FILE" \
-            -alias "$TAMA_TEST_KEY_ALIAS" -keyalg RSA -keysize 2048 -validity 365 \
-            -dname 'CN=Tama V2 Test Temporary CI' -storepass:env TAMA_TEST_STORE_PASSWORD \
-            -keypass:env TAMA_TEST_KEY_PASSWORD -noprompt
-
-          ./gradlew :app:assembleTamaTest --max-workers=1 --console=plain --no-daemon \
+          unset TAMA_TEST_KEYSTORE_FILE TAMA_TEST_STORE_PASSWORD TAMA_TEST_KEY_ALIAS TAMA_TEST_KEY_PASSWORD
+          mkdir -m 0700 -- "$ANDROID_USER_HOME"
+          log="$RUNNER_TEMP/tama-one-time-assemble.log"
+          trap 'rm -f -- "$log"' EXIT
+          if ./gradlew :app:assembleTamaTest --max-workers=1 --console=plain --no-daemon \
             '-Dorg.gradle.jvmargs=-Xmx4608m -XX:MaxMetaspaceSize=768m -Dfile.encoding=UTF-8' \
-            -Pkotlin.compiler.execution.strategy=in-process -Pkotlin.incremental=false
-
+            -Pkotlin.compiler.execution.strategy=in-process -Pkotlin.incremental=false 2>&1 | tee "$log"; then
+            exit 0
+          else
+            status=$?
+            python3 ../../../scripts/android/summarize-build-failure.py "$log" "$status" || true
+            exit "$status"
+          fi
+      - name: Confirm package, architecture and temporary certificate
+        id: build
+        working-directory: android/src/android
+        env:
+          ANDROID_USER_HOME: ${{ runner.temp }}/tama-debug-home
+        run: |
+          set -euo pipefail
+          trap 'echo "::error title=Tama APK verification::Package, ABI, signature or staged bytes did not verify."' ERR
           apk=app/build/outputs/apk/tamaTest/app-tamaTest.apk
           tools="$ANDROID_HOME/build-tools/35.0.0"
           badging=$("$tools/aapt" dump badging "$apk")
@@ -80,8 +86,8 @@ jobs:
           grep -Eq "^native-code: 'arm64-v8a'[[:space:]]*$" <<< "$badging"
           signature=$("$tools/apksigner" verify --print-certs "$apk")
           actual=$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' <<< "$signature")
-          expected=$(keytool -exportcert -keystore "$TAMA_TEST_KEYSTORE_FILE" \
-            -storepass:env TAMA_TEST_STORE_PASSWORD -alias "$TAMA_TEST_KEY_ALIAS" | sha256sum | cut -d' ' -f1)
+          expected=$(keytool -exportcert -keystore "$ANDROID_USER_HOME/debug.keystore" \
+            -storepass android -alias androiddebugkey | sha256sum | cut -d' ' -f1)
           [[ "$actual" =~ ^[0-9a-f]{64}$ && "$actual" == "$expected" ]]
           test "$(grep -Ec '^Signer #[0-9]+ certificate SHA-256 digest: ' <<< "$signature")" = 1
           install -m 0600 "$apk" "$RUNNER_TEMP/Tama-V2-Test-d786d9b.apk"
