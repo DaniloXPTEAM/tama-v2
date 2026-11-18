@@ -680,7 +680,7 @@ fun ProviderDetailScreen(
         // model selection or spending authorization.
         val nmShowFreeFilter = nmParallel && instance.providerType == ProviderType.openRouter &&
             instance.credentialType == com.openminis.app.data.model.ProviderCredential.apiKey && instance.tamaImportFreeOnly &&
-            io.github.nanomuse.cloud.NanoMuseCloud.instance(exportContext)?.id != instanceId
+            io.github.nanomuse.cloud.NanoMuseCloud.instance(exportContext)?.id?.let { it != instanceId } == true
         var nmFilterFree by remember(instanceId, instance.tamaImportFreeOnly) { mutableStateOf(instance.tamaImportFreeOnly) }
         val nmImportStatuses by providerRepository.nmFreeImportStatus.collectAsState()
         // Reading the status makes the view re-evaluate after a background refresh.
