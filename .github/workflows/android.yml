@@ -1,4 +1,6 @@
-name: Android verification without uploads
+# Temporary, user-authorized APK delivery for PR 1. Restore the no-upload
+# workflow immediately after this run is created. Never upload the normal APK.
+name: TAMA V2 parallel APK after stream split
 
 on:
   pull_request:
@@ -9,17 +11,29 @@ permissions:
 
 env:
   NDK_VERSION: 27.2.12479018
+  EXPECTED_PARENT: b815aa46ed4feb51412cf009dca44035403faa05
+  EXPECTED_PARENT_TREE: 27facfd257cf3016f17471d6e3d6575175ae5c58
+  REQUESTED_HEAD: ${{ github.event.pull_request.head.sha }}
 
 jobs:
-  android-check:
-    if: github.head_ref == 'arena/4f0fb56f-tamaaiv2'
+  parallel-test-apk:
+    if: github.event.pull_request.number == 1 && github.head_ref == 'arena/4f0fb56f-tamaaiv2' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
-    timeout-minutes: 80
+    timeout-minutes: 100
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: recursive
           persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 2
+      - name: Verify reviewed source tree
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$REQUESTED_HEAD"
+          test "$(git rev-parse HEAD^)" = "$EXPECTED_PARENT"
+          test "$(git rev-parse HEAD^^{tree})" = "$EXPECTED_PARENT_TREE"
+          git diff --quiet HEAD^ HEAD -- . ':(exclude).github/workflows/android.yml'
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: temurin
@@ -32,7 +46,10 @@ jobs:
       - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
         with:
           packages: platforms;android-36 build-tools;35.0.0 cmake;3.22.1 ndk;${{ env.NDK_VERSION }}
-      - name: Build required native dependencies locally
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+        with:
+          cache-read-only: true
+      - name: Build required native dependencies
         env:
           GOTOOLCHAIN: auto
         run: |
@@ -40,35 +57,105 @@ jobs:
           export GOROOT="$(go env GOROOT)" GOPATH="$(go env GOPATH)"
           export PATH="$GOPATH/bin:$PATH"
           bash scripts/android/build-natives.sh
-      - name: Assemble both debug variants locally
+      # One Kotlin compiler at a time, with a larger in-process heap. The
+      # previous simultaneous two-variant build exhausted Kotlin heap memory.
+      - name: Assemble parallel test APK
         working-directory: android/src/android
         run: |
+          set -o pipefail
           export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/$NDK_VERSION"
-          ./gradlew :app:assembleDebug :app:assembleTamaTest --console=plain --no-daemon
-      - name: Run parallel history tests
+          ./gradlew :app:assembleTamaTest --max-workers=1 --console=plain --no-daemon \
+            '-Dorg.gradle.jvmargs=-Xmx4608m -XX:MaxMetaspaceSize=768m -Dfile.encoding=UTF-8' \
+            -Pkotlin.compiler.execution.strategy=in-process -Pkotlin.incremental=false \
+            2>&1 | tee "$RUNNER_TEMP/assemble-test.log"
+      - name: Assemble normal debug APK only for identity comparison
         working-directory: android/src/android
         run: |
+          set -o pipefail
           export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/$NDK_VERSION"
-          ./gradlew :app:testTamaTestUnitTest \
-            --tests 'ai.tama.net.GroqHistoryPolicyTest' \
-            --tests 'ai.tama.net.GroqHistoryWireTest' \
-            --tests 'ai.tama.net.ProviderHistoryInteroperabilityTest' \
-            --tests 'ai.tama.router.ModelRouteHistoryTest' \
-            --console=plain --no-daemon
-      - name: Run normal debug isolation tests
-        working-directory: android/src/android
-        run: |
-          export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/$NDK_VERSION"
-          ./gradlew :app:testDebugUnitTest \
-            --tests 'ai.tama.net.GroqHistoryPolicyTest' \
-            --tests 'ai.tama.net.GroqNormalHistoryWireTest' \
-            --tests 'ai.tama.router.ModelRouteHistoryTest' \
-            --console=plain --no-daemon
-      - name: Verify separate APK identities locally
+          ./gradlew :app:assembleDebug --max-workers=1 --console=plain --no-daemon \
+            '-Dorg.gradle.jvmargs=-Xmx4608m -XX:MaxMetaspaceSize=768m -Dfile.encoding=UTF-8' \
+            -Pkotlin.compiler.execution.strategy=in-process -Pkotlin.incremental=false \
+            2>&1 | tee "$RUNNER_TEMP/assemble-normal.log"
+      - id: identity
+        name: Verify package, ABI, authorities and signing certificate
         run: |
           python3 scripts/android/verify-parallel-apk.py \
             --aapt "$ANDROID_HOME/build-tools/35.0.0/aapt" \
             --apksigner "$ANDROID_HOME/build-tools/35.0.0/apksigner" \
             --apk android/src/android/app/build/outputs/apk/tamaTest/app-tamaTest.apk \
             --normal-apk android/src/android/app/build/outputs/apk/debug/app-debug.apk \
-            --out-dir /tmp/tama-identity-check
+            --out-dir "$RUNNER_TEMP/tama-identity-check"
+      - id: prepare
+        name: Prepare only the parallel APK and its evidence
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/tama-v2-delivery"
+          cp android/src/android/app/build/outputs/apk/tamaTest/app-tamaTest.apk "$RUNNER_TEMP/tama-v2-delivery/"
+          cp "$RUNNER_TEMP/tama-identity-check/tama-test-metadata.json" \
+             "$RUNNER_TEMP/tama-identity-check/tama-test.sha256" \
+             "$RUNNER_TEMP/tama-identity-check/tama-test-signature.txt" "$RUNNER_TEMP/tama-v2-delivery/"
+          cd "$RUNNER_TEMP/tama-v2-delivery"
+          sha256sum -c tama-test.sha256
+      - name: Run parallel and Hub unit tests
+        working-directory: android/src/android
+        run: |
+          set -o pipefail
+          export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/$NDK_VERSION"
+          ./gradlew :app:testTamaTestUnitTest \
+            --tests 'ai.tama.*' --tests 'io.github.nanomuse.hub.*' \
+            --tests 'io.github.nanomuse.sync.*' --tests 'com.openminis.app.sandbox.*' \
+            --max-workers=1 --console=plain --no-daemon \
+            '-Dorg.gradle.jvmargs=-Xmx4608m -XX:MaxMetaspaceSize=768m -Dfile.encoding=UTF-8' \
+            -Pkotlin.compiler.execution.strategy=in-process -Pkotlin.incremental=false \
+            2>&1 | tee "$RUNNER_TEMP/unit-parallel.log"
+      - name: Run normal debug isolation tests
+        working-directory: android/src/android
+        run: |
+          set -o pipefail
+          export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/$NDK_VERSION"
+          ./gradlew :app:testDebugUnitTest \
+            --tests 'ai.tama.net.GroqHistoryPolicyTest' \
+            --tests 'ai.tama.net.GroqNormalHistoryWireTest' \
+            --tests 'ai.tama.router.ModelRouteHistoryTest' \
+            --max-workers=1 --console=plain --no-daemon \
+            '-Dorg.gradle.jvmargs=-Xmx4608m -XX:MaxMetaspaceSize=768m -Dfile.encoding=UTF-8' \
+            -Pkotlin.compiler.execution.strategy=in-process -Pkotlin.incremental=false \
+            2>&1 | tee "$RUNNER_TEMP/unit-normal.log"
+      - name: Publish sanitized build or test error in the check
+        if: ${{ failure() }}
+        run: |
+          python3 - "$RUNNER_TEMP" <<'PY'
+          import glob, re, sys
+          lines = []
+          for path in glob.glob(sys.argv[1] + '/assemble-*.log') + glob.glob(sys.argv[1] + '/unit-*.log'):
+              raw = open(path, encoding='utf-8', errors='replace').read().splitlines()
+              starts = [i for i, line in enumerate(raw) if 'What went wrong:' in line]
+              for start in starts[-2:]:
+                  for line in raw[start:start + 35]:
+                      if line.startswith('* Try:') or line.startswith('* Get more help'): break
+                      if line.strip(): lines.append(line.strip())
+              if not starts:
+                  lines += [line.strip() for line in raw if re.search(r'(?i)(BUILD FAILED|execution failed|could not resolve|caused by:|timed out|\berror:|\bfailure:)', line)][-15:]
+          for path in glob.glob(sys.argv[1] + '/assemble-*.log') + glob.glob(sys.argv[1] + '/unit-*.log'):
+              raw = open(path, encoding='utf-8', errors='replace').read().splitlines()
+              lines += [line.strip() for line in raw if re.search(r'(?i)(^e: |caused by:|file being compiled|method too large|outofmemory)', line)][-20:]
+          if not lines: lines = ['No concise cause was captured; inspect the failed step in GitHub Actions.']
+          clean = []
+          for line in lines[-50:]:
+              line = re.sub(r'https?://[^\s]+', '[URL]', line)
+              line = re.sub(r'(?i)\b(token|password|secret|authorization|api[_-]?key)\s*[:=]\s*\S+', r'\1=[redacted]', line)
+              clean.append(line[:500])
+          message = '\n'.join(clean)[:6000].replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+          print('::notice title=Android build or test cause::' + message)
+          PY
+      # Artifact remains useful for a physical test if unit tests fail, but the
+      # job still reports failure and the result must be disclosed to the user.
+      - name: Upload the authorized temporary parallel APK
+        if: ${{ !cancelled() && steps.prepare.outcome == 'success' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: tama-v2-parallel-test-${{ github.event.pull_request.head.sha }}
+          path: ${{ runner.temp }}/tama-v2-delivery/
+          retention-days: 3
+          if-no-files-found: error
