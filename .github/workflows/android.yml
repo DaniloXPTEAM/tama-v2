@@ -1,10 +1,11 @@
-# One explicitly authorized, manually started delivery of the parallel test APK.
-# Copy into .github/workflows/android.yml only after reviewing the branch and the
-# owner's current permission. This does not upload the normal APK or create a release.
+# One explicitly authorized delivery of the parallel test APK, triggered by the
+# next pull-request synchronization and then removed from the branch workflow.
+# This never uploads the normal APK or creates a release.
 name: TAMA V2 temporary parallel test APK
 
 on:
-  workflow_dispatch:
+  pull_request:
+    types: [synchronize]
 
 permissions:
   contents: read
@@ -16,10 +17,12 @@ concurrency:
 env:
   NDK_VERSION: 27.2.12479018
   EXPECTED_SOURCE_SHA: 06f9dafaad4b16fc9d29d01b1b26336089b5aef7
+  EXPECTED_PARENT_SHA: a8cc49493a38f2fae8abf40d6f0a3d0e407962af
+  REQUESTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
 
 jobs:
   parallel-test-apk:
-    if: github.ref == 'refs/heads/arena/4f0fb56f-tamaaiv2'
+    if: github.event.pull_request.number == 1 && github.head_ref == 'arena/4f0fb56f-tamaaiv2' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
     timeout-minutes: 100
     steps:
@@ -27,12 +30,14 @@ jobs:
         with:
           submodules: recursive
           persist-credentials: false
-          fetch-depth: 2
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 3
       - name: Verify the authorized source revision
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          test "$(git rev-parse HEAD^)" = "$EXPECTED_SOURCE_SHA"
+          test "$(git rev-parse HEAD)" = "$REQUESTED_HEAD_SHA"
+          test "$(git rev-parse HEAD^)" = "$EXPECTED_PARENT_SHA"
+          test "$(git rev-parse HEAD^^)" = "$EXPECTED_SOURCE_SHA"
           git diff --quiet "$EXPECTED_SOURCE_SHA" HEAD -- . ':(exclude).github/workflows/android.yml'
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
@@ -101,7 +106,7 @@ jobs:
       - name: Upload temporary parallel APK and identity evidence
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: tama-v2-parallel-test-${{ github.sha }}
+          name: tama-v2-parallel-test-${{ github.event.pull_request.head.sha }}
           path: ${{ runner.temp }}/tama-v2-delivery/
           retention-days: 3
           if-no-files-found: error
