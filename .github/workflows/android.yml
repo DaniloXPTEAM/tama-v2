@@ -20,6 +20,16 @@ jobs:
           submodules: recursive
           persist-credentials: false
           ref: ${{ github.sha }}
+      - name: Check parallel Android wiring and local SQLite fixture
+        run: |
+          python3 -m unittest \
+            tests.test_tama_usage_order tests.test_tama_larger_context_static \
+            tests.test_tama_free_list_static tests.test_tama_free_bulk_static \
+            tests.test_tama_free_rank_static tests.test_tama_capability_review_static \
+            tests.test_tama_image_raw_static tests.test_tama_image_retry_static \
+            tests.test_tama_context_notice tests.test_tama_provider_refresh_label \
+            tests.test_tama_key_probe_static tests.test_tama_destination_audit \
+            tests.test_tama_test_signing_config
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: temurin
