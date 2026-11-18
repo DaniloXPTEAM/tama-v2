@@ -325,10 +325,13 @@ ser conferido separadamente.
 
 ## Folha de uso e contagem estimada
 
-No paralelo, valores de uso não disponíveis aparecem como traço, não como zero,
-e um aviso explica que registros podem estar incompletos e não são fatura. O
-contexto vem do último valor positivo salvo na ordem da conversa; empates usam
-data e ID para estabilidade. A contagem de loops continua sendo uma aproximação
-da conversa, não uma contagem de chamadas nem de cobranças. A consulta foi
-exercitada em SQLite local com linhas fictícias e isolamento entre sessões; a
-tela Compose, o banco Room e o aparelho ainda precisam de verificação.
+No paralelo, antes do carregamento e quando não há nenhum registro válido de
+uso, os totais aparecem como traço, não como zero. O contexto também mostra
+traço quando não há valor positivo salvo. Os registros existentes podem conter
+zeros usados como padrão para campos não informados: não é possível distinguir
+todos esses casos retroativamente. Um aviso diz que os registros podem estar
+incompletos e não são fatura. O contexto vem do último valor positivo salvo na
+ordem da conversa; empates usam data e ID para estabilidade. A contagem de
+loops continua sendo uma aproximação, não uma contagem de chamadas ou cobranças.
+A consulta foi exercitada em SQLite local com linhas fictícias e isolamento
+entre sessões; Compose, Room e aparelho ainda precisam de verificação.
