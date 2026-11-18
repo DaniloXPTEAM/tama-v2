@@ -88,7 +88,8 @@ internal object ProviderKeySuggestion {
             // prefixes such as sk- and JWT eyJ are shared and cannot identify a
             // provider. Even a longer match is only a suggestion, not proof.
             val marker = hint?.indexOf('…') ?: -1
-            if (marker < 4) return@mapNotNull null
+            // AQ. is a short, explicitly curated Gemini hint, not proof of origin.
+            if (marker < 4 && !(id == "gemini" && hint == "AQ.…")) return@mapNotNull null
             val prefix = hint!!.substring(0, marker)
             if (prefix.any { it.isWhitespace() } || !pasted.startsWith(prefix)) null else id
         }.distinct()

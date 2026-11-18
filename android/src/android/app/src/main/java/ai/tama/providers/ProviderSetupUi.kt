@@ -69,7 +69,9 @@ internal fun KnownProviderSection(onSelect: (VoiceProviderTemplate) -> Unit) {
 /** Suggest locally. Prefixes are hints, not proof of an account or recipient. */
 internal fun suggestedKeyProvider(context: android.content.Context, apiKey: String): VoiceProviderTemplate? {
     val providers = ProviderCatalogue.load(context).filter { it.takesKey }
-    val matchId = ProviderKeySuggestion.match(apiKey, providers.map { it.id to it.keyHint }) ?: return null
+    // nanoMuse: AQ. is only a local hint; confirmation is still required before saving.
+    val hints = providers.map { it.id to it.keyHint } + listOf("gemini" to "AQ.…")
+    val matchId = ProviderKeySuggestion.match(apiKey, hints) ?: return null
     val provider = providers.firstOrNull { it.id == matchId } ?: return null
     return OwnKeyPresets.template(provider, Region.mainland(context), ProviderCatalogue.chinese(context))
 }

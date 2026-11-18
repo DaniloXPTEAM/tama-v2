@@ -26,15 +26,21 @@ internal object KeyDestinationGuard {
 
     fun review(key: String?, base: String?): Review? {
         val trimmed = key?.trim().orEmpty()
+        // Prefixes are hints, never proof of ownership. A mismatched custom gateway
+        // remains usable only after an explicit, process-local destination review.
         val expected = when {
-            trimmed.startsWith("gsk_") -> "Groq" to "api.groq.com"
-            trimmed.startsWith("sk-or-") -> "OpenRouter" to "openrouter.ai"
+            trimmed.startsWith("gsk_") -> Triple("Groq", "api.groq.com", setOf("/openai/v1"))
+            trimmed.startsWith("sk-or-") -> Triple("OpenRouter", "openrouter.ai", setOf("/api/v1"))
+            trimmed.startsWith("sk-ant-") -> Triple("Anthropic", "api.anthropic.com", setOf("", "/v1"))
+            trimmed.startsWith("xai-") -> Triple("xAI", "api.x.ai", setOf("/v1"))
+            trimmed.startsWith("AQ.") || trimmed.startsWith("AIza") -> Triple(
+                "Gemini", "generativelanguage.googleapis.com", setOf("/v1beta", "/v1beta/openai"),
+            )
             else -> return null
         }
         val uri = parsed(base)
         val host = uri?.host?.lowercase(Locale.ROOT)
-        val expectedPath = if (expected.first == "Groq") "/openai/v1" else "/api/v1"
-        if (host == expected.second && uri?.path?.trimEnd('/') == expectedPath) return null
+        if (host == expected.second && uri?.path?.trimEnd('/') in expected.third) return null
         // URL is shown only in the local confirmation, never logged or persisted here.
         return Review(expected.first, uri?.toASCIIString())
     }
