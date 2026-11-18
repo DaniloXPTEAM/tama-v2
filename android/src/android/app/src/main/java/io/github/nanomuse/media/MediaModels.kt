@@ -53,6 +53,13 @@ object MediaModels {
     private const val KEY_VIDEO_INSTANCE = "media.video.provider_id"
     private const val KEY_VIDEO_MODEL = "media.video.model"
     private const val KEY_ANIMATE = "media.animate_avatar"
+    // nanoMuse: a video choice changed away and back must not revive an in-flight attempt.
+    private var videoChoiceRevision = 0L
+    @Synchronized internal fun videoChoiceRevision(): Long = videoChoiceRevision
+    private fun advanceVideoChoice() {
+        check(videoChoiceRevision < Long.MAX_VALUE) { "video choice version exhausted" }
+        videoChoiceRevision++
+    }
     const val DEFAULT_VIDEO_MODEL = "wan2.2-i2v-flash"
     const val DEEP_LINK = "minis://settings/media"
 
@@ -147,7 +154,9 @@ object MediaModels {
     }
 
     /** [instanceId] null switches the video model off; it is remembered, unlike "never chosen". */
+    @Synchronized // nanoMuse: serialize revision changes with video choice writes.
     fun saveVideo(context: Context, instanceId: String?, model: String) {
+        advanceVideoChoice() // nanoMuse: invalidate active attempts even if a later write fails.
         prefs(context).edit()
             .putString(KEY_VIDEO_INSTANCE, instanceId ?: VIDEO_OFF)
             .putString(KEY_VIDEO_MODEL, model.trim())
@@ -158,7 +167,9 @@ object MediaModels {
     fun videoChosen(context: Context): Boolean = prefs(context).getString(KEY_VIDEO_INSTANCE, null) != null
 
     /** Forgets the choice (a model, or Off): the slot follows the automatic order again. Nothing else moves. */
+    @Synchronized // nanoMuse: serialize revision changes with video choice writes.
     fun clearVideo(context: Context) {
+        advanceVideoChoice() // nanoMuse: an earlier selection cannot inherit this reset.
         prefs(context).edit().remove(KEY_VIDEO_INSTANCE).remove(KEY_VIDEO_MODEL).apply()
     }
 
@@ -190,9 +201,9 @@ object MediaModels {
 
     /**
      * The video models of [inst] that answered the last check, recommended first; null when it
-     * has never been checked (the page then runs [checkVideoModels]). Model Studio does not list
-     * video models on `/models`, so this is what "which models does this key have" means for
-     * video: the known candidates, each probed once and remembered for a day.
+     * has never been checked. Model Studio does not list video models on `/models`, so checking
+     * sends one probe per candidate and remembers the result for a day. The parallel test app
+     * does not start this check automatically, because probes may create billable tasks.
      */
     fun availableVideoModels(context: Context, inst: ProviderInstance): List<String>? {
         val raw = prefs(context).getString(KEY_VIDEO_AVAILABLE + inst.id, null) ?: return null
@@ -229,18 +240,18 @@ object MediaModels {
      * Returns the models found, or null when the host could not be reached at all.
      */
     suspend fun checkVideoModels(context: Context, inst: ProviderInstance): List<String>? = withContext(Dispatchers.IO) {
+        // nanoMuse: a discovery probe can create a task. Refuse before reading a key,
+        // and stop without saving a partial list if permission is withdrawn mid-batch.
+        ai.tama.pricing.ModelCostGuard.requireAllowed()
         val app = context.applicationContext as? MinisApp ?: return@withContext null
         val repo = app.providerRepositoryOrNull ?: return@withContext null
         val key = repo.usableApiKey(inst) ?: return@withContext null
         val host = VideoGen.Endpoint(inst, key, "").host
         val candidates = videoCandidates(context, inst)
-        var reached = false
-        val found = candidates.filter { model ->
-            val ok = VideoGen.probe(host, key, model)
-            if (ok != null) reached = true
-            ok == true
-        }
-        if (!reached) return@withContext null
+        val found = VideoProbeBatch.collect(candidates,
+            requireAllowed = { ai.tama.pricing.ModelCostGuard.requireAllowed() },
+            probe = { model -> VideoGen.probe(host, key, model) },
+        ) ?: return@withContext null
         prefs(context).edit()
             .putString(KEY_VIDEO_AVAILABLE + inst.id, JSONArray(found).toString())
             .putString(KEY_VIDEO_CANDIDATES + inst.id, JSONArray(candidates).toString())

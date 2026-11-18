@@ -947,6 +947,10 @@
     <string name="nm_hub_err_unknown_action">电脑上的 TAMA AI 版本较旧，不认识这个操作。</string>
     <string name="nm_hub_err_bad_key">中继上已退出登录，请重新登录。</string>
     <string name="nm_hub_err_generic">电脑没能完成。</string>
+    <!-- nanoMuse: pre-admission explanations for the parallel package. -->
+    <string name="nm_hub_err_id_reused">新请求未到达设备：调用 ID 正在使用或已使用过。</string>
+    <string name="nm_hub_err_bad_call_id">新请求未到达设备：调用 ID 为空、过长或已保留。</string>
+    <string name="nm_hub_err_id_limit">新请求未到达设备：此客户端已达到远程调用 ID 的数量上限。</string>
     <string name="nm_devices_refused">中继拒绝了连接；重新登录一下</string>
     <string name="nm_devices_paused">中继已暂停</string>
     <string name="nm_devices_notifications_hint">允许通知，手机才能在后台保持可联。</string>
@@ -1423,6 +1427,13 @@
     <string name="nm_auto_reason_disabled">供应商已停用</string>
     <string name="nm_auto_reason_hidden">模型已隐藏</string>
     <string name="nm_auto_reason_credential">没有可用凭据</string>
+    <string name="nm_auto_reason_unverified_cost">自动调用费用尚未核实</string>
+    <string name="nm_auto_allow_unverified_cost">允许费用未核实的自动调用</string>
+    <string name="nm_auto_cost_guard_help">默认关闭。这会暂停部分自动聊天、备用模型、图片、标题和摘要调用。这不是消费限额，手动调用和其他服务仍可能收费。</string>
+    <string name="nm_auto_cost_confirm_title">允许可能产生费用？</string>
+    <string name="nm_auto_cost_confirm_body">即使模型标为免费，自动调用仍可能收费。此权限会一直开启，直到你手动关闭，重启应用后也不会关闭。受保护的模型请求还需要单独的费用权限。要继续吗？</string>
+    <string name="nm_auto_cost_confirm_action">允许可能产生的费用</string>
+    <string name="nm_auto_cost_cancel">取消</string>
     <string name="nm_auto_reason_consent">未授权自动使用</string>
     <string name="nm_auto_reason_capability">所需能力未确认</string>
     <string name="nm_auto_reason_profile">工具不适合此配置</string>
@@ -1450,4 +1461,34 @@
     <string name="nm_diagnostic_copy">复制诊断</string>
     <string name="nm_diagnostic_copied">已复制到剪贴板。</string>
     <string name="nm_diagnostic_copy_failed">无法复制，请重试。</string>
+    <!-- TAMA V2: safe local failure and image summaries. -->
+    <string name="nm_reach_key_zero_title">OpenRouter 支出限额</string>
+    <string name="nm_reach_key_zero_body">OpenRouter 报告此密钥的支出限额为 0 美元。请查看可用的免费模型。</string>
+    <string name="nm_reach_safe_summary">安全错误摘要</string>
+    <string name="nm_reach_private_omitted">原始消息可能包含私人内容，因此已隐藏。分享前请先向服务商确认。</string>
+    <string name="nm_error_private_generic">无法完成请求。请检查设置或重试。</string>
+    <string name="nm_image_guard_ambiguous">无法确认此图片请求，因此未发送。如果需要图片，请直接提出并描述内容。</string>
+    <string name="nm_image_guard_repeat">本轮已处理过图片请求。我不会自动重复。如果想重试，请提出新请求。</string>
+    <string name="nm_image_guard_invalid">无法安全理解图片的详细内容，因此未发送此次请求。如果想重试，请重新描述图片。我不会自动重试。</string>
+    <string name="nm_image_detail_preparing">正在准备图片请求…</string>
+    <string name="nm_image_detail_generated">图片已生成，请在对话中打开。</string>
+    <string name="nm_image_detail_failed">无法完成图片。请检查服务商，仅在需要时重试。</string>
+    <string name="nm_group_switch_title">切换模型</string>
+    <string name="nm_group_switch_attempt">%1$s。正在尝试 %2$s。</string>
+    <string name="nm_group_switch_other">服务商未能完成请求</string>
+    <string name="nm_stream_unconfirmed">服务商未确认此回复已结束。此回复中的工具均未执行。如有需要，请重试。</string>
+    <string name="nm_auto_review_changed">账号、服务商或权限已更改。自动使用权限未保存，请重新检查。</string>
+    <string name="nm_model_cost_blocked">模型费用尚未核实，已阻止一项模型请求。已发送的请求仍可能收费。</string>
+    <string name="nm_model_use_stop_warning">直接模型请求可能已送达服务商并可能产生费用。停止无法撤回已发送的请求；请仅在自己希望时再次请求。</string>
+    <string name="nm_model_allow_unverified_cost">允许费用未核实的模型请求</string>
+    <string name="nm_model_cost_guard_help">默认关闭，应用重启后会恢复关闭。这会暂停受保护的聊天、图片、视频和模型测试请求，包括标为免费的模型。这不是消费限额，语音、命令和其他服务仍可能收费。自动使用还需单独授权。</string>
+    <string name="nm_model_cost_confirm_body">只要此应用进程仍在运行，就会允许费用未核实的受保护模型请求。离开此页面不会关闭权限。即使标为免费也可能收费。已发送的请求无法撤销。其他服务不受此保护。要继续吗？</string>
+    <string name="nm_video_probe_manual_hint">为避免可能的费用，此测试应用已暂停自动视频检查。你可以不检查，直接选择或输入模型。</string>
+    <string name="nm_video_probe_confirm_body">此检查可能为每个候选模型发送一个空任务。即使没有生成视频，服务商也可能收费。可能会发送多个请求。已发送的请求无法撤销。要继续吗？</string>
+    <string name="nm_auto_video_blocked">自动选择已开启或无法检查时，智能体无法请求视频。具体视频模型及其替代模型尚未获准。请检查“模型”设置。已发送的请求仍可能收费。</string>
+    <string name="nm_avatar_auto_unavailable">自动模型选择已开启或无法确认时，头像请求会暂停。请关闭自动选择，并检查所选模型和可能产生的费用。</string>
+    <string name="nm_avatar_background_paused">在此测试应用中，选择图片不会自动创建姿势或视频。你可以在外观或媒体设置中主动请求，服务商可能会收费。</string>
+    <string name="nm_media_model_change_blocked">此请求会换用另一个媒体模型，价格可能不同。请在图像和视频设置中选择兼容模型。此请求未发送，之前发送的其他请求仍可能产生费用。</string>
+    <string name="nm_video_request_failed">无法完成视频。任务可能已发送并可能产生费用。没有新请求时不要重试。</string>
+    <string name="nm_video_authorization_changed">视频服务商、账户、设置或会话已更改。视频任务未发送。其他已发送的请求仍可能产生费用。</string>
 </resources>

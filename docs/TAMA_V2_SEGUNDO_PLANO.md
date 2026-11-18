@@ -5,6 +5,10 @@ X6 Pro que explique a interrupção relatada pelo dono.** Comentários no códig
 implementadores, não prova de comportamento no aparelho ou no HyperOS. Nenhuma mudança no
 manifesto, na política do serviço ou nos dados do telefone foi feita nesta investigação.
 
+**A investigação da jornada no emulador está pausada a pedido do dono.** A proposta de teste no
+emulador descrita mais abaixo é histórica, não uma instrução para executá-la agora. Mantenha as
+falhas e os gates registrados; uma eventual retomada depende de nova orientação do dono.
+
 ## Caminho observado no código
 
 1. **[código] Chat local:** `ChatViewModel.nmSendMessage` tenta primeiro o roteamento explícito
@@ -64,11 +68,12 @@ manifesto, na política do serviço ou nos dados do telefone foi feita nesta inv
 
 ## Evidência necessária e privacidade
 
-Primeiro preparar um teste instrumentado no emulador descartável com provedor e dados fictícios:
-começar um turno controlado, observar se o serviço/notificação sobe, enviar o app para segundo
-plano, aguardar o resultado e conferir que o mesmo turno concluiu ou apresentou erro. Testar
-separadamente a recusa de inicialização do serviço e o encerramento do processo. Esses testes
-não substituem o Poco nem justificam `ANDROID_DEVICE_PASS`.
+O plano anterior previa um teste instrumentado no emulador descartável com provedor e dados
+fictícios: começar um turno controlado, observar se o serviço/notificação sobe, enviar o app para
+segundo plano, aguardar o resultado e conferir que o mesmo turno concluiu ou apresentou erro.
+Previa também testar separadamente a recusa de inicialização do serviço e o encerramento do
+processo. **Essa investigação está pausada agora.** Mesmo que retomados depois, esses testes não
+substituem o Poco nem justificam `ANDROID_DEVICE_PASS`.
 
 No telefone do dono, somente com autorização para uma chave gratuita e um pedido simples, comparar
 primeiro plano e segundo plano, sem remover o app, limpar dados ou substituir o APK por uma

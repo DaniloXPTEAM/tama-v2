@@ -995,6 +995,10 @@
     <string name="nm_hub_err_unknown_action">Computerul rulează un TAMA AI mai vechi, care nu cunoaște această acțiune.</string>
     <string name="nm_hub_err_bad_key">Deconectat pe relay; conectează-te din nou.</string>
     <string name="nm_hub_err_generic">Computerul nu a putut face asta.</string>
+    <!-- nanoMuse: pre-admission explanations for the parallel package. -->
+    <string name="nm_hub_err_id_reused">Noua cerere nu a ajuns la dispozitiv: identificatorul apelului este utilizat sau a fost deja folosit.</string>
+    <string name="nm_hub_err_bad_call_id">Noua cerere nu a ajuns la dispozitiv: identificatorul apelului este gol, prea lung sau rezervat.</string>
+    <string name="nm_hub_err_id_limit">Noua cerere nu a ajuns la dispozitiv: acest client a atins limita de identificatori pentru apeluri la distanță.</string>
     <string name="nm_devices_refused">Refuzat de relay; conectează-te din nou</string>
     <string name="nm_devices_paused">Pus pe pauză de relay</string>
     <string name="nm_devices_notifications_hint">Permite notificările, ca telefonul să rămână accesibil în fundal.</string>
@@ -1454,6 +1458,13 @@
     <string name="nm_auto_reason_disabled">provider disabled</string>
     <string name="nm_auto_reason_hidden">model hidden</string>
     <string name="nm_auto_reason_credential">no usable credential</string>
+    <string name="nm_auto_reason_unverified_cost">costul automat nu este verificat</string>
+    <string name="nm_auto_allow_unverified_cost">Permite rute automate cu cost neverificat</string>
+    <string name="nm_auto_cost_guard_help">Dezactivat implicit. Aceasta pune pe pauză unele apeluri automate de chat, model de rezervă, imagine, titlu și rezumat. Nu este o limită de cheltuieli: apelurile manuale și alte servicii pot taxa în continuare.</string>
+    <string name="nm_auto_cost_confirm_title">Permiți posibile taxe?</string>
+    <string name="nm_auto_cost_confirm_body">Apelurile automate pot fi taxate chiar dacă un model este prezentat ca gratuit. Această permisiune rămâne activă până când o dezactivezi, inclusiv după repornirea aplicației. Cererile protejate de modele necesită și permisiunea separată pentru costuri. Continui?</string>
+    <string name="nm_auto_cost_confirm_action">Permite posibile taxe</string>
+    <string name="nm_auto_cost_cancel">Anulează</string>
     <string name="nm_auto_reason_consent">automatic use not authorized</string>
     <string name="nm_auto_reason_capability">required capability not confirmed</string>
     <string name="nm_auto_reason_profile">tools do not fit this profile</string>
@@ -1481,4 +1492,34 @@
     <string name="nm_diagnostic_copy">Copiază diagnosticul</string>
     <string name="nm_diagnostic_copied">Copiat în clipboard.</string>
     <string name="nm_diagnostic_copy_failed">Nu s-a putut copia. Încearcă din nou.</string>
+    <!-- TAMA V2: safe local failure and image summaries. -->
+    <string name="nm_reach_key_zero_title">Limita de cheltuieli OpenRouter</string>
+    <string name="nm_reach_key_zero_body">OpenRouter a raportat o limită de cheltuieli de 0 USD pentru această cheie. Verifică modelele gratuite disponibile.</string>
+    <string name="nm_reach_safe_summary">Rezumat sigur al erorii</string>
+    <string name="nm_reach_private_omitted">Mesajul original este ascuns deoarece poate conține date private. Verifică-l la furnizor înainte de a distribui ceva.</string>
+    <string name="nm_error_private_generic">Cererea nu a putut fi finalizată. Verifică setările sau încearcă din nou.</string>
+    <string name="nm_image_guard_ambiguous">Nu am putut confirma cererea de imagine, așa că nu a fost trimisă. Dacă vrei o imagine, cere-o direct și descrie-o.</string>
+    <string name="nm_image_guard_repeat">O cerere de imagine a fost deja procesată în această tură. Nu o voi repeta automat. Trimite o cerere nouă dacă vrei să încerci din nou.</string>
+    <string name="nm_image_guard_invalid">Nu am putut înțelege în siguranță detaliile imaginii, așa că încercarea nu a fost trimisă. Descrie imaginea din nou dacă dorești. Nu voi repeta automat.</string>
+    <string name="nm_image_detail_preparing">Pregătesc cererea de imagine…</string>
+    <string name="nm_image_detail_generated">Imaginea a fost generată. Deschide-o din conversație.</string>
+    <string name="nm_image_detail_failed">Imaginea nu a putut fi finalizată. Verifică furnizorul și încearcă din nou doar dacă dorești.</string>
+    <string name="nm_group_switch_title">Schimbarea modelului</string>
+    <string name="nm_group_switch_attempt">%1$s. Încerc %2$s.</string>
+    <string name="nm_group_switch_other">furnizorul nu a putut finaliza cererea</string>
+    <string name="nm_stream_unconfirmed">Furnizorul nu a confirmat încheierea răspunsului. Niciun instrument din acest răspuns nu a fost executat. Încearcă din nou dacă dorești.</string>
+    <string name="nm_auto_review_changed">Contul, furnizorul sau permisiunile s-au schimbat. Permisiunile automate nu au fost salvate. Verifică-le din nou.</string>
+    <string name="nm_model_cost_blocked">O cerere de model a fost blocată deoarece costul ei nu este verificat. Cererile deja trimise pot fi în continuare taxate.</string>
+    <string name="nm_model_use_stop_warning">O cerere directă către model poate să fi ajuns la furnizor și să genereze costuri. Oprirea nu anulează trimiterea; solicită din nou doar dacă dorești.</string>
+    <string name="nm_model_allow_unverified_cost">Permite cereri de modele cu cost neverificat</string>
+    <string name="nm_model_cost_guard_help">Dezactivat implicit și după repornirea aplicației. Pune în pauză cererile protejate de chat, imagini, video și testare a modelelor, inclusiv cele prezentate ca gratuite. Nu este o limită de cheltuieli: vocea, comenzile și alte servicii pot fi taxate. Utilizarea automată necesită și o permisiune separată.</string>
+    <string name="nm_model_cost_confirm_body">Permite cereri protejate de modele cu cost neverificat cât timp acest proces al aplicației rămâne activ. Ieșirea din ecran nu dezactivează permisiunea. Cererile pot fi taxate chiar dacă sunt prezentate ca gratuite. O cerere trimisă nu poate fi retrasă. Alte servicii nu sunt protejate. Continui?</string>
+    <string name="nm_video_probe_manual_hint">Verificările video automate sunt întrerupte în această aplicație de test pentru a evita posibile costuri. Poți alege sau introduce un model fără verificare.</string>
+    <string name="nm_video_probe_confirm_body">Această verificare poate trimite o sarcină goală pentru fiecare model candidat. Furnizorul poate taxa chiar dacă nu este creat niciun videoclip. Pot fi trimise mai multe cereri. O cerere trimisă nu poate fi retrasă. Continui?</string>
+    <string name="nm_auto_video_blocked">Videoclipurile agentului nu sunt disponibile când selecția automată este activată sau nu poate fi verificată. Modelul video exact și modelele înlocuitoare nu au fost aprobate. Verifică setările pentru modele. Cererile deja trimise pot fi totuși taxate.</string>
+    <string name="nm_avatar_auto_unavailable">Solicitările pentru avatar sunt puse pe pauză când selectarea automată a modelului este activă sau nu poate fi verificată. Dezactiveaz-o și verifică modelul ales și eventualele costuri.</string>
+    <string name="nm_avatar_background_paused">În această aplicație de test, alegerea unei imagini nu creează automat ipostaze sau clipuri. Le poți solicita din Aspect sau Media; furnizorii pot percepe costuri.</string>
+    <string name="nm_media_model_change_blocked">Această solicitare ar schimba modelul media cu altul, care poate avea un preț diferit. Alege un model compatibil în setările pentru imagini și video. Această solicitare nu a fost trimisă. Alte solicitări deja trimise pot fi totuși taxate.</string>
+    <string name="nm_video_request_failed">Videoclipul nu a putut fi finalizat. Este posibil ca sarcina să fi fost trimisă și să fie taxată. Nu reîncerca fără o cerere nouă.</string>
+    <string name="nm_video_authorization_changed">Furnizorul, contul, setările sau sesiunea video s-au schimbat. Sarcina video nu a fost trimisă. Alte cereri deja trimise pot fi taxate în continuare.</string>
 </resources>

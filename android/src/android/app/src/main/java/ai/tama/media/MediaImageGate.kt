@@ -14,9 +14,21 @@ import ai.tama.router.AutoModelStore
 import java.security.MessageDigest
 import kotlinx.coroutines.withTimeoutOrNull
 
+/** A revocation witness, never a permission grant in its own right. */
+internal interface MediaPermissionObservation : AutoCloseable {
+    fun isCurrent(): Boolean
+}
+
 /** The same permission and risk checks apply to the CLI, the native tool and shortcuts. */
 internal fun interface MediaImageGate {
     suspend fun allow(endpoint: ImageGen.Endpoint, prompt: String, size: String, sessionId: String?, freshApproval: Boolean): Boolean
+
+    // Fail closed if another implementation forgets to support transport revalidation.
+    fun observe(endpoint: ImageGen.Endpoint, sessionId: String?): MediaPermissionObservation =
+        object : MediaPermissionObservation {
+            override fun isCurrent() = false
+            override fun close() = Unit
+        }
 }
 
 internal class AndroidMediaImageGate(
@@ -24,6 +36,18 @@ internal class AndroidMediaImageGate(
     private val checkRisk: suspend (String, String) -> GateOutcome = RiskGate::checkShell,
     private val permissionTimeoutMs: Long = PERMISSION_TIMEOUT_MS,
 ) : MediaImageGate {
+    override fun observe(endpoint: ImageGen.Endpoint, sessionId: String?): MediaPermissionObservation {
+        val accountVersion = AutoModelRuntime.accountVersion(endpoint.instanceId)
+        val permission = OffloadPermissionManager.observePermission(
+            IMAGE_PERMISSION, sessionId ?: OffloadPermissionManager.OFFLOAD_GLOBAL_SESSION_ID,
+        )
+        return object : MediaPermissionObservation {
+            override fun isCurrent(): Boolean = permission.isCurrent() &&
+                accountVersion == AutoModelRuntime.accountVersion(endpoint.instanceId)
+            override fun close() = permission.close()
+        }
+    }
+
     override suspend fun allow(endpoint: ImageGen.Endpoint, prompt: String, size: String, sessionId: String?, freshApproval: Boolean): Boolean {
         val sid = sessionId ?: OffloadPermissionManager.OFFLOAD_GLOBAL_SESSION_ID
         // This is assessed, not executed. Quoting makes the assessment match the

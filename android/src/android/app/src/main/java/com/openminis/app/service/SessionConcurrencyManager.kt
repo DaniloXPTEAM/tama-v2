@@ -20,6 +20,15 @@ object SessionConcurrencyManager {
     val suspendedSessions = slots.suspendedSessions
 
     suspend fun acquireSlot(sessionId: String): ChatSlotPool.Lease {
+        // nanoMuse: deletion also cancels a turn that is waiting for a slot.
+        // Selected chat setups reserve earlier; callers that do not remain unprotected until here.
+        val owner = if (com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test") {
+            val job = currentCoroutineContext()[kotlinx.coroutines.Job]
+                ?: throw kotlinx.coroutines.CancellationException("Chat job unavailable")
+            if (!ai.tama.chat.ChatSessionJobs.bind(sessionId, job))
+                throw kotlinx.coroutines.CancellationException("Chat session was cleared")
+            job
+        } else null
         val startMs = android.os.SystemClock.elapsedRealtime()
         println("[T-STALL-DIAG] slot REQUEST sid=$sessionId ${diagSnapshot()}")
         val watchdog = CoroutineScope(currentCoroutineContext()).launch {
@@ -37,6 +46,7 @@ object SessionConcurrencyManager {
             return lease
         } catch (e: Throwable) {
             lease?.let(slots::release)
+            owner?.let { ai.tama.chat.ChatSessionJobs.unbind(sessionId, it) }
             throw e
         } finally {
             watchdog.cancel()

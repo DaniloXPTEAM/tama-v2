@@ -14,6 +14,7 @@ internal object ImageShortcutRunner {
         prompt: String,
         failureMessage: String,
         settingsLabel: String,
+        safeFailureMessages: Map<String, String>? = null,
         execute: suspend (String) -> ToolExecutionResult,
     ): Reply {
         val result = try {
@@ -30,12 +31,15 @@ internal object ImageShortcutRunner {
             } ?: return Reply(failureMessage, false)
             return Reply(markdown, true)
         }
-        // Provider errors may echo the person's prompt or secrets. The generic
-        // localized message also warns that an unsuccessful POST may be charged.
-        val code = body.optString("error", "")
+        // Provider errors may echo the person's prompt or secrets. In the parallel
+        // build even an unexpected error code receives only a locally authored text.
+        val safeBody = if (safeFailureMessages == null) body else JSONObject(
+            ImageToolPresentation.sanitizedFailure(result.output, safeFailureMessages, failureMessage),
+        )
+        val code = safeBody.optString("error", "")
         val message = if (code == "image_failed") failureMessage
-            else body.optString("message", "").takeIf { it.isNotBlank() } ?: failureMessage
-        val settings = body.optString("settings", "").takeIf {
+            else safeBody.optString("message", "").takeIf { it.isNotBlank() } ?: failureMessage
+        val settings = safeBody.optString("settings", "").takeIf {
             it in setOf("minis://settings/media", "minis://settings/models", "minis://settings/permissions")
         }
         return Reply(if (settings == null) message else "$message\n\n[$settingsLabel]($settings)", false)

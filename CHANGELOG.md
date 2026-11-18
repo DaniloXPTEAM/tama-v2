@@ -4,6 +4,30 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+- In the side-by-side Android test build, serialized incoming Hub progress and terminal replies per call to prevent tested ordering and completion races. This does not fix relay misrouting.
+
+- In the side-by-side Android test build, kept selected stale Hub socket callbacks and retired call reservations from affecting a replacement connection. This does not fix relay misrouting.
+
+- Explained selected Hub calls refused before delivery in the side-by-side Android test build.
+
+- Kept current requests and, when the token budget permits, previous requests and recent tool work in view during long Python runtime turns and step-limit summaries, without changing saved history.
+
+- Refused agent browser actions and frames on blocked local pages, rejected unsafe URL schemes and non-HTTP fetch redirects, while preserving the person's own take-over view.
+
+- Kept environment-variable names and metadata exceptions out of selected logs in the side-by-side Android test build; other logs and unencrypted metadata still need privacy review.
+
+- Allowed the iSH native-build helper to use complete vendored dependency sources without requiring nested Git directories. Kept Android source directories named `sessions` from being ignored when starting a new Git repository.
+
+- In the side-by-side Android test build, pause covered requests with unverified cost by default, including some manual calls, and recheck image permission and route during dispatch. This is not a global spending limit: uncovered services and already-sent requests can still incur charges.
+
+- Restricted silent retries and redirects in covered side-by-side image and video transports, and added possible-charge warnings in covered video failure and Stop paths. An already-sent request can still be charged, and the parallel `model_use` path currently omits the `OwnTurns` turn record.
+
+- Stopped automatically replaying one-shot shell commands after an early silent signal in the side-by-side Android test build; the normal build keeps its existing seccomp fallback.
+
+- Reduced selected side-by-side chat, shell and native-offload logs that could expose tool arguments, titles, commands or exception details. Other logs and crash reports can still contain private data.
+
+- Kept overlapping sign-ins and credential restores separate in the side-by-side Android test build, and withheld automatic Vision Group requests until their route and image cost can be checked.
+
 - In the side-by-side Android test build, omit the unsupported assistant `reasoning_content` field when sending Chat Completions history to Groq's direct API; other packages and gateways keep their existing behavior.
 
 - Added an Android diagnostic preview in About and through `/diagnostico`; it copies only allowlisted build, device and classified chat-state fields after a tap, without conversations, credentials, addresses or logs.

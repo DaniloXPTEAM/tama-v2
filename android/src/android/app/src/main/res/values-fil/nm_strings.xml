@@ -991,6 +991,10 @@
     <string name="nm_hub_err_unknown_action">Mas lumang TAMA AI ang tumatakbo sa computer na hindi nakakakilala sa aksyong ito.</string>
     <string name="nm_hub_err_bad_key">Na-sign out sa relay; mag-sign in ulit.</string>
     <string name="nm_hub_err_generic">Hindi ito nagawa ng computer.</string>
+    <!-- nanoMuse: pre-admission explanations for the parallel package. -->
+    <string name="nm_hub_err_id_reused">Hindi nakarating sa device ang bagong kahilingan: ginagamit na o nagamit na ang ID ng tawag.</string>
+    <string name="nm_hub_err_bad_call_id">Hindi nakarating sa device ang bagong kahilingan: walang laman, masyadong mahaba o nakalaan ang ID ng tawag.</string>
+    <string name="nm_hub_err_id_limit">Hindi nakarating sa device ang bagong kahilingan: naabot na ng client na ito ang limitasyon sa mga ID ng remote na tawag.</string>
     <string name="nm_devices_refused">Tinanggihan ng relay; mag-sign in ulit</string>
     <string name="nm_devices_paused">Ipinahinto ng relay</string>
     <string name="nm_devices_notifications_hint">Payagan ang mga notification para manatiling maaabot ang telepono sa background.</string>
@@ -1450,6 +1454,13 @@
     <string name="nm_auto_reason_disabled">provider disabled</string>
     <string name="nm_auto_reason_hidden">model hidden</string>
     <string name="nm_auto_reason_credential">no usable credential</string>
+    <string name="nm_auto_reason_unverified_cost">hindi pa nasusuri ang gastos sa awtomatikong tawag</string>
+    <string name="nm_auto_allow_unverified_cost">Payagan ang mga awtomatikong rutang hindi pa nasusuri ang gastos</string>
+    <string name="nm_auto_cost_guard_help">Naka-off bilang default. Ihihinto nito ang ilang awtomatikong tawag sa chat, pamalit na modelo, larawan, pamagat at buod. Hindi ito limitasyon sa gastos: maaari pa ring maningil ang mga manual na tawag at ibang serbisyo.</string>
+    <string name="nm_auto_cost_confirm_title">Payagan ang posibleng singil?</string>
+    <string name="nm_auto_cost_confirm_body">Maaaring may singil ang mga awtomatikong tawag kahit sinasabing libre ang modelo. Mananatiling naka-on ang pahintulot na ito hanggang i-off mo, kahit i-restart ang app. Kailangan din ng hiwalay na pahintulot sa gastos para sa mga protektadong kahilingan sa modelo. Magpatuloy?</string>
+    <string name="nm_auto_cost_confirm_action">Payagan ang posibleng singil</string>
+    <string name="nm_auto_cost_cancel">Kanselahin</string>
     <string name="nm_auto_reason_consent">automatic use not authorized</string>
     <string name="nm_auto_reason_capability">required capability not confirmed</string>
     <string name="nm_auto_reason_profile">tools do not fit this profile</string>
@@ -1477,4 +1488,34 @@
     <string name="nm_diagnostic_copy">Kopyahin ang diagnostic</string>
     <string name="nm_diagnostic_copied">Nakopya sa clipboard.</string>
     <string name="nm_diagnostic_copy_failed">Hindi nakopya. Subukan muli.</string>
+    <!-- TAMA V2: safe local failure and image summaries. -->
+    <string name="nm_reach_key_zero_title">Limitasyon sa gastos ng OpenRouter</string>
+    <string name="nm_reach_key_zero_body">Iniulat ng OpenRouter ang limitasyong US$ 0 para sa susi na ito. Tingnan kung aling mga libreng modelo ang magagamit.</string>
+    <string name="nm_reach_safe_summary">Ligtas na buod ng error</string>
+    <string name="nm_reach_private_omitted">Nakatago ang orihinal na mensahe dahil maaaring may pribadong nilalaman. Suriin ito sa provider bago magbahagi.</string>
+    <string name="nm_error_private_generic">Hindi nakumpleto ang kahilingan. Suriin ang mga setting o subukang muli.</string>
+    <string name="nm_image_guard_ambiguous">Hindi ko nakumpirma ang kahilingan sa larawan kaya hindi ito naipadala. Kung gusto mo ng larawan, direktang hilingin at ilarawan ito.</string>
+    <string name="nm_image_guard_repeat">May naprosesong kahilingan na para sa larawan sa turn na ito. Hindi ko ito awtomatikong uulitin. Gumawa ng bagong kahilingan kung gusto mong subukan muli.</string>
+    <string name="nm_image_guard_invalid">Hindi ko ligtas na naunawaan ang detalye ng larawan kaya hindi naipadala ang pagsubok na ito. Ilarawan muli kung gusto mong subukan. Hindi ko ito awtomatikong uulitin.</string>
+    <string name="nm_image_detail_preparing">Inihahanda ang kahilingan sa larawan…</string>
+    <string name="nm_image_detail_generated">Nagawa ang larawan. Buksan ito sa pag-uusap.</string>
+    <string name="nm_image_detail_failed">Hindi nakumpleto ang larawan. Suriin ang provider at subukang muli lamang kung gusto mo.</string>
+    <string name="nm_group_switch_title">Paglipat ng modelo</string>
+    <string name="nm_group_switch_attempt">%1$s. Sinusubukan ang %2$s.</string>
+    <string name="nm_group_switch_other">hindi nakumpleto ng provider ang kahilingan</string>
+    <string name="nm_stream_unconfirmed">Hindi kinumpirma ng provider ang pagtatapos ng tugon. Walang tool mula sa tugon ang pinatakbo. Subukang muli kung gusto mo.</string>
+    <string name="nm_auto_review_changed">Nagbago ang account, provider o mga pahintulot. Hindi na-save ang mga awtomatikong pahintulot. Suriin muli ang mga ito.</string>
+    <string name="nm_model_cost_blocked">Na-block ang isang kahilingan sa modelo dahil hindi pa napatunayan ang gastos nito. Maaari pa ring singilin ang mga naipadalang kahilingan.</string>
+    <string name="nm_model_use_stop_warning">Maaaring natanggap na ng provider ang direktang kahilingan sa modelo at maaari itong singilin. Hindi ito mababawi sa paghinto; ulitin lamang kung gusto mo.</string>
+    <string name="nm_model_allow_unverified_cost">Payagan ang mga kahilingan sa modelong hindi pa napatunayan ang gastos</string>
+    <string name="nm_model_cost_guard_help">Naka-off bilang default at pagkatapos i-restart ang app. Pinapahinto nito ang mga protektadong kahilingan sa chat, larawan, video at pagsubok ng modelo, pati ang mga sinasabing libre. Hindi ito limitasyon sa gastos: maaari pa ring maningil ang boses, mga command at iba pang serbisyo. Kailangan din ng hiwalay na pahintulot para sa awtomatikong paggamit.</string>
+    <string name="nm_model_cost_confirm_body">Pinapayagan nito ang mga protektadong kahilingan sa modelong hindi pa napatunayan ang gastos habang aktibo ang prosesong ito ng app. Hindi pinapatay ng pag-alis sa screen ang pahintulot. Maaari itong singilin kahit sinasabing libre. Hindi na mababawi ang naipadalang kahilingan. Hindi protektado ang ibang serbisyo. Magpatuloy?</string>
+    <string name="nm_video_probe_manual_hint">Naka-pause ang mga awtomatikong pagsusuri ng video sa pansubok na app na ito upang maiwasan ang posibleng singil. Maaari kang pumili o maglagay ng modelo nang hindi nagsusuri.</string>
+    <string name="nm_video_probe_confirm_body">Maaaring magpadala ang pagsusuring ito ng walang laman na gawain para sa bawat kandidatong modelo. Maaaring maningil ang provider kahit walang magawang video. Maaaring magpadala ng ilang kahilingan. Hindi na mababawi ang naipadalang kahilingan. Magpatuloy?</string>
+    <string name="nm_auto_video_blocked">Hindi magagamit ang video ng agent kapag naka-on ang awtomatikong pagpili o hindi ito masuri. Hindi pa aprubado ang eksaktong video model at mga kapalit nito. Suriin ang Models. Maaari pa ring singilin ang mga naipadalang kahilingan.</string>
+    <string name="nm_avatar_auto_unavailable">Nakahinto ang mga kahilingan sa avatar kapag naka-on ang awtomatikong pagpili ng modelo o hindi ito masuri. I-off ito at suriin ang napiling modelo at mga posibleng singil.</string>
+    <string name="nm_avatar_background_paused">Sa test app na ito, ang pagpili ng larawan ay hindi awtomatikong gumagawa ng mga pose o clip. Maaari mong hilingin ang mga ito sa Appearance o Media; maaaring maningil ang mga provider.</string>
+    <string name="nm_media_model_change_blocked">Lilipat ang kahilingang ito sa ibang media model na maaaring may ibang presyo. Pumili ng katugmang modelo sa mga setting ng larawan at video. Hindi ipinadala ang kahilingang ito. Maaari pa ring masingil ang ibang kahilingang naipadala na.</string>
+    <string name="nm_video_request_failed">Hindi nakumpleto ang video. Maaaring naipadala ang gawain at may singil. Huwag ulitin nang walang bagong kahilingan.</string>
+    <string name="nm_video_authorization_changed">Nagbago ang provider, account, mga setting o session ng video. Hindi naipadala ang gawain sa video. Maaaring may singil pa rin ang ibang kahilingang naipadala na.</string>
 </resources>

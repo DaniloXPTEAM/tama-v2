@@ -75,13 +75,17 @@ internal fun ProviderErrorDetailSheet(
     val unavailable = stringResource(R.string.nm_reach_sheet_unavailable)
     val providerLabel = stringResource(R.string.model_entry_provider)
     val modelLabel = stringResource(R.string.nm_chat_menu_model)
-    val messageLabel = stringResource(R.string.nm_reach_sheet_message)
+    val parallelTest = com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test"
+    val messageLabel = stringResource(if (parallelTest) R.string.nm_reach_safe_summary else R.string.nm_reach_sheet_message)
     val http = reach.httpStatus?.toString() ?: unavailable
     val provider = ProviderReach.redactBody(reach.host).ifBlank { unavailable }
     val model = ProviderReach.redactBody(reach.modelId).ifBlank { unavailable }
-    // Legacy errors have no long message or model snapshot. Do not infer either from the
-    // current model, and disclose that even redacted text may contain other sensitive data.
-    val message = ProviderReach.redactBody(reach.originalMessage.ifBlank { reach.detail }).ifBlank { unavailable }
+    // Redacting keys alone cannot identify arbitrary private text echoed by a provider.
+    // The parallel build shows only a fixed local summary, including for old stored errors.
+    val message = if (parallelTest) {
+        stringResource(if (ai.tama.net.ProviderErrorPrivacy.isZeroKeyLimit(reach))
+            R.string.nm_reach_key_zero_body else R.string.nm_reach_private_omitted)
+    } else ProviderReach.redactBody(reach.originalMessage.ifBlank { reach.detail }).ifBlank { unavailable }
     val copy = "HTTP: $http\n$providerLabel: $provider\n$modelLabel: $model\n\n$messageLabel:\n$message"
 
     StandardChatSheet(title = stringResource(R.string.nm_reach_sheet_title), onDismiss = onDismiss) {

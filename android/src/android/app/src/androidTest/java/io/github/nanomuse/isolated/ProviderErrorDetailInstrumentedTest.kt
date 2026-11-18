@@ -65,7 +65,7 @@ class ProviderErrorDetailInstrumentedTest {
         )
     }
 
-    @Test fun cardOpensAStableSheetAndCopiesTheRedactedMessage() {
+    @Test fun cardOpensAStableSheetAndCopiesOnlyThePermittedMessage() {
         var sourceVisible by mutableStateOf(true)
         val reach = failure()
         compose.setContent {
@@ -88,14 +88,27 @@ class ProviderErrorDetailInstrumentedTest {
         compose.onNodeWithText("413").assertIsDisplayed()
         compose.onNodeWithText("fixture.example").assertIsDisplayed()
         compose.onNodeWithText("fixture-model").assertIsDisplayed()
-        compose.onNodeWithText("Request too large: [redacted]\nsecond line").performScrollTo().assertIsDisplayed()
+        val parallel = com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test"
+        if (parallel) {
+            compose.onNodeWithText(text(R.string.nm_reach_private_omitted)).performScrollTo().assertIsDisplayed()
+            assertTrue(compose.onAllNodes(hasText("Request too large:", substring = true)).fetchSemanticsNodes().isEmpty())
+            assertTrue(compose.onAllNodes(hasText("second line", substring = true)).fetchSemanticsNodes().isEmpty())
+        } else {
+            compose.onNodeWithText("Request too large: [redacted]\nsecond line").performScrollTo().assertIsDisplayed()
+        }
         assertTrue(compose.onAllNodes(hasText("fixture-secret", substring = true)).fetchSemanticsNodes().isEmpty())
         compose.onNodeWithTag("provider-error-copy").performScrollTo().performClick()
         compose.waitForIdle()
         val copied = clipboard.primaryClip?.getItemAt(0)?.coerceToText(context)?.toString().orEmpty()
         assertTrue(copied.contains("413"))
         assertTrue(copied.contains("fixture-model"))
-        assertTrue(copied.contains("[redacted]"))
+        if (parallel) {
+            assertTrue(copied.contains(text(R.string.nm_reach_private_omitted)))
+            assertFalse(copied.contains("Request too large:"))
+            assertFalse(copied.contains("second line"))
+        } else {
+            assertTrue(copied.contains("[redacted]"))
+        }
         assertFalse(copied.contains("fixture-secret"))
         assertFalse(copied.contains("synthetic metadata"))
         compose.onNodeWithContentDescription(close).performClick()
@@ -227,7 +240,12 @@ class ProviderErrorDetailInstrumentedTest {
         compose.onNodeWithTag("provider-error-card").performClick()
         waitForSheet(open = true)
         assertEquals(2, compose.onAllNodes(hasText(text(R.string.nm_reach_sheet_unavailable))).fetchSemanticsNodes().size)
-        compose.onNodeWithText("timeout [redacted]").performScrollTo().assertIsDisplayed()
+        if (com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test") {
+            compose.onNodeWithText(text(R.string.nm_reach_private_omitted)).performScrollTo().assertIsDisplayed()
+            assertTrue(compose.onAllNodes(hasText("timeout", substring = true)).fetchSemanticsNodes().isEmpty())
+        } else {
+            compose.onNodeWithText("timeout [redacted]").performScrollTo().assertIsDisplayed()
+        }
         assertTrue(compose.onAllNodes(hasText("sk-synthetic123", substring = true)).fetchSemanticsNodes().isEmpty())
         compose.onNodeWithContentDescription(close).performClick()
         waitForSheet(open = false)

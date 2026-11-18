@@ -11,6 +11,65 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class AutoModelStoreTest {
+    @Test fun directManualWitnessRejectsModeAndPolicyChangesEvenAfterReturning() {
+        val context = PetPrefsContext()
+        AutoModelStore.setEnabled(context, false)
+        val initial = AutoModelStore.directModelMode(context)
+        val witness = ai.tama.net.DirectModelUseGuard.observeManual(true) { AutoModelStore.directModelMode(context) }
+        witness()
+        AutoModelStore.setEnabled(context, true)
+        assertTrue(AutoModelStore.directModelMode(context).automatic)
+        AutoModelStore.setEnabled(context, false)
+        val returned = AutoModelStore.directModelMode(context)
+        assertFalse(returned.automatic)
+        assertTrue(returned.revision > initial.revision)
+        assertTrue(runCatching { witness() }.exceptionOrNull() is ai.tama.net.DirectModelUseGuard.Blocked)
+
+        val later = ai.tama.net.DirectModelUseGuard.observeManual(true) { AutoModelStore.directModelMode(context) }
+        AutoModelStore.setAllowUnverifiedAutomaticCost(context, true)
+        AutoModelStore.setAllowUnverifiedAutomaticCost(context, false)
+        assertTrue(runCatching { later() }.exceptionOrNull() is ai.tama.net.DirectModelUseGuard.Blocked)
+        ai.tama.net.DirectModelUseGuard.observeManual(true) { AutoModelStore.directModelMode(context) }()
+    }
+
+    @Test fun automaticPolicyRevisionChangesEvenWhenASettingReturnsToItsOldValue() {
+        val context = PetPrefsContext()
+        val first = AutoModelStore.automaticPolicyRevision()
+        AutoModelStore.setEnabled(context, true)
+        val second = AutoModelStore.automaticPolicyRevision()
+        AutoModelStore.setEnabled(context, false)
+        val third = AutoModelStore.automaticPolicyRevision()
+        AutoModelStore.setAllowUnverifiedAutomaticCost(context, true)
+        val fourth = AutoModelStore.automaticPolicyRevision()
+        AutoModelStore.setAllowUnverifiedAutomaticCost(context, false)
+        val fifth = AutoModelStore.automaticPolicyRevision()
+        assertTrue(first < second && second < third && third < fourth && fourth < fifth)
+    }
+
+    @Test fun imageReviewDoesNotSurviveRevocationCapabilityOrAccountABA() {
+        val context = PetPrefsContext()
+        val id = AutoModelStore.Identity("image-entry", "provider", "model", "route-a")
+        AutoModelStore.setImageApproved(context, id, true)
+        val first = AutoModelStore.review(context, id)
+        assertTrue(first.imageApproved)
+        assertTrue(AutoModelStore.imageReviewCurrent(context, id, first.accountVersion, first.reviewVersion))
+        AutoModelStore.setImageApproved(context, id, false)
+        AutoModelStore.setImageApproved(context, id, true)
+        assertFalse(AutoModelStore.imageReviewCurrent(context, id, first.accountVersion, first.reviewVersion))
+        val second = AutoModelStore.review(context, id)
+        AutoModelStore.setCapability(context, id, Need.IMAGE_GENERATION, false)
+        AutoModelStore.setCapability(context, id, Need.IMAGE_GENERATION, true)
+        assertFalse(AutoModelStore.imageReviewCurrent(context, id, second.accountVersion, second.reviewVersion))
+        val third = AutoModelStore.review(context, id)
+        AutoModelStore.accountChanged(context, id.providerId)
+        AutoModelStore.setImageApproved(context, id, true)
+        assertFalse(AutoModelStore.imageReviewCurrent(context, id, third.accountVersion, third.reviewVersion))
+        val fourth = AutoModelStore.review(context, id)
+        assertTrue(AutoModelStore.imageReviewCurrent(context, id, fourth.accountVersion, fourth.reviewVersion))
+        assertFalse(AutoModelStore.imageReviewCurrent(context, id.copy(route = "route-b"), fourth.accountVersion, fourth.reviewVersion))
+        assertFalse(AutoModelStore.imageReviewCurrent(context, id, fourth.accountVersion, null))
+    }
+
     @Test fun consentAndCapabilitiesAreExactRouteScopedAndDefaultToUnknown() {
         val context = PetPrefsContext()
         val instance = ProviderInstance("provider-a", "A", ProviderType.openAI, ProviderCredential.apiKey,
@@ -105,6 +164,106 @@ class AutoModelStoreTest {
         assertEquals(setOf(Need.CHAT), AutoModelStore.capabilities(context, id, catalogue))
         AutoModelStore.setCapability(context, id, Need.TOOLS, null)
         assertEquals(setOf(Need.CHAT, Need.TOOLS), AutoModelStore.capabilities(context, id, catalogue))
+    }
+
+    @Test fun staleToolRefusalDoesNotAlterANewAccountOrRevertARoute() {
+        val context = PetPrefsContext()
+        val old = AutoModelStore.Identity("entry", "provider-stale-tool", "model", "route-a")
+        AutoModelStore.setApproved(context, old, true)
+        val version = AutoModelRuntime.accountVersion(old.providerId)
+        assertTrue(AutoModelStore.noteUnsupportedToolsIfCurrent(context, old, version))
+        assertTrue(AutoModelStore.toolsWereRefused(context, old))
+        AutoModelStore.accountChanged(context, old.providerId)
+        assertFalse(AutoModelStore.noteUnsupportedToolsIfCurrent(context, old, version))
+        assertFalse(AutoModelStore.toolsWereRefused(context, old))
+
+        val newRoute = old.copy(route = "route-b")
+        AutoModelStore.setApproved(context, newRoute, true)
+        val currentVersion = AutoModelRuntime.accountVersion(old.providerId)
+        assertFalse(AutoModelStore.noteUnsupportedToolsIfCurrent(context, old, currentVersion))
+        assertTrue(AutoModelStore.approved(context, newRoute))
+        assertEquals(currentVersion, AutoModelRuntime.accountVersion(old.providerId))
+        assertFalse(AutoModelStore.toolsWereRefused(context, newRoute))
+    }
+
+    @Test fun staleReviewCannotRestoreConsentAfterAccountOrRouteChanges() {
+        val context = PetPrefsContext()
+        val original = AutoModelStore.Identity("entry", "review-account", "model", "route-a")
+        AutoModelStore.setApproved(context, original, true)
+        AutoModelStore.setImageApproved(context, original, true)
+        val review = AutoModelStore.review(context, original)
+        assertTrue(review.chatApproved)
+        assertTrue(review.imageApproved)
+        AutoModelStore.accountChanged(context, original.providerId)
+        assertFalse(AutoModelStore.saveReview(context, review, true, true, mapOf(Need.TOOLS to true)))
+        assertFalse(AutoModelStore.approved(context, original))
+        assertFalse(AutoModelStore.imageApproved(context, original))
+        assertEquals(emptySet<Need>(), AutoModelStore.capabilities(context, original, emptySet()))
+
+        val beforeMove = AutoModelStore.review(context, original)
+        val newRoute = original.copy(route = "route-b")
+        AutoModelStore.setApproved(context, newRoute, true)
+        AutoModelStore.approved(context, original) // an A → B → A route change is still a change
+        assertFalse(AutoModelStore.saveReview(context, beforeMove, true, true, emptyMap()))
+        assertFalse(AutoModelStore.approved(context, original))
+    }
+
+    @Test fun reviewRejectsAnotherReviewOrLearnedRefusalAndSavesSeparateApprovals() {
+        val context = PetPrefsContext()
+        val id = AutoModelStore.Identity("entry", "review-conflict", "model", "route")
+        val first = AutoModelStore.review(context, id)
+        val second = AutoModelStore.review(context, id)
+        assertTrue(AutoModelStore.saveReview(context, first, true, false, mapOf(Need.CHAT to true)))
+        assertFalse(AutoModelStore.saveReview(context, second, false, true, emptyMap()))
+        assertTrue(AutoModelStore.approved(context, id))
+        assertFalse(AutoModelStore.imageApproved(context, id))
+        assertEquals(setOf(Need.CHAT), AutoModelStore.capabilities(context, id, emptySet()))
+
+        val beforeRefusal = AutoModelStore.review(context, id)
+        AutoModelStore.noteUnsupportedTools(context, id)
+        assertFalse(AutoModelStore.saveReview(context, beforeRefusal, true, true, mapOf(Need.TOOLS to true)))
+        assertTrue(AutoModelStore.toolsWereRefused(context, id))
+        val explicitReview = AutoModelStore.review(context, id)
+        assertTrue(AutoModelStore.saveReview(context, explicitReview, false, true, mapOf(Need.TOOLS to true)))
+        assertFalse(AutoModelStore.toolsWereRefused(context, id))
+        assertFalse(AutoModelStore.approved(context, id))
+        assertTrue(AutoModelStore.imageApproved(context, id))
+    }
+
+    @Test fun credentialWriteAndReviewCannotInterleaveAroundInvalidation() {
+        val context = PetPrefsContext()
+        val id = AutoModelStore.Identity("entry", "review-transaction", "model", "route")
+        AutoModelStore.setApproved(context, id, true)
+        val original = AutoModelStore.review(context, id)
+        val entered = java.util.concurrent.CountDownLatch(1)
+        val release = java.util.concurrent.CountDownLatch(1)
+        val workers = java.util.concurrent.Executors.newFixedThreadPool(2)
+        try {
+            val change = workers.submit {
+                AutoModelStore.credentialTransaction {
+                    AutoModelStore.accountChanged(context, id.providerId)
+                    entered.countDown()
+                    check(release.await(5, java.util.concurrent.TimeUnit.SECONDS))
+                    context.getSharedPreferences("fake-key", Context.MODE_PRIVATE).edit().putString("value", "new").apply()
+                }
+            }
+            assertTrue(entered.await(5, java.util.concurrent.TimeUnit.SECONDS))
+            val reviewStarted = java.util.concurrent.CountDownLatch(1)
+            val review = workers.submit<Boolean> {
+                reviewStarted.countDown()
+                AutoModelStore.saveReview(context, original, true, true, emptyMap())
+            }
+            assertTrue(reviewStarted.await(5, java.util.concurrent.TimeUnit.SECONDS))
+            assertFalse(review.isDone) // the credential transaction still owns the monitor
+            release.countDown()
+            change.get(5, java.util.concurrent.TimeUnit.SECONDS)
+            assertFalse(review.get(5, java.util.concurrent.TimeUnit.SECONDS))
+            assertEquals("new", context.getSharedPreferences("fake-key", Context.MODE_PRIVATE).getString("value", null))
+            assertFalse(AutoModelStore.approved(context, id))
+        } finally {
+            release.countDown()
+            workers.shutdownNow()
+        }
     }
 
     @Test fun revokingOneProviderDoesNotEraseAnotherOrTheGlobalMode() {

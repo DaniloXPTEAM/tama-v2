@@ -20,6 +20,11 @@ import java.util.concurrent.TimeUnit
 
 /** The actual OpenAI-compatible request path, with a local server and no real credentials. */
 class OpenRouterErrorPathTest {
+
+    // nanoMuse: these transport fixtures use MockWebServer, never a provider account.
+    @org.junit.Before fun allowFixtureRequests() { ai.tama.pricing.ModelCostGuard.setAllowedForCurrentProcess(true) }
+    @org.junit.After fun resetFixtureCostPermission() { ai.tama.pricing.ModelCostGuard.setAllowedForCurrentProcess(false) }
+
     private lateinit var server: MockWebServer
     private lateinit var provider: OpenAIProvider
     private val fixtureKey = "fixture-credential-123456"

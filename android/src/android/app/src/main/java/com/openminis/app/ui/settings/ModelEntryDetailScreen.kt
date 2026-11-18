@@ -66,6 +66,11 @@ fun ModelEntryDetailScreen(
     val overrides = entry.overrides
     val context = LocalContext.current
     val autoIdentity = instance?.let { AutoModelStore.identity(entry, it) }
+    // nanoMuse: a review is a snapshot, not permission to restore an old account's consent.
+    val nmParallel = com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test"
+    val nmReview = remember(autoIdentity) {
+        if (nmParallel) autoIdentity?.let { providerRepository.nmBeginAutoReview(it) } else null
+    }
     val catalogueCapabilities = remember(autoIdentity) {
         instance?.let {
             io.github.nanomuse.cloud.ProviderCatalogue.match(
@@ -74,13 +79,18 @@ fun ModelEntryDetailScreen(
         }.orEmpty()
     }
     val knownCapabilities = remember(autoIdentity, catalogueCapabilities) {
-        autoIdentity?.let { AutoModelStore.capabilities(context, it, catalogueCapabilities) }.orEmpty()
+        autoIdentity?.let {
+            if (nmParallel) providerRepository.nmAutoReviewCapabilities(it, catalogueCapabilities)
+            else AutoModelStore.capabilities(context, it, catalogueCapabilities)
+        }.orEmpty()
     }
     var autoApproved by remember(autoIdentity) {
-        mutableStateOf(autoIdentity?.let { AutoModelStore.approved(context, it) } == true)
+        mutableStateOf(if (nmParallel) nmReview?.chatApproved == true else
+            autoIdentity?.let { AutoModelStore.approved(context, it) } == true)
     }
     var autoImageApproved by remember(autoIdentity) {
-        mutableStateOf(autoIdentity?.let { AutoModelStore.imageApproved(context, it) } == true)
+        mutableStateOf(if (nmParallel) nmReview?.imageApproved == true else
+            autoIdentity?.let { AutoModelStore.imageApproved(context, it) } == true)
     }
     var autoEdits by remember(autoIdentity) { mutableStateOf<Map<Need, Boolean>>(emptyMap()) }
     var confirmAuto by remember(autoIdentity) { mutableStateOf(false) }
@@ -171,9 +181,19 @@ fun ModelEntryDetailScreen(
                     // different endpoint/model. The new identity must be reviewed separately.
                     if (instance != null && autoIdentity != null &&
                         AutoModelStore.identity(updated, instance) == autoIdentity) {
-                        AutoModelStore.setApproved(context, autoIdentity, autoApproved)
-                        AutoModelStore.setImageApproved(context, autoIdentity, autoImageApproved)
-                        autoEdits.forEach { (need, value) -> AutoModelStore.setCapability(context, autoIdentity, need, value) }
+                        if (nmParallel) {
+                            // nanoMuse: the provider may have changed while this screen or
+                            // its confirmation dialog was open. Never resurrect old consent.
+                            val saved = nmReview?.let {
+                                providerRepository.nmSaveAutoReview(it, autoApproved, autoImageApproved, autoEdits)
+                            } == true
+                            if (!saved) android.widget.Toast.makeText(context,
+                                context.getString(R.string.nm_auto_review_changed), android.widget.Toast.LENGTH_LONG).show()
+                        } else {
+                            AutoModelStore.setApproved(context, autoIdentity, autoApproved)
+                            AutoModelStore.setImageApproved(context, autoIdentity, autoImageApproved)
+                            autoEdits.forEach { (need, value) -> AutoModelStore.setCapability(context, autoIdentity, need, value) }
+                        }
                     }
                     onBack()
                 },

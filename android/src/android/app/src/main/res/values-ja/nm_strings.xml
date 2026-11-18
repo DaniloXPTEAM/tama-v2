@@ -987,6 +987,10 @@
     <string name="nm_hub_err_unknown_action">コンピューターの TAMA AI が古く、この操作を知りません。</string>
     <string name="nm_hub_err_bad_key">リレーでサインアウトされました。もう一度サインインしてください。</string>
     <string name="nm_hub_err_generic">コンピューターで実行できませんでした。</string>
+    <!-- nanoMuse: pre-admission explanations for the parallel package. -->
+    <string name="nm_hub_err_id_reused">新しいリクエストはデバイスに届きませんでした。呼び出しIDは使用中か、すでに使用されています。</string>
+    <string name="nm_hub_err_bad_call_id">新しいリクエストはデバイスに届きませんでした。呼び出しIDが空、長すぎる、または予約済みです。</string>
+    <string name="nm_hub_err_id_limit">新しいリクエストはデバイスに届きませんでした。このクライアントのリモート呼び出しIDが上限に達しました。</string>
     <string name="nm_devices_refused">リレーに拒否されました。もう一度サインインしてください</string>
     <string name="nm_devices_paused">リレー側で一時停止中</string>
     <string name="nm_devices_notifications_hint">バックグラウンドでも到達可能でいられるよう、通知を許可してください。</string>
@@ -1446,6 +1450,13 @@
     <string name="nm_auto_reason_disabled">provider disabled</string>
     <string name="nm_auto_reason_hidden">model hidden</string>
     <string name="nm_auto_reason_credential">no usable credential</string>
+    <string name="nm_auto_reason_unverified_cost">自動呼び出しの料金は未確認です</string>
+    <string name="nm_auto_allow_unverified_cost">料金が未確認の自動ルートを許可</string>
+    <string name="nm_auto_cost_guard_help">初期設定ではオフです。一部の自動チャット、代替モデル、画像、タイトル、要約の呼び出しを停止します。支出上限ではありません。手動呼び出しや他のサービスでは料金が発生する場合があります。</string>
+    <string name="nm_auto_cost_confirm_title">料金が発生する可能性を許可しますか？</string>
+    <string name="nm_auto_cost_confirm_body">無料と表示されたモデルでも、自動呼び出しに料金がかかる場合があります。この許可はアプリの再起動後も、オフにするまで有効です。保護対象のモデルリクエストには別途費用の許可も必要です。続行しますか？</string>
+    <string name="nm_auto_cost_confirm_action">料金が発生する可能性を許可</string>
+    <string name="nm_auto_cost_cancel">キャンセル</string>
     <string name="nm_auto_reason_consent">automatic use not authorized</string>
     <string name="nm_auto_reason_capability">required capability not confirmed</string>
     <string name="nm_auto_reason_profile">tools do not fit this profile</string>
@@ -1473,4 +1484,34 @@
     <string name="nm_diagnostic_copy">診断をコピー</string>
     <string name="nm_diagnostic_copied">クリップボードにコピーしました。</string>
     <string name="nm_diagnostic_copy_failed">コピーできませんでした。もう一度お試しください。</string>
+    <!-- TAMA V2: safe local failure and image summaries. -->
+    <string name="nm_reach_key_zero_title">OpenRouterの利用上限</string>
+    <string name="nm_reach_key_zero_body">OpenRouterはこのキーの利用上限を0米ドルと報告しました。利用できる無料モデルを確認してください。</string>
+    <string name="nm_reach_safe_summary">安全なエラーの概要</string>
+    <string name="nm_reach_private_omitted">元のメッセージには個人情報が含まれる可能性があるため非表示です。共有する前に提供元で確認してください。</string>
+    <string name="nm_error_private_generic">リクエストを完了できませんでした。設定を確認するか、もう一度お試しください。</string>
+    <string name="nm_image_guard_ambiguous">画像のリクエストを確認できなかったため送信しませんでした。画像が必要な場合は、内容を直接指定してください。</string>
+    <string name="nm_image_guard_repeat">このターンでは画像リクエストをすでに処理しました。自動では繰り返しません。再試行する場合は新しく依頼してください。</string>
+    <string name="nm_image_guard_invalid">画像の内容を安全に理解できなかったため送信しませんでした。再試行する場合は画像を説明し直してください。自動では繰り返しません。</string>
+    <string name="nm_image_detail_preparing">画像リクエストを準備中…</string>
+    <string name="nm_image_detail_generated">画像を生成しました。会話から開いてください。</string>
+    <string name="nm_image_detail_failed">画像を完成できませんでした。提供元を確認し、必要な場合のみ再試行してください。</string>
+    <string name="nm_group_switch_title">モデルの切り替え</string>
+    <string name="nm_group_switch_attempt">%1$s。%2$sを試しています。</string>
+    <string name="nm_group_switch_other">提供元がリクエストを完了できませんでした</string>
+    <string name="nm_stream_unconfirmed">提供元が応答の完了を確認しませんでした。この応答のツールは実行していません。必要ならもう一度お試しください。</string>
+    <string name="nm_auto_review_changed">アカウント、プロバイダー、または権限が変更されました。自動使用の権限は保存されていません。もう一度確認してください。</string>
+    <string name="nm_model_cost_blocked">モデルの費用を確認できないため、リクエストを阻止しました。送信済みのリクエストには料金が発生する場合があります。</string>
+    <string name="nm_model_use_stop_warning">モデルへの直接リクエストはプロバイダーに届いて課金される可能性があります。停止しても送信は取り消せません。再実行はご自身の判断で行ってください。</string>
+    <string name="nm_model_allow_unverified_cost">費用未確認のモデルリクエストを許可</string>
+    <string name="nm_model_cost_guard_help">初期設定ではオフで、アプリ再起動時にオフへ戻ります。無料と表示されたモデルを含め、保護対象のチャット、画像、動画、モデルテストを停止します。支出の上限ではなく、音声、コマンド、その他のサービスは課金される場合があります。自動使用には別の許可も必要です。</string>
+    <string name="nm_model_cost_confirm_body">このアプリのプロセスが動作している間、費用未確認の保護対象モデルリクエストを許可します。画面を離れても許可はオフになりません。無料と表示されていても課金される場合があります。送信済みのリクエストは取り消せません。他のサービスは保護されません。続けますか？</string>
+    <string name="nm_video_probe_manual_hint">料金が発生する可能性を避けるため、このテストアプリでは動画モデルの自動確認を停止しています。確認せずにモデルを選ぶか入力できます。</string>
+    <string name="nm_video_probe_confirm_body">この確認では候補モデルごとに空のタスクが送信される場合があります。動画が作成されなくても、プロバイダーから料金を請求される場合があります。複数のリクエストが送信されることがあります。送信済みのリクエストは取り消せません。続けますか？</string>
+    <string name="nm_auto_video_blocked">自動選択がオンの場合、または設定を確認できない場合、エージェントの動画リクエストは利用できません。実際に使う動画モデルと代替モデルは承認されていません。モデル設定を確認してください。送信済みのリクエストには料金がかかる場合があります。</string>
+    <string name="nm_avatar_auto_unavailable">モデルの自動選択がオンの場合、または設定を確認できない場合、アバターのリクエストは停止します。自動選択をオフにし、選択したモデルと発生しうる料金を確認してください。</string>
+    <string name="nm_avatar_background_paused">このテストアプリでは、画像を選択してもポーズや動画は自動作成されません。外観またはメディアから作成を依頼できます。プロバイダーによって料金が発生する場合があります。</string>
+    <string name="nm_media_model_change_blocked">このリクエストでは、料金が異なる可能性のある別のメディアモデルに切り替わります。画像と動画の設定で対応するモデルを選択してください。このリクエストは送信されていません。送信済みの他のリクエストには料金が発生する場合があります。</string>
+    <string name="nm_video_request_failed">動画を完了できませんでした。タスクは送信済みで、料金が発生する可能性があります。新しい依頼がない限り再試行しないでください。</string>
+    <string name="nm_video_authorization_changed">動画のプロバイダー、アカウント、設定またはセッションが変更されました。動画タスクは送信されませんでした。他の送信済みリクエストには料金が発生する可能性があります。</string>
 </resources>

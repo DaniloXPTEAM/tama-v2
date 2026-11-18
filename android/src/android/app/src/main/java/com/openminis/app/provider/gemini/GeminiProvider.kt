@@ -42,8 +42,9 @@ class GeminiProvider(
 ) : LLMProvider {
     override val name = "Google"
 
-    // Set only on the freshly constructed provider used by an automatic picture.
+    // nanoMuse: set on fresh providers for protected images or direct ModelUse.
     internal var singleUseImageRequest: Boolean = false
+    internal var beforeDirectRequest: (() -> Unit)? = null
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
@@ -64,6 +65,8 @@ class GeminiProvider(
         tools: List<AgentToolDefinition>,
         thinkingLevel: ThinkingLevel,
     ): LLMResponse = withContext(Dispatchers.IO) {
+        // nanoMuse: no model or image capability by itself proves zero cost.
+        ai.tama.pricing.ModelCostGuard.requireAllowed()
         val body = buildRequestBody(messages, systemPrompt, maxTokens, temperature, imageParts, tools, thinkingLevel)
         // nanoMuse: this URL, not a later model selection, identifies the failed request.
         val requestModel = model.id
@@ -81,6 +84,9 @@ class GeminiProvider(
         // nanoMuse: redact both the configured key and the one actually present in the URL.
         val credentials = requestCredentials(request)
         val requestClient = if (singleUseImageRequest) client.singleUseImageClient() else client
+        // nanoMuse: revalidate after request preparation and before dispatch.
+        beforeDirectRequest?.invoke()
+        ai.tama.pricing.ModelCostGuard.requireAllowed()
         val response = requestClient.newCall(request).execute()
         val responseBody = response.body?.string() ?: ""
 
@@ -117,13 +123,17 @@ class GeminiProvider(
         tools: List<AgentToolDefinition>,
         thinkingLevel: ThinkingLevel,
     ): Flow<LLMStreamChunk> = callbackFlow {
+        // nanoMuse: block unknown-cost streams before building the outbound request.
+        ai.tama.pricing.ModelCostGuard.requireAllowed()
         val body = buildRequestBody(messages, systemPrompt, maxTokens, temperature, imageParts, tools, thinkingLevel)
         // nanoMuse: snapshot the model in the URL before the request starts.
         val requestModel = model.id
         val url = "$basePath/models/$requestModel:streamGenerateContent?alt=sse&key=$apiKey"
+        // nanoMuse: a protected image/direct stream must not replay the POST.
+        val requestBody = body.toString().toRequestBody("application/json".toMediaType())
         val request = Request.Builder()
             .url(url)
-            .post(body.toString().toRequestBody("application/json".toMediaType()))
+            .post(if (singleUseImageRequest) requestBody.singleUseImageBody() else requestBody)
             // [T-android-default-ua] same intent as the non-streaming
             // branch above — brand outbound requests with Minis/<version>.
             .applyUserAgentOverride(null)
@@ -131,7 +141,11 @@ class GeminiProvider(
 
         // nanoMuse: capture credentials from this call, not a later provider selection.
         val credentials = requestCredentials(request)
-        val response = client.newCall(request).execute()
+        // nanoMuse: the guards may have changed while the request was prepared.
+        beforeDirectRequest?.invoke()
+        ai.tama.pricing.ModelCostGuard.requireAllowed()
+        val requestClient = if (singleUseImageRequest) client.singleUseImageClient() else client
+        val response = requestClient.newCall(request).execute()
         if (!response.isSuccessful) {
             val errorBody = response.body?.string() ?: ""
             response.close()
@@ -194,7 +208,12 @@ class GeminiProvider(
                     lastFinishReason = reason
                 }
             }
-            send(LLMStreamChunk.Finished(lastFinishReason ?: "end_turn"))
+            // nanoMuse: never synthesize success for the isolated test app when
+            // Gemini's stream ended without an actual terminal reason.
+            send(LLMStreamChunk.Finished(ai.tama.net.GeminiStreamTermination.reason(
+                lastFinishReason,
+                parallelTest = com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test",
+            )))
         } catch (e: Exception) {
             cancel("Stream error", mapError(e))
         } finally {
@@ -473,7 +492,10 @@ class GeminiProvider(
             val bytes = try {
                 Base64.decode(b64, Base64.DEFAULT)
             } catch (e: Throwable) {
-                android.util.Log.d("ModelUseImage", "gemini inlineData base64 decode failed: ${e.message}")
+                // nanoMuse: decoding errors can repeat untrusted response data.
+                if (com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test")
+                    android.util.Log.d("ModelUseImage", "Gemini image data could not be decoded")
+                else android.util.Log.d("ModelUseImage", "gemini inlineData base64 decode failed: ${e.message}")
                 continue
             }
             val type = when {
@@ -482,7 +504,9 @@ class GeminiProvider(
                 mime.startsWith("video/") -> LLMMediaAttachment.MediaType.VIDEO
                 else -> LLMMediaAttachment.MediaType.IMAGE  // iOS fallback
             }
-            android.util.Log.d("ModelUseImage", "gemini inlineData received: mime=$mime bytes=${bytes.size}")
+            // nanoMuse: the MIME string is supplied by the remote provider.
+            if (com.openminis.app.BuildConfig.APPLICATION_ID != "ai.tama.assistant.tamav2test")
+                android.util.Log.d("ModelUseImage", "gemini inlineData received: mime=$mime bytes=${bytes.size}")
             out.add(LLMMediaAttachment(type, mime, bytes))
         }
         return out

@@ -987,6 +987,10 @@
     <string name="nm_hub_err_unknown_action">คอมพิวเตอร์ใช้ TAMA AI รุ่นเก่าที่ไม่รู้จักการกระทำนี้</string>
     <string name="nm_hub_err_bad_key">ออกจากระบบบนรีเลย์แล้ว ลงชื่อเข้าใช้อีกครั้ง</string>
     <string name="nm_hub_err_generic">คอมพิวเตอร์ทำสิ่งนี้ไม่ได้</string>
+    <!-- nanoMuse: pre-admission explanations for the parallel package. -->
+    <string name="nm_hub_err_id_reused">คำขอใหม่ไปไม่ถึงอุปกรณ์: รหัสการเรียกกำลังใช้งานอยู่หรือเคยใช้แล้ว</string>
+    <string name="nm_hub_err_bad_call_id">คำขอใหม่ไปไม่ถึงอุปกรณ์: รหัสการเรียกว่างเปล่า ยาวเกินไป หรือเป็นรหัสสงวน</string>
+    <string name="nm_hub_err_id_limit">คำขอใหม่ไปไม่ถึงอุปกรณ์: ไคลเอนต์นี้ใช้รหัสการเรียกทางไกลถึงขีดจำกัดแล้ว</string>
     <string name="nm_devices_refused">รีเลย์ปฏิเสธ ลงชื่อเข้าใช้อีกครั้ง</string>
     <string name="nm_devices_paused">รีเลย์หยุดชั่วคราว</string>
     <string name="nm_devices_notifications_hint">อนุญาตการแจ้งเตือนเพื่อให้โทรศัพท์ติดต่อได้ในเบื้องหลัง</string>
@@ -1446,6 +1450,13 @@
     <string name="nm_auto_reason_disabled">provider disabled</string>
     <string name="nm_auto_reason_hidden">model hidden</string>
     <string name="nm_auto_reason_credential">no usable credential</string>
+    <string name="nm_auto_reason_unverified_cost">ยังไม่ได้ตรวจสอบค่าใช้จ่ายอัตโนมัติ</string>
+    <string name="nm_auto_allow_unverified_cost">อนุญาตเส้นทางอัตโนมัติที่ยังไม่ได้ตรวจสอบค่าใช้จ่าย</string>
+    <string name="nm_auto_cost_guard_help">ปิดไว้เป็นค่าเริ่มต้น การตั้งค่านี้พักการเรียกแชต โมเดลสำรอง ภาพ ชื่อเรื่อง และสรุปอัตโนมัติบางส่วน ไม่ใช่วงเงินใช้จ่าย การเรียกด้วยตนเองและบริการอื่นยังอาจมีค่าใช้จ่าย</string>
+    <string name="nm_auto_cost_confirm_title">อนุญาตค่าใช้จ่ายที่อาจเกิดขึ้นหรือไม่?</string>
+    <string name="nm_auto_cost_confirm_body">การเรียกอัตโนมัติอาจมีค่าใช้จ่าย แม้โมเดลจะระบุว่าใช้ฟรี สิทธิ์นี้จะเปิดอยู่จนกว่าคุณจะปิด แม้เริ่มแอปใหม่ คำขอโมเดลที่ได้รับการป้องกันยังต้องได้รับสิทธิ์ค่าใช้จ่ายแยกต่างหาก ดำเนินการต่อหรือไม่?</string>
+    <string name="nm_auto_cost_confirm_action">อนุญาตค่าใช้จ่ายที่อาจเกิดขึ้น</string>
+    <string name="nm_auto_cost_cancel">ยกเลิก</string>
     <string name="nm_auto_reason_consent">automatic use not authorized</string>
     <string name="nm_auto_reason_capability">required capability not confirmed</string>
     <string name="nm_auto_reason_profile">tools do not fit this profile</string>
@@ -1473,4 +1484,34 @@
     <string name="nm_diagnostic_copy">คัดลอกข้อมูลวินิจฉัย</string>
     <string name="nm_diagnostic_copied">คัดลอกไปยังคลิปบอร์ดแล้ว</string>
     <string name="nm_diagnostic_copy_failed">คัดลอกไม่ได้ ลองอีกครั้ง</string>
+    <!-- TAMA V2: safe local failure and image summaries. -->
+    <string name="nm_reach_key_zero_title">ขีดจำกัดการใช้จ่าย OpenRouter</string>
+    <string name="nm_reach_key_zero_body">OpenRouter แจ้งขีดจำกัดการใช้จ่าย US$ 0 สำหรับคีย์นี้ ตรวจสอบรุ่นฟรีที่ใช้งานได้</string>
+    <string name="nm_reach_safe_summary">สรุปข้อผิดพลาดอย่างปลอดภัย</string>
+    <string name="nm_reach_private_omitted">ข้อความต้นฉบับถูกซ่อนเพราะอาจมีข้อมูลส่วนตัว ตรวจสอบกับผู้ให้บริการก่อนแชร์</string>
+    <string name="nm_error_private_generic">ดำเนินการตามคำขอไม่สำเร็จ ตรวจสอบการตั้งค่าหรือลองอีกครั้ง</string>
+    <string name="nm_image_guard_ambiguous">ยืนยันคำขอภาพนี้ไม่ได้จึงไม่ได้ส่ง หากต้องการภาพ โปรดขอโดยตรงและอธิบายภาพ</string>
+    <string name="nm_image_guard_repeat">มีการจัดการคำขอภาพแล้วในรอบนี้ จะไม่ลองซ้ำโดยอัตโนมัติ หากต้องการลองอีกครั้งโปรดส่งคำขอใหม่</string>
+    <string name="nm_image_guard_invalid">ไม่สามารถเข้าใจรายละเอียดภาพได้อย่างปลอดภัยจึงไม่ได้ส่งครั้งนี้ หากต้องการลองอีกครั้งโปรดอธิบายภาพใหม่ จะไม่ลองซ้ำโดยอัตโนมัติ</string>
+    <string name="nm_image_detail_preparing">กำลังเตรียมคำขอภาพ…</string>
+    <string name="nm_image_detail_generated">สร้างภาพแล้ว เปิดดูได้ในการสนทนา</string>
+    <string name="nm_image_detail_failed">ไม่สามารถสร้างภาพให้เสร็จ ตรวจสอบผู้ให้บริการและลองอีกครั้งเฉพาะเมื่อคุณต้องการ</string>
+    <string name="nm_group_switch_title">เปลี่ยนรุ่น</string>
+    <string name="nm_group_switch_attempt">%1$s กำลังลอง %2$s</string>
+    <string name="nm_group_switch_other">ผู้ให้บริการไม่สามารถทำตามคำขอให้เสร็จ</string>
+    <string name="nm_stream_unconfirmed">ผู้ให้บริการไม่ได้ยืนยันว่าคำตอบนี้เสร็จสมบูรณ์ ไม่มีการเรียกใช้เครื่องมือจากคำตอบนี้ ลองอีกครั้งหากต้องการ</string>
+    <string name="nm_auto_review_changed">บัญชี ผู้ให้บริการ หรือสิทธิ์มีการเปลี่ยนแปลง ระบบไม่ได้บันทึกสิทธิ์อัตโนมัติ โปรดตรวจสอบอีกครั้ง</string>
+    <string name="nm_model_cost_blocked">คำขอโมเดลถูกบล็อกเพราะยังไม่ได้ตรวจสอบค่าใช้จ่าย คำขอที่ส่งไปแล้วอาจยังมีค่าใช้จ่าย</string>
+    <string name="nm_model_use_stop_warning">คำขอโดยตรงถึงโมเดลอาจส่งถึงผู้ให้บริการแล้วและอาจมีค่าใช้จ่าย การหยุดไม่สามารถยกเลิกการส่งได้ โปรดส่งคำขออีกครั้งเฉพาะเมื่อคุณต้องการ</string>
+    <string name="nm_model_allow_unverified_cost">อนุญาตคำขอโมเดลที่ยังไม่ได้ตรวจสอบค่าใช้จ่าย</string>
+    <string name="nm_model_cost_guard_help">ปิดเป็นค่าเริ่มต้นและจะกลับมาปิดเมื่อเริ่มแอปใหม่ การตั้งค่านี้พักคำขอแชต ภาพ วิดีโอ และทดสอบโมเดลที่ได้รับการป้องกัน รวมถึงโมเดลที่ระบุว่าใช้ฟรี ไม่ใช่วงเงินใช้จ่าย เสียง คำสั่ง และบริการอื่นยังอาจมีค่าใช้จ่าย การใช้อัตโนมัติต้องได้รับอนุญาตแยกต่างหาก</string>
+    <string name="nm_model_cost_confirm_body">อนุญาตคำขอโมเดลที่ได้รับการป้องกันแต่ยังไม่ได้ตรวจสอบค่าใช้จ่ายขณะที่กระบวนการของแอปนี้ยังทำงานอยู่ การออกจากหน้าจอไม่ปิดสิทธิ์ คำขออาจมีค่าใช้จ่ายแม้จะระบุว่าใช้ฟรี ไม่สามารถยกเลิกคำขอที่ส่งไปแล้ว บริการอื่นไม่ได้รับการป้องกัน ดำเนินการต่อหรือไม่?</string>
+    <string name="nm_video_probe_manual_hint">การตรวจสอบวิดีโออัตโนมัติถูกพักไว้ในแอปทดสอบนี้เพื่อหลีกเลี่ยงค่าใช้จ่ายที่อาจเกิดขึ้น คุณสามารถเลือกหรือป้อนโมเดลโดยไม่ตรวจสอบได้</string>
+    <string name="nm_video_probe_confirm_body">การตรวจสอบนี้อาจส่งงานว่างสำหรับแต่ละโมเดลที่เป็นตัวเลือก ผู้ให้บริการอาจคิดค่าใช้จ่ายแม้ไม่ได้สร้างวิดีโอ อาจมีการส่งหลายคำขอ ไม่สามารถยกเลิกคำขอที่ส่งไปแล้ว ดำเนินการต่อหรือไม่?</string>
+    <string name="nm_auto_video_blocked">วิดีโอของเอเจนต์ไม่พร้อมใช้งานเมื่อเปิดการเลือกอัตโนมัติหรือไม่สามารถตรวจสอบการตั้งค่าได้ ยังไม่ได้อนุมัติโมเดลวิดีโอที่ใช้จริงและโมเดลทดแทน โปรดตรวจสอบการตั้งค่าโมเดล คำขอที่ส่งไปแล้วอาจยังมีค่าใช้จ่าย</string>
+    <string name="nm_avatar_auto_unavailable">คำขออวาตาร์จะหยุดชั่วคราวเมื่อเปิดการเลือกโมเดลอัตโนมัติหรือไม่สามารถตรวจสอบได้ โปรดปิดการเลือกอัตโนมัติและตรวจสอบโมเดลที่เลือกกับค่าใช้จ่ายที่อาจเกิดขึ้น</string>
+    <string name="nm_avatar_background_paused">ในแอปทดสอบนี้ การเลือกรูปภาพจะไม่สร้างท่าทางหรือคลิปโดยอัตโนมัติ คุณสามารถขอสร้างได้ในส่วนรูปลักษณ์หรือสื่อ โดยผู้ให้บริการอาจคิดค่าบริการ</string>
+    <string name="nm_media_model_change_blocked">คำขอนี้จะเปลี่ยนไปใช้โมเดลสื่ออื่นที่อาจมีราคาต่างกัน โปรดเลือกโมเดลที่รองรับในการตั้งค่าภาพและวิดีโอ คำขอนี้ไม่ได้ถูกส่ง คำขออื่นที่ส่งไปแล้วอาจยังมีค่าใช้จ่าย</string>
+    <string name="nm_video_request_failed">ไม่สามารถสร้างวิดีโอให้เสร็จได้ งานอาจถูกส่งไปแล้วและอาจมีค่าใช้จ่าย โปรดอย่าลองอีกโดยไม่มีคำขอใหม่</string>
+    <string name="nm_video_authorization_changed">ผู้ให้บริการ บัญชี การตั้งค่า หรือเซสชันวิดีโอเปลี่ยนไป จึงไม่ได้ส่งงานวิดีโอ คำขออื่นที่ส่งไปแล้วอาจยังมีค่าใช้จ่าย</string>
 </resources>

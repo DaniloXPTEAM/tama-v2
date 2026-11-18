@@ -47,27 +47,43 @@ object OpenRouterModelsApi {
             .applyUserAgentOverride(null)
             .build()
 
-        val response = client.newCall(request).execute()
-        val body = response.body?.string() ?: return@withContext emptyList()
+        // nanoMuse: reuse this existing fetch in the parallel app to retain only
+        // short-lived catalogue price evidence in memory. It is not a dispatch
+        // authorization and the ordinary 7-day model cache is not price evidence.
+        val priceTicket = if (com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test")
+            ai.tama.pricing.OpenRouterCatalogueCapture.memory.begin(System.currentTimeMillis()) else null
+        var priceCaptured = false
+        try {
+            val response = client.newCall(request).execute()
+            val body = response.body?.string() ?: return@withContext emptyList()
 
-        if (!response.isSuccessful) {
-            if (context != null && (response.code == 401 || response.code == 403)) {
-                cache.invalidate(context, cacheKey)
+            if (!response.isSuccessful) {
+                if (context != null && (response.code == 401 || response.code == 403)) {
+                    cache.invalidate(context, cacheKey)
+                }
+                return@withContext emptyList()
             }
-            return@withContext emptyList()
-        }
 
-        val models = try {
-            val json = JSONObject(body)
-            val data = json.optJSONArray("data") ?: return@withContext emptyList()
-            parseModels(data)
-        } catch (_: Exception) {
-            return@withContext emptyList()
-        }
+            val (models, priceData) = try {
+                val json = JSONObject(body)
+                val data = json.optJSONArray("data") ?: return@withContext emptyList()
+                parseModels(data) to data
+            } catch (_: Exception) {
+                return@withContext emptyList()
+            }
 
-        val enriched = ModelsDevApi.enrichModels(models)
-        if (context != null) cache.save(context, cacheKey, enriched)
-        enriched
+            val enriched = ModelsDevApi.enrichModels(models)
+            if (context != null) cache.save(context, cacheKey, enriched)
+            if (priceTicket != null) {
+                ai.tama.pricing.OpenRouterCatalogueCapture.memory.finish(priceTicket, priceData)
+                priceCaptured = true
+            }
+            enriched
+        } finally {
+            // A failed or cancelled refresh must not resurrect an older quote.
+            if (priceTicket != null && !priceCaptured)
+                ai.tama.pricing.OpenRouterCatalogueCapture.memory.finish(priceTicket, null)
+        }
     }
 
     private fun parseModels(data: JSONArray): List<LLMModel> {

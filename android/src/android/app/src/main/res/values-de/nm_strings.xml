@@ -991,6 +991,10 @@
     <string name="nm_hub_err_unknown_action">Auf dem Computer läuft ein älteres TAMA AI, das diese Aktion nicht kennt.</string>
     <string name="nm_hub_err_bad_key">Beim Relay abgemeldet; melde dich erneut an.</string>
     <string name="nm_hub_err_generic">Der Computer konnte es nicht erledigen.</string>
+    <!-- nanoMuse: pre-admission explanations for the parallel package. -->
+    <string name="nm_hub_err_id_reused">Die neue Anfrage hat das Gerät nicht erreicht: Ihre Aufruf-ID wird bereits verwendet oder wurde schon verwendet.</string>
+    <string name="nm_hub_err_bad_call_id">Die neue Anfrage hat das Gerät nicht erreicht: Ihre Aufruf-ID ist leer, zu lang oder reserviert.</string>
+    <string name="nm_hub_err_id_limit">Die neue Anfrage hat das Gerät nicht erreicht: Dieser Client hat das Limit für IDs von Fernaufrufen erreicht.</string>
     <string name="nm_devices_refused">Vom Relay abgelehnt; erneut anmelden</string>
     <string name="nm_devices_paused">Vom Relay pausiert</string>
     <string name="nm_devices_notifications_hint">Erlaube Benachrichtigungen, damit das Telefon im Hintergrund erreichbar bleibt.</string>
@@ -1450,6 +1454,13 @@
     <string name="nm_auto_reason_disabled">provider disabled</string>
     <string name="nm_auto_reason_hidden">model hidden</string>
     <string name="nm_auto_reason_credential">no usable credential</string>
+    <string name="nm_auto_reason_unverified_cost">Kosten des automatischen Aufrufs nicht geprüft</string>
+    <string name="nm_auto_allow_unverified_cost">Automatische Routen mit ungeprüften Kosten zulassen</string>
+    <string name="nm_auto_cost_guard_help">Standardmäßig aus. Dies pausiert einige automatische Chat-, Ersatzmodell-, Bild-, Titel- und Zusammenfassungsaufrufe. Es ist kein Ausgabenlimit: Manuelle Aufrufe und andere Dienste können weiterhin Kosten verursachen.</string>
+    <string name="nm_auto_cost_confirm_title">Mögliche Kosten zulassen?</string>
+    <string name="nm_auto_cost_confirm_body">Automatische Aufrufe können Kosten verursachen, auch wenn ein Modell als kostenlos bezeichnet wird. Diese Erlaubnis bleibt bis zum Ausschalten aktiv, auch nach einem App-Neustart. Geschützte Modellanfragen benötigen zusätzlich die separate Kostenerlaubnis. Fortfahren?</string>
+    <string name="nm_auto_cost_confirm_action">Mögliche Kosten zulassen</string>
+    <string name="nm_auto_cost_cancel">Abbrechen</string>
     <string name="nm_auto_reason_consent">automatic use not authorized</string>
     <string name="nm_auto_reason_capability">required capability not confirmed</string>
     <string name="nm_auto_reason_profile">tools do not fit this profile</string>
@@ -1477,4 +1488,34 @@
     <string name="nm_diagnostic_copy">Diagnose kopieren</string>
     <string name="nm_diagnostic_copied">In die Zwischenablage kopiert.</string>
     <string name="nm_diagnostic_copy_failed">Kopieren fehlgeschlagen. Bitte erneut versuchen.</string>
+    <!-- TAMA V2: safe local failure and image summaries. -->
+    <string name="nm_reach_key_zero_title">OpenRouter-Ausgabenlimit</string>
+    <string name="nm_reach_key_zero_body">OpenRouter meldet für diesen Schlüssel ein Ausgabenlimit von 0 US$. Prüfe, welche kostenlosen Modelle verfügbar sind.</string>
+    <string name="nm_reach_safe_summary">Sichere Fehlerzusammenfassung</string>
+    <string name="nm_reach_private_omitted">Die Originalmeldung ist verborgen, weil sie private Inhalte enthalten kann. Prüfe sie beim Anbieter, bevor du etwas teilst.</string>
+    <string name="nm_error_private_generic">Die Anfrage konnte nicht abgeschlossen werden. Prüfe die Einstellungen oder versuche es erneut.</string>
+    <string name="nm_image_guard_ambiguous">Die Bildanfrage war nicht eindeutig und wurde nicht gesendet. Bitte beschreibe das gewünschte Bild direkt.</string>
+    <string name="nm_image_guard_repeat">Für diese Anfrage wurde bereits ein Bildversuch bearbeitet. Ich wiederhole ihn nicht automatisch. Stelle eine neue Anfrage, wenn du es erneut versuchen möchtest.</string>
+    <string name="nm_image_guard_invalid">Die Bildangaben waren nicht sicher verständlich, daher wurde dieser Versuch nicht gesendet. Beschreibe das Bild bei Bedarf erneut. Ich wiederhole den Versuch nicht automatisch.</string>
+    <string name="nm_image_detail_preparing">Bildanfrage wird vorbereitet…</string>
+    <string name="nm_image_detail_generated">Das Bild wurde erzeugt. Öffne es in der Unterhaltung.</string>
+    <string name="nm_image_detail_failed">Das Bild konnte nicht fertiggestellt werden. Prüfe den Anbieter und versuche es nur erneut, wenn du möchtest.</string>
+    <string name="nm_group_switch_title">Modellwechsel</string>
+    <string name="nm_group_switch_attempt">%1$s. %2$s wird versucht.</string>
+    <string name="nm_group_switch_other">der Anbieter konnte die Anfrage nicht abschließen</string>
+    <string name="nm_stream_unconfirmed">Der Anbieter hat den Abschluss dieser Antwort nicht bestätigt. Keine Werkzeuge aus dieser Antwort wurden ausgeführt. Versuche es bei Bedarf erneut.</string>
+    <string name="nm_auto_review_changed">Das Konto, der Anbieter oder die Berechtigungen haben sich geändert. Die automatischen Berechtigungen wurden nicht gespeichert. Bitte erneut prüfen.</string>
+    <string name="nm_model_cost_blocked">Eine Modellanfrage wurde blockiert, weil ihre Kosten nicht geprüft sind. Bereits gesendete Anfragen können weiterhin Kosten verursachen.</string>
+    <string name="nm_model_use_stop_warning">Eine direkte Modellanfrage kann beim Anbieter eingegangen sein und Kosten verursachen. Das Stoppen macht sie nicht rückgängig; sende sie nur auf eigenen Wunsch erneut.</string>
+    <string name="nm_model_allow_unverified_cost">Modellanfragen mit ungeprüften Kosten erlauben</string>
+    <string name="nm_model_cost_guard_help">Standardmäßig aus und nach einem App-Neustart wieder aus. Pausiert geschützte Chat-, Bild-, Video- und Modelltestanfragen, auch bei als kostenlos beworbenen Modellen. Dies ist kein Ausgabenlimit: Sprache, Befehle und andere Dienste können weiterhin Kosten verursachen. Automatische Nutzung benötigt eine eigene Erlaubnis.</string>
+    <string name="nm_model_cost_confirm_body">Dies erlaubt geschützte Modellanfragen mit ungeprüften Kosten, solange dieser App-Prozess aktiv ist. Das Verlassen der Ansicht schaltet die Erlaubnis nicht aus. Anfragen können auch bei kostenloser Bewerbung Kosten verursachen. Eine gesendete Anfrage lässt sich nicht zurücknehmen. Andere Dienste sind nicht geschützt. Fortfahren?</string>
+    <string name="nm_video_probe_manual_hint">Automatische Videoprüfungen sind in dieser Test-App pausiert, um mögliche Kosten zu vermeiden. Du kannst ein Modell ohne Prüfung auswählen oder eingeben.</string>
+    <string name="nm_video_probe_confirm_body">Diese Prüfung kann für jedes Kandidatenmodell eine leere Aufgabe senden. Der Anbieter kann auch dann Kosten berechnen, wenn kein Video erstellt wird. Es können mehrere Anfragen gesendet werden. Eine gesendete Anfrage lässt sich nicht zurücknehmen. Fortfahren?</string>
+    <string name="nm_auto_video_blocked">Agenten-Videos sind nicht verfügbar, wenn die automatische Auswahl aktiviert ist oder nicht geprüft werden kann. Das genaue Videomodell und seine Ersatzmodelle sind nicht freigegeben. Prüfe die Modelleinstellungen. Bereits gesendete Anfragen können weiterhin Kosten verursachen.</string>
+    <string name="nm_avatar_auto_unavailable">Avatar-Anfragen werden pausiert, wenn die automatische Modellauswahl aktiv ist oder nicht geprüft werden kann. Schalte sie aus und prüfe das gewählte Modell und mögliche Kosten.</string>
+    <string name="nm_avatar_background_paused">In dieser Test-App erstellt die Auswahl eines Bildes nicht automatisch Posen oder Clips. Du kannst sie unter Darstellung oder Medien anfordern; Anbieter können Kosten berechnen.</string>
+    <string name="nm_media_model_change_blocked">Diese Anfrage würde zu einem anderen Medienmodell wechseln, das einen anderen Preis haben kann. Wähle in den Bild- und Videoeinstellungen ein kompatibles Modell. Diese Anfrage wurde nicht gesendet. Andere bereits gesendete Anfragen können dennoch Kosten verursachen.</string>
+    <string name="nm_video_request_failed">Das Video konnte nicht fertiggestellt werden. Die Aufgabe wurde möglicherweise gesendet und kann Kosten verursachen. Wiederhole sie nur auf neue Anfrage.</string>
+    <string name="nm_video_authorization_changed">Anbieter, Konto, Einstellungen oder Sitzung für das Video haben sich geändert. Die Videoaufgabe wurde nicht gesendet. Andere bereits gesendete Anfragen können dennoch Kosten verursachen.</string>
 </resources>

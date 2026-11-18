@@ -8,7 +8,7 @@ package ai.tama.router
  * The supplied clock must be monotonic; rollback is clamped for additional safety.
  */
 class ModelHealth(private val clockMillis: () -> Long) {
-    enum class Failure { RATE_LIMIT, QUOTA, NO_CREDIT, AUTH, SERVER, NETWORK, REQUEST_TOO_LARGE }
+    enum class Failure { RATE_LIMIT, QUOTA, NO_CREDIT, KEY_SPEND_LIMIT, AUTH, SERVER, NETWORK, REQUEST_TOO_LARGE }
     enum class DeadlineSource { RETRY_AFTER, HEURISTIC, UNKNOWN }
 
     data class Cooldown(val reason: Failure, val untilMillis: Long?, val source: DeadlineSource)
@@ -169,9 +169,13 @@ class ModelHealth(private val clockMillis: () -> Long) {
     }
 
     /**
-     * Auth, rate limits, and account quota/credit are conservatively account-scoped. A valid Retry-After is honored exactly;
-     * a malformed provided header and quota without a deadline stay unavailable until reset.
-     * Other missing headers get conservative local heuristics, identified as such in the result.
+     * Auth, rate limits, and account quota/credit are conservatively account-scoped by default.
+     * The caller may scope a rate limit to the failed entry when trying another model is an
+     * intentional policy. The shared account token reservation still applies in that case.
+     * A valid Retry-After is honored exactly; a malformed provided header and quota without
+     * a deadline stay unavailable until reset. An explicit zero key-spend limit blocks only
+     * the rejected entry, because it does not prove a free sibling model is unavailable.
+     * Other missing headers get local heuristics.
      */
     @Synchronized
     fun failure(
@@ -180,18 +184,19 @@ class ModelHealth(private val clockMillis: () -> Long) {
         reason: Failure,
         retryAfterSeconds: Int? = null,
         retryAfterPresent: Boolean = retryAfterSeconds != null,
+        modelScopedRateLimit: Boolean = false,
     ): Cooldown {
         require(entryId.isNotBlank() && providerId.isNotBlank())
         val at = now()
         prune(at)
         val validRetry = retryAfterSeconds?.takeIf { it >= 0 }
         val accountBlocked = reason == Failure.AUTH || reason == Failure.QUOTA ||
-            reason == Failure.NO_CREDIT || reason == Failure.RATE_LIMIT
+            reason == Failure.NO_CREDIT || (reason == Failure.RATE_LIMIT && !modelScopedRateLimit)
         val wait = when {
             // Authentication failures need a credential change or an explicit retry, not a timer.
             reason == Failure.AUTH -> Cooldown(reason, null, DeadlineSource.UNKNOWN)
             validRetry != null -> Cooldown(reason, plus(at, validRetry.toLong() * 1000), DeadlineSource.RETRY_AFTER)
-            retryAfterPresent || reason == Failure.QUOTA || reason == Failure.NO_CREDIT ->
+            retryAfterPresent || reason == Failure.QUOTA || reason == Failure.NO_CREDIT || reason == Failure.KEY_SPEND_LIMIT ->
                 Cooldown(reason, null, DeadlineSource.UNKNOWN)
             else -> Cooldown(reason, plus(at, when (reason) {
                 Failure.RATE_LIMIT -> 60_000L

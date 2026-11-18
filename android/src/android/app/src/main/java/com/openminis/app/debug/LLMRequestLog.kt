@@ -57,7 +57,9 @@ object LLMRequestLog {
         // OOM the HONOR PTP-AN00 user hit. Debug builds still record, with
         // each entry truncated to MAX_BODY_CHARS so even a single retained
         // entry can't push a memory-tight device over the line.
-        if (!BuildConfig.DEBUG) return
+        if (!BuildConfig.DEBUG || BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test") return
+        // nanoMuse: the parallel test build does not retain raw requests, which can
+        // contain private conversation text and unknown custom-header credentials.
         // nanoMuse: keep an independent, masked copy of the headers so no credential sits
         // in this buffer and a later change to the caller's map cannot rewrite the entry (#347).
         val masked = entry.copy(requestHeaders = maskHeaders(entry.requestHeaders))

@@ -792,6 +792,10 @@ private fun ColumnScope.OAuthConfigSection(
             Text(stringResource(R.string.add_provider_save_provider))
         }
     } else {
+        // nanoMuse: a newer sign-out/login can follow the returned OAuth result.
+        fun currentOAuthKey(returned: String): String =
+            if (com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test")
+                providerRepository.loadApiKey(pendingInstanceId).orEmpty() else returned
         // ── Sign In ────────────────────────────────────────────────────
         SettingsSection(
             header = stringResource(R.string.provider_detail_sign_in),
@@ -816,29 +820,31 @@ private fun ColumnScope.OAuthConfigSection(
                                             onDeviceCode = { auth -> kimiDeviceAuth = auth },
                                         )
                                         kimiDeviceAuth = null
-                                        maskedToken = maskOAuthToken(key)
+                                        maskedToken = maskOAuthToken(currentOAuthKey(key))
                                     }
                                     ProviderType.openRouter -> {
                                         val key = OpenRouterOAuthManager.login(context, pendingInstanceId, providerRepository)
-                                        maskedToken = maskOAuthToken(key)
+                                        maskedToken = maskOAuthToken(currentOAuthKey(key))
                                     }
                                     ProviderType.anthropic -> {
                                         val key = com.openminis.app.auth.ClaudeOAuthManager.login(context, pendingInstanceId, providerRepository)
-                                        maskedToken = maskOAuthToken(key)
+                                        maskedToken = maskOAuthToken(currentOAuthKey(key))
                                     }
                                     ProviderType.openAI -> {
                                         val key = OpenAIOAuthManager.login(context, pendingInstanceId, providerRepository)
-                                        maskedToken = maskOAuthToken(key)
+                                        maskedToken = maskOAuthToken(currentOAuthKey(key))
                                     }
                                     ProviderType.xAI -> {
                                         val key = com.openminis.app.auth.XAIOAuthManager.login(context, pendingInstanceId, providerRepository)
-                                        maskedToken = maskOAuthToken(key)
+                                        maskedToken = maskOAuthToken(currentOAuthKey(key))
                                     }
                                     else -> {
                                         throw Exception("OAuth not yet implemented for ${providerType.displayName}")
                                     }
                                 }
-                                isAuthenticated = true
+                                // nanoMuse: do not mark an already signed-out result connected.
+                                isAuthenticated = if (com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test")
+                                    !providerRepository.loadApiKey(pendingInstanceId).isNullOrEmpty() else true
                             } catch (e: kotlinx.coroutines.CancellationException) {
                                 // [T-kimi-oauth] User dismissed the device-code
                                 // dialog — not an error; just reset the button.
@@ -855,6 +861,9 @@ private fun ColumnScope.OAuthConfigSection(
                                 // signal.
                                 errorMessage = if (e is com.openminis.app.auth.OAuthNetworkUnreachableException) {
                                     context.getString(R.string.add_provider_oauth_network_unreachable)
+                                } else if (com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test") {
+                                    // nanoMuse: arbitrary server and network text can contain credentials.
+                                    context.getString(R.string.nm_error_private_generic)
                                 } else {
                                     e.message ?: "Authentication failed"
                                 }

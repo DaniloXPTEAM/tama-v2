@@ -120,6 +120,35 @@ class MediaImageGateTest {
         manager.clearSessionGrants(session)
     }
 
+    @Test fun `transport observation follows account changes after a one time approval`() = runBlocking {
+        manager.init(PetPrefsContext())
+        manager.setLevel("image_generation", OffloadPermissionManager.PermissionLevel.ASK_ONCE)
+        val session = UUID.randomUUID().toString()
+        val original = endpoint.copy(instance = endpoint.instance.copy(id = UUID.randomUUID().toString()))
+        val gate = AndroidMediaImageGate(context(), checkRisk = { _, _ -> GateOutcome.Allowed() })
+        val observation = gate.observe(original, session)
+        try {
+            val request = async(start = CoroutineStart.UNDISPATCHED) {
+                gate.allow(original, "bird", "1024x1024", session, false)
+            }
+            val pending = requireNotNull(manager.pendingRequest.value)
+            manager.respondToRequest(pending.requestId, OffloadPermissionManager.Response.ALLOW_ONCE)
+            assertTrue(request.await())
+            assertTrue(observation.isCurrent())
+            AutoModelRuntime.invalidateAccount(original.instanceId)
+            assertFalse(observation.isCurrent())
+        } finally {
+            observation.close()
+            manager.clearSessionGrants(session)
+        }
+    }
+
+    @Test fun `an image gate without an observation fails closed`() {
+        val gate = MediaImageGate { _, _, _, _, _ -> true }
+        val observation = gate.observe(endpoint, null)
+        try { assertFalse(observation.isCurrent()) } finally { observation.close() }
+    }
+
     @Test fun `a timeout withdraws the dialog and is a refusal`() = runBlocking {
         manager.init(PetPrefsContext())
         manager.setLevel("image_generation", OffloadPermissionManager.PermissionLevel.ASK_ONCE)

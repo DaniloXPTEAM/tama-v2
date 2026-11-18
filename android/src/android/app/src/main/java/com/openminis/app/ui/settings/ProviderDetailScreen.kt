@@ -938,8 +938,15 @@ private fun OAuthCredentialBlock(
                 // and validAccessToken() silently re-minted an access token —
                 // the user stayed effectively logged in. Then flip local state so
                 // the UI swaps to the Sign In button immediately.
-                com.openminis.app.auth.OAuthManager.forInstance(context, instance)?.logout()
-                providerRepository.deleteApiKey(instance.id)
+                // nanoMuse: the parallel sign-out must not delete a newer login
+                // between clearing its token bundle and its API-key mirror.
+                val manager = com.openminis.app.auth.OAuthManager.forInstance(context, instance)
+                if (com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test" && manager != null) {
+                    manager.nmLogoutWithMirror(providerRepository)
+                } else {
+                    manager?.logout()
+                    providerRepository.deleteApiKey(instance.id)
+                }
                 displayedKey = ""
                 AppLogger.info(TAG, "OAuth signed out for ${instance.id} (tokens + apiKey cleared)")
             },
@@ -985,11 +992,19 @@ private fun OAuthCredentialBlock(
                         // reflect it locally so the UI flips to the connected state
                         // without needing the parent to recompose.
                         if (token != null) {
-                            displayedKey = providerRepository.loadApiKey(instance.id) ?: token
+                            // nanoMuse: a sign-out/new login may have followed completion;
+                            // never display the returned older token as a fallback.
+                            val liveKey = providerRepository.loadApiKey(instance.id)
+                            displayedKey = if (com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test")
+                                liveKey.orEmpty() else liveKey ?: token
                             AppLogger.info(TAG, "OAuth signed in for ${instance.id}")
                         }
                     } catch (e: Exception) {
-                        AppLogger.warning(TAG, "OAuth sign-in failed for ${instance.id}: ${e.message}")
+                        // nanoMuse: preserve cancellation and omit untrusted exception text.
+                        if (com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test") {
+                            if (e is kotlinx.coroutines.CancellationException) throw e
+                            AppLogger.warning(TAG, "OAuth sign-in failed")
+                        } else AppLogger.warning(TAG, "OAuth sign-in failed for ${instance.id}: ${e.message}")
                     } finally {
                         isAuthenticating = false
                         kimiDeviceAuth = null

@@ -6,6 +6,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Assume.assumeTrue
 import org.junit.Test
 
 /**
@@ -42,7 +43,11 @@ class LLMRequestLogTest {
         for (key in headers.keys()) assertFalse(key, headers.getString(key).contains("secret"))
     }
 
-    @Before fun clear() = LLMRequestLog.clear()
+    @Before fun clear() {
+        // The parallel variant deliberately records nothing; its own test checks that policy.
+        assumeTrue(com.openminis.app.BuildConfig.APPLICATION_ID != "ai.tama.assistant.tamav2test")
+        LLMRequestLog.clear()
+    }
 
     @Test fun `credential headers are masked everywhere the log is read`() {
         val headers = LinkedHashMap<String, String>()

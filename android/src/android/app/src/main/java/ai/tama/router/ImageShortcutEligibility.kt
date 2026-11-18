@@ -9,13 +9,14 @@ internal data class ImageShortcutContext(
     val editing: Boolean = false,
     val sharedContent: Boolean = false,
     val busy: Boolean = false,
+    val portugueseMake: Boolean = false,
 )
 
 internal object ImageShortcutEligibility {
     fun select(text: String, context: ImageShortcutContext): Shortcut.Image? {
         if (!context.person || context.batchSize != 1 || context.hasAttachments || context.hasPastedContent ||
             context.editing || context.sharedContent || context.busy || text.contains("[Pasted#")) return null
-        return ShortcutParser.parse(text) as? Shortcut.Image
+        return ShortcutParser.parse(text, portugueseMake = context.portugueseMake) as? Shortcut.Image
     }
 
     /** The same branch is used by the human send path and by fake-client tests. */

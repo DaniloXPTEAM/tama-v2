@@ -131,7 +131,7 @@ object OffloadPermissionManager {
     private val permissionStateLock = Any()
     // Any settings change invalidates an answer to an older, still-open dialog.
     private val permissionVersions = mutableMapOf<String, Long>()
-    // Kept only while checks are active, so ending many sessions cannot leak epochs.
+    // nanoMuse: retain an epoch only while checks or transport observations are active.
     private data class SessionEpoch(var version: Long = 0, var checks: Int = 0)
     private val activeSessionEpochs = mutableMapOf<String, SessionEpoch>()
     // Incremented under permissionStateLock; never reused while this process lives.
@@ -374,6 +374,45 @@ object OffloadPermissionManager {
      */
     enum class Response { ALLOW_SESSION, ALLOW_ONCE, DENY_SESSION }
 
+    // nanoMuse: a revocation observation is not an approval. It must be opened
+    // before checkPermission, used only after that check succeeds, and closed
+    // after the operation. Keeping the session epoch alive also invalidates
+    // one-time approvals when a chat is cleared after its dialog has closed.
+    internal interface PermissionObservation : AutoCloseable {
+        fun isCurrent(): Boolean
+    }
+
+    internal fun observePermission(toolName: String, sessionId: String): PermissionObservation {
+        val (epoch, sessionVersion, toolVersion) = synchronized(permissionStateLock) {
+            val current = activeSessionEpochs.getOrPut(sessionId) { SessionEpoch() }
+            current.checks++
+            Triple(current, current.version, permissionVersions[toolName] ?: 0L)
+        }
+        return object : PermissionObservation {
+            private var closed = false
+
+            override fun isCurrent(): Boolean = synchronized(permissionStateLock) {
+                !closed && epoch.version == sessionVersion &&
+                    (permissionVersions[toolName] ?: 0L) == toolVersion &&
+                    getLevel(toolName) != PermissionLevel.NOT_ALLOWED &&
+                    toolName !in sessionDenials[sessionId].orEmpty()
+            }
+
+            override fun close() = synchronized(permissionStateLock) {
+                if (!closed) {
+                    closed = true
+                    releaseSessionEpoch(sessionId, epoch)
+                }
+            }
+        }
+    }
+
+    /** Caller holds [permissionStateLock]. */
+    private fun releaseSessionEpoch(sessionId: String, epoch: SessionEpoch) {
+        epoch.checks--
+        if (epoch.checks == 0 && activeSessionEpochs[sessionId] === epoch) activeSessionEpochs.remove(sessionId)
+    }
+
     /**
      * Check permission for a tool in the given session.
      * For ASK_ONCE, suspends until user responds via the dialog. A non-null
@@ -461,10 +500,8 @@ object OffloadPermissionManager {
                 }
             }
         } finally {
-            synchronized(permissionStateLock) {
-                epoch.checks--
-                if (epoch.checks == 0 && activeSessionEpochs[sessionId] === epoch) activeSessionEpochs.remove(sessionId)
-            }
+            // nanoMuse: checks and transport observations share the same bounded epoch lifetime.
+            synchronized(permissionStateLock) { releaseSessionEpoch(sessionId, epoch) }
         }
     }
 
@@ -492,6 +529,28 @@ object OffloadPermissionManager {
                     _pendingRequest.value = null
                 }
             } else null
+        }
+        // nanoMuse: stop the old managed peer while registrations are paused.
+        // Requests already sent cannot be retracted or unbilled here.
+        if (com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test") {
+            try {
+                ai.tama.media.VideoAttemptTracker.pauseSession(sessionId)
+                try {
+                    ai.tama.media.ImageAttemptTracker.pauseSession(sessionId)
+                    // nanoMuse: direct model-use calls have their own conservative
+                    // submission marker and can also arrive late from the shell.
+                    ai.tama.net.ModelUseAttemptTracker.pauseSession(sessionId)
+                    try {
+                        // Slot owners and waiters may not have reached a native image yet.
+                        try {
+                            ai.tama.chat.ChatSessionJobs.pauseSession(sessionId)
+                        } finally {
+                            try { com.openminis.app.sandbox.ExecutionCoordinator.stopCurrentCommand(sessionId) }
+                            finally { ai.tama.chat.ChatSessionJobs.resumeSession(sessionId) }
+                        }
+                    } finally { ai.tama.net.ModelUseAttemptTracker.resumeSession(sessionId) }
+                } finally { ai.tama.media.ImageAttemptTracker.resumeSession(sessionId) }
+            } finally { ai.tama.media.VideoAttemptTracker.resumeSession(sessionId) }
         }
         // Resume outside the lock. The changed epoch makes this a refusal, not
         // a new cached denial, and advances the queue for other sessions.

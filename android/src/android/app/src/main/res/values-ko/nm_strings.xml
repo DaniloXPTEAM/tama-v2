@@ -987,6 +987,10 @@
     <string name="nm_hub_err_unknown_action">컴퓨터가 이 동작을 모르는 이전 버전의 TAMA AI를 실행하고 있습니다.</string>
     <string name="nm_hub_err_bad_key">릴레이에서 로그아웃되었습니다. 다시 로그인하세요.</string>
     <string name="nm_hub_err_generic">컴퓨터가 처리하지 못했습니다.</string>
+    <!-- nanoMuse: pre-admission explanations for the parallel package. -->
+    <string name="nm_hub_err_id_reused">새 요청이 기기에 전달되지 않았습니다. 호출 ID가 사용 중이거나 이미 사용되었습니다.</string>
+    <string name="nm_hub_err_bad_call_id">새 요청이 기기에 전달되지 않았습니다. 호출 ID가 비어 있거나 너무 길거나 예약되어 있습니다.</string>
+    <string name="nm_hub_err_id_limit">새 요청이 기기에 전달되지 않았습니다. 이 클라이언트의 원격 호출 ID가 한도에 도달했습니다.</string>
     <string name="nm_devices_refused">릴레이가 거부했습니다. 다시 로그인하세요</string>
     <string name="nm_devices_paused">릴레이에서 일시 중지됨</string>
     <string name="nm_devices_notifications_hint">휴대전화가 백그라운드에서도 접근 가능하도록 알림을 허용하세요.</string>
@@ -1446,6 +1450,13 @@
     <string name="nm_auto_reason_disabled">provider disabled</string>
     <string name="nm_auto_reason_hidden">model hidden</string>
     <string name="nm_auto_reason_credential">no usable credential</string>
+    <string name="nm_auto_reason_unverified_cost">자동 호출 비용이 확인되지 않음</string>
+    <string name="nm_auto_allow_unverified_cost">비용이 확인되지 않은 자동 경로 허용</string>
+    <string name="nm_auto_cost_guard_help">기본적으로 꺼져 있습니다. 일부 자동 채팅, 대체 모델, 이미지, 제목 및 요약 호출을 일시 중지합니다. 지출 한도는 아니며 수동 호출과 다른 서비스에는 요금이 발생할 수 있습니다.</string>
+    <string name="nm_auto_cost_confirm_title">요금이 발생할 가능성을 허용할까요?</string>
+    <string name="nm_auto_cost_confirm_body">무료로 표시된 모델도 자동 호출 시 요금이 발생할 수 있습니다. 이 권한은 앱을 다시 시작해도 직접 끌 때까지 유지됩니다. 보호 대상 모델 요청에는 별도의 비용 허가도 필요합니다. 계속할까요?</string>
+    <string name="nm_auto_cost_confirm_action">요금 발생 가능성 허용</string>
+    <string name="nm_auto_cost_cancel">취소</string>
     <string name="nm_auto_reason_consent">automatic use not authorized</string>
     <string name="nm_auto_reason_capability">required capability not confirmed</string>
     <string name="nm_auto_reason_profile">tools do not fit this profile</string>
@@ -1473,4 +1484,34 @@
     <string name="nm_diagnostic_copy">진단 복사</string>
     <string name="nm_diagnostic_copied">클립보드에 복사했습니다.</string>
     <string name="nm_diagnostic_copy_failed">복사하지 못했습니다. 다시 시도하세요.</string>
+    <!-- TAMA V2: safe local failure and image summaries. -->
+    <string name="nm_reach_key_zero_title">OpenRouter 지출 한도</string>
+    <string name="nm_reach_key_zero_body">OpenRouter가 이 키의 지출 한도를 미화 0달러로 알렸습니다. 사용할 수 있는 무료 모델을 확인하세요.</string>
+    <string name="nm_reach_safe_summary">안전한 오류 요약</string>
+    <string name="nm_reach_private_omitted">원본 메시지에 개인 정보가 있을 수 있어 숨겼습니다. 공유하기 전에 제공업체에서 확인하세요.</string>
+    <string name="nm_error_private_generic">요청을 완료하지 못했습니다. 설정을 확인하거나 다시 시도하세요.</string>
+    <string name="nm_image_guard_ambiguous">이미지 요청을 확인할 수 없어 보내지 않았습니다. 이미지가 필요하면 직접 요청하고 내용을 설명하세요.</string>
+    <string name="nm_image_guard_repeat">이번 차례에 이미지 요청을 이미 처리했습니다. 자동으로 반복하지 않습니다. 다시 시도하려면 새로 요청하세요.</string>
+    <string name="nm_image_guard_invalid">이미지 내용을 안전하게 이해하지 못해 이번 요청을 보내지 않았습니다. 다시 시도하려면 설명해 주세요. 자동으로 반복하지 않습니다.</string>
+    <string name="nm_image_detail_preparing">이미지 요청 준비 중…</string>
+    <string name="nm_image_detail_generated">이미지가 생성되었습니다. 대화에서 열어 보세요.</string>
+    <string name="nm_image_detail_failed">이미지를 완성하지 못했습니다. 제공업체를 확인하고 원할 때만 다시 시도하세요.</string>
+    <string name="nm_group_switch_title">모델 전환</string>
+    <string name="nm_group_switch_attempt">%1$s. %2$s을 시도합니다.</string>
+    <string name="nm_group_switch_other">제공업체가 요청을 완료하지 못했습니다</string>
+    <string name="nm_stream_unconfirmed">제공업체가 이 응답의 완료를 확인하지 않았습니다. 이 응답의 도구는 실행하지 않았습니다. 원하면 다시 시도하세요.</string>
+    <string name="nm_auto_review_changed">계정, 제공업체 또는 권한이 변경되었습니다. 자동 사용 권한이 저장되지 않았습니다. 다시 확인해 주세요.</string>
+    <string name="nm_model_cost_blocked">모델 비용이 확인되지 않아 요청을 차단했습니다. 이미 보낸 요청에는 비용이 청구될 수 있습니다.</string>
+    <string name="nm_model_use_stop_warning">모델에 직접 보낸 요청이 제공업체에 전달되어 요금이 발생할 수 있습니다. 중지해도 전송은 취소되지 않습니다. 원하는 경우에만 다시 요청하세요.</string>
+    <string name="nm_model_allow_unverified_cost">비용이 확인되지 않은 모델 요청 허용</string>
+    <string name="nm_model_cost_guard_help">기본적으로 꺼져 있으며 앱을 다시 시작하면 꺼집니다. 무료로 표시된 모델을 포함해 보호 대상 채팅, 이미지, 동영상 및 모델 테스트 요청을 일시 중지합니다. 지출 한도가 아니므로 음성, 명령 및 다른 서비스에는 비용이 청구될 수 있습니다. 자동 사용에는 별도 허가도 필요합니다.</string>
+    <string name="nm_model_cost_confirm_body">이 앱 프로세스가 활성 상태인 동안 비용이 확인되지 않은 보호 대상 모델 요청을 허용합니다. 화면을 나가도 권한은 꺼지지 않습니다. 무료로 표시되어도 비용이 청구될 수 있습니다. 이미 보낸 요청은 되돌릴 수 없습니다. 다른 서비스는 보호되지 않습니다. 계속할까요?</string>
+    <string name="nm_video_probe_manual_hint">비용이 발생할 가능성을 피하기 위해 이 테스트 앱에서는 동영상 모델 자동 확인을 일시 중지했습니다. 확인하지 않고 모델을 선택하거나 입력할 수 있습니다.</string>
+    <string name="nm_video_probe_confirm_body">이 확인은 후보 모델마다 빈 작업을 보낼 수 있습니다. 동영상이 만들어지지 않아도 제공업체에서 비용을 청구할 수 있습니다. 여러 요청이 전송될 수 있습니다. 이미 보낸 요청은 되돌릴 수 없습니다. 계속할까요?</string>
+    <string name="nm_auto_video_blocked">자동 선택이 켜져 있거나 설정을 확인할 수 없으면 에이전트의 동영상 요청을 사용할 수 없습니다. 정확한 동영상 모델과 대체 모델은 승인되지 않았습니다. 모델 설정을 확인하세요. 이미 보낸 요청에는 요금이 청구될 수 있습니다.</string>
+    <string name="nm_avatar_auto_unavailable">자동 모델 선택이 켜져 있거나 설정을 확인할 수 없으면 아바타 요청이 일시 중지됩니다. 자동 선택을 끄고 선택한 모델과 발생할 수 있는 비용을 확인하세요.</string>
+    <string name="nm_avatar_background_paused">이 테스트 앱에서는 사진을 선택해도 포즈나 영상이 자동으로 생성되지 않습니다. 모양 또는 미디어 설정에서 직접 요청할 수 있으며 제공업체가 요금을 청구할 수 있습니다.</string>
+    <string name="nm_media_model_change_blocked">이 요청은 가격이 다를 수 있는 다른 미디어 모델로 전환합니다. 이미지 및 동영상 설정에서 호환되는 모델을 선택하세요. 이 요청은 전송되지 않았습니다. 이미 전송된 다른 요청에는 요금이 청구될 수 있습니다.</string>
+    <string name="nm_video_request_failed">동영상을 완료하지 못했습니다. 작업이 전송되어 요금이 청구될 수 있습니다. 새 요청 없이 다시 시도하지 마세요.</string>
+    <string name="nm_video_authorization_changed">동영상 제공업체, 계정, 설정 또는 세션이 변경되었습니다. 동영상 작업은 전송되지 않았습니다. 이미 전송된 다른 요청에는 요금이 청구될 수 있습니다.</string>
 </resources>

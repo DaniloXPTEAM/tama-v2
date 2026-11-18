@@ -63,11 +63,17 @@ internal object ImageModelRequests {
         size: String = "1024x1024",
         images: List<LLMMessage.ImagePart> = emptyList(),
         allowFormatRetry: Boolean = true,
+        // nanoMuse: callers with a fresh provider may revalidate immediately before I/O.
+        beforeRequest: (() -> Unit)? = null,
     ): LLMResponse = if (provider is OpenAIProvider) {
+        if (beforeRequest != null) provider.beforeDirectRequest = beforeRequest
         if (images.isEmpty()) provider.generateImage(prompt = prompt, n = 1, size = size, allowFormatRetry = allowFormatRetry)
-        else provider.editImage(prompt = prompt, images = images, n = 1, size = size)
+        else provider.editImage(prompt = prompt, images = images, n = 1, size = size, allowFormatRetry = allowFormatRetry)
     } else {
-        if (provider is GeminiProvider) provider.singleUseImageRequest = !allowFormatRetry
+        if (provider is GeminiProvider) {
+            provider.singleUseImageRequest = !allowFormatRetry
+            if (beforeRequest != null) provider.beforeDirectRequest = beforeRequest
+        }
         provider.sendMessage(
             messages = listOf(LLMMessage(LLMMessage.Role.USER, prompt)),
             systemPrompt = null,

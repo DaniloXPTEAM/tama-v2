@@ -1,8 +1,91 @@
 # TAMA V2: andamento e evidências
 
+**Rodada atual:** o relato das correções do teste manual prevalece sobre a prioridade antiga
+registrada abaixo. Consulte `TAMA_V2_CORRECOES_TESTE_MANUAL.md` para o estado de cada item e
+para os limites das provas. O artefato paralelo antigo citado abaixo foi removido, mas a consulta
+atual de metadados encontrou outros artefatos antigos não expirados no GitHub, incluindo artefatos
+de debug e instrumentação cujos workflows estavam configurados para carregar APKs. Seus arquivos não foram
+baixados nem removidos nesta revisão. Não há autorização para publicar APK ou artefato; a entrega
+privada precisa ser acordada.
+
 Este registro acompanha o plano completo fornecido pelo dono. O trabalho está somente na branch
-`arena/4f0fb56f-tamaaiv2`; não houve sincronização com nanoMuse nem OpenMinis. Estados possíveis:
+`arena/4f0fb56f-tamaaiv2`; não houve merge nem sincronização integral com nanoMuse ou OpenMinis.
+Duas famílias de correções Python do nanoMuse foram comparadas e adaptadas depois, como descrito em
+[TAMA_V2_COMPARACAO_NANOMUSE.md](TAMA_V2_COMPARACAO_NANOMUSE.md). Estados possíveis:
 **PENDENTE**, **EM ANDAMENTO**, **PARCIAL**, **BLOQUEADA** e **CONCLUÍDA COM PROVA**.
+
+## Rodada atual: ainda parcial
+
+Nesta revisão, a suíte Python com dependências de teste instaladas executou novamente
+`python -m pytest -q -m 'not live'`: **1.866 passaram, nove foram pulados, dois testes live foram
+excluídos e 33 subtestes passaram**, em 343,45 s. Ela foi repetida após a formatação de sete
+arquivos de fixtures e testes; Ruff e formato também passaram para `nanomuse`, `tests` e `scripts`.
+Isso inclui fixtures e fontes verificadas no computador, não comprova o funcionamento do Android.
+Um ensaio anterior identificou terminologia chinesa inconsistente no novo aviso; ela foi ajustada
+antes deste resultado. Os detalhes e o que foi adiado estão em
+[TAMA_V2_COMPARACAO_NANOMUSE.md](TAMA_V2_COMPARACAO_NANOMUSE.md).
+
+O repositório de variáveis de ambiente passou a omitir nomes e detalhes de exceção em cinco pontos
+de log na variante paralela. Um teste de host compilou a classe real com substitutos de Android,
+preferências e JSON; a variante normal manteve os detalhes. Nomes e notas ainda são metadados em
+JSON, e outros logs podem conter dados privados. Isso não prova o keystore ou o logcat no aparelho.
+
+A proteção de custo da variante paralela é process-local e bloqueia por padrão os pontos
+protegidos, inclusive alguns pedidos manuais; confirmar possível cobrança não é limite de gastos
+nem prova de gratuidade. Imagem e vídeo revalidam autorização, rota, configuração e conta em pontos
+protegidos, mas não há atomicidade com a rede; um POST já enviado pode cobrar. Em caminhos cobertos,
+o vídeo apresenta aviso de possível cobrança após o marcador conservador de envio, inclusive no
+Stop de uma tentativa registrada e marcada. Isso não cobre todas as corridas nem prova a interface.
+Um ensaio antigo com socket e handler falsos mostrou registro tardio aceito. Foram acrescentados
+vínculos de peer para shells gerenciados, trackers e reservas para algumas preparações de chat;
+contraprovas para caminhos sem registro continuam válidas. O ID vindo do ambiente convidado não
+é autenticado, e PID/socket/PRoot reais no Android seguem sem prova. `model_use` paralelo não
+registra o wrapper `OwnTurns`; a sanitização de logs é parcial. Veja detalhes e limitações em
+[TAMA_V2_CORRECOES_TESTE_MANUAL.md](TAMA_V2_CORRECOES_TESTE_MANUAL.md).
+
+Na montagem host mais recente, os handlers de mídia com serviços falsos tiveram **47 aprovados e
+um `Assume`** no paralelo, **14 aprovados e 34 `Assume`** na normal. `model_use` com providers
+reais e SSE simulado em loopback executou 51 testes por identidade, com um e 11 `Assume`,
+respectivamente, sem falhas. Passaram **119 testes JUnit** de setup, recibo headless, serialização,
+parada e trechos extraídos com fakes, além da simulação de socket/slots; 12 controles negativos
+reproduzíveis falharam como esperado. O ID novo é vinculado antes do insert nos envios protegidos,
+sem promessa de atomicidade do banco. Passaram 58 verificações Python direcionadas anteriormente
+e 36 em uma repetição parcial. PSI verificou 14 arquivos Kotlin apenas quanto à sintaxe; os
+trechos extraídos foram compilados com fakes, não o ViewModel completo. No Hub, passaram também
+41 testes do cliente com colaboradores locais, cinco testes de socket em cada identidade e 24
+contraprovas do cliente com falhas esperadas, além de duas contraprovas separadas para a nova
+serialização de respostas recebidas. Uma repetição de
+`cd cloud && python -m pytest -q tests/test_hub.py` confirmou **25 testes do relay**
+com contas e serviços sintéticos. As três mensagens de recusa local estão nos 17 locales, com 18
+verificações XML; a qualidade das traduções e a interface Android não foram validadas. Nada disso
+comprova build Android, Compose, Room, preços, medições de
+tokens, dez mensagens ou funcionamento no Poco.
+
+**Hub remoto: risco aberto.** Um resultado antigo foi entregue a outro dispositivo da mesma conta
+após desconexão e reuso de ID. A reprodução incluiu três `HubClient` reais no JVM e o relay local
+real por WebSocket TCP loopback, com contas e executor fictícios. A variante paralela recebeu
+proteções locais para IDs concorrentes, limpeza, conclusão e socket; também recusa reuso explícito
+na mesma instância, com limite de 16.384 IDs. Em ensaios com sockets falsos e reflexão, eventos de
+uma conexão já substituída deixaram de alterar a chamada nova, e uma reserva removida antes do envio
+não foi transmitida pelo socket substituto. Uma recusa local comprovada antes do envio não pede Stop
+no wrapper testado; a testemunha também foi preservada em um teste separado de thread interrompida.
+Uma ação iniciada ou um envio em andamento ainda pode continuar, e o cancelamento entre corrotinas e
+Android não foi comprovado. O reuso após timeout foi reproduzido antes da guarda e passou depois,
+mas outra instância ou dispositivo não compartilha o histórico. Nesta revisão, outra corrida foi
+reproduzida em socket falso: um resultado podia ultrapassar um evento em envio. A variante paralela
+passou a serializar evento e resposta por chamada, e as contraprovas direcionadas falharam como
+esperado; isso não comprova Android nem entrega pela rede. A proteção local não resolve a
+ambiguidade do relay. Evitar tarefas remotas sensíveis até haver correção e validação do protocolo;
+isso não prova a causa da interrupção do chat local no Poco nem funcionamento no Android. As
+reproduções e os limites estão em `tests/host_android/chat_setup/README-hub.md`.
+
+O `ShellExecutor` da variante paralela não repete automaticamente um comando após o sinal que
+acionava o fallback de seccomp. A montagem host reproduziu uma gravação dupla antes da correção;
+a normal conserva o comportamento anterior e seu risco. No checkout local, o template sem upload
+está fora de `.github/workflows` e não foi executado, e o workflow Android restaurado à base ainda
+prevê upload. O head remoto da PR #1 (`51e4762`) contém outra verificação sem upload e workflows
+pausados, mas não as alterações locais atuais; não foi acionado nesta rodada. Nenhum provedor pago
+foi chamado.
 
 ## Incremento: diagnóstico local
 
@@ -11,8 +94,8 @@ Há uma prévia em **Configurações → Sobre → Diagnóstico** e no comando e
 usa uma lista fechada de campos de build, API Android, arquitetura e, no chat, estado de perfil e
 categoria/código HTTP da última falha disponível. Não inclui conversa, chaves, nomes de modelos,
 identificadores de conta, endereços, texto de erro ou logs. A entrada Sobre não lê o chat; a ausência de dados é
-marcada `UNAVAILABLE`. Os oito passos para baixar e testar estão em
-[TAMA_V2_DIAGNOSTICO.md](TAMA_V2_DIAGNOSTICO.md).
+marcada `UNAVAILABLE`. O roteiro para uma futura entrega privada e o teste no aparelho estão em
+[TAMA_V2_DIAGNOSTICO.md](TAMA_V2_DIAGNOSTICO.md); não há APK atual disponível para baixar.
 
 Os testes locais cobrem o formatador, a interpretação exata do comando e os limites de entrada;
 checagens estruturais cobrem os dois caminhos de envio e os recursos de todos os idiomas. O CI
@@ -28,10 +111,10 @@ debug temporária, não distribuído como release de produção.
 
 ### APK com diagnóstico e resultados observados
 
-O [artefato `tama-v2-parallel-test-apk`](https://github.com/DaniloXPTEAM/tamaaiv2/actions/runs/43712635223/artifacts/14161802281)
-da [execução 43712635223](https://github.com/DaniloXPTEAM/tamaaiv2/actions/runs/43712635223) foi
-compilado de `3b469dd` **com o diagnóstico**. O verificador do CI confirmou pacote paralelo,
-rótulos, ABI, permissões, authorities disjuntas e assinatura; registrou SHA-256 do APK
+O antigo artefato `tama-v2-parallel-test-apk` da execução 43712635223 foi compilado de `3b469dd`
+**com o diagnóstico** e depois removido a pedido do dono. Não é um download disponível. O
+verificador do CI confirmou pacote paralelo, rótulos, ABI, permissões, authorities disjuntas e
+assinatura; registrou SHA-256 do APK
 `38cace68c978a8591bd9ccfe44b8dddbb3f5dbe043f4784f41850a9cd09b41b4`, 70.285.157 bytes e
 certificado debug SHA-256 `8b46674aadfb2a0174f87cecb32010d8daf5544445fe782e099dedb368c71d96`.
 O ZIP também contém o arquivo de hash e a evidência de assinatura. Não presumir que ele atualize

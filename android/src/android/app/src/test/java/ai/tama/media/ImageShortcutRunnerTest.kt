@@ -50,6 +50,19 @@ class ImageShortcutRunnerTest {
         assertEquals(1, calls)
     }
 
+    @Test fun `parallel shortcut cannot display arbitrary failure content or links`() = runBlocking {
+        val messages = mapOf("no_image_model" to "Sem modelo", "image_failed" to failure)
+        for (code in listOf("unexpected", "no_image_model", "image_failed")) {
+            val answer = ImageShortcutRunner.run("bird", failure, "Configurações", safeFailureMessages = messages) {
+                ToolExecutionResult(JSONObject().put("error", code).put("message", "private prompt or token")
+                    .put("settings", "https://attacker.invalid").toString(), false)
+            }
+            assertFalse(answer.text.contains("private"))
+            assertFalse(answer.text.contains("attacker"))
+            assertEquals(if (code == "no_image_model") "Sem modelo\n\n[Configurações](minis://settings/media)" else failure, answer.text)
+        }
+    }
+
     @Test fun `invalid success does not pretend an image was generated`() = runBlocking {
         val answer = ImageShortcutRunner.run("bird", failure, "Settings") {
             ToolExecutionResult("{\"markdown\":\"[fake](https://example.com)\"}", true)

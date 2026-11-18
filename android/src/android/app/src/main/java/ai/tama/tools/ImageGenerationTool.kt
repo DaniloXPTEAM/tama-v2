@@ -29,10 +29,40 @@ object ImageGenerationTool {
         propertyOrdering = listOf("prompt", "size"),
     )
 
-    suspend fun execute(argsJson: String, sessionId: String, context: Context): ToolExecutionResult =
-        execute(argsJson, context.getString(R.string.nm_models_image_title)) { prompt, size ->
-            withContext(Dispatchers.IO) { MediaOffloadHandler(context).generateImage(prompt, size, sessionId) }
+    suspend fun execute(argsJson: String, sessionId: String, context: Context): ToolExecutionResult {
+        val parallel = com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test"
+        val title = context.getString(R.string.nm_models_image_title)
+        val result = try {
+            execute(argsJson, title) { prompt, size ->
+                withContext(Dispatchers.IO) { MediaOffloadHandler(context).generateImage(prompt, size, sessionId) }
+            }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            if (!parallel) throw e
+            ToolExecutionResult("{}", false, toolTitle = title)
         }
+        if (!parallel || result.success) return result
+        // The provider may echo the person's prompt or a credential in any error.
+        // Only locally authored text and fixed settings links enter history or the model.
+        return result.copy(output = ai.tama.media.ImageToolPresentation.sanitizedFailure(
+            result.output, failureMessages(context), context.getString(R.string.nm_image_request_failed),
+        ))
+    }
+
+    /** Localized fixed text shared by the native tool and its shortcut presentation. */
+    internal fun failureMessages(context: Context): Map<String, String> = mapOf(
+        "no_image_model" to context.getString(R.string.nm_image_provider_missing),
+        "no_approved_image_model" to context.getString(R.string.nm_auto_image_missing),
+        "automatic_image_cost_unverified" to context.getString(R.string.nm_auto_reason_unverified_cost),
+        "image_cost_unverified" to context.getString(R.string.nm_model_cost_blocked),
+        "image_authorization_changed" to context.getString(R.string.nm_auto_image_changed),
+        "permission_denied" to context.getString(R.string.nm_image_permission_denied),
+        "automatic_image_edit_unavailable" to context.getString(R.string.nm_auto_image_edit_blocked),
+        "media_model_change_blocked" to context.getString(R.string.nm_media_model_change_blocked),
+        "invalid_image_request" to context.getString(R.string.nm_image_guard_invalid),
+        "image_failed" to context.getString(R.string.nm_image_request_failed),
+    )
 
     /** Injectable edge for tests; no client is created unless all arguments are valid. */
     internal suspend fun execute(

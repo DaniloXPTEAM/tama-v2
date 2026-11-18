@@ -118,7 +118,14 @@ fun ProviderReachCard(
     val host = reach.host.ifBlank { stringResource(R.string.nm_reach_the_provider) }
     val plan = reach.isChatGptPlan
 
-    val (icon, tint, title, body) = when (reach.kind) {
+    val (icon, tint, title, body) = if (
+        com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test" &&
+        ai.tama.net.OpenRouterSpendLimit.keyLimitIsZero(reach)
+    ) {
+        // nanoMuse: this is a key spending limit, not proof of an empty account balance.
+        Head(Icons.Outlined.AccountBalanceWallet, Color(0xFFE0772C),
+            stringResource(R.string.nm_reach_key_zero_title), stringResource(R.string.nm_reach_key_zero_body))
+    } else when (reach.kind) {
         ProviderReach.Kind.UNREACHABLE -> Head(
             Icons.Outlined.CloudOff, Color(0xFFE0772C),
             stringResource(R.string.nm_reach_unreachable_title, host),
@@ -211,7 +218,10 @@ fun ProviderReachCard(
                         modifier = Modifier.padding(top = 3.dp),
                     )
                     Text(body, fontSize = 13.sp, lineHeight = 18.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 2.dp))
-                    if (reach.detail.isNotBlank() && reach.kind != ProviderReach.Kind.UNREACHABLE) {
+                    // nanoMuse: the parallel build keeps the provider's original text
+                    // in Details, not on the ordinary error card.
+                    if (com.openminis.app.BuildConfig.APPLICATION_ID != "ai.tama.assistant.tamav2test" &&
+                        reach.detail.isNotBlank() && reach.kind != ProviderReach.Kind.UNREACHABLE) {
                         Text(
                             stringResource(R.string.nm_reach_vendor_said, reach.detail),
                             fontSize = 13.sp,

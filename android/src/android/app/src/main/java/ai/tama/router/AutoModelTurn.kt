@@ -7,7 +7,10 @@ package ai.tama.router
  *
  * This class does not retain messages, credentials, prompts or provider responses.
  */
-class AutoModelTurn(private val health: ModelHealth) {
+class AutoModelTurn(
+    private val health: ModelHealth,
+    private val modelScopedRateLimits: Boolean = false,
+) {
     private val excluded = linkedSetOf<String>()
 
     data class FailureRecord(
@@ -62,7 +65,8 @@ class AutoModelTurn(private val health: ModelHealth) {
         retryAfterSeconds: Int? = null,
         retryAfterPresent: Boolean = retryAfterSeconds != null,
     ): ModelHealth.Cooldown {
-        val cooldown = health.failure(entryId, providerId, reason, retryAfterSeconds, retryAfterPresent)
+        val cooldown = health.failure(entryId, providerId, reason, retryAfterSeconds, retryAfterPresent,
+            modelScopedRateLimit = modelScopedRateLimits)
         failures += FailureRecord(entryId, providerId, reason, cooldown)
         exclude(entryId)
         return cooldown

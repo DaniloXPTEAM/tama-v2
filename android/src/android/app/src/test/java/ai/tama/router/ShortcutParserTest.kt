@@ -24,6 +24,20 @@ class ShortcutParserTest {
         ).forEach { assertNull(it, ShortcutParser.parse(it)) }
     }
 
+    @Test fun `parallel app accepts faz and faça without treating a question or other action as consent`() {
+        val beach = "faz uma imagem de um domingo na praia"
+        assertNull(ShortcutParser.parse(beach)) // normal app keeps its prior behavior
+        assertEquals(Shortcut.Image("um domingo na praia"), ShortcutParser.parse(beach, portugueseMake = true))
+        assertEquals(Shortcut.Image("uma maçã"), ShortcutParser.parse("Faça uma imagem de uma maçã", portugueseMake = true))
+        assertTrue(ImageRequestIntent.explicit(beach, portugueseMake = true))
+        assertFalse(ImageRequestIntent.explicit(beach))
+        listOf("não faz imagem de um gato", "faz imagem de um gato e abra o banco",
+            "faz imagem de gato?", "se chover, faz imagem de gato").forEach {
+            assertNull(it, ShortcutParser.parse(it, portugueseMake = true))
+        }
+        assertFalse(ImageRequestIntent.explicit("como faz uma imagem de gato?", portugueseMake = true))
+    }
+
     @Test fun `model image intent requires an explicit positive request`() {
         assertTrue(ImageRequestIntent.explicit("Crie um cartão e gere uma imagem de um gato"))
         assertTrue(ImageRequestIntent.explicit("Please generate an image of a bird"))

@@ -999,6 +999,10 @@
     <string name="nm_hub_err_unknown_action">Komputer ma starszą wersję TAMA AI, która nie zna tej akcji.</string>
     <string name="nm_hub_err_bad_key">Wylogowano na relayu; zaloguj się ponownie.</string>
     <string name="nm_hub_err_generic">Komputer nie mógł tego zrobić.</string>
+    <!-- nanoMuse: pre-admission explanations for the parallel package. -->
+    <string name="nm_hub_err_id_reused">Nowe żądanie nie dotarło do urządzenia: identyfikator wywołania jest używany lub był już użyty.</string>
+    <string name="nm_hub_err_bad_call_id">Nowe żądanie nie dotarło do urządzenia: identyfikator wywołania jest pusty, zbyt długi lub zastrzeżony.</string>
+    <string name="nm_hub_err_id_limit">Nowe żądanie nie dotarło do urządzenia: ten klient osiągnął limit identyfikatorów wywołań zdalnych.</string>
     <string name="nm_devices_refused">Odrzucone przez relay; zaloguj się ponownie</string>
     <string name="nm_devices_paused">Wstrzymane przez relay</string>
     <string name="nm_devices_notifications_hint">Zezwól na powiadomienia, aby telefon pozostawał dostępny w tle.</string>
@@ -1458,6 +1462,13 @@
     <string name="nm_auto_reason_disabled">provider disabled</string>
     <string name="nm_auto_reason_hidden">model hidden</string>
     <string name="nm_auto_reason_credential">no usable credential</string>
+    <string name="nm_auto_reason_unverified_cost">koszt automatycznego wywołania nie został sprawdzony</string>
+    <string name="nm_auto_allow_unverified_cost">Zezwalaj na automatyczne trasy o niesprawdzonym koszcie</string>
+    <string name="nm_auto_cost_guard_help">Domyślnie wyłączone. Wstrzymuje niektóre automatyczne wywołania czatu, modelu zastępczego, obrazów, tytułów i podsumowań. To nie jest limit wydatków: wywołania ręczne i inne usługi nadal mogą naliczać opłaty.</string>
+    <string name="nm_auto_cost_confirm_title">Zezwolić na możliwe opłaty?</string>
+    <string name="nm_auto_cost_confirm_body">Automatyczne wywołania mogą być płatne, nawet jeśli model jest reklamowany jako bezpłatny. Zgoda pozostaje aktywna do jej wyłączenia, również po ponownym uruchomieniu aplikacji. Chronione żądania modeli wymagają też osobnej zgody na koszty. Kontynuować?</string>
+    <string name="nm_auto_cost_confirm_action">Zezwól na możliwe opłaty</string>
+    <string name="nm_auto_cost_cancel">Anuluj</string>
     <string name="nm_auto_reason_consent">automatic use not authorized</string>
     <string name="nm_auto_reason_capability">required capability not confirmed</string>
     <string name="nm_auto_reason_profile">tools do not fit this profile</string>
@@ -1485,4 +1496,34 @@
     <string name="nm_diagnostic_copy">Kopiuj diagnostykę</string>
     <string name="nm_diagnostic_copied">Skopiowano do schowka.</string>
     <string name="nm_diagnostic_copy_failed">Nie udało się skopiować. Spróbuj ponownie.</string>
+    <!-- TAMA V2: safe local failure and image summaries. -->
+    <string name="nm_reach_key_zero_title">Limit wydatków OpenRouter</string>
+    <string name="nm_reach_key_zero_body">OpenRouter zgłosił limit wydatków 0 USD dla tego klucza. Sprawdź dostępne bezpłatne modele.</string>
+    <string name="nm_reach_safe_summary">Bezpieczne podsumowanie błędu</string>
+    <string name="nm_reach_private_omitted">Oryginalny komunikat ukryto, ponieważ może zawierać prywatne dane. Sprawdź go u dostawcy przed udostępnieniem.</string>
+    <string name="nm_error_private_generic">Nie udało się wykonać żądania. Sprawdź ustawienia lub spróbuj ponownie.</string>
+    <string name="nm_image_guard_ambiguous">Nie udało się potwierdzić prośby o obraz, więc jej nie wysłano. Jeśli chcesz obraz, poproś wprost i go opisz.</string>
+    <string name="nm_image_guard_repeat">W tej turze obsłużono już prośbę o obraz. Nie powtórzę jej automatycznie. Wyślij nową prośbę, jeśli chcesz spróbować ponownie.</string>
+    <string name="nm_image_guard_invalid">Nie udało się bezpiecznie zrozumieć opisu obrazu, więc próby nie wysłano. Opisz obraz ponownie, jeśli chcesz spróbować. Nie powtórzę próby automatycznie.</string>
+    <string name="nm_image_detail_preparing">Przygotowywanie prośby o obraz…</string>
+    <string name="nm_image_detail_generated">Obraz został wygenerowany. Otwórz go w rozmowie.</string>
+    <string name="nm_image_detail_failed">Nie udało się ukończyć obrazu. Sprawdź dostawcę i ponów próbę tylko wtedy, gdy chcesz.</string>
+    <string name="nm_group_switch_title">Zmiana modelu</string>
+    <string name="nm_group_switch_attempt">%1$s. Próbuję modelu %2$s.</string>
+    <string name="nm_group_switch_other">dostawca nie mógł wykonać żądania</string>
+    <string name="nm_stream_unconfirmed">Dostawca nie potwierdził zakończenia odpowiedzi. Nie uruchomiono żadnych narzędzi z tej odpowiedzi. Spróbuj ponownie, jeśli chcesz.</string>
+    <string name="nm_auto_review_changed">Konto, dostawca lub uprawnienia uległy zmianie. Uprawnienia automatyczne nie zostały zapisane. Sprawdź je ponownie.</string>
+    <string name="nm_model_cost_blocked">Żądanie modelu zostało zablokowane, ponieważ jego koszt nie został potwierdzony. Wysłane żądania nadal mogą być płatne.</string>
+    <string name="nm_model_use_stop_warning">Bezpośrednie żądanie do modelu mogło dotrzeć do dostawcy i spowodować opłatę. Zatrzymanie go nie cofnie; ponów tylko jeśli chcesz.</string>
+    <string name="nm_model_allow_unverified_cost">Zezwól na żądania modeli o niepotwierdzonym koszcie</string>
+    <string name="nm_model_cost_guard_help">Domyślnie wyłączone, ponownie wyłącza się po uruchomieniu aplikacji. Wstrzymuje chronione żądania czatu, obrazów, wideo i testów modeli, także reklamowanych jako darmowe. To nie jest limit wydatków: głos, polecenia i inne usługi nadal mogą być płatne. Użycie automatyczne wymaga osobnej zgody.</string>
+    <string name="nm_model_cost_confirm_body">Pozwala na chronione żądania modeli o niepotwierdzonym koszcie, dopóki ten proces aplikacji jest aktywny. Wyjście z ekranu nie wyłącza zgody. Żądania mogą być płatne nawet wtedy, gdy są reklamowane jako darmowe. Wysłanego żądania nie można cofnąć. Inne usługi nie są chronione. Kontynuować?</string>
+    <string name="nm_video_probe_manual_hint">Automatyczne sprawdzanie wideo jest w tej aplikacji testowej wstrzymane, aby uniknąć możliwych opłat. Możesz wybrać lub wpisać model bez sprawdzania.</string>
+    <string name="nm_video_probe_confirm_body">Sprawdzenie może wysłać puste zadanie dla każdego kandydującego modelu. Dostawca może naliczyć opłatę, nawet jeśli nie powstanie wideo. Może zostać wysłanych kilka żądań. Wysłanego żądania nie można cofnąć. Kontynuować?</string>
+    <string name="nm_auto_video_blocked">Wideo agenta jest niedostępne, gdy automatyczny wybór jest włączony lub nie można go sprawdzić. Dokładny model wideo i jego zamienniki nie zostały zatwierdzone. Sprawdź ustawienia modeli. Za wysłane żądania nadal może zostać naliczona opłata.</string>
+    <string name="nm_avatar_auto_unavailable">Żądania awatara są wstrzymane, gdy automatyczny wybór modelu jest włączony lub nie można go sprawdzić. Wyłącz go i sprawdź wybrany model oraz możliwe opłaty.</string>
+    <string name="nm_avatar_background_paused">W tej aplikacji testowej wybranie obrazu nie tworzy automatycznie póz ani filmów. Możesz je zamówić w ustawieniach Wygląd lub Media; dostawcy mogą naliczyć opłaty.</string>
+    <string name="nm_media_model_change_blocked">To żądanie przełączyłoby na inny model multimediów, który może mieć inną cenę. Wybierz zgodny model w ustawieniach obrazów i wideo. To żądanie nie zostało wysłane. Za inne już wysłane żądania nadal mogą zostać naliczone opłaty.</string>
+    <string name="nm_video_request_failed">Nie udało się ukończyć filmu. Zadanie mogło zostać wysłane i może wiązać się z opłatą. Nie ponawiaj go bez nowej prośby.</string>
+    <string name="nm_video_authorization_changed">Zmieniono dostawcę, konto, ustawienia lub sesję filmu. Zadanie filmu nie zostało wysłane. Inne wysłane już żądania nadal mogą wiązać się z opłatą.</string>
 </resources>

@@ -8,6 +8,9 @@ import io.github.nanomuse.media.*
  * Revalidation reduces, but cannot make atomic, concurrent settings changes and network I/O.
  */
 internal object ImageDispatch {
+    /** A route or approval changed while a transport was preparing its request. */
+    class AuthorizationChanged : Exception("Image authorization changed")
+
     enum class Block { AUTO_EDIT_UNAVAILABLE, NO_APPROVED_IMAGE, AUTHORIZATION_CHANGED, NO_MANUAL_IMAGE, PERMISSION_DENIED }
 
     fun validSize(value: String): Boolean {

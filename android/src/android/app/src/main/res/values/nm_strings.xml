@@ -973,6 +973,10 @@
     <string name="nm_hub_err_unknown_action">The computer runs an older TAMA AI that does not know this action.</string>
     <string name="nm_hub_err_bad_key">Signed out on the relay; sign in again.</string>
     <string name="nm_hub_err_generic">The computer could not do it.</string>
+    <!-- nanoMuse: fixed explanations for a request refused before reaching its target. -->
+    <string name="nm_hub_err_id_reused">The new request did not reach the device: its call ID is in use or has already been used.</string>
+    <string name="nm_hub_err_bad_call_id">The new request did not reach the device: its call ID is empty, too long, or reserved.</string>
+    <string name="nm_hub_err_id_limit">The new request did not reach the device: this client has reached its remote call ID limit.</string>
     <string name="nm_devices_refused">Refused by the relay; sign in again</string>
     <string name="nm_devices_paused">Paused by the relay</string>
     <string name="nm_devices_notifications_hint">Allow notifications so the phone can stay reachable in the background.</string>
@@ -1378,6 +1382,11 @@
     <string name="nm_reach_output_adjusted">The provider accepted a retry with a maximum of %1$d output tokens.</string>
     <string name="nm_reach_rate_wait">Request limit reached. Trying again in %1$d s.</string>
     <string name="nm_reach_server_retry">The provider is unstable. Trying again.</string>
+    <string name="nm_reach_key_zero_title">OpenRouter spending limit</string>
+    <string name="nm_reach_key_zero_body">OpenRouter reported a US$ 0 spending limit for this key. Check which free models are available for it.</string>
+    <string name="nm_reach_safe_summary">Safe error summary</string>
+    <string name="nm_reach_private_omitted">The original message is hidden because it may contain private content. Check the provider before sharing anything.</string>
+    <string name="nm_error_private_generic">Could not complete the request. Check the settings or try again.</string>
     <!-- nanoMuse: a rejected service request is not a completed or protected task. -->
     <string name="nm_background_start_rejected">Could not request the background service. Keep TAMA open while a task runs; it may stop if you leave.</string>
     <string name="nm_background_stop_rejected">Could not request stopping the background service. Its notification may remain visible.</string>
@@ -1413,6 +1422,12 @@
     <string name="nm_image_provider_missing">No image provider configured: open Settings → Image and video models</string>
     <string name="nm_image_call_consent">Image generation may incur a charge per request, even when the price is unknown. Allow only if you accept the cost for the model shown.</string>
     <string name="nm_image_permission_denied">Image permission was denied or expired. No image request was sent.</string>
+    <string name="nm_image_guard_ambiguous">I could not confirm this image request, so it was not sent. If you want a picture, ask directly and describe it.</string>
+    <string name="nm_image_guard_repeat">An image request has already been handled in this turn. I will not repeat it automatically; make a new request if you want to try again.</string>
+    <string name="nm_image_guard_invalid">I could not safely understand the image details, so this attempt was not sent. Please describe the picture again if you want to try; I will not retry automatically.</string>
+    <string name="nm_image_detail_preparing">Preparing the image request…</string>
+    <string name="nm_image_detail_generated">The image was generated. Check the conversation to open it.</string>
+    <string name="nm_image_detail_failed">The image could not be completed. Check the provider and try again only if you want to.</string>
     <string name="nm_image_request_failed">The image could not be completed. The request may have been charged; I will not retry without a new request.</string>
     <string name="nm_auto_image_missing">No registered image model currently meets all requirements: enabled and visible, a unique provider and model identity, usable credentials, a supported image route, confirmed generation capability, and separate automatic image permission. Open Settings → Models → Review model permissions and choose the provider and model.</string>
     <string name="nm_auto_image_changed">Image permission, account or configuration changed. No image request was sent; review the model permissions and try again.</string>
@@ -1424,12 +1439,23 @@
     <string name="nm_auto_consent_allow">Allow automatic use</string>
     <string name="nm_auto_switch">Continuing with %2$s instead of %1$s.</string>
     <string name="nm_auto_switch_reason">%1$s: %2$s; continuing with %3$s.</string>
+    <string name="nm_group_switch_title">Switching model</string>
+    <string name="nm_group_switch_attempt">%1$s. Trying %2$s.</string>
+    <string name="nm_group_switch_other">the provider could not complete the request</string>
+    <string name="nm_stream_unconfirmed">The provider did not confirm this response was complete. No tools from this response were run. Try again if you want to.</string>
     <string name="nm_auto_return">Returned to the preferred model %1$s.</string>
     <string name="nm_auto_none">No approved model can safely handle this request. Review the models and capabilities in Settings.</string>
     <string name="nm_auto_disabled_during_turn">Automatic selection was turned off or authorization changed. No further request was sent.</string>
     <string name="nm_auto_reason_disabled">provider disabled</string>
     <string name="nm_auto_reason_hidden">model hidden</string>
     <string name="nm_auto_reason_credential">no usable credential</string>
+    <string name="nm_auto_reason_unverified_cost">automatic cost is not verified</string>
+    <string name="nm_auto_allow_unverified_cost">Allow automatic routes with unverified cost</string>
+    <string name="nm_auto_cost_guard_help">Off by default. This pauses some automatic chat, fallback, image, title and compaction calls. It is not a spending limit: manual calls and other services may still charge.</string>
+    <string name="nm_auto_cost_confirm_title">Allow possible charges?</string>
+    <string name="nm_auto_cost_confirm_body">Automatic calls may charge, even if a model is advertised as free. This permission stays on until you turn it off, including after an app restart. Protected model requests also need the separate model-cost permission. Continue?</string>
+    <string name="nm_auto_cost_confirm_action">Allow possible charges</string>
+    <string name="nm_auto_cost_cancel">Cancel</string>
     <string name="nm_auto_reason_consent">automatic use not authorized</string>
     <string name="nm_auto_reason_capability">required capability not confirmed</string>
     <string name="nm_auto_reason_profile">tools do not fit this profile</string>
@@ -1457,4 +1483,18 @@
     <string name="nm_diagnostic_copy">Copy diagnostic</string>
     <string name="nm_diagnostic_copied">Copied to clipboard.</string>
     <string name="nm_diagnostic_copy_failed">Could not copy. Try again.</string>
+    <string name="nm_auto_review_changed">The account, provider or permissions changed. Automatic permissions were not saved. Review them again.</string>
+    <string name="nm_model_cost_blocked">A model request was blocked because its cost is not verified. Requests already sent may still be charged.</string>
+    <string name="nm_model_use_stop_warning">A direct model request may have reached the provider and may be charged. Stopping cannot undo it; request it again only if you choose.</string>
+    <string name="nm_model_allow_unverified_cost">Allow model requests with unverified cost</string>
+    <string name="nm_model_cost_guard_help">Off by default and reset when the app restarts. This pauses guarded chat, image, video and model-test requests, including models advertised as free. It is not a spending limit: voice, commands and other services may still charge. Automatic use also needs separate permission.</string>
+    <string name="nm_model_cost_confirm_body">This allows guarded model requests with unverified cost while this app process remains active. Leaving the screen does not turn it off. Requests may charge even when advertised as free. A request already sent cannot be undone. Other services are not protected. Continue?</string>
+    <string name="nm_video_probe_manual_hint">Automatic video checks are paused in this test app to avoid possible charges. You can choose or enter a model without checking.</string>
+    <string name="nm_video_probe_confirm_body">This check can send an empty task for each candidate model. The provider may charge even if no video is created. Several requests may be sent. A request already sent cannot be undone. Continue?</string>
+    <string name="nm_auto_video_blocked">Agent video is unavailable while automatic selection is on or cannot be checked. The exact video model and substitutions have not been approved. Review Models. Requests already sent may still be charged.</string>
+    <string name="nm_avatar_auto_unavailable">Avatar requests are paused while automatic model selection is on or cannot be checked. Turn it off and review the selected model and possible charges.</string>
+    <string name="nm_avatar_background_paused">In this test app, choosing a picture does not automatically create poses or clips. You can request them in Appearance or Media; providers may charge.</string>
+    <string name="nm_media_model_change_blocked">This request would switch to a different media model, which may have a different price. Choose a compatible model in Image and video settings. This request was not sent. Other requests already sent may still be charged.</string>
+    <string name="nm_video_request_failed">The video could not be completed. The task may have been sent and may be charged. Do not retry without a new request.</string>
+    <string name="nm_video_authorization_changed">The video provider, account, settings or session changed. The video task was not sent. Other requests already sent may still be charged.</string>
 </resources>

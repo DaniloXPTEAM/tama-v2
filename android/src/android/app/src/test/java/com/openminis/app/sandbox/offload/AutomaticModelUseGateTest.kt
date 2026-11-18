@@ -21,10 +21,18 @@ class AutomaticModelUseGateTest {
         val handler = ModelUseOffloadHandler(context, repository)
         val request = NativeOffloadRequest(1, listOf("minis-model-use", "run", "--model", "image"), emptyMap(), "/", "session")
         AutoModelStore.setEnabled(context, true)
-        val blocked = handler.handle(request)
-        assertEquals(3, blocked.exitCode)
-        assertEquals("automatic_direct_model_use_unavailable", JSONObject(blocked.output).getString("error"))
-        Mockito.verifyNoInteractions(repository)
+        if (com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test") {
+            val blocked = handler.handle(request)
+            assertEquals(3, blocked.exitCode)
+            assertEquals("automatic_direct_model_use_unavailable", JSONObject(blocked.output).getString("error"))
+            Mockito.verifyNoInteractions(repository)
+        } else {
+            // The normal package retains its original direct-run validation even if the new preference is on.
+            val normal = handler.handle(request.copy(argv = listOf("minis-model-use", "run")))
+            assertEquals(2, normal.exitCode)
+            assertTrue(normal.output.contains("--model is required"))
+            Mockito.verifyNoInteractions(repository)
+        }
 
         AutoModelStore.setEnabled(context, false)
         // Missing --model reaches the existing manual validation instead of the automatic gate.

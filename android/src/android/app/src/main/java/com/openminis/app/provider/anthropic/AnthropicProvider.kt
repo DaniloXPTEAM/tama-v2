@@ -15,6 +15,8 @@ import com.openminis.app.provider.ImageBudget
 import com.openminis.app.provider.LLMProvider
 import com.openminis.app.provider.applyUserAgentOverride
 import com.openminis.app.provider.safeOptString
+import ai.tama.net.singleUseImageBody // nanoMuse: direct ModelUse must not replay a possibly billed request.
+import ai.tama.net.singleUseImageClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.awaitClose
@@ -48,6 +50,18 @@ class AnthropicProvider(
 ) : LLMProvider {
     override val name = "Anthropic"
     override val defaultMaxOutputTokens: Int get() = 64_000
+
+    // nanoMuse: only enabled on a fresh direct ModelUse provider in the test
+    // package. The recheck is not atomic with the network and is not a budget.
+    internal var singleUseDirectRequest: Boolean = false
+    internal var beforeDirectRequest: (() -> Unit)? = null
+
+    private fun protectDirectRequest(request: Request): Request {
+        val body = request.body
+        return if (singleUseDirectRequest && body != null)
+            request.newBuilder().method(request.method, body.singleUseImageBody()).build()
+        else request
+    }
 
     /**
      * [T-android-enhanced-cache] Enhanced Cache toggle — when true, every
@@ -92,12 +106,18 @@ class AnthropicProvider(
         tools: List<AgentToolDefinition>,
         thinkingLevel: ThinkingLevel,
     ): LLMResponse = withContext(Dispatchers.IO) {
+        // nanoMuse: a selected model or account does not establish its request cost.
+        ai.tama.pricing.ModelCostGuard.requireAllowed()
         val body = buildRequestBody(messages, systemPrompt, maxTokens, stream = false, temperature = temperature, imageParts = imageParts, tools = tools, thinkingLevel = thinkingLevel)
-        val request = buildRequest(body.toString(), body)
+        val request = protectDirectRequest(buildRequest(body.toString(), body))
         // nanoMuse: snapshot the model and credentials for this specific wire request.
         val requestModel = body.opt("model") as? String
         val credentials = requestCredentials(request)
-        val response = client.newCall(request).execute()
+        // nanoMuse: revalidate after request preparation and before dispatch.
+        beforeDirectRequest?.invoke()
+        ai.tama.pricing.ModelCostGuard.requireAllowed()
+        val requestClient = if (singleUseDirectRequest) client.singleUseImageClient() else client
+        val response = requestClient.newCall(request).execute()
         val responseBody = response.body?.string() ?: ""
 
         if (!response.isSuccessful) {
@@ -129,13 +149,15 @@ class AnthropicProvider(
         tools: List<AgentToolDefinition>,
         thinkingLevel: ThinkingLevel,
     ): Flow<LLMStreamChunk> = callbackFlow {
+        // nanoMuse: block unknown-cost streams before building the outbound request.
+        ai.tama.pricing.ModelCostGuard.requireAllowed()
         val body = buildRequestBody(messages, systemPrompt, maxTokens, stream = true, temperature = temperature, imageParts = imageParts, tools = tools, thinkingLevel = thinkingLevel)
         // T302: serialize the body exactly once and pass the string to
         // buildRequest. Pre-T302 body.toString() ran twice per call (once
         // here, once inside buildRequest); each emitted string was tens of
         // MB on long agent loops and stacked under GC pressure.
         val bodyStr = body.toString()
-        val request = buildRequest(bodyStr, body)
+        val request = protectDirectRequest(buildRequest(bodyStr, body))
         // nanoMuse: a later model or credential change cannot rewrite this failure's details.
         val requestModel = body.opt("model") as? String
         val credentials = requestCredentials(request)
@@ -148,7 +170,11 @@ class AnthropicProvider(
             headerMap[name] = request.headers[name] ?: ""
         }
 
-        val response = client.newCall(request).execute()
+        // nanoMuse: the guards may have changed while the request was prepared.
+        beforeDirectRequest?.invoke()
+        ai.tama.pricing.ModelCostGuard.requireAllowed()
+        val requestClient = if (singleUseDirectRequest) client.singleUseImageClient() else client
+        val response = requestClient.newCall(request).execute()
         val durationMs = System.currentTimeMillis() - startTime
 
         if (!response.isSuccessful) {

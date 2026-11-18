@@ -220,6 +220,67 @@ class OffloadPermissionQueueTest {
         manager.clearSessionGrants(oldSession)
     }
 
+    @Test fun `one time approval remains observable until closed and settings ABA revokes it`() = runBlocking {
+        manager.init(PetPrefsContext())
+        manager.setLevel("image_generation", OffloadPermissionManager.PermissionLevel.ASK_ONCE)
+        val session = UUID.randomUUID().toString()
+        val observation = manager.observePermission("image_generation", session)
+        try {
+            val request = async(start = CoroutineStart.UNDISPATCHED) {
+                manager.checkPermission("image_generation", "Image", session, grantScope = "model")
+            }
+            respond(OffloadPermissionManager.Response.ALLOW_ONCE)
+            assertTrue(request.await())
+            assertTrue(observation.isCurrent())
+            manager.setLevel("image_generation", OffloadPermissionManager.PermissionLevel.NOT_ALLOWED)
+            manager.setLevel("image_generation", OffloadPermissionManager.PermissionLevel.ASK_ONCE)
+            assertFalse(observation.isCurrent())
+        } finally {
+            observation.close()
+            observation.close() // release is idempotent
+            manager.clearSessionGrants(session)
+        }
+        assertFalse(observation.isCurrent())
+        val epochs = manager.javaClass.getDeclaredField("activeSessionEpochs").apply { isAccessible = true }.get(manager) as Map<*, *>
+        assertFalse(epochs.containsKey(session))
+    }
+
+    @Test fun `clearing or denying a session revokes its live observations only`() = runBlocking {
+        manager.init(PetPrefsContext())
+        manager.setLevel("image_generation", OffloadPermissionManager.PermissionLevel.ASK_ONCE)
+        val cleared = UUID.randomUUID().toString()
+        val other = UUID.randomUUID().toString()
+        val one = manager.observePermission("image_generation", cleared)
+        val two = manager.observePermission("image_generation", cleared)
+        val otherObservation = manager.observePermission("image_generation", other)
+        try {
+            suspend fun answer(session: String, response: OffloadPermissionManager.Response): Boolean {
+                val request = async(start = CoroutineStart.UNDISPATCHED) {
+                    manager.checkPermission("image_generation", "Image", session, grantScope = "model")
+                }
+                respond(response)
+                return request.await()
+            }
+            assertTrue(answer(cleared, OffloadPermissionManager.Response.ALLOW_SESSION))
+            assertTrue(answer(other, OffloadPermissionManager.Response.ALLOW_ONCE))
+            manager.clearSessionGrants(cleared)
+            assertFalse(one.isCurrent())
+            assertFalse(two.isCurrent())
+            assertTrue(otherObservation.isCurrent())
+            assertFalse(answer(other, OffloadPermissionManager.Response.DENY_SESSION))
+            assertFalse(otherObservation.isCurrent())
+        } finally {
+            one.close()
+            two.close()
+            otherObservation.close()
+            manager.clearSessionGrants(cleared)
+            manager.clearSessionGrants(other)
+        }
+        val epochs = manager.javaClass.getDeclaredField("activeSessionEpochs").apply { isAccessible = true }.get(manager) as Map<*, *>
+        assertFalse(epochs.containsKey(cleared))
+        assertFalse(epochs.containsKey(other))
+    }
+
     @Test fun `cancellation withdraws only its own dialog and a settings denial wins`() = runBlocking {
         manager.init(PetPrefsContext())
         manager.setLevel("calendar", OffloadPermissionManager.PermissionLevel.ASK_ONCE)

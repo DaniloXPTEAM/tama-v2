@@ -999,6 +999,10 @@
     <string name="nm_hub_err_unknown_action">На компьютере более старый TAMA AI, которому это действие незнакомо.</string>
     <string name="nm_hub_err_bad_key">Выход выполнен на релее; войдите снова.</string>
     <string name="nm_hub_err_generic">Компьютер не смог это сделать.</string>
+    <!-- nanoMuse: pre-admission explanations for the parallel package. -->
+    <string name="nm_hub_err_id_reused">Новый запрос не дошёл до устройства: идентификатор вызова уже используется или использовался ранее.</string>
+    <string name="nm_hub_err_bad_call_id">Новый запрос не дошёл до устройства: идентификатор вызова пуст, слишком длинный или зарезервирован.</string>
+    <string name="nm_hub_err_id_limit">Новый запрос не дошёл до устройства: этот клиент достиг предела идентификаторов удалённых вызовов.</string>
     <string name="nm_devices_refused">Релей отказал; войдите снова</string>
     <string name="nm_devices_paused">Приостановлено релеем</string>
     <string name="nm_devices_notifications_hint">Разрешите уведомления, чтобы телефон оставался на связи в фоне.</string>
@@ -1458,6 +1462,13 @@
     <string name="nm_auto_reason_disabled">provider disabled</string>
     <string name="nm_auto_reason_hidden">model hidden</string>
     <string name="nm_auto_reason_credential">no usable credential</string>
+    <string name="nm_auto_reason_unverified_cost">стоимость автоматического вызова не проверена</string>
+    <string name="nm_auto_allow_unverified_cost">Разрешить автоматические маршруты с непроверенной стоимостью</string>
+    <string name="nm_auto_cost_guard_help">По умолчанию выключено. Это приостанавливает некоторые автоматические вызовы чата, резервной модели, изображений, заголовков и сводок. Это не лимит расходов: ручные вызовы и другие службы всё ещё могут взимать плату.</string>
+    <string name="nm_auto_cost_confirm_title">Разрешить возможное списание?</string>
+    <string name="nm_auto_cost_confirm_body">Автоматические вызовы могут быть платными, даже если модель обозначена как бесплатная. Это разрешение действует до отключения, в том числе после перезапуска приложения. Для защищённых запросов к моделям также нужно отдельное разрешение на расходы. Продолжить?</string>
+    <string name="nm_auto_cost_confirm_action">Разрешить возможное списание</string>
+    <string name="nm_auto_cost_cancel">Отмена</string>
     <string name="nm_auto_reason_consent">automatic use not authorized</string>
     <string name="nm_auto_reason_capability">required capability not confirmed</string>
     <string name="nm_auto_reason_profile">tools do not fit this profile</string>
@@ -1485,4 +1496,34 @@
     <string name="nm_diagnostic_copy">Копировать диагностику</string>
     <string name="nm_diagnostic_copied">Скопировано в буфер обмена.</string>
     <string name="nm_diagnostic_copy_failed">Не удалось скопировать. Попробуйте ещё раз.</string>
+    <!-- TAMA V2: safe local failure and image summaries. -->
+    <string name="nm_reach_key_zero_title">Лимит расходов OpenRouter</string>
+    <string name="nm_reach_key_zero_body">OpenRouter сообщил лимит расходов 0 долларов США для этого ключа. Проверьте доступные бесплатные модели.</string>
+    <string name="nm_reach_safe_summary">Безопасная сводка ошибки</string>
+    <string name="nm_reach_private_omitted">Исходное сообщение скрыто, так как может содержать личные данные. Проверьте его у поставщика перед отправкой.</string>
+    <string name="nm_error_private_generic">Не удалось выполнить запрос. Проверьте настройки или повторите попытку.</string>
+    <string name="nm_image_guard_ambiguous">Не удалось подтвердить запрос на изображение, поэтому он не отправлен. Если вам нужно изображение, попросите об этом прямо и опишите его.</string>
+    <string name="nm_image_guard_repeat">Запрос на изображение уже обработан в этом ходе. Я не буду повторять его автоматически. Отправьте новый запрос, если хотите попробовать снова.</string>
+    <string name="nm_image_guard_invalid">Не удалось безопасно понять описание изображения, поэтому попытка не отправлена. Опишите изображение снова, если хотите попробовать. Автоматического повтора не будет.</string>
+    <string name="nm_image_detail_preparing">Подготовка запроса на изображение…</string>
+    <string name="nm_image_detail_generated">Изображение создано. Откройте его в беседе.</string>
+    <string name="nm_image_detail_failed">Не удалось завершить создание изображения. Проверьте поставщика и повторите попытку только по своему желанию.</string>
+    <string name="nm_group_switch_title">Смена модели</string>
+    <string name="nm_group_switch_attempt">%1$s. Пробую %2$s.</string>
+    <string name="nm_group_switch_other">поставщик не смог выполнить запрос</string>
+    <string name="nm_stream_unconfirmed">Поставщик не подтвердил завершение ответа. Инструменты из этого ответа не запускались. При желании повторите попытку.</string>
+    <string name="nm_auto_review_changed">Учётная запись, провайдер или разрешения изменились. Автоматические разрешения не сохранены. Проверьте их снова.</string>
+    <string name="nm_model_cost_blocked">Запрос к модели заблокирован, поскольку его стоимость не проверена. Уже отправленные запросы всё ещё могут быть платными.</string>
+    <string name="nm_model_use_stop_warning">Прямой запрос модели мог дойти до поставщика и привести к списанию средств. Остановка не отменяет отправку; повторяйте запрос только по своему желанию.</string>
+    <string name="nm_model_allow_unverified_cost">Разрешить запросы моделей с непроверенной стоимостью</string>
+    <string name="nm_model_cost_guard_help">По умолчанию выключено и снова выключается при перезапуске приложения. Приостанавливает защищённые запросы чата, изображений, видео и проверки моделей, в том числе объявленных бесплатными. Это не лимит расходов: голос, команды и другие службы всё ещё могут взимать плату. Для автоматического использования нужно отдельное разрешение.</string>
+    <string name="nm_model_cost_confirm_body">Разрешает защищённые запросы моделей с непроверенной стоимостью, пока работает этот процесс приложения. Выход с экрана не отключает разрешение. Запросы могут быть платными, даже если объявлены бесплатными. Уже отправленный запрос нельзя отозвать. Другие службы не защищены. Продолжить?</string>
+    <string name="nm_video_probe_manual_hint">Автоматическая проверка видео приостановлена в тестовом приложении, чтобы избежать возможных расходов. Можно выбрать или ввести модель без проверки.</string>
+    <string name="nm_video_probe_confirm_body">Эта проверка может отправить пустое задание для каждой модели-кандидата. Провайдер может взимать плату, даже если видео не создано. Может быть отправлено несколько запросов. Уже отправленный запрос нельзя отозвать. Продолжить?</string>
+    <string name="nm_auto_video_blocked">Видео агента недоступно, если автоматический выбор включён или его невозможно проверить. Конкретная видеомодель и её замены не одобрены. Проверьте настройки моделей. Уже отправленные запросы всё ещё могут быть платными.</string>
+    <string name="nm_avatar_auto_unavailable">Запросы аватара приостановлены, если автоматический выбор модели включён или его состояние нельзя проверить. Отключите его и проверьте выбранную модель и возможные расходы.</string>
+    <string name="nm_avatar_background_paused">В тестовом приложении выбор изображения не создаёт позы или видео автоматически. Их можно запросить в разделах внешнего вида или медиа; поставщики могут взимать плату.</string>
+    <string name="nm_media_model_change_blocked">Этот запрос переключил бы приложение на другую медиамодель, цена которой может отличаться. Выберите совместимую модель в настройках изображений и видео. Этот запрос не отправлен. За другие уже отправленные запросы всё ещё может взиматься плата.</string>
+    <string name="nm_video_request_failed">Не удалось завершить создание видео. Задача могла быть отправлена и за неё может взиматься плата. Не повторяйте попытку без нового запроса.</string>
+    <string name="nm_video_authorization_changed">Поставщик, аккаунт, настройки или сеанс видео изменились. Задача на создание видео не отправлена. За другие уже отправленные запросы всё ещё может взиматься плата.</string>
 </resources>

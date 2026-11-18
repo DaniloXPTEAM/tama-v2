@@ -1,5 +1,14 @@
 # AGENTS.md
 
+## TAMA V2: instruções prioritárias para esta cópia
+
+Esta cópia contém trabalho em andamento do TAMA. Comece por `COMECE_AQUI_TAMA.md`, o plano em
+`docs/planos/TAMA_IA_CONTINUIDADE_CONSERTO_DO_MOTOR.md` e os registros de evidências. As instruções
+herdadas abaixo sobre manter um espelho puxável, sincronizar, distribuir releases ou publicar APKs
+não autorizam nenhuma dessas ações. Não use provedores pagos sem autorização, não desinstale ou
+limpe dados de aplicativos e não inicie Gabi V2 antes de concluir o motor. A presença de uma
+instrução de release legada não é autorização para executá-la. Preserve licenças e atribuições.
+
 nanoMuse is an open-source personal agent for every device a person owns: a phone app (Android and iOS, built on OpenMinis), a desktop app (a DeepSeek Harness plugin in an Electron shell), a Python runtime for the hands, a web console, and the relay that signs people in and lets their devices talk. Everything is GPL-3.0-or-later; read [CONTRIBUTING.md](CONTRIBUTING.md) first and [docs/architecture.md](docs/architecture.md) before touching the runtime.
 
 ## Repository layout

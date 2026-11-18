@@ -991,6 +991,10 @@
     <string name="nm_hub_err_unknown_action">La computadora ejecuta un TAMA AI más antiguo que no conoce esta acción.</string>
     <string name="nm_hub_err_bad_key">Sesión cerrada en el relay; inicia sesión de nuevo.</string>
     <string name="nm_hub_err_generic">La computadora no pudo hacerlo.</string>
+    <!-- nanoMuse: pre-admission explanations for the parallel package. -->
+    <string name="nm_hub_err_id_reused">La nueva solicitud no llegó al dispositivo: su identificador de llamada está en uso o ya se utilizó.</string>
+    <string name="nm_hub_err_bad_call_id">La nueva solicitud no llegó al dispositivo: su identificador de llamada está vacío, es demasiado largo o está reservado.</string>
+    <string name="nm_hub_err_id_limit">La nueva solicitud no llegó al dispositivo: este cliente alcanzó el límite de identificadores de llamadas remotas.</string>
     <string name="nm_devices_refused">Rechazado por el relay; inicia sesión de nuevo</string>
     <string name="nm_devices_paused">En pausa por el relay</string>
     <string name="nm_devices_notifications_hint">Permite las notificaciones para que el teléfono pueda seguir accesible en segundo plano.</string>
@@ -1450,6 +1454,13 @@
     <string name="nm_auto_reason_disabled">provider disabled</string>
     <string name="nm_auto_reason_hidden">model hidden</string>
     <string name="nm_auto_reason_credential">no usable credential</string>
+    <string name="nm_auto_reason_unverified_cost">coste automático sin verificar</string>
+    <string name="nm_auto_allow_unverified_cost">Permitir rutas automáticas con coste sin verificar</string>
+    <string name="nm_auto_cost_guard_help">Desactivado por defecto. Esto pausa algunas llamadas automáticas de chat, sustitución, imagen, título y resumen. No es un límite de gasto: las llamadas manuales y otros servicios aún pueden cobrar.</string>
+    <string name="nm_auto_cost_confirm_title">¿Permitir posibles cargos?</string>
+    <string name="nm_auto_cost_confirm_body">Las llamadas automáticas pueden generar cargos aunque un modelo se anuncie como gratuito. Este permiso sigue activo hasta que lo desactives, incluso al reiniciar la aplicación. Las solicitudes de modelos protegidas también necesitan el permiso de coste por separado. ¿Continuar?</string>
+    <string name="nm_auto_cost_confirm_action">Permitir posibles cargos</string>
+    <string name="nm_auto_cost_cancel">Cancelar</string>
     <string name="nm_auto_reason_consent">automatic use not authorized</string>
     <string name="nm_auto_reason_capability">required capability not confirmed</string>
     <string name="nm_auto_reason_profile">tools do not fit this profile</string>
@@ -1477,4 +1488,34 @@
     <string name="nm_diagnostic_copy">Copiar diagnóstico</string>
     <string name="nm_diagnostic_copied">Copiado al portapapeles.</string>
     <string name="nm_diagnostic_copy_failed">No se pudo copiar. Inténtalo de nuevo.</string>
+    <!-- TAMA V2: safe local failure and image summaries. -->
+    <string name="nm_reach_key_zero_title">Límite de gasto de OpenRouter</string>
+    <string name="nm_reach_key_zero_body">OpenRouter informó un límite de gasto de US$ 0 para esta clave. Comprueba qué modelos gratuitos están disponibles.</string>
+    <string name="nm_reach_safe_summary">Resumen seguro del error</string>
+    <string name="nm_reach_private_omitted">El mensaje original está oculto porque puede contener datos privados. Compruébalo en el proveedor antes de compartir algo.</string>
+    <string name="nm_error_private_generic">No se pudo completar la solicitud. Revisa la configuración o vuelve a intentarlo.</string>
+    <string name="nm_image_guard_ambiguous">No pude confirmar esta solicitud de imagen y no se envió. Si quieres una imagen, pídela directamente y descríbela.</string>
+    <string name="nm_image_guard_repeat">Ya se procesó una solicitud de imagen en este turno. No la repetiré automáticamente. Haz una nueva solicitud si quieres volver a intentarlo.</string>
+    <string name="nm_image_guard_invalid">No pude entender los detalles de la imagen con seguridad y este intento no se envió. Descríbela de nuevo si quieres intentarlo. No lo repetiré automáticamente.</string>
+    <string name="nm_image_detail_preparing">Preparando la solicitud de imagen…</string>
+    <string name="nm_image_detail_generated">La imagen se generó. Ábrela desde la conversación.</string>
+    <string name="nm_image_detail_failed">No se pudo completar la imagen. Revisa el proveedor e inténtalo de nuevo solo si quieres.</string>
+    <string name="nm_group_switch_title">Cambio de modelo</string>
+    <string name="nm_group_switch_attempt">%1$s. Probando %2$s.</string>
+    <string name="nm_group_switch_other">el proveedor no pudo completar la solicitud</string>
+    <string name="nm_stream_unconfirmed">El proveedor no confirmó el final de esta respuesta. No se ejecutó ninguna herramienta de esta respuesta. Vuelve a intentarlo si quieres.</string>
+    <string name="nm_auto_review_changed">La cuenta, el proveedor o los permisos cambiaron. No se guardaron los permisos automáticos. Revísalos de nuevo.</string>
+    <string name="nm_model_cost_blocked">Se bloqueó una solicitud del modelo porque no se ha verificado su coste. Las solicitudes ya enviadas aún pueden generar cargos.</string>
+    <string name="nm_model_use_stop_warning">Una solicitud directa al modelo puede haber llegado al proveedor y generar cargos. Detenerla no revierte el envío; vuelve a solicitarla solo si lo deseas.</string>
+    <string name="nm_model_allow_unverified_cost">Permitir solicitudes de modelos con coste no verificado</string>
+    <string name="nm_model_cost_guard_help">Desactivado por defecto y al reiniciar la aplicación. Pausa las solicitudes protegidas de chat, imagen, vídeo y prueba de modelos, incluidos los anunciados como gratuitos. No es un límite de gasto: voz, comandos y otros servicios aún pueden cobrar. El uso automático requiere permiso aparte.</string>
+    <string name="nm_model_cost_confirm_body">Permite solicitudes protegidas de modelos con coste no verificado mientras este proceso de la aplicación siga activo. Salir de la pantalla no desactiva el permiso. Pueden generar cargos aunque se anuncien como gratuitas. Una solicitud enviada no se puede deshacer. Otros servicios no están protegidos. ¿Continuar?</string>
+    <string name="nm_video_probe_manual_hint">Las comprobaciones automáticas de vídeo están pausadas en esta aplicación de prueba para evitar posibles cargos. Puedes elegir o escribir un modelo sin comprobarlo.</string>
+    <string name="nm_video_probe_confirm_body">Esta comprobación puede enviar una tarea vacía por cada modelo candidato. El proveedor puede cobrar incluso si no se crea ningún vídeo. Pueden enviarse varias solicitudes. Una solicitud enviada no se puede deshacer. ¿Continuar?</string>
+    <string name="nm_auto_video_blocked">El vídeo del agente no está disponible si la selección automática está activada o no se puede comprobar. El modelo de vídeo exacto y sus sustitutos no están autorizados. Revisa Modelos. Las solicitudes ya enviadas aún pueden generar cargos.</string>
+    <string name="nm_avatar_auto_unavailable">Las solicitudes de avatar se pausan si la selección automática de modelos está activada o no se puede comprobar. Desactívala y revisa el modelo elegido y los posibles cargos.</string>
+    <string name="nm_avatar_background_paused">En esta aplicación de prueba, elegir una imagen no crea poses ni vídeos automáticamente. Puedes solicitarlos en Apariencia o Multimedia; los proveedores pueden cobrar.</string>
+    <string name="nm_media_model_change_blocked">Esta solicitud cambiaría a otro modelo multimedia, que podría tener otro precio. Elige un modelo compatible en los ajustes de imagen y vídeo. Esta solicitud no se envió. Otras solicitudes ya enviadas aún pueden generar cargos.</string>
+    <string name="nm_video_request_failed">No se pudo completar el video. La tarea puede haberse enviado y generar cargos. No vuelvas a intentarlo sin una solicitud nueva.</string>
+    <string name="nm_video_authorization_changed">El proveedor, la cuenta, la configuración o la sesión de video cambiaron. No se envió la tarea de video. Otras solicitudes ya enviadas todavía pueden generar cargos.</string>
 </resources>

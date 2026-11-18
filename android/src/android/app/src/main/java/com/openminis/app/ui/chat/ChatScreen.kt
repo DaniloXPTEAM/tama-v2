@@ -4297,13 +4297,17 @@ fun ChatScreen(
                                 // state, same rule as Retry on the user bubble).
                                 // safeMutate tears down the selection toolbar
                                 // before the truncation reshuffles the list.
-                                onRerunFromHere = if (!isStreaming) ({
+                                onRerunFromHere = if (!isStreaming && !(com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test" &&
+                                        item.block.toolName == ai.tama.tools.ImageGenerationTool.NAME)) ({
                                     coroutineScope.launch {
                                         tracedScrollToItem("RERUN-FROM-TOOL", 0, 0)
                                     }
                                     safeMutate { viewModel.rerunFromToolBlock(item.messageId, item.block.id) }
                                 }) else null,
-                                onCopyDetails = {
+                                // Image tool JSON may contain the person's prompt or provider text. Its
+                                // detail sheet offers a safe summary instead of copying raw arguments.
+                                onCopyDetails = if (com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test" &&
+                                    item.block.toolName == ai.tama.tools.ImageGenerationTool.NAME) null else ({
                                     val text = formatToolDetailsForClipboard(item.block)
                                     val cb = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
                                     cb.setPrimaryClip(android.content.ClipData.newPlainText("tool", text))
@@ -4312,7 +4316,7 @@ fun ChatScreen(
                                         context.getString(R.string.tool_longpress_copied_toast),
                                         android.widget.Toast.LENGTH_SHORT,
                                     ).show()
-                                },
+                                }),
                             )
                             is FlatChatItem.AssistantInfo -> FallbackInfoBlock(
                                 block = item.block,
@@ -4439,7 +4443,21 @@ fun ChatScreen(
                                         }
                                     },
                                 ) {
-                                    InlineErrorBanner(error = item.error, onRetry = retry)
+                                    // Old stored/unclassified failures may contain echoed prompts or
+                                    // credentials. Only exact local messages reach the parallel banner.
+                                    val bannerError = if (com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test") {
+                                        ai.tama.net.ProviderErrorPrivacy.localOrGeneric(item.error, listOf(
+                                            context.getString(R.string.nm_stream_unconfirmed),
+                                            context.getString(R.string.nm_auto_none),
+                                            context.getString(R.string.nm_auto_disabled_during_turn),
+                                            context.getString(R.string.nm_error_private_generic),
+                                            context.getString(R.string.chat_error_stream_dropped_partial),
+                                            context.getString(R.string.error_empty_response_generic),
+                                            context.getString(R.string.error_empty_response_after_tool),
+                                            context.getString(R.string.error_empty_response_context_large),
+                                        ), context.getString(R.string.nm_error_private_generic))
+                                    } else item.error
+                                    InlineErrorBanner(error = bannerError, onRetry = retry)
                                 }
                             }
                             is FlatChatItem.AssistantLegacyContent -> BoundsTrackedBlock(

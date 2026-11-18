@@ -36,6 +36,11 @@ import org.junit.Test
 import org.mockito.Mockito
 
 class ImageModelRequestsTest {
+
+    // nanoMuse: these transport fixtures use MockWebServer, never a provider account.
+    @org.junit.Before fun allowFixtureRequests() { ai.tama.pricing.ModelCostGuard.setAllowedForCurrentProcess(true) }
+    @org.junit.After fun resetFixtureCostPermission() { ai.tama.pricing.ModelCostGuard.setAllowedForCurrentProcess(false) }
+
     private fun instance(type: ProviderType) = ProviderInstance(
         id = "image-provider", label = "Image provider", providerType = type,
         credentialType = ProviderCredential.apiKey,
@@ -225,6 +230,64 @@ class ImageModelRequestsTest {
         Unit
     }
 
+    @Test fun `single attempt edit does not retry a rejected response format`() = runBlocking {
+        val server = MockWebServer()
+        server.start()
+        try {
+            server.enqueue(MockResponse().setResponseCode(400)
+                .setBody("""{"error":{"message":"response_format not supported"}}"""))
+            // A buggy retry gets a response rather than hanging the test.
+            server.enqueue(MockResponse().setBody("""{"data":[]}"""))
+            val provider = OpenAIProvider(
+                apiKey = "fixture-key", model = LLMModel("edit-image", "Image", "openAI"),
+                basePath = server.url("/v1").toString().trimEnd('/'),
+            )
+            val image = LLMMessage.ImagePart(byteArrayOf(1, 2, 3), "image/png")
+            val error = runCatching {
+                ImageModelRequests.request(provider, "Edit", images = listOf(image), allowFormatRetry = false)
+            }.exceptionOrNull()
+            assertTrue(error != null)
+            val wire = requireNotNull(server.takeRequest(5, TimeUnit.SECONDS))
+            assertEquals("/v1/images/edits", wire.requestUrl!!.encodedPath)
+            assertTrue(wire.body.readUtf8().contains("b64_json"))
+            assertEquals(1, server.requestCount)
+            assertNull(server.takeRequest(300, TimeUnit.MILLISECONDS))
+        } finally {
+            server.shutdown()
+        }
+        Unit
+    }
+
+    @Test fun `single attempt edit does not follow a redirect or retry a 503`() = runBlocking {
+        val retry = MockWebServer()
+        val redirect = MockWebServer()
+        val target = MockWebServer()
+        retry.start(); redirect.start(); target.start()
+        try {
+            fun provider(server: MockWebServer) = OpenAIProvider(
+                apiKey = "fixture-key", model = LLMModel("edit-image", "Image", "openAI"),
+                basePath = server.url("/v1").toString().trimEnd('/'),
+            )
+            val image = LLMMessage.ImagePart(byteArrayOf(1, 2, 3), "image/png")
+            retry.enqueue(MockResponse().setResponseCode(503).setHeader("Retry-After", "0").setBody("busy"))
+            retry.enqueue(MockResponse().setBody("""{"data":[]}"""))
+            assertTrue(runCatching {
+                ImageModelRequests.request(provider(retry), "Edit", images = listOf(image), allowFormatRetry = false)
+            }.isFailure)
+            assertEquals(1, retry.requestCount)
+            redirect.enqueue(MockResponse().setResponseCode(307).setHeader("Location", target.url("/other")))
+            target.enqueue(MockResponse().setBody("""{"data":[]}"""))
+            assertTrue(runCatching {
+                ImageModelRequests.request(provider(redirect), "Edit", images = listOf(image), allowFormatRetry = false)
+            }.isFailure)
+            assertEquals(1, redirect.requestCount)
+            assertEquals(0, target.requestCount)
+        } finally {
+            retry.shutdown(); redirect.shutdown(); target.shutdown()
+        }
+        Unit
+    }
+
     @Test fun `automatic OpenAI image POST is not replayed for 503 retry-after zero`() = runBlocking {
         val server = MockWebServer()
         server.start()
@@ -304,6 +367,103 @@ class ImageModelRequestsTest {
             assertNull(server.takeRequest(300, TimeUnit.MILLISECONDS))
         } finally {
             server.shutdown()
+        }
+        Unit
+    }
+
+    @Test fun `image request preflight blocks OpenAI Gemini and DashScope before posting`() = runBlocking {
+        val server = MockWebServer()
+        server.start()
+        try {
+            val failure = ai.tama.media.ImageDispatch.AuthorizationChanged()
+            val preflight: () -> Unit = { throw failure }
+            val openai = OpenAIProvider("fixture-key", LLMModel("image", "Image", "openAI"),
+                server.url("/v1").toString().trimEnd('/'))
+            val gemini = GeminiProvider("fixture-key", LLMModel("image", "Image", "gemini"),
+                server.url("/v1beta").toString().trimEnd('/'))
+            val dash = ImageGen.Endpoint(instance(ProviderType.openAI).copy(
+                customBaseURL = server.url("/dashscope/compatible-mode/v1").toString().trimEnd('/'),
+            ), "fixture-key", "qwen-image-3.0")
+            assertSame(failure, runCatching {
+                ImageModelRequests.request(openai, "Draw", allowFormatRetry = false, beforeRequest = preflight)
+            }.exceptionOrNull())
+            assertSame(failure, runCatching {
+                ImageModelRequests.request(gemini, "Draw", allowFormatRetry = false, beforeRequest = preflight)
+            }.exceptionOrNull())
+            assertSame(failure, runCatching {
+                ImageGen.generate(Mockito.mock(Context::class.java), dash, "Draw", allowFormatRetry = false, beforeRequest = preflight)
+            }.exceptionOrNull())
+            assertEquals(0, server.requestCount)
+        } finally {
+            server.shutdown()
+        }
+        Unit
+    }
+
+    @Test fun `parallel OpenAI and DashScope recheck after post and before image download`() = runBlocking {
+        org.junit.Assume.assumeTrue(com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test")
+        val openaiServer = MockWebServer()
+        val dashServer = MockWebServer()
+        openaiServer.start(); dashServer.start()
+        try {
+            val openaiUrl = openaiServer.url("/picture").toString()
+            openaiServer.enqueue(MockResponse().setBody("""{"data":[{"url":"$openaiUrl"}]}"""))
+            openaiServer.enqueue(MockResponse().setBody("unexpected download"))
+            var openaiChecks = 0
+            val openai = OpenAIProvider("fixture-key", LLMModel("image", "Image", "openAI"),
+                openaiServer.url("/v1").toString().trimEnd('/'))
+            val blocked = runCatching {
+                ImageModelRequests.request(openai, "Draw", allowFormatRetry = false, beforeRequest = {
+                    if (++openaiChecks == 2) throw ai.tama.media.ImageDispatch.AuthorizationChanged()
+                })
+            }.exceptionOrNull()
+            assertTrue(blocked is ai.tama.media.ImageDispatch.AuthorizationChanged)
+            assertEquals(2, openaiChecks)
+            assertEquals(1, openaiServer.requestCount)
+
+            val dashUrl = dashServer.url("/picture").toString()
+            dashServer.enqueue(MockResponse().setBody(
+                """{"output":{"choices":[{"message":{"content":[{"image":"$dashUrl"}]}}]}}"""))
+            dashServer.enqueue(MockResponse().setBody("unexpected download"))
+            var dashChecks = 0
+            val dash = ImageGen.Endpoint(instance(ProviderType.openAI).copy(
+                customBaseURL = dashServer.url("/dashscope/compatible-mode/v1").toString().trimEnd('/'),
+            ), "fixture-key", "qwen-image-3.0")
+            val dashBlocked = runCatching {
+                ImageGen.generate(Mockito.mock(Context::class.java), dash, "Draw", allowFormatRetry = false, beforeRequest = {
+                    if (++dashChecks == 2) throw ai.tama.media.ImageDispatch.AuthorizationChanged()
+                })
+            }.exceptionOrNull()
+            assertTrue(dashBlocked is ai.tama.media.ImageDispatch.AuthorizationChanged)
+            assertEquals(2, dashChecks)
+            assertEquals(1, dashServer.requestCount)
+        } finally {
+            openaiServer.shutdown(); dashServer.shutdown()
+        }
+        Unit
+    }
+
+    @Test fun `parallel image download does not follow a redirect or report it as an image`() = runBlocking {
+        org.junit.Assume.assumeTrue(com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test")
+        val source = MockWebServer()
+        val target = MockWebServer()
+        source.start(); target.start()
+        try {
+            val imageUrl = source.url("/picture").toString()
+            source.enqueue(MockResponse().setBody("""{"data":[{"url":"$imageUrl"}]}"""))
+            source.enqueue(MockResponse().setResponseCode(307).setHeader("Location", target.url("/other")))
+            target.enqueue(MockResponse().setBody("not an image"))
+            val provider = OpenAIProvider("fixture-key", LLMModel("image", "Image", "openAI"),
+                source.url("/v1").toString().trimEnd('/'))
+            val error = runCatching {
+                ImageModelRequests.request(provider, "Draw", allowFormatRetry = false)
+            }.exceptionOrNull()
+            assertTrue(error != null)
+            assertFalse(error!!.message.orEmpty().contains(imageUrl))
+            assertEquals(2, source.requestCount)
+            assertEquals(0, target.requestCount)
+        } finally {
+            source.shutdown(); target.shutdown()
         }
         Unit
     }

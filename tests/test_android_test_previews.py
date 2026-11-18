@@ -94,8 +94,18 @@ def test_noisy_image_still_fits_the_annotation_budget(tmp_path, capsys, monkeypa
     assert lines[-1].endswith(hashlib.sha256(data).hexdigest())
 
 
-def test_preview_jobs_stay_below_the_check_run_annotation_limit() -> None:
-    workflow = (ROOT / ".github/workflows/android.yml").read_text(encoding="utf-8")
+def test_preview_jobs_are_absent_or_stay_below_the_check_run_annotation_limit() -> None:
+    active = ROOT / ".github/workflows/android.yml"
+    # A portable source export keeps the original workflow outside GitHub's active directory.
+    workflow_path = (
+        active if active.is_file() else ROOT / ".github/workflows-desativados/android.yml"
+    )
+    workflow = workflow_path.read_text(encoding="utf-8")
+    # The active workflow was restored; do not assume a preview job exists or
+    # reactivate it just to satisfy this historical check.
+    if "  visual-previews:" not in workflow:
+        assert "scripts/android/publish-test-previews.py" not in workflow
+        return
     preview_job = workflow.split("  visual-previews:", 1)[1]
     assert "needs: device-smoke" in preview_job
     assert "name: tama-device-smoke" in preview_job

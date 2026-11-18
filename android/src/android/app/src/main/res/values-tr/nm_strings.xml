@@ -991,6 +991,10 @@
     <string name="nm_hub_err_unknown_action">Bilgisayar bu eylemi bilmeyen daha eski bir TAMA AI çalıştırıyor.</string>
     <string name="nm_hub_err_bad_key">Relay’de oturum kapatılmış; yeniden oturum aç.</string>
     <string name="nm_hub_err_generic">Bilgisayar bunu yapamadı.</string>
+    <!-- nanoMuse: pre-admission explanations for the parallel package. -->
+    <string name="nm_hub_err_id_reused">Yeni istek cihaza ulaşmadı: çağrı kimliği kullanılıyor veya daha önce kullanılmış.</string>
+    <string name="nm_hub_err_bad_call_id">Yeni istek cihaza ulaşmadı: çağrı kimliği boş, çok uzun veya ayrılmış.</string>
+    <string name="nm_hub_err_id_limit">Yeni istek cihaza ulaşmadı: bu istemci uzak çağrı kimliği sınırına ulaştı.</string>
     <string name="nm_devices_refused">Relay reddetti; yeniden oturum aç</string>
     <string name="nm_devices_paused">Relay tarafından duraklatıldı</string>
     <string name="nm_devices_notifications_hint">Telefonun arka planda erişilebilir kalabilmesi için bildirimlere izin ver.</string>
@@ -1450,6 +1454,13 @@
     <string name="nm_auto_reason_disabled">provider disabled</string>
     <string name="nm_auto_reason_hidden">model hidden</string>
     <string name="nm_auto_reason_credential">no usable credential</string>
+    <string name="nm_auto_reason_unverified_cost">otomatik kullanım maliyeti doğrulanmadı</string>
+    <string name="nm_auto_allow_unverified_cost">Maliyeti doğrulanmamış otomatik rotalara izin ver</string>
+    <string name="nm_auto_cost_guard_help">Varsayılan olarak kapalıdır. Bazı otomatik sohbet, yedek model, görsel, başlık ve özet çağrılarını duraklatır. Bu bir harcama sınırı değildir: manuel çağrılar ve diğer hizmetler ücretlendirebilir.</string>
+    <string name="nm_auto_cost_confirm_title">Olası ücretlere izin verilsin mi?</string>
+    <string name="nm_auto_cost_confirm_body">Bir model ücretsiz olarak tanıtılsa bile otomatik çağrılar ücretlendirebilir. Bu izin, uygulama yeniden başlatılsa da siz kapatana kadar açık kalır. Korunan model istekleri ayrıca ayrı maliyet izni gerektirir. Devam edilsin mi?</string>
+    <string name="nm_auto_cost_confirm_action">Olası ücretlere izin ver</string>
+    <string name="nm_auto_cost_cancel">İptal</string>
     <string name="nm_auto_reason_consent">automatic use not authorized</string>
     <string name="nm_auto_reason_capability">required capability not confirmed</string>
     <string name="nm_auto_reason_profile">tools do not fit this profile</string>
@@ -1477,4 +1488,34 @@
     <string name="nm_diagnostic_copy">Tanılamayı kopyala</string>
     <string name="nm_diagnostic_copied">Panoya kopyalandı.</string>
     <string name="nm_diagnostic_copy_failed">Kopyalanamadı. Tekrar deneyin.</string>
+    <!-- TAMA V2: safe local failure and image summaries. -->
+    <string name="nm_reach_key_zero_title">OpenRouter harcama sınırı</string>
+    <string name="nm_reach_key_zero_body">OpenRouter bu anahtar için 0 ABD doları harcama sınırı bildirdi. Kullanılabilir ücretsiz modelleri kontrol edin.</string>
+    <string name="nm_reach_safe_summary">Güvenli hata özeti</string>
+    <string name="nm_reach_private_omitted">Özgün mesaj özel bilgiler içerebileceği için gizlendi. Paylaşmadan önce sağlayıcıda kontrol edin.</string>
+    <string name="nm_error_private_generic">İstek tamamlanamadı. Ayarları kontrol edin veya yeniden deneyin.</string>
+    <string name="nm_image_guard_ambiguous">Görsel isteği doğrulanamadığı için gönderilmedi. Görsel istiyorsanız doğrudan isteyin ve açıklayın.</string>
+    <string name="nm_image_guard_repeat">Bu turda bir görsel isteği zaten işlendi. Otomatik olarak tekrarlamayacağım. Yeniden denemek isterseniz yeni bir istek yapın.</string>
+    <string name="nm_image_guard_invalid">Görsel ayrıntıları güvenle anlaşılamadığı için bu deneme gönderilmedi. İsterseniz görseli yeniden açıklayın. Otomatik olarak tekrar denemeyeceğim.</string>
+    <string name="nm_image_detail_preparing">Görsel isteği hazırlanıyor…</string>
+    <string name="nm_image_detail_generated">Görsel oluşturuldu. Sohbetten açabilirsiniz.</string>
+    <string name="nm_image_detail_failed">Görsel tamamlanamadı. Sağlayıcıyı kontrol edin ve yalnızca isterseniz yeniden deneyin.</string>
+    <string name="nm_group_switch_title">Model değiştiriliyor</string>
+    <string name="nm_group_switch_attempt">%1$s. %2$s deneniyor.</string>
+    <string name="nm_group_switch_other">sağlayıcı isteği tamamlayamadı</string>
+    <string name="nm_stream_unconfirmed">Sağlayıcı bu yanıtın tamamlandığını doğrulamadı. Bu yanıttaki hiçbir araç çalıştırılmadı. İsterseniz yeniden deneyin.</string>
+    <string name="nm_auto_review_changed">Hesap, sağlayıcı veya izinler değişti. Otomatik kullanım izinleri kaydedilmedi. Yeniden gözden geçirin.</string>
+    <string name="nm_model_cost_blocked">Maliyeti doğrulanmadığı için bir model isteği engellendi. Gönderilmiş istekler yine de ücretlendirilebilir.</string>
+    <string name="nm_model_use_stop_warning">Modele doğrudan gönderilen istek sağlayıcıya ulaşmış ve ücrete neden olabilir. Durdurmak gönderimi geri almaz; yalnızca isterseniz yeniden isteyin.</string>
+    <string name="nm_model_allow_unverified_cost">Maliyeti doğrulanmamış model isteklerine izin ver</string>
+    <string name="nm_model_cost_guard_help">Varsayılan olarak kapalıdır ve uygulama yeniden başlayınca kapanır. Ücretsiz tanıtılan modeller dahil, korunan sohbet, görsel, video ve model testi isteklerini duraklatır. Bu bir harcama sınırı değildir: ses, komutlar ve diğer hizmetler yine de ücretlendirebilir. Otomatik kullanım ayrıca izin gerektirir.</string>
+    <string name="nm_model_cost_confirm_body">Bu uygulama işlemi etkin kaldığı sürece maliyeti doğrulanmamış korunan model isteklerine izin verir. Ekrandan çıkmak izni kapatmaz. Ücretsiz tanıtılsalar bile ücretli olabilirler. Gönderilmiş bir istek geri alınamaz. Diğer hizmetler korunmaz. Devam edilsin mi?</string>
+    <string name="nm_video_probe_manual_hint">Olası ücretleri önlemek için bu test uygulamasında otomatik video kontrolleri duraklatıldı. Kontrol etmeden bir model seçebilir veya girebilirsiniz.</string>
+    <string name="nm_video_probe_confirm_body">Bu kontrol her aday model için boş bir görev gönderebilir. Video oluşturulmasa bile sağlayıcı ücret alabilir. Birden fazla istek gönderilebilir. Gönderilmiş bir istek geri alınamaz. Devam edilsin mi?</string>
+    <string name="nm_auto_video_blocked">Otomatik seçim açıkken veya kontrol edilemiyorken aracı video isteği kullanılamaz. Kullanılacak video modeli ve yerine geçebilecek modeller onaylanmadı. Modeller ayarını kontrol edin. Gönderilmiş istekler yine de ücretlendirilebilir.</string>
+    <string name="nm_avatar_auto_unavailable">Otomatik model seçimi açıkken veya kontrol edilemiyorken avatar istekleri duraklatılır. Seçimi kapatın, seçilen modeli ve olası ücretleri gözden geçirin.</string>
+    <string name="nm_avatar_background_paused">Bu test uygulamasında bir resim seçmek otomatik olarak poz veya klip oluşturmaz. Bunları Görünüm veya Medya bölümünden isteyebilirsiniz; sağlayıcılar ücret alabilir.</string>
+    <string name="nm_media_model_change_blocked">Bu istek, fiyatı farklı olabilecek başka bir medya modeline geçecekti. Görüntü ve video ayarlarından uyumlu bir model seçin. Bu istek gönderilmedi. Daha önce gönderilen diğer istekler yine de ücretlendirilebilir.</string>
+    <string name="nm_video_request_failed">Video tamamlanamadı. Görev gönderilmiş olabilir ve ücret alınabilir. Yeni bir istek olmadan tekrar denemeyin.</string>
+    <string name="nm_video_authorization_changed">Video sağlayıcısı, hesap, ayarlar veya oturum değişti. Video görevi gönderilmedi. Daha önce gönderilen diğer istekler yine de ücretlendirilebilir.</string>
 </resources>

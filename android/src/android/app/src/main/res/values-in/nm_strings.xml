@@ -987,6 +987,10 @@
     <string name="nm_hub_err_unknown_action">Komputer menjalankan TAMA AI versi lama yang tidak mengenal aksi ini.</string>
     <string name="nm_hub_err_bad_key">Sudah keluar di relay; masuk lagi.</string>
     <string name="nm_hub_err_generic">Komputer tidak bisa melakukannya.</string>
+    <!-- nanoMuse: pre-admission explanations for the parallel package. -->
+    <string name="nm_hub_err_id_reused">Permintaan baru tidak sampai ke perangkat: ID panggilannya sedang atau sudah digunakan.</string>
+    <string name="nm_hub_err_bad_call_id">Permintaan baru tidak sampai ke perangkat: ID panggilannya kosong, terlalu panjang, atau dicadangkan.</string>
+    <string name="nm_hub_err_id_limit">Permintaan baru tidak sampai ke perangkat: klien ini telah mencapai batas ID panggilan jarak jauh.</string>
     <string name="nm_devices_refused">Ditolak relay; masuk lagi</string>
     <string name="nm_devices_paused">Dijeda oleh relay</string>
     <string name="nm_devices_notifications_hint">Izinkan notifikasi supaya ponsel tetap bisa dijangkau di latar belakang.</string>
@@ -1446,6 +1450,13 @@
     <string name="nm_auto_reason_disabled">provider disabled</string>
     <string name="nm_auto_reason_hidden">model hidden</string>
     <string name="nm_auto_reason_credential">no usable credential</string>
+    <string name="nm_auto_reason_unverified_cost">biaya otomatis belum diverifikasi</string>
+    <string name="nm_auto_allow_unverified_cost">Izinkan rute otomatis dengan biaya yang belum diverifikasi</string>
+    <string name="nm_auto_cost_guard_help">Nonaktif secara default. Ini menjeda sebagian panggilan otomatis untuk chat, model pengganti, gambar, judul, dan ringkasan. Ini bukan batas pengeluaran: panggilan manual dan layanan lain masih dapat mengenakan biaya.</string>
+    <string name="nm_auto_cost_confirm_title">Izinkan kemungkinan biaya?</string>
+    <string name="nm_auto_cost_confirm_body">Panggilan otomatis dapat dikenakan biaya meskipun model disebut gratis. Izin ini tetap aktif sampai Anda menonaktifkannya, termasuk setelah aplikasi dimulai ulang. Permintaan model yang dilindungi juga memerlukan izin biaya terpisah. Lanjutkan?</string>
+    <string name="nm_auto_cost_confirm_action">Izinkan kemungkinan biaya</string>
+    <string name="nm_auto_cost_cancel">Batal</string>
     <string name="nm_auto_reason_consent">automatic use not authorized</string>
     <string name="nm_auto_reason_capability">required capability not confirmed</string>
     <string name="nm_auto_reason_profile">tools do not fit this profile</string>
@@ -1473,4 +1484,34 @@
     <string name="nm_diagnostic_copy">Salin diagnostik</string>
     <string name="nm_diagnostic_copied">Disalin ke papan klip.</string>
     <string name="nm_diagnostic_copy_failed">Tidak dapat menyalin. Coba lagi.</string>
+    <!-- TAMA V2: safe local failure and image summaries. -->
+    <string name="nm_reach_key_zero_title">Batas pengeluaran OpenRouter</string>
+    <string name="nm_reach_key_zero_body">OpenRouter melaporkan batas pengeluaran US$ 0 untuk kunci ini. Periksa model gratis yang tersedia.</string>
+    <string name="nm_reach_safe_summary">Ringkasan kesalahan yang aman</string>
+    <string name="nm_reach_private_omitted">Pesan asli disembunyikan karena mungkin berisi data pribadi. Periksa di penyedia sebelum membagikan apa pun.</string>
+    <string name="nm_error_private_generic">Permintaan tidak dapat diselesaikan. Periksa pengaturan atau coba lagi.</string>
+    <string name="nm_image_guard_ambiguous">Permintaan gambar tidak dapat dipastikan sehingga tidak dikirim. Jika ingin gambar, mintalah langsung dan jelaskan gambarnya.</string>
+    <string name="nm_image_guard_repeat">Permintaan gambar sudah ditangani dalam giliran ini. Saya tidak akan mengulanginya secara otomatis. Buat permintaan baru jika ingin mencoba lagi.</string>
+    <string name="nm_image_guard_invalid">Detail gambar tidak dapat dipahami dengan aman sehingga percobaan ini tidak dikirim. Jelaskan lagi jika ingin mencoba. Saya tidak akan mengulanginya secara otomatis.</string>
+    <string name="nm_image_detail_preparing">Menyiapkan permintaan gambar…</string>
+    <string name="nm_image_detail_generated">Gambar telah dibuat. Buka melalui percakapan.</string>
+    <string name="nm_image_detail_failed">Gambar tidak dapat diselesaikan. Periksa penyedia dan coba lagi hanya jika Anda mau.</string>
+    <string name="nm_group_switch_title">Beralih model</string>
+    <string name="nm_group_switch_attempt">%1$s. Mencoba %2$s.</string>
+    <string name="nm_group_switch_other">penyedia tidak dapat menyelesaikan permintaan</string>
+    <string name="nm_stream_unconfirmed">Penyedia tidak mengonfirmasi akhir jawaban ini. Tidak ada alat dari jawaban ini yang dijalankan. Coba lagi jika Anda mau.</string>
+    <string name="nm_auto_review_changed">Akun, penyedia, atau izin telah berubah. Izin otomatis tidak disimpan. Tinjau kembali.</string>
+    <string name="nm_model_cost_blocked">Permintaan model diblokir karena biayanya belum diverifikasi. Permintaan yang sudah dikirim masih dapat dikenai biaya.</string>
+    <string name="nm_model_use_stop_warning">Permintaan langsung ke model mungkin sudah diterima penyedia dan dapat dikenai biaya. Menghentikan tidak membatalkan pengiriman; minta lagi hanya jika Anda menginginkannya.</string>
+    <string name="nm_model_allow_unverified_cost">Izinkan permintaan model dengan biaya yang belum diverifikasi</string>
+    <string name="nm_model_cost_guard_help">Nonaktif secara bawaan dan kembali nonaktif setelah aplikasi dimulai ulang. Menjeda permintaan chat, gambar, video, dan uji model yang dilindungi, termasuk model yang diiklankan gratis. Ini bukan batas pengeluaran: suara, perintah, dan layanan lain masih dapat mengenakan biaya. Penggunaan otomatis juga memerlukan izin terpisah.</string>
+    <string name="nm_model_cost_confirm_body">Ini mengizinkan permintaan model yang dilindungi dengan biaya belum diverifikasi selama proses aplikasi ini masih aktif. Keluar dari layar tidak menonaktifkan izin. Permintaan dapat dikenai biaya meski diiklankan gratis. Permintaan yang sudah dikirim tidak dapat dibatalkan. Layanan lain tidak dilindungi. Lanjutkan?</string>
+    <string name="nm_video_probe_manual_hint">Pemeriksaan video otomatis dijeda di aplikasi uji ini untuk menghindari kemungkinan biaya. Anda dapat memilih atau memasukkan model tanpa memeriksanya.</string>
+    <string name="nm_video_probe_confirm_body">Pemeriksaan ini dapat mengirim tugas kosong untuk setiap model kandidat. Penyedia dapat mengenakan biaya meskipun tidak ada video yang dibuat. Beberapa permintaan dapat dikirim. Permintaan yang sudah dikirim tidak dapat dibatalkan. Lanjutkan?</string>
+    <string name="nm_auto_video_blocked">Video agen tidak tersedia saat pemilihan otomatis aktif atau tidak dapat diperiksa. Model video yang tepat dan penggantinya belum disetujui. Periksa Model. Permintaan yang sudah dikirim masih dapat dikenakan biaya.</string>
+    <string name="nm_avatar_auto_unavailable">Permintaan avatar dijeda saat pemilihan model otomatis aktif atau tidak dapat diperiksa. Matikan pilihan tersebut dan periksa model yang dipilih serta kemungkinan biayanya.</string>
+    <string name="nm_avatar_background_paused">Di aplikasi uji ini, memilih gambar tidak otomatis membuat pose atau klip. Anda dapat memintanya di Tampilan atau Media; penyedia dapat mengenakan biaya.</string>
+    <string name="nm_media_model_change_blocked">Permintaan ini akan beralih ke model media lain yang mungkin memiliki harga berbeda. Pilih model yang kompatibel di pengaturan gambar dan video. Permintaan ini tidak dikirim. Permintaan lain yang sudah dikirim masih dapat dikenai biaya.</string>
+    <string name="nm_video_request_failed">Video tidak dapat diselesaikan. Tugas mungkin telah dikirim dan dapat dikenai biaya. Jangan coba lagi tanpa permintaan baru.</string>
+    <string name="nm_video_authorization_changed">Penyedia, akun, pengaturan, atau sesi video berubah. Tugas video tidak dikirim. Permintaan lain yang sudah dikirim masih dapat dikenai biaya.</string>
 </resources>

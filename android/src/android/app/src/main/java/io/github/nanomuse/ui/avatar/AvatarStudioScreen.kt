@@ -438,7 +438,9 @@ fun AvatarStudioScreen(onBack: () -> Unit, onOpenSoul: () -> Unit, onOpenMediaMo
                                 }
                                 Spacer(Modifier.height(6.dp))
                                 Text(
-                                    stringResource(R.string.nm_avatar_use_this_hint),
+                                    // nanoMuse: the test package does not start poses or clips implicitly.
+                                    stringResource(if (com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test")
+                                        R.string.nm_avatar_background_paused else R.string.nm_avatar_use_this_hint),
                                     fontSize = 12.sp,
                                     lineHeight = 16.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -520,7 +522,9 @@ fun AvatarStudioScreen(onBack: () -> Unit, onOpenSoul: () -> Unit, onOpenMediaMo
             }
             item(key = "footer") {
                 Text(
-                    stringResource(R.string.nm_avatar_footer),
+                    // nanoMuse: do not promise automatic poses in the parallel package.
+                    stringResource(if (com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test")
+                        R.string.nm_avatar_background_paused else R.string.nm_avatar_footer),
                     fontSize = 12.sp,
                     lineHeight = 17.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,

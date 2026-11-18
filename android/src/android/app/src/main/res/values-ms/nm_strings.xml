@@ -987,6 +987,10 @@
     <string name="nm_hub_err_unknown_action">Komputer menjalankan TAMA AI versi lama yang tidak mengenali tindakan ini.</string>
     <string name="nm_hub_err_bad_key">Log keluar di relay; log masuk semula.</string>
     <string name="nm_hub_err_generic">Komputer tidak dapat melakukannya.</string>
+    <!-- nanoMuse: pre-admission explanations for the parallel package. -->
+    <string name="nm_hub_err_id_reused">Permintaan baharu tidak sampai ke peranti: ID panggilannya sedang digunakan atau pernah digunakan.</string>
+    <string name="nm_hub_err_bad_call_id">Permintaan baharu tidak sampai ke peranti: ID panggilannya kosong, terlalu panjang atau dikhaskan.</string>
+    <string name="nm_hub_err_id_limit">Permintaan baharu tidak sampai ke peranti: klien ini telah mencapai had ID panggilan jauh.</string>
     <string name="nm_devices_refused">Ditolak oleh relay; log masuk semula</string>
     <string name="nm_devices_paused">Dijeda oleh relay</string>
     <string name="nm_devices_notifications_hint">Benarkan pemberitahuan supaya telefon boleh kekal dicapai di latar belakang.</string>
@@ -1446,6 +1450,13 @@
     <string name="nm_auto_reason_disabled">provider disabled</string>
     <string name="nm_auto_reason_hidden">model hidden</string>
     <string name="nm_auto_reason_credential">no usable credential</string>
+    <string name="nm_auto_reason_unverified_cost">kos automatik belum disahkan</string>
+    <string name="nm_auto_allow_unverified_cost">Benarkan laluan automatik dengan kos yang belum disahkan</string>
+    <string name="nm_auto_cost_guard_help">Dimatikan secara lalai. Ini menjeda sesetengah panggilan automatik untuk sembang, model gantian, imej, tajuk dan ringkasan. Ini bukan had perbelanjaan: panggilan manual dan perkhidmatan lain masih boleh mengenakan caj.</string>
+    <string name="nm_auto_cost_confirm_title">Benarkan kemungkinan caj?</string>
+    <string name="nm_auto_cost_confirm_body">Panggilan automatik mungkin dikenakan caj walaupun model diiklankan sebagai percuma. Kebenaran ini kekal aktif sehingga anda mematikannya, termasuk selepas aplikasi dimulakan semula. Permintaan model yang dilindungi juga memerlukan kebenaran kos yang berasingan. Teruskan?</string>
+    <string name="nm_auto_cost_confirm_action">Benarkan kemungkinan caj</string>
+    <string name="nm_auto_cost_cancel">Batal</string>
     <string name="nm_auto_reason_consent">automatic use not authorized</string>
     <string name="nm_auto_reason_capability">required capability not confirmed</string>
     <string name="nm_auto_reason_profile">tools do not fit this profile</string>
@@ -1473,4 +1484,34 @@
     <string name="nm_diagnostic_copy">Salin diagnostik</string>
     <string name="nm_diagnostic_copied">Disalin ke papan keratan.</string>
     <string name="nm_diagnostic_copy_failed">Tidak dapat menyalin. Cuba lagi.</string>
+    <!-- TAMA V2: safe local failure and image summaries. -->
+    <string name="nm_reach_key_zero_title">Had perbelanjaan OpenRouter</string>
+    <string name="nm_reach_key_zero_body">OpenRouter melaporkan had perbelanjaan US$ 0 untuk kunci ini. Semak model percuma yang tersedia.</string>
+    <string name="nm_reach_safe_summary">Ringkasan ralat selamat</string>
+    <string name="nm_reach_private_omitted">Mesej asal disembunyikan kerana mungkin mengandungi maklumat peribadi. Semak dengan penyedia sebelum berkongsi.</string>
+    <string name="nm_error_private_generic">Permintaan tidak dapat diselesaikan. Semak tetapan atau cuba lagi.</string>
+    <string name="nm_image_guard_ambiguous">Permintaan imej ini tidak dapat disahkan dan tidak dihantar. Jika mahu imej, minta secara langsung dan terangkannya.</string>
+    <string name="nm_image_guard_repeat">Satu permintaan imej telah diproses dalam giliran ini. Saya tidak akan mengulanginya secara automatik. Buat permintaan baharu jika mahu mencuba lagi.</string>
+    <string name="nm_image_guard_invalid">Butiran imej tidak dapat difahami dengan selamat, jadi percubaan ini tidak dihantar. Terangkan semula jika mahu mencuba. Saya tidak akan mengulanginya secara automatik.</string>
+    <string name="nm_image_detail_preparing">Menyediakan permintaan imej…</string>
+    <string name="nm_image_detail_generated">Imej telah dijana. Buka dalam perbualan.</string>
+    <string name="nm_image_detail_failed">Imej tidak dapat disiapkan. Semak penyedia dan cuba lagi hanya jika anda mahu.</string>
+    <string name="nm_group_switch_title">Pertukaran model</string>
+    <string name="nm_group_switch_attempt">%1$s. Mencuba %2$s.</string>
+    <string name="nm_group_switch_other">penyedia tidak dapat menyelesaikan permintaan</string>
+    <string name="nm_stream_unconfirmed">Penyedia tidak mengesahkan tamatnya jawapan ini. Tiada alat daripada jawapan ini dijalankan. Cuba lagi jika anda mahu.</string>
+    <string name="nm_auto_review_changed">Akaun, penyedia atau kebenaran telah berubah. Kebenaran automatik tidak disimpan. Semak semula.</string>
+    <string name="nm_model_cost_blocked">Permintaan model disekat kerana kosnya belum disahkan. Permintaan yang telah dihantar masih boleh dikenakan caj.</string>
+    <string name="nm_model_use_stop_warning">Permintaan terus kepada model mungkin sudah sampai kepada penyedia dan boleh dikenakan bayaran. Menghentikan tidak membatalkan penghantaran; minta semula hanya jika anda mahu.</string>
+    <string name="nm_model_allow_unverified_cost">Benarkan permintaan model dengan kos yang belum disahkan</string>
+    <string name="nm_model_cost_guard_help">Dimatikan secara lalai dan apabila aplikasi dimulakan semula. Ini menjeda permintaan sembang, imej, video dan ujian model yang dilindungi, termasuk model yang diiklankan percuma. Ini bukan had perbelanjaan: suara, arahan dan perkhidmatan lain masih boleh mengenakan caj. Penggunaan automatik juga memerlukan kebenaran berasingan.</string>
+    <string name="nm_model_cost_confirm_body">Ini membenarkan permintaan model yang dilindungi dengan kos belum disahkan selagi proses aplikasi ini aktif. Keluar dari skrin tidak mematikan kebenaran. Caj mungkin dikenakan walaupun diiklankan percuma. Permintaan yang telah dihantar tidak boleh dibatalkan. Perkhidmatan lain tidak dilindungi. Teruskan?</string>
+    <string name="nm_video_probe_manual_hint">Semakan video automatik dijeda dalam aplikasi ujian ini untuk mengelakkan kemungkinan caj. Anda boleh memilih atau memasukkan model tanpa membuat semakan.</string>
+    <string name="nm_video_probe_confirm_body">Semakan ini boleh menghantar tugas kosong untuk setiap model calon. Penyedia mungkin mengenakan caj walaupun tiada video dihasilkan. Beberapa permintaan mungkin dihantar. Permintaan yang telah dihantar tidak boleh dibatalkan. Teruskan?</string>
+    <string name="nm_auto_video_blocked">Video ejen tidak tersedia apabila pemilihan automatik dihidupkan atau tidak dapat diperiksa. Model video yang tepat dan penggantinya belum diluluskan. Semak Model. Permintaan yang telah dihantar masih mungkin dikenakan caj.</string>
+    <string name="nm_avatar_auto_unavailable">Permintaan avatar dijeda apabila pemilihan model automatik dihidupkan atau tidak dapat diperiksa. Matikannya dan semak model yang dipilih serta kemungkinan caj.</string>
+    <string name="nm_avatar_background_paused">Dalam aplikasi ujian ini, memilih gambar tidak membuat pose atau klip secara automatik. Anda boleh memintanya dalam Rupa atau Media; penyedia mungkin mengenakan caj.</string>
+    <string name="nm_media_model_change_blocked">Permintaan ini akan beralih kepada model media lain yang mungkin berbeza harganya. Pilih model yang serasi dalam tetapan imej dan video. Permintaan ini tidak dihantar. Permintaan lain yang telah dihantar masih mungkin dikenakan caj.</string>
+    <string name="nm_video_request_failed">Video tidak dapat diselesaikan. Tugasan mungkin telah dihantar dan boleh dikenakan caj. Jangan cuba lagi tanpa permintaan baharu.</string>
+    <string name="nm_video_authorization_changed">Penyedia, akaun, tetapan atau sesi video telah berubah. Tugasan video tidak dihantar. Permintaan lain yang telah dihantar masih boleh dikenakan caj.</string>
 </resources>

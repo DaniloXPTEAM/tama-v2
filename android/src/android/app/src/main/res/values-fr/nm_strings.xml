@@ -992,6 +992,10 @@
     <string name="nm_hub_err_unknown_action">L’ordinateur fait tourner un TAMA AI plus ancien qui ne connaît pas cette action.</string>
     <string name="nm_hub_err_bad_key">Déconnecté du relais ; reconnectez-vous.</string>
     <string name="nm_hub_err_generic">L’ordinateur n’a pas pu le faire.</string>
+    <!-- nanoMuse: pre-admission explanations for the parallel package. -->
+    <string name="nm_hub_err_id_reused">La nouvelle demande n’a pas atteint l’appareil : son identifiant d’appel est en cours d’utilisation ou a déjà été utilisé.</string>
+    <string name="nm_hub_err_bad_call_id">La nouvelle demande n’a pas atteint l’appareil : son identifiant d’appel est vide, trop long ou réservé.</string>
+    <string name="nm_hub_err_id_limit">La nouvelle demande n’a pas atteint l’appareil : ce client a atteint la limite des identifiants d’appel à distance.</string>
     <string name="nm_devices_refused">Refusé par le relais ; reconnectez-vous</string>
     <string name="nm_devices_paused">Mis en pause par le relais</string>
     <string name="nm_devices_notifications_hint">Autorisez les notifications pour que le téléphone reste joignable en arrière-plan.</string>
@@ -1451,6 +1455,13 @@
     <string name="nm_auto_reason_disabled">provider disabled</string>
     <string name="nm_auto_reason_hidden">model hidden</string>
     <string name="nm_auto_reason_credential">no usable credential</string>
+    <string name="nm_auto_reason_unverified_cost">coût automatique non vérifié</string>
+    <string name="nm_auto_allow_unverified_cost">Autoriser les routes automatiques au coût non vérifié</string>
+    <string name="nm_auto_cost_guard_help">Désactivé par défaut. Cela suspend certains appels automatiques de chat, de remplacement, d’image, de titre et de résumé. Ce n’est pas une limite de dépenses : les appels manuels et les autres services peuvent encore facturer.</string>
+    <string name="nm_auto_cost_confirm_title">Autoriser des frais éventuels ?</string>
+    <string name="nm_auto_cost_confirm_body">Les appels automatiques peuvent être facturés, même si un modèle est annoncé comme gratuit. Cette autorisation reste active jusqu’à sa désactivation, même après le redémarrage de l’application. Les demandes de modèles protégées nécessitent aussi une autorisation de coût distincte. Continuer ?</string>
+    <string name="nm_auto_cost_confirm_action">Autoriser les frais éventuels</string>
+    <string name="nm_auto_cost_cancel">Annuler</string>
     <string name="nm_auto_reason_consent">automatic use not authorized</string>
     <string name="nm_auto_reason_capability">required capability not confirmed</string>
     <string name="nm_auto_reason_profile">tools do not fit this profile</string>
@@ -1478,4 +1489,34 @@
     <string name="nm_diagnostic_copy">Copier le diagnostic</string>
     <string name="nm_diagnostic_copied">Copié dans le presse-papiers.</string>
     <string name="nm_diagnostic_copy_failed">Copie impossible. Réessayez.</string>
+    <!-- TAMA V2: safe local failure and image summaries. -->
+    <string name="nm_reach_key_zero_title">Limite de dépenses OpenRouter</string>
+    <string name="nm_reach_key_zero_body">OpenRouter indique une limite de dépenses de 0 US$ pour cette clé. Vérifiez les modèles gratuits disponibles.</string>
+    <string name="nm_reach_safe_summary">Résumé sûr de l’erreur</string>
+    <string name="nm_reach_private_omitted">Le message original est masqué car il peut contenir des données privées. Vérifiez-le auprès du fournisseur avant tout partage.</string>
+    <string name="nm_error_private_generic">La demande n’a pas pu être terminée. Vérifiez les réglages ou réessayez.</string>
+    <string name="nm_image_guard_ambiguous">Je n’ai pas pu confirmer cette demande d’image, elle n’a donc pas été envoyée. Si vous voulez une image, demandez-la directement et décrivez-la.</string>
+    <string name="nm_image_guard_repeat">Une demande d’image a déjà été traitée à ce tour. Je ne la répéterai pas automatiquement. Faites une nouvelle demande si vous souhaitez réessayer.</string>
+    <string name="nm_image_guard_invalid">Les détails de l’image ne sont pas assez clairs, cette tentative n’a donc pas été envoyée. Décrivez à nouveau l’image si vous voulez réessayer. Je ne répéterai pas automatiquement.</string>
+    <string name="nm_image_detail_preparing">Préparation de la demande d’image…</string>
+    <string name="nm_image_detail_generated">L’image a été générée. Ouvrez-la dans la conversation.</string>
+    <string name="nm_image_detail_failed">L’image n’a pas pu être terminée. Vérifiez le fournisseur et ne réessayez que si vous le souhaitez.</string>
+    <string name="nm_group_switch_title">Changement de modèle</string>
+    <string name="nm_group_switch_attempt">%1$s. Essai avec %2$s.</string>
+    <string name="nm_group_switch_other">le fournisseur n’a pas pu terminer la demande</string>
+    <string name="nm_stream_unconfirmed">Le fournisseur n’a pas confirmé la fin de cette réponse. Aucun outil de cette réponse n’a été exécuté. Réessayez si vous le souhaitez.</string>
+    <string name="nm_auto_review_changed">Le compte, le fournisseur ou les autorisations ont changé. Les autorisations automatiques ne sont pas enregistrées. Vérifiez-les à nouveau.</string>
+    <string name="nm_model_cost_blocked">Une demande de modèle a été bloquée car son coût n’a pas été vérifié. Les demandes déjà envoyées peuvent encore être facturées.</string>
+    <string name="nm_model_use_stop_warning">Une requête directe au modèle peut avoir atteint le fournisseur et être facturée. L’arrêt ne l’annule pas ; relancez-la uniquement si vous le souhaitez.</string>
+    <string name="nm_model_allow_unverified_cost">Autoriser les demandes de modèles au coût non vérifié</string>
+    <string name="nm_model_cost_guard_help">Désactivé par défaut et après le redémarrage de l’application. Met en pause les demandes protégées de chat, image, vidéo et test de modèle, même annoncées gratuites. Ce n’est pas une limite de dépenses : la voix, les commandes et les autres services peuvent encore être payants. L’usage automatique nécessite une autorisation distincte.</string>
+    <string name="nm_model_cost_confirm_body">Autorise les demandes protégées de modèles au coût non vérifié tant que ce processus de l’application reste actif. Quitter l’écran ne désactive pas l’autorisation. Elles peuvent être facturées même si elles sont annoncées gratuites. Une demande déjà envoyée ne peut pas être annulée. Les autres services ne sont pas protégés. Continuer ?</string>
+    <string name="nm_video_probe_manual_hint">Les vérifications vidéo automatiques sont suspendues dans cette application de test pour éviter des frais éventuels. Vous pouvez choisir ou saisir un modèle sans vérification.</string>
+    <string name="nm_video_probe_confirm_body">Cette vérification peut envoyer une tâche vide pour chaque modèle candidat. Le fournisseur peut facturer même si aucune vidéo n’est créée. Plusieurs demandes peuvent être envoyées. Une demande déjà envoyée ne peut pas être annulée. Continuer ?</string>
+    <string name="nm_auto_video_blocked">La vidéo de l’agent est indisponible lorsque la sélection automatique est activée ou ne peut pas être vérifiée. Le modèle vidéo exact et ses modèles de remplacement ne sont pas autorisés. Vérifiez les modèles. Les demandes déjà envoyées peuvent encore être facturées.</string>
+    <string name="nm_avatar_auto_unavailable">Les demandes d’avatar sont suspendues lorsque la sélection automatique du modèle est activée ou ne peut pas être vérifiée. Désactivez-la et vérifiez le modèle choisi et les frais possibles.</string>
+    <string name="nm_avatar_background_paused">Dans cette application de test, choisir une image ne crée pas automatiquement de poses ou de vidéos. Vous pouvez les demander dans Apparence ou Médias ; les fournisseurs peuvent facturer ces demandes.</string>
+    <string name="nm_media_model_change_blocked">Cette demande utiliserait un autre modèle multimédia, dont le prix peut être différent. Choisissez un modèle compatible dans les paramètres d’image et de vidéo. Cette demande n’a pas été envoyée. Les autres demandes déjà envoyées peuvent encore être facturées.</string>
+    <string name="nm_video_request_failed">Impossible de terminer la vidéo. La tâche a peut-être été envoyée et peut être facturée. Ne réessayez pas sans une nouvelle demande.</string>
+    <string name="nm_video_authorization_changed">Le fournisseur, le compte, les paramètres ou la session vidéo ont changé. La tâche vidéo ne fut pas envoyée. Les autres requêtes déjà envoyées peuvent encore être facturées.</string>
 </resources>

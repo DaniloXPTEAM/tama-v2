@@ -23,8 +23,10 @@ object ModelRouter {
         val enabled: Boolean = true,
         val visible: Boolean = true,
         val credentialed: Boolean = true,
-        /** Explicit permission for automatic use, including possible paid/unknown charges. */
+        /** Explicit route permission; it does not establish that a request is free. */
         val automaticApproved: Boolean = false,
+        /** Legacy callers default to true; the parallel dispatch must supply its separate cost guard. */
+        val automaticCostAllowed: Boolean = true,
         /** Only true on verified evidence; an unpriced or unknown model is not free. */
         val verifiedFree: Boolean = false,
         /** Lower is earlier. Null follows entries for which a person set an order. */
@@ -35,7 +37,7 @@ object ModelRouter {
     )
 
     enum class Reason {
-        DUPLICATE_ID, DISABLED, HIDDEN, NO_CREDENTIAL, NOT_APPROVED, MISSING_CAPABILITY,
+        DUPLICATE_ID, DISABLED, HIDDEN, NO_CREDENTIAL, NOT_APPROVED, UNVERIFIED_COST, MISSING_CAPABILITY,
         PROFILE_TOO_SMALL, UNKNOWN_REQUEST_SIZE, CONTEXT_LIMIT, MINUTE_LIMIT, COOLDOWN, EXCLUDED,
     }
 
@@ -100,6 +102,7 @@ object ModelRouter {
         if (!candidate.visible) return rejected(Reason.HIDDEN)
         if (!candidate.credentialed) return rejected(Reason.NO_CREDENTIAL)
         if (!candidate.automaticApproved) return rejected(Reason.NOT_APPROVED)
+        if (!candidate.automaticCostAllowed) return rejected(Reason.UNVERIFIED_COST)
         val missing = needs - candidate.capabilities
         if (missing.isNotEmpty()) return rejected(Reason.MISSING_CAPABILITY, missing)
         candidate.unavailable?.let { return rejected(Reason.COOLDOWN, until = it.untilMillis) }
