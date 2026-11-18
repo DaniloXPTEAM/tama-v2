@@ -4,6 +4,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+- Counted confirmed personal-key chat responses and offered a larger approved context after a confirmed input overflow in the parallel Android test build.
+
 - Clarified image cost refusals for personal-key chat in the parallel Android test build without changing media permissions.
 
 - Added a read-only key check to the saved-provider screen and kept provider-prefix hints from replacing the address on paste in the parallel Android test build.

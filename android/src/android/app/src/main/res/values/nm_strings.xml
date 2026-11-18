@@ -1548,4 +1548,9 @@
     <string name="nm_key_probe_no_credit">The provider reported insufficient credit.</string>
     <string name="nm_own_image_no_generator">No registered model is confirmed to generate images on a compatible route. No image request was sent.</string>
     <string name="nm_own_image_no_verified_free">There is no verified free image generation route for this request. No image request was sent.</string>
+    <string name="nm_own_context_switched">The conversation did not fit in %1$s. Continuing with %2$s, which can handle longer conversations.</string>
+    <string name="nm_own_context_limit">The conversation is too long for this model. Shorten it or start a new conversation.</string>
+    <string name="nm_confirmed_reply_steps_title">Reply steps</string>
+    <string name="nm_confirmed_reply_steps_total">Completed steps</string>
+    <string name="nm_confirmed_reply_steps_note">Counts only completed responses saved since this update. Failed attempts are not counted. This is not a billing total.</string>
 </resources>

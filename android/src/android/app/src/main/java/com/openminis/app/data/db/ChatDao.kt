@@ -223,6 +223,11 @@ interface ChatDao {
     @Query("SELECT token_usage FROM messages WHERE session_id = :sessionId AND token_usage IS NOT NULL ORDER BY sort_order ASC, created_at ASC, id ASC")
     suspend fun tokenUsagesInChatOrder(sessionId: String): List<String>
 
+    // nanoMuse: marker is a locally authored JSON property, never supplied in unescaped text.
+    @Query("""SELECT COUNT(*) FROM messages WHERE session_id = :sessionId AND role = 'assistant'
+        AND instr(parts_json, '"_tamaReplyCompleted":true') > 0""")
+    suspend fun confirmedReplySteps(sessionId: String): Int
+
     /**
      * Fetch all token usage records joined with session model_id for aggregation.
      *

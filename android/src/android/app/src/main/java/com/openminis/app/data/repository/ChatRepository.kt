@@ -56,6 +56,8 @@ class ChatRepository(internal val dao: ChatDao) {
     // nanoMuse: keep the ordinary app's query unchanged.
     suspend fun sessionTokenUsagesInChatOrder(sessionId: String): List<String> = dao.tokenUsagesInChatOrder(sessionId)
 
+    internal suspend fun confirmedReplySteps(sessionId: String): Int = dao.confirmedReplySteps(sessionId)
+
     /**
      * [T-android-session-paused-badge-hardkill] Session ids whose agent loop was
      * left interrupted, derived purely from the persisted message tail — so the

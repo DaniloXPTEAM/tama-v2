@@ -1971,6 +1971,7 @@ class ChatViewModel(
         val loopCount: Int,
         // nanoMuse: zero is not evidence of reported usage when no usable row exists.
         val hasReportedUsage: Boolean = false,
+        val confirmedReplySteps: Int? = null,
     )
 
     data class ThinkingInfo(
@@ -1997,7 +1998,9 @@ class ChatViewModel(
      */
     suspend fun loadSessionTokenStats(): SessionTokenStats {
         val sid = realSessionId.ifEmpty { sessionId }
-        if (sid.isEmpty()) return SessionTokenStats(0, 0, 0, 0, 0, 0)
+        val ownKey = currentProvider?.let(::nmOwnKeyFallbackTurn) == true
+        if (sid.isEmpty()) return SessionTokenStats(0, 0, 0, 0, 0, 0,
+            confirmedReplySteps = if (ownKey) 0 else null)
         // nanoMuse: context is the last reported positive value in chat order;
         // preserve the upstream query in the normal application.
         val usages = if (com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test")
@@ -2029,7 +2032,9 @@ class ChatViewModel(
         val toolCalls = snapshot.filter { it.role == "assistant" }
             .sumOf { msg -> msg.toolBlocks.count { it.kind != "text" && it.kind != "info" } }
         val loops = maxOf(toolCalls, assistantCount)
-        return SessionTokenStats(input, output, cacheRead, cacheWrite, context, loops, hasReportedUsage)
+        // nanoMuse: do not count placeholders, tool blocks or attempts that never saved a complete response.
+        return SessionTokenStats(input, output, cacheRead, cacheWrite, context, loops, hasReportedUsage,
+            confirmedReplySteps = if (ownKey) chatRepository.confirmedReplySteps(sid) else null)
     }
 
     // [T-android-split-chat] toggleMemorySheet / dismissMemorySheet moved to ChatViewModelUiStateExt.kt.
@@ -9664,7 +9669,7 @@ class ChatViewModel(
                 }
             }
         }
-        suspend fun nmAutoActivate(choice: AutoChoice) {
+        suspend fun nmAutoActivate(choice: AutoChoice, largerWindow: Boolean = false) {
             // nanoMuse: a candidate is a snapshot, not permission to use stale settings.
             if (tamaV2Test && !nmAutoChoiceStillEligible(choice)) {
                 throw LLMError.ProviderError(context.getString(R.string.nm_auto_disabled_during_turn))
@@ -9746,13 +9751,16 @@ class ChatViewModel(
                 if (priorEntryId != entry.id) {
                     withContext(Dispatchers.Main) {
                         val notice = when {
+                            largerWindow && nmOwnKeyTurn -> context.getString(
+                                R.string.nm_own_context_switched, priorName, choice.model.displayName)
                             choice.switchReason != null -> context.getString(
                                 R.string.nm_auto_switch_reason, priorName, choice.switchReason, choice.model.displayName)
                             entry.id == nmPreferredAutoEntryId -> context.getString(R.string.nm_auto_return, choice.model.displayName)
                             else -> context.getString(R.string.nm_auto_switch, priorName, choice.model.displayName)
                         }
                         if (!tamaV2Test || (nmLoopSession == realSessionId.ifEmpty { sessionId } &&
-                                this@ChatViewModel.currentProvider === client)) appendSystemInfo(notice, "info")
+                                this@ChatViewModel.currentProvider === client)) appendSystemInfo(notice,
+                                    if (largerWindow && nmOwnKeyTurn) "tama_context_notice" else "info")
                     }
                 }
             }
@@ -10008,7 +10016,7 @@ class ChatViewModel(
                                 catch (_: NoLargerContext) { null }
                             if (larger != null) {
                                 nmAutoTurn.exclude(prior)
-                                nmAutoActivate(larger)
+                                nmAutoActivate(larger, largerWindow = true)
                                 continue@agentTurns
                             }
                         }
@@ -10060,7 +10068,7 @@ class ChatViewModel(
                     // already persisted by those turns.
                     appendSystemInfo(
                         // nanoMuse: this path now means the actual capacity reserve was reached (#719).
-                        text = context.getString(R.string.nm_context_limit_reached),
+                        text = context.getString(if (nmOwnKeyTurn) R.string.nm_own_context_limit else R.string.nm_context_limit_reached),
                         iconKind = if (tamaV2Test) "tama_context_notice" else "compact",
                     )
                     // [T-android-group-pause-badge-restamp] A LIVE interruption just
@@ -10280,12 +10288,14 @@ class ChatViewModel(
                                                 catch (_: NoLargerContext) { null }
                                             if (larger != null) {
                                                 nmAutoTurn.exclude(prior)
-                                                nmAutoActivate(larger)
+                                                nmAutoActivate(larger, largerWindow = true)
                                                 return@streamBlock true
                                             }
                                         }
                                     }
-                                    throw LLMError.ProviderError(context.getString(R.string.nm_context_limit_reached))
+                                    throw LLMError.ProviderError(context.getString(
+                                        if (nmOwnKeyTurn) R.string.nm_own_context_limit else R.string.nm_context_limit_reached,
+                                    ))
                                 }
                             }
                         }
@@ -11087,8 +11097,11 @@ class ChatViewModel(
                         } else null
                         // nanoMuse: one server-overflow retry is allowed only after local work
                         // measurably shrinks the same request. No blind resend of identical history.
+                        val ownInputOverflow = nmOwnKeyTurn && !recipientBlocked &&
+                            ai.tama.router.LargerContext.serverRejected(reach?.httpStatus, reach?.originalMessage)
                         var recoveredContext = false
-                        if (smallerProfile == null && !contextOverflowRetried && isContextTooLargeError(actual)) {
+                        if (smallerProfile == null && !contextOverflowRetried &&
+                            (if (nmOwnKeyTurn) ownInputOverflow else isContextTooLargeError(actual))) {
                             contextOverflowRetried = true
                             val before = measureRawTokens()
                             prepareContext(force = true)
@@ -11218,10 +11231,25 @@ class ChatViewModel(
                         // makes the intent explicit and avoids a one-frame
                         // flash of the stale banner.
                         withContext(Dispatchers.Main) { clearInlineError() }
+                        if (ownInputOverflow && nmAutoTurn == null) {
+                            throw LLMError.ProviderError(context.getString(R.string.nm_own_context_limit))
+                        }
                         if (nmAutoTurn != null) {
+                            // nanoMuse: an explicit server input overflow can retry only on a larger,
+                            // still-approved route, after the existing deterministic reduction failed.
+                            val larger = if (ownInputOverflow) {
+                                val prior = checkNotNull(nmAutoCandidate).entryId
+                                nmAutoLocalBlocks[prior] = context.getString(R.string.nm_auto_reason_context)
+                                val choice = try { nmAutoSelect(null, largerThanWindow = requestBudget.window) }
+                                    catch (_: NoLargerContext) {
+                                        throw LLMError.ProviderError(context.getString(R.string.nm_own_context_limit))
+                                    }
+                                nmAutoTurn.exclude(prior)
+                                choice
+                            } else null
                             // A bug, malformed request, safety refusal or cancellation must not
                             // silently trigger another potentially billable provider.
-                            if (decision == null && !recipientBlocked && !freeOnlyBlocked) throw actual
+                            if (larger == null && decision == null && !recipientBlocked && !freeOnlyBlocked) throw actual
                             val failed = checkNotNull(nmAutoCandidate)
                             val expectedVersion = nmDispatchAccountVersion
                             // nanoMuse: checking a version and then recording separately permits
@@ -11249,7 +11277,9 @@ class ChatViewModel(
                                 }
                                 true
                             } else false
-                            if (recipientBlocked) {
+                            if (larger != null) {
+                                // This is local to the request shape, not a provider health verdict.
+                            } else if (recipientBlocked) {
                                 nmAutoLocalBlocks[failed.entryId] = context.getString(R.string.nm_key_destination_blocked)
                                 nmAutoTurn.exclude(failed.entryId)
                             } else if (freeOnlyBlocked) {
@@ -11280,7 +11310,7 @@ class ChatViewModel(
                             lastFlushedLen = 0
                             lastFileToolInputMs = 0L
                             lastOtherToolInputMs = 0L
-                            nmAutoActivate(nmAutoSelect(null))
+                            nmAutoActivate(larger ?: nmAutoSelect(null), largerWindow = larger != null)
                             preparedMessages = null
                             pendingOutput = null
                             outputRetried = false
@@ -11493,6 +11523,9 @@ class ChatViewModel(
             // Accumulate text across turns
             accumulatedText += turnText
 
+            val completedOwnKeyReply = nmOwnKeyTurn && ai.tama.router.GroupFallback.completed(
+                turnFinishReason, turnText.isNotBlank(), toolCalls.any { it.second.isNotBlank() },
+            )
             // Build assistant contentParts for history
             val assistantParts = mutableListOf<AgentContentPart>()
             if (turnText.isNotEmpty()) {
@@ -11551,7 +11584,7 @@ class ChatViewModel(
                 }
                 val turnParts = buildTurnParts(allToolBlocks, turnStartBlockIndex, toolInputMap)
                 val blockMeta = allToolBlocks.filter { it.kind == "tool_use" }.associateBy { it.id }
-                val terminalAssistantId = persistAssistantTurn(turnParts, lastUsage, turnReasoningContent, blockMeta, nmLastSentRoute) // nanoMuse: identify the saved final row.
+                val terminalAssistantId = persistAssistantTurn(turnParts, lastUsage, turnReasoningContent, blockMeta, nmLastSentRoute, completedOwnKeyReply) // nanoMuse: identify the saved final row.
                 // [T-error-persist-android] Empty-response hint: the model ended a
                 // turn (finish=stop/end_turn) with no visible text anywhere in the
                 // reply and no tool blocks — the user just sees a blank bubble.
@@ -11722,7 +11755,7 @@ class ChatViewModel(
             // assistant entry — compact-marker boundary resolution depends on it.
             val turnParts = buildTurnParts(allToolBlocks, turnStartBlockIndex, toolInputMap)
             val blockMeta = allToolBlocks.filter { it.kind == "tool_use" }.associateBy { it.id }
-            val assistantDbId = persistAssistantTurn(turnParts, lastUsage, turnReasoningContent, blockMeta, nmLastSentRoute)
+            val assistantDbId = persistAssistantTurn(turnParts, lastUsage, turnReasoningContent, blockMeta, nmLastSentRoute, completedOwnKeyReply)
             if (assistantDbId != null) {
                 val lastIdx = agentHistory.indexOfLast { it.role == LLMMessage.Role.ASSISTANT && it.dbMessageId == null }
                 if (lastIdx >= 0) {
@@ -12768,7 +12801,9 @@ class ChatViewModel(
         parts: List<AgentContentPart>,
         toolBlockMeta: Map<String, AssistantBlock>,
         routeFingerprint: String? = null,
+        completedOwnKeyReply: Boolean = false,
     ): String = buildString {
+        val completionField = if (completedOwnKeyReply) ",\"_tamaReplyCompleted\":true" else ""
         val routeField = routeFingerprint
             ?.takeIf { ai.tama.router.ModelRouteHistory.validFingerprint(it) }
             ?.let { ",\"_tamaRoute\":${escapeJson(it)}" }.orEmpty()
@@ -12777,7 +12812,7 @@ class ChatViewModel(
             if (index > 0) append(",")
             when (part) {
                 is AgentContentPart.Text -> {
-                    append("""{"type":"text","value":${escapeJson(part.text)}$routeField}""")
+                    append("""{"type":"text","value":${escapeJson(part.text)}$routeField$completionField}""")
                 }
                 is AgentContentPart.ToolUse -> {
                     // Skip tool_use with blank name — upstream bug guard.
@@ -12792,7 +12827,7 @@ class ChatViewModel(
                     // signature (null-literal when absent) so it survives a session
                     // reload and can be replayed on the historical functionCall.
                     val sigJson = part.thoughtSignature?.let { escapeJson(it) } ?: "null"
-                    append("""{"type":"toolUse","value":{"toolUseId":${escapeJson(part.id)},"name":${escapeJson(name)},"input":${escapeJson(inputStr)},"description":${escapeJson(desc)},"pageURL":${escapeJson(pageURL)},"imageFilePath":${escapeJson(imgPath)},"thoughtSignature":$sigJson}$routeField}""")
+                    append("""{"type":"toolUse","value":{"toolUseId":${escapeJson(part.id)},"name":${escapeJson(name)},"input":${escapeJson(inputStr)},"description":${escapeJson(desc)},"pageURL":${escapeJson(pageURL)},"imageFilePath":${escapeJson(imgPath)},"thoughtSignature":$sigJson}$routeField$completionField}""")
                 }
                 else -> { /* tool_result is persisted via persistToolResultMessage */ }
             }
@@ -12806,9 +12841,10 @@ class ChatViewModel(
         reasoningContent: String? = null,
         toolBlockMeta: Map<String, AssistantBlock> = emptyMap(),
         routeFingerprint: String? = null,
+        completedOwnKeyReply: Boolean = false,
     ): String? {
         if (parts.isEmpty()) return null
-        val partsJson = buildAssistantPartsJson(parts, toolBlockMeta, routeFingerprint)
+        val partsJson = buildAssistantPartsJson(parts, toolBlockMeta, routeFingerprint, completedOwnKeyReply)
         val tokenJson = usage?.let {
             """{"inputTokens":${it.inputTokens},"outputTokens":${it.outputTokens},"cacheCreationTokens":${it.cacheCreationInputTokens ?: 0},"cacheReadTokens":${it.cacheReadInputTokens ?: 0},"latestContextTokens":${it.latestContextTokens}}"""
         }

@@ -40,6 +40,26 @@ class ParallelUsageOrder(unittest.TestCase):
         self.assertIn('if (ctx > 0) context = ctx', source)
         self.assertIn('reportedInput != null && reportedOutput != null', source)
 
+    def test_confirmed_steps_ignore_errors_placeholders_and_escaped_marker(self):
+        query = re.search(r'@Query\("""(SELECT COUNT\(\*\).*?)"""\)\s+suspend fun confirmedReplySteps', DAO.read_text(), re.S)
+        self.assertIsNotNone(query)
+        db = sqlite3.connect(":memory:")
+        self.addCleanup(db.close)
+        db.execute("CREATE TABLE messages(session_id TEXT, role TEXT, parts_json TEXT)")
+        mark = {"type": "text", "value": "Concluída", "_tamaReplyCompleted": True}
+        js = lambda row: json.dumps(row, separators=(",", ":"))
+        db.executemany("INSERT INTO messages VALUES (?, ?, ?)", [
+            ("one", "assistant", js([mark, mark])),
+            ("one", "assistant", js([{"type": "text", "value": 'A falha mostrou "_tamaReplyCompleted":true'}])),
+            ("one", "assistant", js([])),
+            ("one", "user", js([mark])),
+            ("other", "assistant", js([mark])),
+        ])
+        self.assertEqual(1, db.execute(query.group(1), {"sessionId": "one"}).fetchone()[0])
+        vm = VM.read_text()
+        self.assertIn('val completedOwnKeyReply = nmOwnKeyTurn && ai.tama.router.GroupFallback.completed(', vm)
+        self.assertEqual(2, vm.count('persistAssistantTurn(turnParts, lastUsage, turnReasoningContent, blockMeta, nmLastSentRoute, completedOwnKeyReply)'))
+
     def test_parallel_sheet_does_not_show_unknown_usage_as_zero(self):
         text = (MAIN / 'com/openminis/app/ui/chat/TokenUsageSheet.kt').read_text()
         self.assertIn('val usageKnown = !parallelTest || s?.hasReportedUsage == true', text)

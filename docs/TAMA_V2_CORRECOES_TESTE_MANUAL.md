@@ -360,3 +360,18 @@ bloqueada, não enviamos a geração. Não foi criado um veto novo para mídia n
 alterados a seleção, a permissão por imagem, a nuvem ou o app normal. Falha sem
 sinal de cobrança não exibe uma suposição de cobrança. “Sim” e “tenta de novo” só
 repetem o pedido após o convite do app na mesma conversa e revalidam os controles.
+
+### Contexto e etapas de resposta com chave própria
+
+Com Auto ligado, uma recusa explícita por excesso de tokens, mesmo depois da
+redução local possível, pode usar outro modelo aprovado, que caiba na janela e
+cujo limite conhecido seja maior. Uma recusa genérica ou um limite em bytes não
+serve de sinal. Não muda custo nem autorizações, nem força a troca de um modelo
+fixado. O aviso da troca é exibido inteiro no chat.
+
+“11 loops” na versão anterior era o maior valor entre a quantidade de mensagens
+do assistente e os blocos que não eram texto nem aviso (inclusive raciocínio).
+Não eram 11 cobranças nem 11 respostas confirmadas. Agora **Etapas concluídas**
+conta etapas de resposta salvas por esta versão com término confirmado. Uma etapa
+pode devolver ferramentas ou o texto final. Tentativa de envio que falhou, texto
+parcial, imagem local e histórico antigo sem confirmação não contam.

@@ -1569,4 +1569,9 @@
     <string name="nm_key_probe_no_credit">O provedor informou que não há crédito suficiente.</string>
     <string name="nm_own_image_no_generator">Nenhum modelo cadastrado tem geração de imagens confirmada por uma rota compatível. O pedido de imagem não foi enviado.</string>
     <string name="nm_own_image_no_verified_free">Não há uma rota de geração de imagens com gratuidade comprovada para este pedido. O pedido de imagem não foi enviado.</string>
+    <string name="nm_own_context_switched">A conversa não coube em %1$s. Continuando com %2$s, que aceita conversas mais longas.</string>
+    <string name="nm_own_context_limit">A conversa ficou longa demais para este modelo. Resuma a conversa ou comece uma nova.</string>
+    <string name="nm_confirmed_reply_steps_title">Etapas de resposta</string>
+    <string name="nm_confirmed_reply_steps_total">Etapas concluídas</string>
+    <string name="nm_confirmed_reply_steps_note">Conta só as respostas concluídas e salvas a partir desta versão. Tentativas que falharam não entram na conta. Este número não indica cobranças.</string>
 </resources>

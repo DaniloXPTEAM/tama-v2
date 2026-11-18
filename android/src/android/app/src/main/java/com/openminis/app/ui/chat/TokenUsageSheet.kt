@@ -115,7 +115,15 @@ fun TokenUsageSheet(
                 StatRow(stringResource(R.string.token_usage_cache_write), if (usageKnown) formatTokens(s?.cacheWrite ?: 0L) else "—")
             }
 
-            StatSection(title = stringResource(R.string.token_usage_section_agent_loop)) {
+            val confirmed = s?.confirmedReplySteps
+            if (confirmed != null) StatSection(title = stringResource(R.string.nm_confirmed_reply_steps_title)) {
+                StatRow(stringResource(R.string.nm_confirmed_reply_steps_total), confirmed.toString())
+                Text(
+                    text = stringResource(R.string.nm_confirmed_reply_steps_note),
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else StatSection(title = stringResource(R.string.token_usage_section_agent_loop)) {
                 StatRow(stringResource(R.string.token_usage_total_loops),
                     if (parallelTest && s == null) "—" else (s?.loopCount ?: 0).toString())
                 if (parallelTest) {
