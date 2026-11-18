@@ -1548,7 +1548,7 @@
     <string name="nm_key_destination_invalid">Adres geçersiz veya HTTPS kullanmıyor. Devam etmeden önce düzeltin.</string>
     <string name="nm_key_probe_button">Anahtarı test et</string>
     <string name="nm_key_probe_help">Anahtarı resmi model listesine gönderir, mesaj göndermez. Sonuç erişimi veya maliyeti garanti etmez.</string>
-    <string name="nm_key_probe_accepted">Sağlayıcı model listesi isteğini kabul etti.</string>
+    <string name="nm_key_probe_accepted">Model listesi isteği kabul edildi. Bu, anahtarın geçerli olduğunu kanıtlamaz.</string>
     <string name="nm_key_probe_rejected">Sağlayıcı anahtarı reddetti.</string>
     <string name="nm_key_probe_denied">Sağlayıcı erişimi reddetti; nedeni bilinmiyor.</string>
     <string name="nm_key_probe_unavailable">Anahtar test edilemedi. Bağlantıyı kontrol edin.</string>

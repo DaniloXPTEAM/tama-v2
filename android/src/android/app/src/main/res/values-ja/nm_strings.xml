@@ -1544,7 +1544,7 @@
     <string name="nm_key_destination_invalid">アドレスが無効かHTTPSではありません。続行する前に修正してください。</string>
     <string name="nm_key_probe_button">キーをテスト</string>
     <string name="nm_key_probe_help">キーを公式のモデル一覧に送信します。メッセージは送信しません。利用や料金は保証されません。</string>
-    <string name="nm_key_probe_accepted">プロバイダーがモデル一覧の要求を受け付けました。</string>
+    <string name="nm_key_probe_accepted">モデル一覧の要求が受け付けられました。キーが有効である証明にはなりません。</string>
     <string name="nm_key_probe_rejected">プロバイダーがキーを拒否しました。</string>
     <string name="nm_key_probe_denied">アクセスが拒否されました。理由は不明です。</string>
     <string name="nm_key_probe_unavailable">キーを確認できませんでした。接続を確認してください。</string>

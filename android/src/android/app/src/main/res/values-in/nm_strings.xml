@@ -1544,7 +1544,7 @@
     <string name="nm_key_destination_invalid">Alamat tidak valid atau tidak menggunakan HTTPS. Perbaiki sebelum melanjutkan.</string>
     <string name="nm_key_probe_button">Uji kunci</string>
     <string name="nm_key_probe_help">Mengirim kunci ke daftar model resmi, tanpa pesan. Hasil tidak menjamin akses atau biaya.</string>
-    <string name="nm_key_probe_accepted">Penyedia menerima permintaan daftar model.</string>
+    <string name="nm_key_probe_accepted">Permintaan daftar model diterima. Ini tidak membuktikan kunci valid.</string>
     <string name="nm_key_probe_rejected">Penyedia menolak kunci.</string>
     <string name="nm_key_probe_denied">Penyedia menolak akses; alasannya tidak diketahui.</string>
     <string name="nm_key_probe_unavailable">Kunci tidak dapat diuji. Periksa koneksi.</string>

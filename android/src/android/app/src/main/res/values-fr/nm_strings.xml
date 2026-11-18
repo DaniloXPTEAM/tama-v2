@@ -1549,7 +1549,7 @@
     <string name="nm_key_destination_invalid">La destination est invalide ou ne prévoit pas HTTPS. Corrigez-la avant de continuer.</string>
     <string name="nm_key_probe_button">Tester la clé</string>
     <string name="nm_key_probe_help">Envoie la clé à la liste officielle des modèles, sans envoyer de message. Le résultat ne garantit ni accès ni coût.</string>
-    <string name="nm_key_probe_accepted">Le fournisseur a accepté la demande de liste des modèles.</string>
+    <string name="nm_key_probe_accepted">La demande de liste des modèles a été acceptée. Cela ne prouve pas que la clé est valide.</string>
     <string name="nm_key_probe_rejected">Le fournisseur a refusé la clé.</string>
     <string name="nm_key_probe_denied">Le fournisseur a refusé l’accès ; la raison est inconnue.</string>
     <string name="nm_key_probe_unavailable">Impossible de tester la clé. Vérifiez la connexion.</string>

@@ -1528,7 +1528,7 @@
     <string name="nm_loop_estimate_explanation">Estimated from this session: the larger of assistant messages or tool blocks. It is not an exact count of requests or charges.</string>
     <string name="nm_key_probe_button">Test key</string>
     <string name="nm_key_probe_help">Sends the key to the official model list. No message is sent. A result does not guarantee model access or cost.</string>
-    <string name="nm_key_probe_accepted">The provider accepted the model list request.</string>
+    <string name="nm_key_probe_accepted">The model list request was accepted. This does not prove the key is valid.</string>
     <string name="nm_key_probe_rejected">The provider rejected the key.</string>
     <string name="nm_key_probe_denied">The provider denied access; the reason is not known.</string>
     <string name="nm_key_probe_unavailable">Could not check the key. Check the connection and try again.</string>

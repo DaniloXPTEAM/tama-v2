@@ -1556,7 +1556,7 @@
     <string name="nm_key_destination_invalid">Adres jest nieprawidłowy lub nie używa HTTPS. Popraw go przed kontynuowaniem.</string>
     <string name="nm_key_probe_button">Sprawdź klucz</string>
     <string name="nm_key_probe_help">Wysyła klucz do oficjalnej listy modeli, bez wiadomości. Wynik nie gwarantuje dostępu ani kosztu.</string>
-    <string name="nm_key_probe_accepted">Dostawca przyjął zapytanie o listę modeli.</string>
+    <string name="nm_key_probe_accepted">Przyjęto zapytanie o listę modeli. Nie dowodzi to, że klucz jest prawidłowy.</string>
     <string name="nm_key_probe_rejected">Dostawca odrzucił klucz.</string>
     <string name="nm_key_probe_denied">Dostawca odmówił dostępu; przyczyna jest nieznana.</string>
     <string name="nm_key_probe_unavailable">Nie można sprawdzić klucza. Sprawdź połączenie.</string>

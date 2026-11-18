@@ -1521,7 +1521,7 @@
     <string name="nm_key_destination_invalid">地址无效或未使用HTTPS。请先修改再继续。</string>
     <string name="nm_key_probe_button">测试密钥</string>
     <string name="nm_key_probe_help">将密钥发送到官方模型列表，不发送消息。结果不能保证模型访问或费用。</string>
-    <string name="nm_key_probe_accepted">服务商接受了模型列表请求。</string>
+    <string name="nm_key_probe_accepted">模型列表请求已被接受，但这不能证明密钥有效。</string>
     <string name="nm_key_probe_rejected">服务商拒绝了密钥。</string>
     <string name="nm_key_probe_denied">服务商拒绝访问，原因未知。</string>
     <string name="nm_key_probe_unavailable">无法测试密钥，请检查网络连接。</string>

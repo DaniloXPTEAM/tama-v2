@@ -1548,7 +1548,7 @@
     <string name="nm_key_destination_invalid">Die Adresse ist ungültig oder verwendet kein HTTPS. Korrigieren Sie sie vor dem Fortfahren.</string>
     <string name="nm_key_probe_button">Schlüssel testen</string>
     <string name="nm_key_probe_help">Sendet den Schlüssel an die offizielle Modellliste. Keine Nachricht wird gesendet. Das Ergebnis garantiert weder Zugriff noch Kosten.</string>
-    <string name="nm_key_probe_accepted">Der Anbieter hat die Modellabfrage akzeptiert.</string>
+    <string name="nm_key_probe_accepted">Die Modellabfrage wurde akzeptiert. Dies beweist nicht, dass der Schlüssel gültig ist.</string>
     <string name="nm_key_probe_rejected">Der Anbieter hat den Schlüssel abgelehnt.</string>
     <string name="nm_key_probe_denied">Der Anbieter hat den Zugriff verweigert; der Grund ist unbekannt.</string>
     <string name="nm_key_probe_unavailable">Der Schlüssel konnte nicht geprüft werden. Verbindung prüfen.</string>

@@ -1549,7 +1549,7 @@
     <string name="nm_loop_estimate_explanation">Estimativa desta conversa: o maior entre mensagens do assistente e blocos de ferramentas. Não é uma contagem exata de pedidos nem de cobranças.</string>
     <string name="nm_key_probe_button">Testar chave</string>
     <string name="nm_key_probe_help">Envia a chave à lista oficial de modelos. Não envia mensagem. O resultado não garante acesso aos modelos nem custo.</string>
-    <string name="nm_key_probe_accepted">O provedor aceitou a consulta da lista de modelos.</string>
+    <string name="nm_key_probe_accepted">A consulta da lista de modelos foi aceita. Isso não comprova que a chave é válida.</string>
     <string name="nm_key_probe_rejected">O provedor recusou a chave.</string>
     <string name="nm_key_probe_denied">O provedor negou o acesso; o motivo não é conhecido.</string>
     <string name="nm_key_probe_unavailable">Não foi possível testar a chave. Confira a conexão e tente novamente.</string>

@@ -1548,7 +1548,7 @@
     <string name="nm_key_destination_invalid">La dirección no es válida o no usa HTTPS. Corríjala antes de continuar.</string>
     <string name="nm_key_probe_button">Probar clave</string>
     <string name="nm_key_probe_help">Envía la clave a la lista oficial de modelos. No envía mensajes. El resultado no garantiza acceso ni coste.</string>
-    <string name="nm_key_probe_accepted">El proveedor aceptó la consulta de modelos.</string>
+    <string name="nm_key_probe_accepted">Se aceptó la consulta de modelos. Esto no demuestra que la clave sea válida.</string>
     <string name="nm_key_probe_rejected">El proveedor rechazó la clave.</string>
     <string name="nm_key_probe_denied">El proveedor denegó el acceso; se desconoce el motivo.</string>
     <string name="nm_key_probe_unavailable">No se pudo probar la clave. Comprueba la conexión.</string>
