@@ -44,3 +44,40 @@ não reprodução em Android e não identifica a causa do erro daquele APK.
   fictícios e servidor local, distinguindo bloqueio local, erro HTTP e evento SSE;
   então corrigir somente o caso reproduzido no pacote paralelo. A montagem host não
   substitui compilação Android nem teste real.
+
+## Pista da URL vazia: análise adicional
+
+O dono informou que, no teste antigo do Poco, uma chave Groq estava no tipo OpenAI
+com a URL base vazia. Na base analisada, o caminho normal do formulário grava um campo
+vazio como `null` (`ProviderEndpoints.storageBase`). `ProviderInstance.effectiveBaseURL`
+retorna `null` nesse caso e a ramificação OpenAI de `ProviderFactory.create` escolhe
+`https://api.openai.com/v1`. Portanto, se essa mesma configuração estiver presente e a
+requisição chegar ao envio, o destino configurado não será Groq. Isso não prova que a
+requisição antiga saiu, qual foi a resposta, nem que este seja o único motivo do erro.
+Se houver suspeita de que uma credencial foi enviada ao destinatário errado, o dono pode
+avaliar revogá-la e gerar outra no provedor; não compartilhar a chave ou registros brutos.
+
+Uma string realmente vazia já persistida, diferente de `null`, tem outro comportamento:
+`effectiveBaseURL` resulta em `/v1` com o sufixo ligado ou em vazio com ele desligado.
+Não há evidência de que esse seja o estado do celular. Não se pode afirmar que isso
+produziu um `ProviderError` específico sem executar o caminho e observar o resultado.
+
+No catálogo atual, Groq usa `https://api.groq.com/openai/v1` e OpenRouter usa
+`https://openrouter.ai/api/v1`. No pacote paralelo o formulário tem seleção explícita de
+provedor, com endereço preenchido por `OwnKeyPresets`; a sugestão por prefixo exige
+confirmação. O tipo OpenAI genérico, sem escolher Groq, usa o endereço da OpenAI. O tipo
+OpenRouter usa endereço fixo em `ProviderFactory`. A tela real e o estado salvo no
+aparelho não foram verificados.
+
+**Proposta, NÃO FEITA:** no paralelo, detectar a combinação suspeita de chave com
+prefixo de outro provedor e endereço padrão da OpenAI tanto no cadastro quanto antes
+de iniciar uma chamada de uma configuração já existente. Parar localmente e
+pedir confirmação do destinatário ou correção do endereço; nunca trocar a URL ou
+reenviar a chave silenciosamente. Preservar endereços personalizados e não confiar no
+prefixo como prova de identidade. A regra precisa cobrir descoberta de modelos, chat e
+outras rotas que possam transmitir credenciais, sem desligar guardas de cobrança.
+
+`tests/host_android/provider_endpoints/run.sh` compila lógica real dos presets e do
+tratamento de endereço em JVM, com dublês e trechos extraídos, sem rede. O teste também
+confere estática e pontualmente o catálogo e a ligação do formulário; não executa a
+fábrica inteira, a tela, o envio HTTP ou Android. Os limites estão no README do teste.
