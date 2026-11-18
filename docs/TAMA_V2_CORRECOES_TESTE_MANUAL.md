@@ -425,3 +425,18 @@ A conferência de identidades agora ocorre assim que os dois builds terminam;
 os unitários continuam obrigatórios antes de qualquer entrega. A falha da etapa
 de unitários do paralelo também recebe diagnóstico por categoria fixa, sem
 anexar APK ou copiar o log para a anotação.
+
+Em loopback, duas contraprovas confirmaram a diferença: retirando o
+`Retry-After` do 408, o teste recebeu a resposta 404 de chamada inesperada;
+com o teste de chave anterior, o 503 com `Retry-After: 0` provocou um segundo
+GET. Com os ajustes, os cinco testes das duas classes passaram. Ao todo,
+62 testes JUnit do paralelo e 14 do normal passaram na montagem local,
+incluindo histórico, catálogo e apresentação de imagem. Os JARs OkHttp/Okio
+foram compilados a partir de tags, com adaptações de compilação e plataforma
+para JVM. Os servidores, chaves e identidades eram fictícios, com Android
+substituído por dublês; não é validação de APK, Gradle ou aparelho.
+
+Os harnesses `model_use_direct` e `media_handlers` voltaram a compilar com o
+sinal de falha novo e o `commit()` das preferências em memória. Passaram sem
+falhas nas duas identidades simuladas, incluindo os skips por `Assume`. Os
+dublês não simulam gravação em disco nem recusa da gravação no Android.

@@ -25,5 +25,9 @@ class SharedPreferences {
         fun putBoolean(key: String, value: Boolean) = apply { changes[key] = value }
         fun remove(key: String) = apply { changes[key] = null }
         fun apply() = synchronized(values) { for ((key, value) in changes) if (value == null) values.remove(key) else values[key] = value }
+        fun commit(): Boolean {
+            apply()
+            return true // In-memory fixture; does not simulate disk writes or failure.
+        }
     }
 }
