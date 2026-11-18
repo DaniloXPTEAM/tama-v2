@@ -1556,4 +1556,7 @@
     <string name="nm_image_retry_question">Ingin mencoba gambar ini lagi? Jawab ya atau minta coba lagi.</string>
     <string name="nm_context_near_limit">Konteks mendekati batas model (%1$d / %2$d token). Mulai chat baru atau gunakan /compact agar dapat melanjutkan dengan andal.</string>
     <string name="nm_image_raw_tool_text">Penyedia mengembalikan panggilan alat sebagai teks. Teks itu tidak dijalankan sebagai alat.</string>
+    <string name="nm_free_list_filter">Tampilkan hanya model yang tercantum gratis</string>
+    <string name="nm_free_list_help">Hanya memfilter daftar ini. Tidak menghapus model atau menjamin biaya. Matikan filter untuk melihat semua model tersimpan.</string>
+    <string name="nm_free_list_refresh">Tidak ada data katalog terbaru. Perbarui daftar model atau matikan filter.</string>
 </resources>

@@ -1561,4 +1561,7 @@
     <string name="nm_free_bulk_retry">Nenhum modelo elegível atual foi autorizado. Atualize o catálogo e tente novamente.</string>
     <string name="nm_image_retry_question">Quer tentar esta imagem novamente? Responda sim ou peça para tentar de novo.</string>
     <string name="nm_image_raw_tool_text">O provedor retornou uma chamada de ferramenta como texto. Esse trecho não foi executado como ferramenta.</string>
+    <string name="nm_free_list_filter">Mostrar só modelos anunciados como grátis</string>
+    <string name="nm_free_list_help">Filtra apenas esta lista. Não apaga modelos nem garante o custo. Desligue o filtro para ver todos os modelos salvos.</string>
+    <string name="nm_free_list_refresh">Não há evidência atual do catálogo. Atualize a lista de modelos ou desligue o filtro.</string>
 </resources>

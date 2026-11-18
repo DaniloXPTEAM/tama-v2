@@ -1540,4 +1540,7 @@
     <string name="nm_free_bulk_retry">No current eligible models were approved. Refresh the catalogue and try again.</string>
     <string name="nm_image_retry_question">Would you like to try this image again? Reply yes or ask to try again.</string>
     <string name="nm_image_raw_tool_text">The provider returned a tool call as text. That text was not executed as a tool.</string>
+    <string name="nm_free_list_filter">Show only models advertised as free</string>
+    <string name="nm_free_list_help">This filters this list only. It does not delete models or guarantee their cost. Turn it off to see all saved entries.</string>
+    <string name="nm_free_list_refresh">No current catalogue evidence. Refresh the model list or turn off the filter.</string>
 </resources>

@@ -1533,4 +1533,7 @@
     <string name="nm_image_retry_question">要再次尝试这张图片吗？请回复“是”或“重试”。</string>
     <string name="nm_context_near_limit">上下文接近模型上限（%1$d / %2$d 个词元）。请开始新对话或使用 /compact，以便可靠地继续。</string>
     <string name="nm_image_raw_tool_text">服务商将工具调用作为文本返回。该文本没有作为工具执行。</string>
+    <string name="nm_free_list_filter">仅显示标为免费的模型</string>
+    <string name="nm_free_list_help">仅筛选此列表，不删除模型，也不保证费用。关闭筛选可查看所有已保存的模型。</string>
+    <string name="nm_free_list_refresh">没有当前目录数据。请刷新模型列表或关闭筛选。</string>
 </resources>

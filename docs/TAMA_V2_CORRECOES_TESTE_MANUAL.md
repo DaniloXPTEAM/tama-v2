@@ -288,3 +288,12 @@ com marcadores divididos entre pedaços do fluxo e não executa texto como chama
 eventos nativos de ferramenta permanecem separados e passam pelos controles
 existentes. Um marcador sem fechamento é descartado até o fim da resposta. O
 teste local usa eventos fictícios e não cobre a tela real nem um provedor.
+
+## Lista de modelos anunciados gratuitos
+
+A tela da conta OpenRouter com chave própria pode mostrar apenas os modelos
+presentes na evidência recente de importação gratuita. Sem evidência atual,
+pede atualização em vez de tratar modelo desconhecido como grátis. O filtro é
+visual e reversível: não apaga modelos salvos, não altera o seletor de chat e
+não garante custo zero. Os testes locais verificam a filtragem e a ligação
+estática; ainda é necessário verificar a tela no Android.

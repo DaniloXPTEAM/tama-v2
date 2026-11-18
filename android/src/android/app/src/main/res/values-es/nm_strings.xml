@@ -1560,4 +1560,7 @@
     <string name="nm_image_retry_question">¿Quieres intentar esta imagen de nuevo? Responde sí o pide reintentar.</string>
     <string name="nm_context_near_limit">El contexto está cerca del límite del modelo (%1$d / %2$d tokens). Inicia una conversación nueva o usa /compact para continuar de forma fiable.</string>
     <string name="nm_image_raw_tool_text">El proveedor devolvió una llamada a herramienta como texto. Ese texto no se ejecutó como herramienta.</string>
+    <string name="nm_free_list_filter">Mostrar solo modelos anunciados gratis</string>
+    <string name="nm_free_list_help">Filtra solo esta lista. No elimina modelos ni garantiza su coste. Desactiva el filtro para ver todos los modelos guardados.</string>
+    <string name="nm_free_list_refresh">No hay datos actuales del catálogo. Actualiza la lista o desactiva el filtro.</string>
 </resources>

@@ -1556,4 +1556,7 @@
     <string name="nm_image_retry_question">이 이미지를 다시 시도할까요? 네 또는 다시 시도라고 답하세요.</string>
     <string name="nm_context_near_limit">컨텍스트가 모델 한도에 가까워졌습니다 (%1$d / %2$d 토큰). 안정적으로 계속하려면 새 채팅을 시작하거나 /compact를 사용하세요.</string>
     <string name="nm_image_raw_tool_text">제공자가 도구 호출을 텍스트로 반환했습니다. 이 텍스트는 도구로 실행되지 않았습니다.</string>
+    <string name="nm_free_list_filter">무료로 표시된 모델만 보기</string>
+    <string name="nm_free_list_help">이 목록만 필터링합니다. 모델을 삭제하지 않으며 비용을 보장하지 않습니다. 저장된 모든 모델을 보려면 필터를 끄세요.</string>
+    <string name="nm_free_list_refresh">최신 카탈로그 정보가 없습니다. 모델 목록을 새로 고치거나 필터를 끄세요.</string>
 </resources>

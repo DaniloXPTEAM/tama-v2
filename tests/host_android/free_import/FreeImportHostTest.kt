@@ -27,6 +27,11 @@ fun main() {
     check(FreeModelBulk.select("instance", freeIds, freeRows) == listOf("one", "two"))
     check(FreeModelBulk.select("instance", emptySet(), freeRows).isEmpty())
     check(FreeModelBulk.select("missing", freeIds, freeRows).isEmpty())
+    val original = listOf("fixture/one:free", "fixture/paid:free", "fixture/two:free")
+    check(FreeModelList.filter(original, true, freeIds) { it } == listOf("fixture/one:free", "fixture/two:free"))
+    check(FreeModelList.filter(original, true, null) { it }.isEmpty())
+    check(FreeModelList.filter(original, false, null) { it } == original)
+    check(original.size == 3) // filter never removes saved rows
     val gate = ModelRefreshGate()
     val ticket = gate.begin("instance", true, "route")
     val evidence = FreeModelImportEvidence(ticket, 1, prices,

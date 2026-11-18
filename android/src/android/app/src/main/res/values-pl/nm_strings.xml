@@ -1568,4 +1568,7 @@
     <string name="nm_image_retry_question">Czy chcesz ponowić próbę tej ilustracji? Odpowiedz tak lub poproś o ponowną próbę.</string>
     <string name="nm_context_near_limit">Kontekst zbliża się do limitu modelu (%1$d / %2$d tokenów). Rozpocznij nowy czat lub użyj /compact, aby kontynuować niezawodnie.</string>
     <string name="nm_image_raw_tool_text">Dostawca zwrócił wywołanie narzędzia jako tekst. Ten fragment nie został wykonany jako narzędzie.</string>
+    <string name="nm_free_list_filter">Pokaż tylko modele oznaczone jako darmowe</string>
+    <string name="nm_free_list_help">Filtruje tylko tę listę. Nie usuwa modeli ani nie gwarantuje kosztu. Wyłącz filtr, aby zobaczyć wszystkie zapisane modele.</string>
+    <string name="nm_free_list_refresh">Brak aktualnych danych katalogu. Odśwież listę modeli lub wyłącz filtr.</string>
 </resources>

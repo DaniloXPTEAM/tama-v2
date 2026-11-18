@@ -1560,4 +1560,7 @@
     <string name="nm_image_retry_question">Bu görseli yeniden denemek ister misin? Evet yanıtını ver veya tekrar denemeyi iste.</string>
     <string name="nm_context_near_limit">Bağlam model sınırına yaklaşıyor (%1$d / %2$d token). Güvenilir biçimde devam etmek için yeni sohbet başlatın veya /compact kullanın.</string>
     <string name="nm_image_raw_tool_text">Sağlayıcı bir araç çağrısını metin olarak döndürdü. Bu metin araç olarak çalıştırılmadı.</string>
+    <string name="nm_free_list_filter">Yalnızca ücretsiz listelenen modelleri göster</string>
+    <string name="nm_free_list_help">Yalnızca bu listeyi filtreler. Modelleri silmez veya maliyeti garanti etmez. Kayıtlı tüm modelleri görmek için filtreyi kapatın.</string>
+    <string name="nm_free_list_refresh">Güncel katalog verisi yok. Model listesini yenileyin veya filtreyi kapatın.</string>
 </resources>

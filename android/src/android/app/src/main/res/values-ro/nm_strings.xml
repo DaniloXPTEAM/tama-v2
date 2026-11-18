@@ -1564,4 +1564,7 @@
     <string name="nm_image_retry_question">Vrei să încerci din nou această imagine? Răspunde da sau cere o nouă încercare.</string>
     <string name="nm_context_near_limit">Contextul se apropie de limita modelului (%1$d / %2$d tokenuri). Începe o conversație nouă sau folosește /compact pentru a continua în siguranță.</string>
     <string name="nm_image_raw_tool_text">Furnizorul a returnat un apel de instrument ca text. Textul nu a fost executat ca instrument.</string>
+    <string name="nm_free_list_filter">Afișează doar modelele anunțate gratuite</string>
+    <string name="nm_free_list_help">Filtrează doar această listă. Nu șterge modele și nu garantează costul. Dezactivează filtrul pentru a vedea toate modelele salvate.</string>
+    <string name="nm_free_list_refresh">Nu există date actuale din catalog. Actualizează lista sau dezactivează filtrul.</string>
 </resources>

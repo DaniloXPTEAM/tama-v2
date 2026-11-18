@@ -676,8 +676,28 @@ fun ProviderDetailScreen(
         ThinkingRulesSection(instance = instance, providerRepository = providerRepository)
 
         // ─── Models ─────────────────────────────────────────────────
+        // nanoMuse: this is a reversible view filter, not a change to saved entries,
+        // model selection or spending authorization.
+        val nmShowFreeFilter = nmParallel && instance.providerType == ProviderType.openRouter &&
+            instance.credentialType == com.openminis.app.data.model.ProviderCredential.apiKey && instance.tamaImportFreeOnly &&
+            io.github.nanomuse.cloud.NanoMuseCloud.instance(exportContext)?.id != instanceId
+        var nmFilterFree by remember(instanceId, instance.tamaImportFreeOnly) { mutableStateOf(instance.tamaImportFreeOnly) }
+        val nmImportStatuses by providerRepository.nmFreeImportStatus.collectAsState()
+        // Reading the status makes the view re-evaluate after a background refresh.
+        val nmImportStatus = nmImportStatuses[instanceId]
+        val nmFreeIds = if (nmShowFreeFilter && nmFilterFree && nmImportStatus !is ai.tama.pricing.FreeModelImportStatus.Checking)
+            providerRepository.tamaEligibleFreeModelIds(instanceId) else null
+        val nmDisplayedEntries = ai.tama.pricing.FreeModelList.filter(entries, nmShowFreeFilter && nmFilterFree, nmFreeIds) { it.model.id }
+        if (nmShowFreeFilter) {
+            SettingsSection(footer = stringResource(R.string.nm_free_list_help)) {
+                SettingsSwitchRow(title = stringResource(R.string.nm_free_list_filter), checked = nmFilterFree,
+                    onCheckedChange = { nmFilterFree = it }, showDivider = false)
+            }
+        }
         SettingsSection(
-            header = stringResource(R.string.provider_detail_models_count_header, entries.size),
+            header = stringResource(R.string.provider_detail_models_count_header, nmDisplayedEntries.size),
+            footer = if (nmShowFreeFilter && nmFilterFree && nmFreeIds == null)
+                stringResource(R.string.nm_free_list_refresh) else null,
         ) {
             // Refresh action sits as the first row, mirroring the iOS
             // tap-to-refresh affordance in the section header area.
@@ -715,10 +735,10 @@ fun ProviderDetailScreen(
                         tint = MaterialTheme.colorScheme.primary,
                     )
                 },
-                showDivider = entries.isNotEmpty() || true,
+                showDivider = nmDisplayedEntries.isNotEmpty() || true,
             )
 
-            entries.forEachIndexed { idx, entry ->
+            nmDisplayedEntries.forEachIndexed { idx, entry ->
                 // Drive both tap and long-press from a Box wrapper so we
                 // don't have to expand SettingsRow's signature.
                 Box(
@@ -780,7 +800,7 @@ fun ProviderDetailScreen(
                         // wrapping Box owns both gestures.
                         onClick = null,
                         showChevron = true,
-                        showDivider = idx != entries.lastIndex,
+                        showDivider = idx != nmDisplayedEntries.lastIndex,
                         // [T-android-settings-ui-md3] #8 two-line row (name + id)
                         // uses the MD3 double-line height (72dp).
                         minHeight = 72.dp,

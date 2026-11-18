@@ -32,6 +32,15 @@ class FreeModelImportTest {
         assertTrue(FreeModelBulk.select("a", emptySet(), rows).isEmpty())
     }
 
+    @Test fun `free list is a reversible view and unknown evidence is not free`() {
+        val original = listOf("vendor/one:free", "vendor/paid", "vendor/two:free")
+        val free = setOf("vendor/one:free", "vendor/two:free")
+        assertEquals(listOf("vendor/one:free", "vendor/two:free"), FreeModelList.filter(original, true, free) { it })
+        assertTrue(FreeModelList.filter(original, true, null) { it }.isEmpty())
+        assertEquals(original, FreeModelList.filter(original, false, null) { it })
+        assertEquals(3, original.size)
+    }
+
     @Test fun `only fresh evidence for exact free variants is eligible`() {
         val raw = JSONArray().put(quote("vendor/a:free")).put(quote("openrouter/free"))
             .put(quote("vendor/paid:free", "0.01"))
