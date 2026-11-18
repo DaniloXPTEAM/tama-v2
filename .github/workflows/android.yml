@@ -96,6 +96,7 @@ jobs:
             --tests 'ai.tama.router.AutoModelFailureTest' \
             --tests 'ai.tama.router.ModelRouterTest' \
             --tests 'ai.tama.router.ImageRetryOfferTest' \
+            --tests 'ai.tama.router.LargerContextTest' \
             --tests 'ai.tama.router.AutomaticCostGuardTest' \
             --tests 'ai.tama.pricing.FreeModelImportTest' \
             --tests 'ai.tama.pricing.OpenRouterPricingTest' \

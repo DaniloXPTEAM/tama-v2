@@ -269,3 +269,13 @@ invalidada se a conversa ou a última mensagem mudar. Anexos, edição e turnos
 automáticos não usam o atalho. As mesmas verificações de custo e permissão
 continuam obrigatórias; isso não prova que a nova tentativa será gratuita.
 O teste local cobre a decisão, não o aparelho nem a geração real.
+
+## Limite de contexto no modo automático
+
+No paralelo, antes de parar por limite local de contexto, o roteador tenta
+um modelo com janela comprovadamente maior, desde que ele também passe pelas
+verificações de autorização, custo, capacidade e orçamento. Limites iguais ou
+desconhecidos não contam como maiores. Se não houver candidato, o aviso
+anterior permanece. A requisição é remontada e reavaliada; não se altera a
+permissão de custo. O teste local cobre o filtro de janela e verifica a ligação
+estática, não uma conversa Android completa.

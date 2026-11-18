@@ -9537,16 +9537,21 @@ class ChatViewModel(
             }
             return LLMError.ProviderError((listOf(context.getString(R.string.nm_auto_none)) + details).joinToString("\n"))
         }
-        suspend fun nmAutoSelect(stickyEntryId: String?): AutoChoice {
+        class NoLargerContext : Exception()
+        suspend fun nmAutoSelect(stickyEntryId: String?, largerThanWindow: Int? = null): AutoChoice {
             val turnState = checkNotNull(nmAutoTurn)
             while (true) {
                 if (!AutoModelStore.enabled(context)) throw LLMError.ProviderError(context.getString(R.string.nm_auto_disabled_during_turn))
                 val messages = applyRequestImageBudget(effectiveAgentHistory(), preview = true)
-                val choices = nmAutoCandidates()
+                // nanoMuse: unknown or equal windows are not evidence of a larger model.
+                val choices = nmAutoCandidates().filter {
+                    largerThanWindow == null || ai.tama.router.LargerContext.eligible(largerThanWindow, it.candidate.contextLimit)
+                }
                 when (val selection = turnState.pick(choices.map { it.candidate }, nmAutoNeeds(messages), stickyEntryId) { candidate, snapshot ->
                     nmAutoFit(choices.first { it.candidate === candidate }, messages, snapshot)
                 }) {
-                    is ModelRouter.Choice.None -> throw nmAutoNoCandidate(choices, selection)
+                    is ModelRouter.Choice.None -> if (largerThanWindow != null) throw NoLargerContext()
+                        else throw nmAutoNoCandidate(choices, selection)
                     is ModelRouter.Choice.Selected -> {
                         val selected = choices.first { it.entry.id == selection.candidate.entryId }
                         val why = when (val cause = ai.tama.router.AutoSwitchReason.forSwitch(
@@ -9897,6 +9902,22 @@ class ChatViewModel(
                     continue
                 }
                 ContextMaintenance.Action.STOP -> {
+                    // nanoMuse: in automatic mode try only an approved, cost-permitted
+                    // model with a known strictly larger window. No request has been
+                    // sent in this iteration; rebuild and recheck before dispatch.
+                    if (tamaV2Test && nmAutoTurn != null) {
+                        val prior = _activeEntryId.value
+                        if (prior != null && requestBudget.window > 0) {
+                            nmAutoLocalBlocks[prior] = context.getString(R.string.nm_auto_reason_context)
+                            val larger = try { nmAutoSelect(null, largerThanWindow = requestBudget.window) }
+                                catch (_: NoLargerContext) { null }
+                            if (larger != null) {
+                                nmAutoTurn.exclude(prior)
+                                nmAutoActivate(larger)
+                                continue@agentTurns
+                            }
+                        }
+                    }
                     // The loop cannot present a modal mid-flight, so stop
                     // safely: user-visible notice + resumable, without the
                     // turn-limit error overwrite.
