@@ -1557,4 +1557,5 @@
     <string name="nm_free_bulk_help">Pinapahintulutan ang nakikitang modelong nakalistang libre sa kamakailang katalogo para sa awtomatikong pagpili sa chat. Hindi nito binubuksan ang awtomatikong mode o pahintulot sa gastos at hindi nito pinapahintulutan ang larawan. Maaaring magbago ang presyo at dagdag na serbisyo.</string>
     <string name="nm_free_bulk_done">Mga pinahintulutang chat route: %1$d. May iba pang pagsusuri sa pagiging angkop at gastos.</string>
     <string name="nm_free_bulk_retry">Walang kasalukuyang angkop na modelo ang pinahintulutan. I-refresh ang katalogo at subukan muli.</string>
+    <string name="nm_image_retry_question">Gusto mo bang subukang muli ang larawang ito? Sumagot ng oo o hilinging subukan muli.</string>
 </resources>

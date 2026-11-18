@@ -1553,4 +1553,5 @@
     <string name="nm_free_bulk_help">최근 카탈로그에 무료로 표시된 보이는 모델을 자동 채팅 선택에 허용합니다. 자동 모드나 비용 권한을 켜지 않으며 이미지 생성도 허용하지 않습니다. 가격과 추가 서비스는 변경될 수 있습니다.</string>
     <string name="nm_free_bulk_done">허용된 채팅 경로: %1$d. 다른 자격 및 비용 검사도 적용됩니다.</string>
     <string name="nm_free_bulk_retry">현재 적격 모델이 허용되지 않았습니다. 카탈로그를 새로 고치고 다시 시도하세요.</string>
+    <string name="nm_image_retry_question">이 이미지를 다시 시도할까요? 네 또는 다시 시도라고 답하세요.</string>
 </resources>

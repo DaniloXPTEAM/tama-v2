@@ -4,6 +4,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+- Added an explicit, short-lived retry offer after a failed standalone image request in the parallel Android test build.
+
 - Avoided suggesting an image charge for known preflight refusals in the parallel Android test build.
 
 - Added a one-touch chat-route approval for visible OpenRouter models advertised free in the current catalogue, in the parallel Android test build.

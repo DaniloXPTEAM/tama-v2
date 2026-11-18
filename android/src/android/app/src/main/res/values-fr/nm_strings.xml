@@ -1558,4 +1558,5 @@
     <string name="nm_free_bulk_help">Autorise les modèles visibles annoncés gratuits dans le catalogue récent pour la sélection automatique du chat. Ne active ni le mode automatique ni les frais et ne autorise pas les images. Les prix et services supplémentaires peuvent changer.</string>
     <string name="nm_free_bulk_done">Routes de chat autorisées : %1$d. Les autres contrôles de disponibilité et de coût restent actifs.</string>
     <string name="nm_free_bulk_retry">Aucun modèle admissible actuel autorisé. Actualisez le catalogue et réessayez.</string>
+    <string name="nm_image_retry_question">Voulez-vous réessayer cette image ? Répondez oui ou demandez un nouvel essai.</string>
 </resources>

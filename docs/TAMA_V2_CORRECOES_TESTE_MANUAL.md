@@ -258,3 +258,14 @@ instrução ao assistente deixa de sugerir cobrança. Para uma falha genérica,
 que pode ter ocorrido após o envio, o aviso de possível cobrança e a regra
 de não repetir automaticamente continuam. Teste local cobre a política de
 instrução; a apresentação real no chat ainda precisa ser verificada.
+
+## Repetir uma imagem que falhou
+
+Após falhar um pedido direto de imagem pelo atalho local, o paralelo pode
+perguntar se a pessoa quer tentar de novo. A resposta exata “sim” ou “tenta de
+novo” inicia uma nova tentativa pela mesma ferramenta, nunca uma repetição
+automática. A oferta fica apenas na memória, vale por até cinco minutos e é
+invalidada se a conversa ou a última mensagem mudar. Anexos, edição e turnos
+automáticos não usam o atalho. As mesmas verificações de custo e permissão
+continuam obrigatórias; isso não prova que a nova tentativa será gratuita.
+O teste local cobre a decisão, não o aparelho nem a geração real.

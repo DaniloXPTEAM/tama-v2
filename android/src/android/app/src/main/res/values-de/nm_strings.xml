@@ -1557,4 +1557,5 @@
     <string name="nm_free_bulk_help">Lässt sichtbare, im aktuellen Katalog als kostenlos angebotene Modelle für die automatische Chatauswahl zu. Aktiviert weder Automatik noch Kostenerlaubnis und erlaubt keine Bilder. Preise und Zusatzdienste können sich ändern.</string>
     <string name="nm_free_bulk_done">Zugelassene Chatrouten: %1$d. Weitere Eignungs- und Kostenprüfungen gelten weiterhin.</string>
     <string name="nm_free_bulk_retry">Keine aktuell geeigneten Modelle zugelassen. Katalog aktualisieren und erneut versuchen.</string>
+    <string name="nm_image_retry_question">Möchtest du dieses Bild erneut versuchen? Antworte mit Ja oder bitte um einen neuen Versuch.</string>
 </resources>

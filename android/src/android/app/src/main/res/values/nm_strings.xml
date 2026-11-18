@@ -1538,4 +1538,5 @@
     <string name="nm_free_bulk_help">Approves visible models advertised as free in the latest catalogue for automatic chat selection. Does not turn on automatic mode or cost permission, and does not approve image generation. Prices and extra services may change.</string>
     <string name="nm_free_bulk_done">Approved chat routes: %1$d. Other eligibility and cost checks still apply.</string>
     <string name="nm_free_bulk_retry">No current eligible models were approved. Refresh the catalogue and try again.</string>
+    <string name="nm_image_retry_question">Would you like to try this image again? Reply yes or ask to try again.</string>
 </resources>

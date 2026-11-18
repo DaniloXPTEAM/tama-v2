@@ -1557,4 +1557,5 @@
     <string name="nm_free_bulk_help">Son katalogda ücretsiz listelenen görünür modellerin otomatik sohbet seçimine izin verir. Otomatik modu veya maliyet iznini açmaz ve görsel üretimine izin vermez. Fiyatlar ve ek hizmetler değişebilir.</string>
     <string name="nm_free_bulk_done">İzin verilen sohbet yolları: %1$d. Diğer uygunluk ve maliyet kontrolleri geçerlidir.</string>
     <string name="nm_free_bulk_retry">Güncel uygun modellerden hiçbirine izin verilmedi. Kataloğu yenileyip tekrar deneyin.</string>
+    <string name="nm_image_retry_question">Bu görseli yeniden denemek ister misin? Evet yanıtını ver veya tekrar denemeyi iste.</string>
 </resources>

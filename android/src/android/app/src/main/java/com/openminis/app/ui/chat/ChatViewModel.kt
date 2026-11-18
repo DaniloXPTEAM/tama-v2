@@ -1313,6 +1313,9 @@ class ChatViewModel(
         _nmProfileOverride.value = profile
     }
 
+    // nanoMuse: a failed standalone image can offer one short-lived, session-bound retry.
+    private val nmImageRetryOffer = ai.tama.router.ImageRetryOffer()
+
     // nanoMuse: recognize the common PT-BR "faz uma imagem" form only in the parallel app.
     private fun nmExplicitImageRequest(text: String): Boolean = ai.tama.router.ImageRequestIntent.explicit(
         text, portugueseMake = com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test",
@@ -6933,8 +6936,22 @@ class ChatViewModel(
         // nanoMuse: explicit device work is routed before any local model or avatar action.
         if (nmRemoteBridge.send(text, io.github.nanomuse.hub.Hub.others(context),
                 _attachments.value.isNotEmpty() || _pastedTexts.value.isNotEmpty(), _isCompacting.value,
-                onUserSaved = { id -> petGeneration?.let { io.github.nanomuse.pet.PetEvents.chat(context, id, it) } })) return
+                onUserSaved = { id -> petGeneration?.let { io.github.nanomuse.pet.PetEvents.chat(context, id, it) } })) {
+            nmImageRetryOffer.clear()
+            return
+        }
         if (_isStreaming.value) { nmEnqueuePrompt(text, petGeneration); return }
+        // nanoMuse: only an explicit answer to our own latest retry question can
+        // start a fresh image attempt. Existing cost and permission checks still apply.
+        if (com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test") {
+            val retry = nmImageRetryOffer.consume(
+                activeSessionId, _messages.value.lastOrNull { it.queuedPromptId == null }?.id, text,
+                eligible = petGeneration != null && !_isCompacting.value && _attachments.value.isEmpty() &&
+                    _pastedTexts.value.isEmpty() && _editingMessageId.value == null && !_hasInjectedShareContent.value,
+                nowMillis = android.os.SystemClock.elapsedRealtime(),
+            )
+            if (retry != null && petGeneration != null) { nmStartImageShortcut(text, petGeneration, retry); return }
+        }
         // nanoMuse: an automated prompt must not trigger a paid avatar request on its own.
         if (petGeneration != null && nmInterceptAvatar(text, petGeneration)) { nmCountableTurn = false; return }
         // Both branches are explicit so the same decision can be tested with a
@@ -7038,7 +7055,17 @@ class ChatViewModel(
                     nmRunImageShortcut(sid, image) { reply ->
                         if (!reply.success) SessionActivityTracker.markStreamError(sid, turnId)
                         _messages.value = _messages.value.filterNot { it.id == placeholderId }
-                        nmAppendAssistantLine(sid, reply.text)
+                        // nanoMuse: only offer a retry when this local question is
+                        // the next unanswered turn; never replay in the background.
+                        val offerRetry = com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test" &&
+                            !reply.success && _promptQueue.value.isEmpty() && activeSessionId == sid
+                        val shown = if (offerRetry) reply.text + "\n\n" + context.getString(R.string.nm_image_retry_question) else reply.text
+                        nmAppendAssistantLine(sid, shown)
+                        val last = _messages.value.lastOrNull()
+                        if (offerRetry && _promptQueue.value.isEmpty() && activeSessionId == sid &&
+                            last?.role == "assistant" && last.content == shown) {
+                            nmImageRetryOffer.offer(sid, last.id, image.prompt, android.os.SystemClock.elapsedRealtime())
+                        }
                         finished = true
                     }
                 } catch (e: CancellationException) {
@@ -7086,7 +7113,13 @@ class ChatViewModel(
                 portugueseMake = com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test",
             ),
         ) != null
-        if (localImage || currentProvider != null || AutoModelStore.enabled(context)) nmSendNextQueued()
+        // nanoMuse: a queued answer to our own retry question also works without a chat model.
+        val retryImage = com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test" &&
+            nmImageRetryOffer.matches(activeSessionId, _messages.value.lastOrNull { it.queuedPromptId == null }?.id,
+                next.text, eligible = next.petGeneration != null && next.attachments.isEmpty() &&
+                    _pastedTexts.value.isEmpty() && _editingMessageId.value == null && !_hasInjectedShareContent.value,
+                nowMillis = android.os.SystemClock.elapsedRealtime())
+        if (localImage || retryImage || currentProvider != null || AutoModelStore.enabled(context)) nmSendNextQueued()
         else _error.value = context.getString(R.string.nm_chat_no_model)
     }
 

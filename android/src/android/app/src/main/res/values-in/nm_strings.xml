@@ -1553,4 +1553,5 @@
     <string name="nm_free_bulk_help">Mengizinkan model terlihat yang tercantum gratis di katalog terbaru untuk pemilihan chat otomatis. Tidak mengaktifkan mode otomatis atau izin biaya dan tidak mengizinkan pembuatan gambar. Harga dan layanan tambahan dapat berubah.</string>
     <string name="nm_free_bulk_done">Rute chat diizinkan: %1$d. Pemeriksaan kelayakan dan biaya lain tetap berlaku.</string>
     <string name="nm_free_bulk_retry">Tidak ada model yang memenuhi syarat saat ini. Perbarui katalog dan coba lagi.</string>
+    <string name="nm_image_retry_question">Ingin mencoba gambar ini lagi? Jawab ya atau minta coba lagi.</string>
 </resources>
