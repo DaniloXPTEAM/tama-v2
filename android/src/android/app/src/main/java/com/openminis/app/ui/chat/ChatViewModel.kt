@@ -10173,8 +10173,26 @@ class ChatViewModel(
                                     resumeAfterCompaction()
                                     return@streamBlock true
                                 }
-                                ContextMaintenance.Action.STOP -> throw LLMError.ProviderError(
-                                    context.getString(R.string.nm_context_limit_reached))
+                                ContextMaintenance.Action.STOP -> {
+                                    // A fallback can introduce a smaller window. This candidate has
+                                    // not been sent the rebuilt request; earlier attempts may have
+                                    // been sent. Keep their completed history and recheck a larger
+                                    // approved candidate through the ordinary automatic selector.
+                                    if (tamaV2Test && nmAutoTurn != null) {
+                                        val prior = _activeEntryId.value
+                                        if (prior != null && requestBudget.window > 0) {
+                                            nmAutoLocalBlocks[prior] = context.getString(R.string.nm_auto_reason_context)
+                                            val larger = try { nmAutoSelect(null, largerThanWindow = requestBudget.window) }
+                                                catch (_: NoLargerContext) { null }
+                                            if (larger != null) {
+                                                nmAutoTurn.exclude(prior)
+                                                nmAutoActivate(larger)
+                                                return@streamBlock true
+                                            }
+                                        }
+                                    }
+                                    throw LLMError.ProviderError(context.getString(R.string.nm_context_limit_reached))
+                                }
                             }
                         }
                         val requestMessages = checkNotNull(preparedMessages)

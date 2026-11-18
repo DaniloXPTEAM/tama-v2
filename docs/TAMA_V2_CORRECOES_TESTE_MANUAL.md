@@ -297,3 +297,9 @@ pede atualização em vez de tratar modelo desconhecido como grátis. O filtro �
 visual e reversível: não apaga modelos salvos, não altera o seletor de chat e
 não garante custo zero. Os testes locais verificam a filtragem e a ligação
 estática; ainda é necessário verificar a tela no Android.
+
+A checagem de capacidade durante a reconstrução após fallback também tenta um
+modelo automático elegível de janela conhecida e estritamente maior antes de
+parar. A tentativa anterior pode já ter sido enviada e cobrada; a nova escolha
+não ignora autorizações. A ligação foi verificada estaticamente, mas ainda não
+foi exercitada em uma conversa Android com fallback real.

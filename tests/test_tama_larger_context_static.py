@@ -18,5 +18,15 @@ class LargerContextWiring(unittest.TestCase):
             self.assertIn(item, guard)
         self.assertNotIn('setAllowUnverifiedAutomaticCost', guard)
 
+    def test_fallback_rebuild_guard_also_checks_a_larger_candidate(self):
+        text = VM.read_text()
+        rebuild = text.split('// nanoMuse: fallback may change provider, model vision and OAuth prefix.', 1)[1]
+        rebuild = rebuild.split('val requestMessages = checkNotNull(preparedMessages)', 1)[0]
+        for item in ('ContextMaintenance.Action.STOP', 'tamaV2Test && nmAutoTurn != null',
+                     'largerThanWindow = requestBudget.window', 'nmAutoTurn.exclude(prior)',
+                     'nmAutoActivate(larger)', 'return@streamBlock true', 'nm_context_limit_reached'):
+            self.assertIn(item, rebuild)
+        self.assertNotIn('setAllowUnverifiedAutomaticCost', rebuild)
+
 if __name__ == '__main__':
     unittest.main()
