@@ -1,8 +1,8 @@
 name: Android verification without uploads
 
 on:
-  pull_request:
-    types: [synchronize]
+  push:
+    branches: ["arena/d9e25272-tama-v2"]
 
 permissions:
   contents: read
@@ -12,14 +12,14 @@ env:
 
 jobs:
   android-check:
-    if: github.head_ref == 'arena/4f0fb56f-tamaaiv2'
     runs-on: ubuntu-24.04
-    timeout-minutes: 80
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: recursive
           persist-credentials: false
+          ref: ${{ github.sha }}
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: temurin
@@ -40,11 +40,21 @@ jobs:
           export GOROOT="$(go env GOROOT)" GOPATH="$(go env GOPATH)"
           export PATH="$GOPATH/bin:$PATH"
           bash scripts/android/build-natives.sh
-      - name: Assemble both debug variants locally
+      # Separate Gradle processes prevent two variant compilers sharing the same heap.
+      - name: Assemble parallel test locally
         working-directory: android/src/android
         run: |
           export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/$NDK_VERSION"
-          ./gradlew :app:assembleDebug :app:assembleTamaTest --console=plain --no-daemon
+          ./gradlew :app:assembleTamaTest --max-workers=1 --console=plain --no-daemon \
+            '-Dorg.gradle.jvmargs=-Xmx4608m -XX:MaxMetaspaceSize=768m -Dfile.encoding=UTF-8' \
+            -Pkotlin.compiler.execution.strategy=in-process -Pkotlin.incremental=false
+      - name: Assemble normal debug locally for identity check
+        working-directory: android/src/android
+        run: |
+          export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/$NDK_VERSION"
+          ./gradlew :app:assembleDebug --max-workers=1 --console=plain --no-daemon \
+            '-Dorg.gradle.jvmargs=-Xmx4608m -XX:MaxMetaspaceSize=768m -Dfile.encoding=UTF-8' \
+            -Pkotlin.compiler.execution.strategy=in-process -Pkotlin.incremental=false
       - name: Run parallel history tests
         working-directory: android/src/android
         run: |
@@ -54,7 +64,10 @@ jobs:
             --tests 'ai.tama.net.GroqHistoryWireTest' \
             --tests 'ai.tama.net.ProviderHistoryInteroperabilityTest' \
             --tests 'ai.tama.router.ModelRouteHistoryTest' \
-            --console=plain --no-daemon
+            --tests 'ai.tama.providers.ProviderEndpointsTest' \
+            --max-workers=1 --console=plain --no-daemon \
+            '-Dorg.gradle.jvmargs=-Xmx4608m -XX:MaxMetaspaceSize=768m -Dfile.encoding=UTF-8' \
+            -Pkotlin.compiler.execution.strategy=in-process -Pkotlin.incremental=false
       - name: Run normal debug isolation tests
         working-directory: android/src/android
         run: |
@@ -63,7 +76,10 @@ jobs:
             --tests 'ai.tama.net.GroqHistoryPolicyTest' \
             --tests 'ai.tama.net.GroqNormalHistoryWireTest' \
             --tests 'ai.tama.router.ModelRouteHistoryTest' \
-            --console=plain --no-daemon
+            --tests 'ai.tama.providers.ProviderEndpointsTest' \
+            --max-workers=1 --console=plain --no-daemon \
+            '-Dorg.gradle.jvmargs=-Xmx4608m -XX:MaxMetaspaceSize=768m -Dfile.encoding=UTF-8' \
+            -Pkotlin.compiler.execution.strategy=in-process -Pkotlin.incremental=false
       - name: Verify separate APK identities locally
         run: |
           python3 scripts/android/verify-parallel-apk.py \
