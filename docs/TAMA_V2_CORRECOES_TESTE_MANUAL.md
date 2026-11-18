@@ -353,6 +353,13 @@ visíveis de chat da lista em um toque. Não muda o modo automático, não autor
 imagem e não liga nenhuma permissão de custo. O catálogo não comprova a cobrança
 final. Sem evidência atual, o filtro não inclui modelos de custo desconhecido.
 
+A aprovação explícita em lote agora ignora identificadores de entrada duplicados
+em qualquer conta e modelos duplicados na conta, inclusive duplicatas ocultas;
+também recusa IDs duplicados de conta. Isso evita aprovar uma identidade ambígua
+após importações ou configurações inconsistentes. Não remove nem altera entradas;
+o usuário pode resolvê-las antes de aprovar. Os testes são sintéticos e não
+comprovam comportamento das preferências Android em um aparelho.
+
 Se uma recusa oficial indicar limite de gastos zero, o app restringe o chat aos
 gratuitos para aquela chave enquanto a observação estiver ativa. Se não houver
 rota elegível, mostra a explicação em português em vez do código HTTP. Catálogos

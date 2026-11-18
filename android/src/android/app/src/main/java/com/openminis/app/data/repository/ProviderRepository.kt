@@ -2413,7 +2413,9 @@ class ProviderRepository(private val context: Context) {
         val secrets = encryptedPrefs // initialize before acquiring either lock
         return synchronized(configLock) {
             ensureConfigLoaded()
-            val live = _config.value.instances.firstOrNull { it.id == instanceId } ?: return@synchronized 0
+            // nanoMuse: a duplicated provider id cannot identify the account whose routes are approved.
+            val matchingInstances = _config.value.instances.filter { it.id == instanceId }
+            val live = matchingInstances.singleOrNull() ?: return@synchronized 0
             if (!live.isEnabled || !tamaFreeChatOnly(live) || live.providerType != ProviderType.openRouter ||
                 live.credentialType != ProviderCredential.apiKey ||
                 io.github.nanomuse.cloud.NanoMuseCloud.instance(context)?.id == instanceId) return@synchronized 0

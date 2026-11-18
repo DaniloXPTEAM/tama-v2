@@ -9,7 +9,8 @@ class FreeBulkIntegration(unittest.TestCase):
     def test_revalidated_and_cost_policy_is_not_changed(self):
         repo = (MAIN / "com/openminis/app/data/repository/ProviderRepository.kt").read_text()
         section = repo.split("private fun tamaApproveFreeChatModels", 1)[1].split("/** Fresh exact-model", 1)[0]
-        for guard in ("APPLICATION_ID", "synchronized(configLock)", "ProviderType.openRouter",
+        for guard in ("APPLICATION_ID", "synchronized(configLock)", "matchingInstances.singleOrNull()",
+                      "ProviderType.openRouter",
                       "ProviderCredential.apiKey", "tamaFreeChatOnly(live)", "credentialTransaction",
                       "evidence.current(", "accountVersion(instanceId)", "FreeModelBulk.select(",
                       "approveFreeChatBatch(context, identities)"):
