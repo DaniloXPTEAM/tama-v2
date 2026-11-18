@@ -108,6 +108,13 @@ fun TokenUsageSheet(
 
             StatSection(title = stringResource(R.string.token_usage_section_agent_loop)) {
                 StatRow(stringResource(R.string.token_usage_total_loops), (s?.loopCount ?: 0).toString())
+                if (com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test") {
+                    Text(
+                        text = stringResource(R.string.nm_loop_estimate_explanation),
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         }
     }

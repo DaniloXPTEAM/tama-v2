@@ -1546,4 +1546,5 @@
     <string name="nm_key_destination_body">A chave parece ser da %1$s, mas será enviada para %2$s. Confirme somente se confiar nesse destino. Isso não autoriza cobranças.</string>
     <string name="nm_key_destination_blocked">A chave e o endereço não correspondem. Abra as configurações do provedor e corrija ou confirme o destino antes de enviar.</string>
     <string name="nm_key_destination_invalid">O endereço é inválido ou não usa HTTPS. Corrija antes de continuar.</string>
+    <string name="nm_loop_estimate_explanation">Estimativa desta conversa: o maior entre mensagens do assistente e blocos de ferramentas. Não é uma contagem exata de pedidos nem de cobranças.</string>
 </resources>

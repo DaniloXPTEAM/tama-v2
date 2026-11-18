@@ -1525,4 +1525,5 @@
     <string name="nm_key_destination_body">This key looks like %1$s, but will be sent to %2$s. Confirm only if you trust this destination. This does not authorize charges.</string>
     <string name="nm_key_destination_blocked">The key and address do not match. Open provider settings and correct or confirm the destination before sending.</string>
     <string name="nm_key_destination_invalid">The address is invalid or does not use HTTPS. Correct it before continuing.</string>
+    <string name="nm_loop_estimate_explanation">Estimated from this session: the larger of assistant messages or tool blocks. It is not an exact count of requests or charges.</string>
 </resources>

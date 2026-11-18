@@ -113,3 +113,11 @@ segredos não foram criados nesta sessão: a consulta às permissões retornou H
 A compilação Android e o uso dos segredos no Actions não foram verificados. Mesmo com
 uma nova chave estável, atualizar o APK já instalado só é possível se o certificado for
 o mesmo da instalação anterior. Não desinstalar ou limpar dados para contornar isso.
+
+## Número de loops na folha de tokens
+
+No código atual, o número é uma estimativa da conversa inteira: o maior valor
+entre a quantidade de mensagens do assistente e a soma de blocos de ferramentas
+que não são texto nem informação (`loadSessionTokenStats`). Assim, um valor 11
+não demonstra 11 chamadas de API, cobranças ou laços reais. Sem dados do teste
+antigo, não é possível identificar quais mensagens originaram esse 11.
