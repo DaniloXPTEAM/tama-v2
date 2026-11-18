@@ -21,6 +21,10 @@ def categories(text: str, exit_code: int) -> list[str]:
         found.append("Android resource processing reported an error")
     if any(s in lower for s in ("keystore was tampered", "keystore file not found", "failed to read key")):
         found.append("Signing configuration may need attention")
+    if "there were failing tests" in lower:
+        found.append("Gradle reported failing unit tests")
+    if "no tests found for given includes" in lower:
+        found.append("Gradle found no tests for the selected filters")
     return found or ["No known failure category was found in the captured build output"]
 
 

@@ -18,13 +18,29 @@ class FailureSummary(unittest.TestCase):
         self.assertEqual(["Resource pressure or terminated build process may be involved"], module.categories("", 137))
         self.assertEqual(["No known failure category was found in the captured build output"], module.categories("unrecognized", 1))
 
+    def test_unit_test_diagnostics_distinguish_assertions_from_missing_filters(self):
+        for message, category in (
+            ("There were failing tests. See the report at: file:///fixture", "Gradle reported failing unit tests"),
+            ("No tests found for given includes: [fixture]", "Gradle found no tests for the selected filters"),
+        ):
+            self.assertEqual([category], module.categories(message, 1))
+
     def test_workflow_preserves_failure_and_cleans_log(self):
         workflow = (SCRIPT.parents[2] / '.github/workflows/android.yml').read_text()
-        assemble = workflow.split('- name: Assemble parallel test locally', 1)[1].split('- name: Assemble normal debug locally', 1)[0]
-        for part in ('set -o pipefail', 'status=$?', 'exit "$status"', 'summarize-build-failure.py', 'rm -f "$RUNNER_TEMP/tama-assemble.log"'):
-            self.assertIn(part, assemble)
-        self.assertIn('"$RUNNER_TEMP/tama-test-signing.jks" "$RUNNER_TEMP/tama-assemble.log"', workflow)
-        self.assertNotIn('cat "$RUNNER_TEMP/tama-assemble.log"', workflow)
+        for step, log in (
+            ('Assemble parallel test locally', 'tama-assemble.log'),
+            ('Run parallel routing, key probe and history tests', 'tama-unit-tests.log'),
+        ):
+            body = workflow.split(f'- name: {step}', 1)[1].split('- name:', 1)[0]
+            for part in ('set -o pipefail', 'status=$?', 'exit "$status"', 'summarize-build-failure.py',
+                         f'rm -f "$RUNNER_TEMP/{log}"'):
+                self.assertIn(part, body)
+            self.assertIn(f'"$RUNNER_TEMP/{log}"', workflow.split('- name: Remove private test signer', 1)[1])
+            self.assertNotIn(f'cat "$RUNNER_TEMP/{log}"', workflow)
+        self.assertLess(workflow.index('- name: Verify separate APK identities locally'),
+                        workflow.index('- name: Run parallel routing, key probe and history tests'))
+        self.assertLess(workflow.index('- name: Run normal debug isolation tests'),
+                        workflow.index('- name: Deliver only to a new restricted Drive folder'))
 
     def test_log_data_is_never_echoed(self):
         fixture = "fixture-private-token-XYZ123"

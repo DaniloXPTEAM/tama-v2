@@ -111,6 +111,14 @@ jobs:
           ./gradlew :app:assembleDebug --max-workers=1 --console=plain --no-daemon \
             '-Dorg.gradle.jvmargs=-Xmx4608m -XX:MaxMetaspaceSize=768m -Dfile.encoding=UTF-8' \
             -Pkotlin.compiler.execution.strategy=in-process -Pkotlin.incremental=false
+      - name: Verify separate APK identities locally
+        run: |
+          python3 scripts/android/verify-parallel-apk.py \
+            --aapt "$ANDROID_HOME/build-tools/35.0.0/aapt" \
+            --apksigner "$ANDROID_HOME/build-tools/35.0.0/apksigner" \
+            --apk android/src/android/app/build/outputs/apk/tamaTest/app-tamaTest.apk \
+            --normal-apk android/src/android/app/build/outputs/apk/debug/app-debug.apk \
+            --out-dir /tmp/tama-identity-check
       - name: Run parallel routing, key probe and history tests
         working-directory: android/src/android
         env:
@@ -120,7 +128,8 @@ jobs:
         run: |
           if [ -f "$RUNNER_TEMP/tama-test-signing.jks" ]; then export TAMA_TEST_KEYSTORE_FILE="$RUNNER_TEMP/tama-test-signing.jks"; fi
           export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/$NDK_VERSION"
-          ./gradlew :app:testTamaTestUnitTest \
+          set -o pipefail
+          if ./gradlew :app:testTamaTestUnitTest \
             --tests 'ai.tama.net.GroqHistoryPolicyTest' \
             --tests 'ai.tama.net.GroqHistoryWireTest' \
             --tests 'ai.tama.net.ProviderHistoryInteroperabilityTest' \
@@ -140,7 +149,14 @@ jobs:
             --tests 'ai.tama.providers.ProviderEndpointsTest' \
             --max-workers=1 --console=plain --no-daemon \
             '-Dorg.gradle.jvmargs=-Xmx4608m -XX:MaxMetaspaceSize=768m -Dfile.encoding=UTF-8' \
-            -Pkotlin.compiler.execution.strategy=in-process -Pkotlin.incremental=false
+            -Pkotlin.compiler.execution.strategy=in-process -Pkotlin.incremental=false 2>&1 | tee "$RUNNER_TEMP/tama-unit-tests.log"; then
+            rm -f "$RUNNER_TEMP/tama-unit-tests.log"
+          else
+            status=$?
+            python3 ../../../scripts/android/summarize-build-failure.py "$RUNNER_TEMP/tama-unit-tests.log" "$status" || true
+            rm -f "$RUNNER_TEMP/tama-unit-tests.log"
+            exit "$status"
+          fi
       - name: Run normal debug isolation tests
         working-directory: android/src/android
         run: |
@@ -153,14 +169,6 @@ jobs:
             --max-workers=1 --console=plain --no-daemon \
             '-Dorg.gradle.jvmargs=-Xmx4608m -XX:MaxMetaspaceSize=768m -Dfile.encoding=UTF-8' \
             -Pkotlin.compiler.execution.strategy=in-process -Pkotlin.incremental=false
-      - name: Verify separate APK identities locally
-        run: |
-          python3 scripts/android/verify-parallel-apk.py \
-            --aapt "$ANDROID_HOME/build-tools/35.0.0/aapt" \
-            --apksigner "$ANDROID_HOME/build-tools/35.0.0/apksigner" \
-            --apk android/src/android/app/build/outputs/apk/tamaTest/app-tamaTest.apk \
-            --normal-apk android/src/android/app/build/outputs/apk/debug/app-debug.apk \
-            --out-dir /tmp/tama-identity-check
       - name: Check stable signature for private delivery
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.deliver_to_drive }}
         env:
@@ -185,4 +193,4 @@ jobs:
           python3 scripts/android/deliver-private-drive.py android/src/android/app/build/outputs/apk/tamaTest/app-tamaTest.apk
       - name: Remove private test signer
         if: ${{ always() }}
-        run: rm -f "$RUNNER_TEMP/tama-test-signing.jks" "$RUNNER_TEMP/tama-assemble.log"
+        run: rm -f "$RUNNER_TEMP/tama-test-signing.jks" "$RUNNER_TEMP/tama-assemble.log" "$RUNNER_TEMP/tama-unit-tests.log"

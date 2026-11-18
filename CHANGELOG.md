@@ -4,6 +4,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+- Prevented a read-only Android test key check from sending the key again after an HTTP 503 that requests an immediate retry.
+
 - Adjusted the parallel Android test build’s chat header, model picker, avatar footer and Hands setup, with PT-BR labels.
 
 - Counted confirmed personal-key chat responses and offered a larger approved context after a confirmed input overflow in the parallel Android test build.

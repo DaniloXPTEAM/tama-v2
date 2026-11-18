@@ -7,12 +7,15 @@ import com.openminis.app.data.model.ProviderType
 import kotlinx.coroutines.runBlocking
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
+import okhttp3.mockwebserver.QueueDispatcher
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import java.util.concurrent.TimeUnit
 
 class KeyProbeWireTest {
-    @Test fun readOnlyProbeUsesTheResponseForThisKeyAndNeverFollowsRedirects() = runBlocking {
+    @Test fun readOnlyProbeUsesTheResponseForThisKeyWithoutRedirectOrReplay() = runBlocking {
         MockWebServer().use { server ->
+            server.dispatcher = QueueDispatcher().apply { setFailFast(true) }
             server.start()
             val official = checkNotNull(KeyProbePlan.create(ProviderType.openRouter, "https://openrouter.ai/api/v1"))
             val plan = official.copy(url = server.url("/api/v1/key").toString())
@@ -26,13 +29,17 @@ class KeyProbeWireTest {
                 Triple(402, """{"error":{"metadata":{"limit_source":"openrouter_key_limit"}}}""", Outcome.DENIED),
                 Triple(403, "{}", Outcome.DENIED),
                 Triple(302, "", Outcome.UNAVAILABLE),
+                Triple(503, "", Outcome.UNAVAILABLE),
             )
-            for ((status, body, outcome) in fixtures) {
+            for ((index, fixture) in fixtures.withIndex()) {
+                val (status, body, outcome) = fixture
                 server.enqueue(MockResponse().setResponseCode(status).setBody(body).apply {
                     if (status == 302) setHeader("Location", server.url("/unexpected"))
+                    if (status == 503) setHeader("Retry-After", "0")
                 })
                 assertEquals(outcome, KeyProbe.check(plan, "fixture-key").outcome)
-                val request = server.takeRequest()
+                assertEquals("HTTP $status must use one request", index + 1, server.requestCount)
+                val request = checkNotNull(server.takeRequest(2, TimeUnit.SECONDS)) { "Missing probe request" }
                 assertEquals("GET", request.method)
                 assertEquals("/api/v1/key", request.path)
                 assertEquals("Bearer fixture-key", request.getHeader("Authorization"))

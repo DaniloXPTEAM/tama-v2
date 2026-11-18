@@ -407,3 +407,21 @@ permissões de acessibilidade e sobreposição continuam sob controle do Android
 O seletor de modelo padrão não lista nem grava um modelo fora da lista
 confirmada de gratuitos da conta própria quando o filtro está ativo. Nenhum
 modelo pago virou padrão por conta própria. Não há alteração no padrão Cloud.
+
+### Verificação Android da PR #7
+
+A [execução 44372229478](https://github.com/DaniloXPTEAM/tama-v2/actions/runs/44372229478)
+montou os dois APKs de `3413403` com sucesso, mas falhou na etapa de unitários do
+paralelo antes da conferência das identidades. O runner informou assinatura de
+verificação temporária. O log remoto não pôde ser lido neste ambiente; o código de
+saída por si só não identifica o teste que falhou.
+
+O teste HTTP 408 foi ajustado: sem `Retry-After` positivo, o OkHttp pode repetir
+a chamada e esperar uma resposta que o mock não enfileirou. O teste agora exige
+receber o 408 original e o mock responde de imediato a uma chamada inesperada.
+Isso não altera a política de retries do cliente de chat. Separadamente, o teste
+de chave não envia um segundo GET se o serviço responder 503 com `Retry-After: 0`.
+A conferência de identidades agora ocorre assim que os dois builds terminam;
+os unitários continuam obrigatórios antes de qualquer entrega. A falha da etapa
+de unitários do paralelo também recebe diagnóstico por categoria fixa, sem
+anexar APK ou copiar o log para a anotação.

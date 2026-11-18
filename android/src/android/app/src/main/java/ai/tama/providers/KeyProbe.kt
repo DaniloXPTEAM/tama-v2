@@ -9,12 +9,24 @@ import okhttp3.Response
 import org.json.JSONObject
 import java.io.IOException
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.coroutines.resume
 
 /** Explicit one-shot metadata GET; no inference, logs, redirects or retries. */
 internal object KeyProbe {
+    private class Attempt(val sent: AtomicBoolean = AtomicBoolean(false))
+
     private val client = OkHttpClient.Builder()
         .followRedirects(false).followSslRedirects(false).retryOnConnectionFailure(false)
+        // OkHttp can still schedule a follow-up for a 503 with Retry-After: 0.
+        // Reject any second HTTP exchange before it can write the key again.
+        .addNetworkInterceptor { chain ->
+            val request = chain.request()
+            if (request.tag(Attempt::class.java)?.sent?.compareAndSet(false, true) != true) {
+                throw IOException("Key probe cannot repeat a request")
+            }
+            chain.proceed(request)
+        }
         .callTimeout(15, TimeUnit.SECONDS).build()
 
     private val unavailable = KeyProbePlan.Result(KeyProbePlan.Outcome.UNAVAILABLE)
@@ -24,7 +36,8 @@ internal object KeyProbe {
             try {
                 val request = Request.Builder().url(plan.url).get().header(
                     plan.header, if (plan.header == "Authorization") "Bearer $key" else key,
-                ).apply { if (plan.anthropicVersion) header("anthropic-version", "2023-06-01") }.build()
+                ).apply { if (plan.anthropicVersion) header("anthropic-version", "2023-06-01") }
+                    .tag(Attempt::class.java, Attempt()).build()
                 val call = client.newCall(request)
                 continuation.invokeOnCancellation { call.cancel() }
                 call.enqueue(object : Callback {
