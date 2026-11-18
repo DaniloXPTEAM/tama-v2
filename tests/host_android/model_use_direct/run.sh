@@ -73,6 +73,7 @@ kotlinc -nowarn -cp "$CP" -include-runtime -d "$OUT/model-use-host.jar" \
     "$MAIN/ai/tama/net/ProviderCredentials.kt" \
     "$MAIN/ai/tama/net/ProviderErrorDiagnostics.kt" \
     "$MAIN/ai/tama/pricing/ModelCostGuard.kt" \
+    "$MAIN/ai/tama/providers/KeyDestinationGuard.kt" \
     "$MAIN/com/openminis/app/provider/anthropic/AnthropicProvider.kt" \
     "$MAIN/com/openminis/app/provider/openai/OpenAIProvider.kt" \
     "$MAIN/com/openminis/app/provider/openai/ThinkPrefixStreamParser.kt" \
