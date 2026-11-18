@@ -1563,4 +1563,6 @@
     <string name="nm_free_list_filter">Yalnızca ücretsiz listelenen modelleri göster</string>
     <string name="nm_free_list_help">Yalnızca bu listeyi filtreler. Modelleri silmez veya maliyeti garanti etmez. Kayıtlı tüm modelleri görmek için filtreyi kapatın.</string>
     <string name="nm_free_list_refresh">Güncel katalog verisi yok. Model listesini yenileyin veya filtreyi kapatın.</string>
+    <string name="nm_usage_reports_note">Kullanım, kaydedilmiş sağlayıcı raporlarına dayanır ve eksik olabilir. Fatura veya ücret olmadığının kanıtı değildir.</string>
+    <string name="nm_loop_estimate_explanation">Bu konuşma için tahmin: asistan mesajları ile araç bloklarından sayısı daha büyük olan. Tam istek veya ücret sayısı değildir.</string>
 </resources>

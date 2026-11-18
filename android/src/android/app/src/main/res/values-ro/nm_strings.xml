@@ -1567,4 +1567,6 @@
     <string name="nm_free_list_filter">Afișează doar modelele anunțate gratuite</string>
     <string name="nm_free_list_help">Filtrează doar această listă. Nu șterge modele și nu garantează costul. Dezactivează filtrul pentru a vedea toate modelele salvate.</string>
     <string name="nm_free_list_refresh">Nu există date actuale din catalog. Actualizează lista sau dezactivează filtrul.</string>
+    <string name="nm_usage_reports_note">Utilizarea se bazează pe rapoartele salvate ale furnizorilor și poate fi incompletă. Nu este o factură sau o dovadă că nu există costuri.</string>
+    <string name="nm_loop_estimate_explanation">Estimare pentru această conversație: numărul mai mare dintre mesajele asistentului și blocurile de instrumente. Nu este numărul exact de cereri sau taxe.</string>
 </resources>

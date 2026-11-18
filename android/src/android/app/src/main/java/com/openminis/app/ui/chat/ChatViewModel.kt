@@ -1969,6 +1969,8 @@ class ChatViewModel(
         val cacheWrite: Long,
         val context: Int,
         val loopCount: Int,
+        // nanoMuse: zero is not evidence of reported usage when no usable row exists.
+        val hasReportedUsage: Boolean = false,
     )
 
     data class ThinkingInfo(
@@ -1996,15 +1998,24 @@ class ChatViewModel(
     suspend fun loadSessionTokenStats(): SessionTokenStats {
         val sid = realSessionId.ifEmpty { sessionId }
         if (sid.isEmpty()) return SessionTokenStats(0, 0, 0, 0, 0, 0)
-        val usages = chatRepository.sessionTokenUsages(sid)
+        // nanoMuse: context is the last reported positive value in chat order;
+        // preserve the upstream query in the normal application.
+        val usages = if (com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test")
+            chatRepository.sessionTokenUsagesInChatOrder(sid) else chatRepository.sessionTokenUsages(sid)
         var input = 0L
         var output = 0L
         var cacheRead = 0L
         var cacheWrite = 0L
         var context = 0
+        var hasReportedUsage = false
         for (json in usages) {
             try {
                 val obj = org.json.JSONObject(json)
+                // nanoMuse: malformed or absent counts must not be presented as measured zero.
+                val reportedInput = obj.opt("inputTokens") as? Number
+                val reportedOutput = obj.opt("outputTokens") as? Number
+                if (reportedInput != null && reportedOutput != null &&
+                    reportedInput.toLong() >= 0 && reportedOutput.toLong() >= 0) hasReportedUsage = true
                 input += obj.optLong("inputTokens", 0L)
                 output += obj.optLong("outputTokens", 0L)
                 cacheRead += obj.optLong("cacheReadTokens", 0L)
@@ -2018,7 +2029,7 @@ class ChatViewModel(
         val toolCalls = snapshot.filter { it.role == "assistant" }
             .sumOf { msg -> msg.toolBlocks.count { it.kind != "text" && it.kind != "info" } }
         val loops = maxOf(toolCalls, assistantCount)
-        return SessionTokenStats(input, output, cacheRead, cacheWrite, context, loops)
+        return SessionTokenStats(input, output, cacheRead, cacheWrite, context, loops, hasReportedUsage)
     }
 
     // [T-android-split-chat] toggleMemorySheet / dismissMemorySheet moved to ChatViewModelUiStateExt.kt.

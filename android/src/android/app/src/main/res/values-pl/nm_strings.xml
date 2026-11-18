@@ -1571,4 +1571,6 @@
     <string name="nm_free_list_filter">Pokaż tylko modele oznaczone jako darmowe</string>
     <string name="nm_free_list_help">Filtruje tylko tę listę. Nie usuwa modeli ani nie gwarantuje kosztu. Wyłącz filtr, aby zobaczyć wszystkie zapisane modele.</string>
     <string name="nm_free_list_refresh">Brak aktualnych danych katalogu. Odśwież listę modeli lub wyłącz filtr.</string>
+    <string name="nm_usage_reports_note">Zużycie opiera się na zapisanych raportach dostawców i może być niepełne. Nie jest rachunkiem ani dowodem braku kosztów.</string>
+    <string name="nm_loop_estimate_explanation">Szacunek dla tej rozmowy: większa liczba wiadomości asystenta lub bloków narzędzi. To nie jest dokładna liczba żądań ani opłat.</string>
 </resources>

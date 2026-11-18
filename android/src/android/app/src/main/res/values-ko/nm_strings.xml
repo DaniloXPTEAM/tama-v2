@@ -1559,4 +1559,6 @@
     <string name="nm_free_list_filter">무료로 표시된 모델만 보기</string>
     <string name="nm_free_list_help">이 목록만 필터링합니다. 모델을 삭제하지 않으며 비용을 보장하지 않습니다. 저장된 모든 모델을 보려면 필터를 끄세요.</string>
     <string name="nm_free_list_refresh">최신 카탈로그 정보가 없습니다. 모델 목록을 새로 고치거나 필터를 끄세요.</string>
+    <string name="nm_usage_reports_note">사용량은 저장된 제공업체 보고를 기반으로 하며 불완전할 수 있습니다. 청구서나 무료 사용의 증거가 아닙니다.</string>
+    <string name="nm_loop_estimate_explanation">이 대화의 추정치입니다. 어시스턴트 메시지와 도구 블록 중 더 큰 수이며, 요청이나 청구의 정확한 횟수가 아닙니다.</string>
 </resources>

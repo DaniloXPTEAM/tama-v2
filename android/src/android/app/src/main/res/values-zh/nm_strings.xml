@@ -1536,4 +1536,6 @@
     <string name="nm_free_list_filter">仅显示标为免费的模型</string>
     <string name="nm_free_list_help">仅筛选此列表，不删除模型，也不保证费用。关闭筛选可查看所有已保存的模型。</string>
     <string name="nm_free_list_refresh">没有当前目录数据。请刷新模型列表或关闭筛选。</string>
+    <string name="nm_usage_reports_note">用量基于已保存的服务商报告，可能不完整。这不是账单，也不能证明没有费用。</string>
+    <string name="nm_loop_estimate_explanation">本对话的估算值取助手消息数和工具块数中的较大值，并非请求次数或收费次数的准确统计。</string>
 </resources>

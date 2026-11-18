@@ -1563,4 +1563,6 @@
     <string name="nm_free_list_filter">Nur als kostenlos angebotene Modelle anzeigen</string>
     <string name="nm_free_list_help">Filtert nur diese Liste. Löscht keine Modelle und garantiert keine Kosten. Schalte den Filter aus, um alle gespeicherten Modelle zu sehen.</string>
     <string name="nm_free_list_refresh">Keine aktuellen Katalogdaten. Aktualisiere die Modellliste oder schalte den Filter aus.</string>
+    <string name="nm_usage_reports_note">Die Nutzung basiert auf gespeicherten Anbieterangaben und kann unvollständig sein. Sie ist keine Rechnung und kein Nachweis für kostenlose Nutzung.</string>
+    <string name="nm_loop_estimate_explanation">Schätzung für diese Unterhaltung: der höhere Wert aus Assistentennachrichten und Werkzeugblöcken. Keine genaue Anzahl von Anfragen oder Kosten.</string>
 </resources>

@@ -4,6 +4,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+- Clarified the parallel Android chat usage sheet when provider usage has not been reported.
+
 - Added a reversible free-catalogue view filter for own-key OpenRouter providers in the parallel Android test build.
 
 - Replaced literal tool-call markup in image replies with a localized notice in the parallel Android test build.

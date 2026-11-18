@@ -1564,4 +1564,6 @@
     <string name="nm_free_list_filter">Afficher seulement les modèles annoncés gratuits</string>
     <string name="nm_free_list_help">Filtre uniquement cette liste. Ne supprime pas les modèles et ne garantit pas leur coût. Désactivez le filtre pour voir tous les modèles enregistrés.</string>
     <string name="nm_free_list_refresh">Aucune donnée actuelle du catalogue. Actualisez la liste ou désactivez le filtre.</string>
+    <string name="nm_usage_reports_note">La consommation repose sur les rapports enregistrés des fournisseurs et peut être incomplète. Ce n’est ni une facture ni une preuve de gratuité.</string>
+    <string name="nm_loop_estimate_explanation">Estimation pour cette conversation : le plus grand nombre entre les messages de l’assistant et les blocs d’outils. Ce n’est pas un décompte exact des requêtes ou des frais.</string>
 </resources>

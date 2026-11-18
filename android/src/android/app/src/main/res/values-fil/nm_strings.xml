@@ -1563,4 +1563,6 @@
     <string name="nm_free_list_filter">Ipakita lamang ang mga modelong nakalistang libre</string>
     <string name="nm_free_list_help">Ang listahang ito lang ang sinasala. Hindi nito binubura ang mga modelo o ginagarantiya ang gastos. Patayin ang filter para makita ang lahat ng naka-save na modelo.</string>
     <string name="nm_free_list_refresh">Walang kasalukuyang datos ng katalogo. I-refresh ang listahan o patayin ang filter.</string>
+    <string name="nm_usage_reports_note">Batay ang paggamit sa mga naka-save na ulat ng provider at maaaring hindi kumpleto. Hindi ito bill o patunay na walang gastos.</string>
+    <string name="nm_loop_estimate_explanation">Tantiya sa usapang ito: ang mas mataas sa bilang ng mensahe ng assistant o mga bloke ng tool. Hindi ito eksaktong bilang ng request o bayarin.</string>
 </resources>

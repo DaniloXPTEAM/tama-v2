@@ -1559,4 +1559,6 @@
     <string name="nm_free_list_filter">Tampilkan hanya model yang tercantum gratis</string>
     <string name="nm_free_list_help">Hanya memfilter daftar ini. Tidak menghapus model atau menjamin biaya. Matikan filter untuk melihat semua model tersimpan.</string>
     <string name="nm_free_list_refresh">Tidak ada data katalog terbaru. Perbarui daftar model atau matikan filter.</string>
+    <string name="nm_usage_reports_note">Penggunaan berdasarkan laporan penyedia yang tersimpan dan mungkin tidak lengkap. Ini bukan tagihan atau bukti tanpa biaya.</string>
+    <string name="nm_loop_estimate_explanation">Perkiraan percakapan ini: jumlah terbesar antara pesan asisten dan blok alat. Ini bukan jumlah pasti permintaan atau biaya.</string>
 </resources>

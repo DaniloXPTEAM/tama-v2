@@ -1559,4 +1559,6 @@
     <string name="nm_free_list_filter">Tunjukkan hanya model yang disenaraikan percuma</string>
     <string name="nm_free_list_help">Menapis senarai ini sahaja. Tidak memadam model atau menjamin kosnya. Matikan penapis untuk melihat semua model tersimpan.</string>
     <string name="nm_free_list_refresh">Tiada data katalog terkini. Muat semula senarai model atau matikan penapis.</string>
+    <string name="nm_usage_reports_note">Penggunaan berdasarkan laporan penyedia yang disimpan dan mungkin tidak lengkap. Ini bukan bil atau bukti tiada caj.</string>
+    <string name="nm_loop_estimate_explanation">Anggaran untuk perbualan ini: jumlah yang lebih besar antara mesej pembantu dan blok alat. Ini bukan bilangan tepat permintaan atau caj.</string>
 </resources>

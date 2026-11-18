@@ -1559,4 +1559,6 @@
     <string name="nm_free_list_filter">無料と掲載されたモデルのみ表示</string>
     <string name="nm_free_list_help">この一覧だけを絞り込みます。モデルは削除されず、費用は保証されません。すべての保存済みモデルを見るにはフィルターをオフにしてください。</string>
     <string name="nm_free_list_refresh">現在のカタログ情報がありません。モデル一覧を更新するか、フィルターをオフにしてください。</string>
+    <string name="nm_usage_reports_note">使用量は保存されたプロバイダーの報告に基づき、不完全な場合があります。請求書でも無料の証明でもありません。</string>
+    <string name="nm_loop_estimate_explanation">この会話の推定値です。アシスタントのメッセージ数とツールブロック数の多い方で、リクエスト数や請求数の正確な値ではありません。</string>
 </resources>
