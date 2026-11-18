@@ -67,6 +67,15 @@ class ProviderEndpointsTest {
         assertTrue(KeyDestinationGuard.causedByBlock(IllegalStateException(KeyDestinationGuard.Blocked())))
     }
 
+    @Test fun `no own key does not activate the key destination review`() {
+        // This tests only the key guard, not Cloud initialization or a real conversation.
+        for (base in listOf(null, "", "https://cloud.example.invalid/v1")) {
+            assertNull(KeyDestinationGuard.review(null, base))
+            assertTrue(KeyDestinationGuard.permits(null, base))
+            KeyDestinationGuard.requireAllowed(true, null, base)
+        }
+    }
+
     @Test fun `only unique informative hints match and manual endpoints are never overwritten`() {
         val hints = listOf(
             "router" to "sk-or-v1-…", "groq" to "gsk_…", "one" to "sk-…",

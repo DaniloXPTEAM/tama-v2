@@ -51,6 +51,13 @@ fun main() {
     equal(false, ProviderKeySuggestion.mayFill(false, true, false))
     equal(true, ProviderKeySuggestion.mayFill(false, false, false))
 
+    // This is only the key-review policy, not the Cloud initialization or chat path.
+    for (base in listOf(null, "", "https://cloud.example.invalid/v1")) {
+        equal(null, KeyDestinationGuard.review(null, base))
+        equal(true, KeyDestinationGuard.permits(null, base))
+        KeyDestinationGuard.requireAllowed(true, null, base)
+    }
+
     val groqKey = "gsk_synthetic"
     val routerKey = "sk-or-synthetic"
     val openAI = ProviderEndpoints.factoryBase(ProviderType.openAI, null, true)
