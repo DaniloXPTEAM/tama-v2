@@ -1519,8 +1519,8 @@
     <string name="nm_provider_known_title">ผู้ให้บริการที่รู้จัก</string>
     <string name="nm_provider_known_help">เลือกผู้ให้บริการของคีย์เพื่อกรอก endpoint ผู้ให้บริการบางรายใช้ที่อยู่ต่างกันตามภูมิภาค</string>
     <string name="nm_provider_show_all">แสดงผู้ให้บริการทั้งหมด</string>
-    <string name="nm_key_autofill_confirm">แนะนำ endpoint สำหรับ %1$s แตะเพื่อยืนยันผู้ให้บริการ</string>
-    <string name="nm_key_autofill_help">คำนำหน้าเป็นเพียงคำใบ้ โปรดยืนยันผู้ให้บริการก่อนบันทึก คุณแก้ไขที่อยู่ได้</string>
+    <string name="nm_key_autofill_confirm">ผู้ให้บริการที่แนะนำ: %1$s</string>
+    <string name="nm_key_autofill_help">คำนำหน้าเป็นเพียงคำแนะนำ ที่อยู่จะเปลี่ยนเมื่อคุณเลือกคำแนะนำเท่านั้น</string>
     <string name="nm_endpoint_region">ภูมิภาคของ endpoint</string>
     <string name="nm_endpoint_region_help">เลือกภูมิภาคของบัญชี การเปลี่ยนภูมิภาคจะเปลี่ยนที่อยู่</string>
     <string name="nm_endpoint_global">ทั่วโลก</string>
@@ -1543,8 +1543,8 @@
     <string name="nm_key_destination_blocked">คีย์และที่อยู่ไม่ตรงกัน เปิดการตั้งค่าผู้ให้บริการแล้วแก้ไขหรือยืนยันปลายทางก่อนส่ง</string>
     <string name="nm_key_destination_invalid">ที่อยู่ไม่ถูกต้องหรือไม่ได้ใช้ HTTPS โปรดแก้ไขก่อนดำเนินการต่อ</string>
     <string name="nm_key_probe_button">ทดสอบคีย์</string>
-    <string name="nm_key_probe_help">ส่งคีย์ไปยังรายการโมเดลทางการโดยไม่ส่งข้อความ ผลลัพธ์ไม่รับประกันการเข้าถึงหรือค่าใช้จ่าย</string>
-    <string name="nm_key_probe_accepted">ยอมรับคำขอรายการโมเดลแล้ว แต่ไม่ได้พิสูจน์ว่าคีย์ถูกต้อง</string>
+    <string name="nm_key_probe_help">การทดสอบอ่านข้อมูลจาก API ทางการ ไม่ส่งข้อความและไม่เรียกใช้โมเดล</string>
+    <string name="nm_key_probe_accepted">ผู้ให้บริการยอมรับการทดสอบ แต่ไม่ได้รับรองสิทธิ์ใช้โมเดลหรือค่าใช้จ่าย</string>
     <string name="nm_key_probe_rejected">ผู้ให้บริการปฏิเสธคีย์</string>
     <string name="nm_key_probe_denied">ผู้ให้บริการปฏิเสธการเข้าถึง โดยไม่ทราบสาเหตุ</string>
     <string name="nm_key_probe_unavailable">ทดสอบคีย์ไม่ได้ โปรดตรวจสอบการเชื่อมต่อ</string>
@@ -1562,4 +1562,5 @@
     <string name="nm_usage_reports_note">การใช้งานอิงตามรายงานของผู้ให้บริการที่บันทึกไว้และอาจไม่ครบถ้วน ไม่ใช่ใบแจ้งหนี้หรือหลักฐานว่าไม่มีค่าใช้จ่าย</string>
     <string name="nm_loop_estimate_explanation">ค่าประมาณของบทสนทนานี้ใช้จำนวนที่มากกว่าระหว่างข้อความผู้ช่วยกับบล็อกเครื่องมือ ไม่ใช่จำนวนคำขอหรือค่าบริการที่แน่นอน</string>
     <string name="nm_free_chat_choose">เลือกโมเดลฟรีหรือรีเฟรชรายการโมเดลของผู้ให้บริการ</string>
+    <string name="nm_key_probe_no_credit">ผู้ให้บริการแจ้งว่าเครดิตไม่พอ</string>
 </resources>

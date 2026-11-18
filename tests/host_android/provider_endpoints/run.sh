@@ -24,7 +24,9 @@ form = (main / 'com/openminis/app/ui/settings/AddProviderScreen.kt').read_text()
 assert 'ai.tama.providers.KnownProviderSection(onSelect = onSelectVoiceTemplate)' in form
 assert 'voiceTemplate?.baseURL ?: if (nmParallel) ai.tama.providers.ProviderEndpoints.editableDefault(providerType)' in form
 assert 'ai.tama.providers.ProviderEndpoints.storageBase(providerType, trimmedBase, appendV1Suffix)' in form
-assert '(!nmParallel || (!autoSuggested && nmDestinationAllowed))' in form
+assert 'enabled = nmDestinationAllowed &&' in form
+assert 'OpenRouterEndpointSection()' in form
+assert 'onApiKeyChange = onApiKeyChange' in form
 assert 'KeyDestinationGuard.permits(apiKey, nmDestination)' in form
 provider = (main / 'com/openminis/app/provider/openai/OpenAIProvider.kt').read_text()
 assert provider.index('KeyDestinationGuard.requireAllowed(') < provider.index('val body = if (isCodexImageModel)')

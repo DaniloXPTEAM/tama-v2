@@ -4,6 +4,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+- Added a read-only key check to the saved-provider screen and kept provider-prefix hints from replacing the address on paste in the parallel Android test build.
+
 - Unified the personal-key free chat filter and bulk approval in the parallel Android test build without changing the cost guards.
 
 - Fixed automatic chat recovery for misconfigured recipients and explicit provider refusals on personal-key routes in the parallel Android test build.

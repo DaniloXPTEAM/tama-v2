@@ -104,9 +104,8 @@ class ProviderEndpointsTest {
         assertNull(ProviderKeySuggestion.match("eyJsynthetic", hints))
         assertNull(ProviderKeySuggestion.match("anything", hints))
         assertNull(ProviderKeySuggestion.match("gsk_synthetic", hints + ("other" to "gsk_…")))
-        assertTrue(ProviderKeySuggestion.mayFill(endpointEdited = false, hasSelectedVendor = false, autoSuggested = false))
-        assertTrue(ProviderKeySuggestion.mayFill(endpointEdited = false, hasSelectedVendor = true, autoSuggested = true))
-        assertFalse(ProviderKeySuggestion.mayFill(endpointEdited = true, hasSelectedVendor = false, autoSuggested = false))
-        assertFalse(ProviderKeySuggestion.mayFill(endpointEdited = false, hasSelectedVendor = true, autoSuggested = false))
+        assertTrue(ProviderKeySuggestion.mayOfferPreset(endpointEdited = false, hasSelectedVendor = false))
+        assertFalse(ProviderKeySuggestion.mayOfferPreset(endpointEdited = true, hasSelectedVendor = false))
+        assertFalse(ProviderKeySuggestion.mayOfferPreset(endpointEdited = false, hasSelectedVendor = true))
     }
 }

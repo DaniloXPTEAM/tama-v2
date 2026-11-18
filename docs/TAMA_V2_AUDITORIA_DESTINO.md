@@ -47,3 +47,19 @@ prefixo não bloqueia uma chave nula. Não executam inicialização da Cloud, au
 seleção do modelo, persistência ou conversa. Portanto, o caso completo com zero
 chaves próprias **não foi verificado** e ainda precisa de um teste de integração e
 um teste no aparelho. Nenhuma configuração ou código da Cloud foi editado nesta rodada.
+
+## Testar chave na tela de cadastro e no provedor salvo
+
+Escolher Groq preenche `https://api.groq.com/openai` e anexa `/v1`. A tela do
+OpenRouter mostra a base fixa `https://openrouter.ai/api` e a versão usada. Colar
+uma chave só sugere o provedor: não muda nem salva o endereço. Na configuração
+antiga de Groq com tipo OpenAI e endereço vazio ou padrão, toque na sugestão e
+em **Salvar configurações da URL** para corrigir.
+
+**Testar chave** verifica os destinos oficiais suportados com GET, sem inferência,
+redirecionamento ou repetição. No OpenRouter consulta os dados da própria chave;
+limite configurado zero não é a mesma coisa que saldo zero ou limite restante
+esgotado. Só mostra falta de crédito diante de uma indicação explícita. Um teste
+aceito não é teste de conversa. Em gateways o teste oficial fica indisponível,
+sem bloquear a configuração existente. Alterar a chave ou o destino descarta o
+resultado antigo.

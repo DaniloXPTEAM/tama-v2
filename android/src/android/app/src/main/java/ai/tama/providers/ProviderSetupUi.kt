@@ -69,8 +69,7 @@ internal fun KnownProviderSection(onSelect: (VoiceProviderTemplate) -> Unit) {
 /** Suggest locally. Prefixes are hints, not proof of an account or recipient. */
 internal fun suggestedKeyProvider(context: android.content.Context, apiKey: String): VoiceProviderTemplate? {
     val providers = ProviderCatalogue.load(context).filter { it.takesKey }
-    // nanoMuse: AQ. is only a local hint; confirmation is still required before saving.
-    val hints = providers.map { it.id to it.keyHint } + listOf("gemini" to "AQ.…")
+    val hints = providers.map { it.id to it.keyHint } + listOf("gemini" to "AQ.…", "openrouter" to "sk-or-…")
     val matchId = ProviderKeySuggestion.match(apiKey, hints) ?: return null
     val provider = providers.firstOrNull { it.id == matchId } ?: return null
     return OwnKeyPresets.template(provider, Region.mainland(context), ProviderCatalogue.chinese(context))
@@ -110,13 +109,14 @@ internal fun KeyDestinationReview(key: String, endpoint: String?): Boolean {
     return allowed
 }
 
-/** An inferred endpoint is displayed immediately, but cannot be saved without this tap. */
+/** A suggestion does not change either endpoint or vendor until the person taps. */
 @Composable
-internal fun KeyProviderConfirmation(providerName: String, onConfirm: () -> Unit) {
+internal fun KeyProviderHint(providerName: String, applyPreset: (() -> Unit)?) {
     SettingsSection(footer = stringResource(R.string.nm_key_autofill_help)) {
         SettingsRow(
             title = stringResource(R.string.nm_key_autofill_confirm, providerName),
-            onClick = onConfirm,
+            onClick = applyPreset,
+            showChevron = applyPreset != null,
             showDivider = false,
         )
     }
@@ -185,13 +185,15 @@ internal fun FreeModelImportSection(
 }
 
 @Composable
-internal fun FixedEndpointSection(endpoint: String) {
+internal fun OpenRouterEndpointSection() {
     SettingsSection(
         header = stringResource(R.string.add_provider_endpoint),
-        footer = stringResource(R.string.nm_endpoint_fixed_help),
+        footer = stringResource(R.string.nm_endpoint_fixed_help) + "\n" + stringResource(
+            R.string.nm_endpoint_effective, "${ProviderEndpoints.OPENROUTER_BASE}/v1",
+        ),
     ) {
         SettingsRow(
-            title = stringResource(R.string.nm_endpoint_effective, endpoint),
+            title = ProviderEndpoints.OPENROUTER_BASE,
             showChevron = false,
             showDivider = false,
         )

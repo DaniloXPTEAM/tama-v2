@@ -1523,8 +1523,8 @@
     <string name="nm_provider_known_title">Provedores conhecidos</string>
     <string name="nm_provider_known_help">Escolha o provedor da sua chave para preencher o endpoint. Alguns usam endereços diferentes por região.</string>
     <string name="nm_provider_show_all">Mostrar todos os provedores</string>
-    <string name="nm_key_autofill_confirm">Endpoint sugerido para %1$s. Toque para confirmar o provedor.</string>
-    <string name="nm_key_autofill_help">O prefixo é apenas uma sugestão. Confirme o provedor antes de salvar. Você pode editar o endereço.</string>
+    <string name="nm_key_autofill_confirm">Provedor sugerido: %1$s</string>
+    <string name="nm_key_autofill_help">O prefixo é só uma dica. O endereço só muda se você tocar na sugestão.</string>
     <string name="nm_endpoint_region">Região do endpoint</string>
     <string name="nm_endpoint_region_help">Escolha a região da sua conta. Mudar a região substitui o endereço.</string>
     <string name="nm_endpoint_global">Global</string>
@@ -1548,8 +1548,8 @@
     <string name="nm_key_destination_invalid">O endereço é inválido ou não usa HTTPS. Corrija antes de continuar.</string>
     <string name="nm_loop_estimate_explanation">Estimativa desta conversa: o maior entre mensagens do assistente e blocos de ferramentas. Não é uma contagem exata de pedidos nem de cobranças.</string>
     <string name="nm_key_probe_button">Testar chave</string>
-    <string name="nm_key_probe_help">Envia a chave à lista oficial de modelos. Não envia mensagem. O resultado não garante acesso aos modelos nem custo.</string>
-    <string name="nm_key_probe_accepted">A consulta da lista de modelos foi aceita. Isso não comprova que a chave é válida.</string>
+    <string name="nm_key_probe_help">O teste consulta a API oficial do provedor. Não envia mensagens nem executa modelos.</string>
+    <string name="nm_key_probe_accepted">O provedor aceitou o teste. Isso não garante que a chave funcione com todos os modelos nem que o uso seja gratuito.</string>
     <string name="nm_key_probe_rejected">O provedor recusou a chave.</string>
     <string name="nm_key_probe_denied">O provedor negou o acesso; o motivo não é conhecido.</string>
     <string name="nm_key_probe_unavailable">Não foi possível testar a chave. Confira a conexão e tente novamente.</string>
@@ -1566,4 +1566,5 @@
     <string name="nm_free_list_refresh">Não há evidência atual do catálogo. Atualize a lista de modelos ou desligue o filtro.</string>
     <string name="nm_usage_reports_note">O uso se baseia nos relatórios salvos dos provedores e pode estar incompleto. Não é uma fatura nem prova de custo zero.</string>
     <string name="nm_free_chat_choose">Escolha um modelo gratuito ou atualize a lista nas configurações do provedor.</string>
+    <string name="nm_key_probe_no_credit">O provedor informou que não há crédito suficiente.</string>
 </resources>

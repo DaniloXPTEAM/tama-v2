@@ -1519,8 +1519,8 @@
     <string name="nm_provider_known_title">登録済みのプロバイダー</string>
     <string name="nm_provider_known_help">キーのプロバイダーを選ぶとエンドポイントが入力されます。地域によってアドレスが異なる場合があります。</string>
     <string name="nm_provider_show_all">すべてのプロバイダーを表示</string>
-    <string name="nm_key_autofill_confirm">%1$s のエンドポイント候補です。タップしてプロバイダーを確認してください。</string>
-    <string name="nm_key_autofill_help">接頭辞は目安にすぎません。保存前にプロバイダーを確認してください。アドレスは変更できます。</string>
+    <string name="nm_key_autofill_confirm">候補のプロバイダー: %1$s</string>
+    <string name="nm_key_autofill_help">接頭辞は参考情報です。候補を選んだ場合にのみアドレスが変わります。</string>
     <string name="nm_endpoint_region">エンドポイントの地域</string>
     <string name="nm_endpoint_region_help">アカウントの地域を選んでください。地域を変更するとアドレスが置き換わります。</string>
     <string name="nm_endpoint_global">グローバル</string>
@@ -1543,8 +1543,8 @@
     <string name="nm_key_destination_blocked">キーとアドレスが一致しません。送信前にプロバイダー設定で送信先を修正または確認してください。</string>
     <string name="nm_key_destination_invalid">アドレスが無効かHTTPSではありません。続行する前に修正してください。</string>
     <string name="nm_key_probe_button">キーをテスト</string>
-    <string name="nm_key_probe_help">キーを公式のモデル一覧に送信します。メッセージは送信しません。利用や料金は保証されません。</string>
-    <string name="nm_key_probe_accepted">モデル一覧の要求が受け付けられました。キーが有効である証明にはなりません。</string>
+    <string name="nm_key_probe_help">公式 API から情報を取得します。メッセージの送信やモデルの実行は行いません。</string>
+    <string name="nm_key_probe_accepted">確認リクエストが受理されました。モデルの利用可否や費用は保証されません。</string>
     <string name="nm_key_probe_rejected">プロバイダーがキーを拒否しました。</string>
     <string name="nm_key_probe_denied">アクセスが拒否されました。理由は不明です。</string>
     <string name="nm_key_probe_unavailable">キーを確認できませんでした。接続を確認してください。</string>
@@ -1562,4 +1562,5 @@
     <string name="nm_usage_reports_note">使用量は保存されたプロバイダーの報告に基づき、不完全な場合があります。請求書でも無料の証明でもありません。</string>
     <string name="nm_loop_estimate_explanation">この会話の推定値です。アシスタントのメッセージ数とツールブロック数の多い方で、リクエスト数や請求数の正確な値ではありません。</string>
     <string name="nm_free_chat_choose">無料モデルを選択するか、プロバイダーのモデル一覧を更新してください。</string>
+    <string name="nm_key_probe_no_credit">プロバイダーからクレジット不足が報告されました。</string>
 </resources>

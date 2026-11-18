@@ -1519,8 +1519,8 @@
     <string name="nm_provider_known_title">Penyedia yang dikenal</string>
     <string name="nm_provider_known_help">Pilih penyedia kunci untuk mengisi endpoint. Beberapa penyedia menggunakan alamat berbeda menurut wilayah.</string>
     <string name="nm_provider_show_all">Tampilkan semua penyedia</string>
-    <string name="nm_key_autofill_confirm">Endpoint disarankan untuk %1$s. Ketuk untuk mengonfirmasi penyedia.</string>
-    <string name="nm_key_autofill_help">Awalan hanya petunjuk. Konfirmasikan penyedia sebelum menyimpan. Anda dapat mengubah alamat.</string>
+    <string name="nm_key_autofill_confirm">Saran penyedia: %1$s</string>
+    <string name="nm_key_autofill_help">Awalan hanya petunjuk. Alamat berubah hanya jika Anda memilih saran.</string>
     <string name="nm_endpoint_region">Wilayah endpoint</string>
     <string name="nm_endpoint_region_help">Pilih wilayah akun Anda. Mengubah wilayah akan mengganti alamat.</string>
     <string name="nm_endpoint_global">Global</string>
@@ -1543,8 +1543,8 @@
     <string name="nm_key_destination_blocked">Kunci dan alamat tidak cocok. Buka pengaturan penyedia dan perbaiki atau konfirmasi tujuan sebelum mengirim.</string>
     <string name="nm_key_destination_invalid">Alamat tidak valid atau tidak menggunakan HTTPS. Perbaiki sebelum melanjutkan.</string>
     <string name="nm_key_probe_button">Uji kunci</string>
-    <string name="nm_key_probe_help">Mengirim kunci ke daftar model resmi, tanpa pesan. Hasil tidak menjamin akses atau biaya.</string>
-    <string name="nm_key_probe_accepted">Permintaan daftar model diterima. Ini tidak membuktikan kunci valid.</string>
+    <string name="nm_key_probe_help">Pemeriksaan membaca data dari API resmi. Tidak mengirim pesan atau menjalankan model.</string>
+    <string name="nm_key_probe_accepted">Penyedia menerima pemeriksaan. Ini tidak menjamin akses ke model atau biayanya.</string>
     <string name="nm_key_probe_rejected">Penyedia menolak kunci.</string>
     <string name="nm_key_probe_denied">Penyedia menolak akses; alasannya tidak diketahui.</string>
     <string name="nm_key_probe_unavailable">Kunci tidak dapat diuji. Periksa koneksi.</string>
@@ -1562,4 +1562,5 @@
     <string name="nm_usage_reports_note">Penggunaan berdasarkan laporan penyedia yang tersimpan dan mungkin tidak lengkap. Ini bukan tagihan atau bukti tanpa biaya.</string>
     <string name="nm_loop_estimate_explanation">Perkiraan percakapan ini: jumlah terbesar antara pesan asisten dan blok alat. Ini bukan jumlah pasti permintaan atau biaya.</string>
     <string name="nm_free_chat_choose">Pilih model gratis atau perbarui daftar model penyedia.</string>
+    <string name="nm_key_probe_no_credit">Penyedia melaporkan kredit tidak cukup.</string>
 </resources>

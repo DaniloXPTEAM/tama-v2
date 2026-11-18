@@ -1502,8 +1502,8 @@
     <string name="nm_provider_known_title">Known providers</string>
     <string name="nm_provider_known_help">Choose the provider of your key to fill its endpoint. Some providers use different regional addresses.</string>
     <string name="nm_provider_show_all">Show all providers</string>
-    <string name="nm_key_autofill_confirm">Endpoint suggested for %1$s. Tap to confirm this provider.</string>
-    <string name="nm_key_autofill_help">The prefix is only a hint. Confirm the provider before saving. You can edit the address.</string>
+    <string name="nm_key_autofill_confirm">Suggested provider: %1$s</string>
+    <string name="nm_key_autofill_help">The prefix is only a hint. The address changes only if you select the suggestion.</string>
     <string name="nm_endpoint_region">Endpoint region</string>
     <string name="nm_endpoint_region_help">Choose the region of your account. Changing the region replaces the address.</string>
     <string name="nm_endpoint_global">Global</string>
@@ -1527,8 +1527,8 @@
     <string name="nm_key_destination_invalid">The address is invalid or does not use HTTPS. Correct it before continuing.</string>
     <string name="nm_loop_estimate_explanation">Estimated from this session: the larger of assistant messages or tool blocks. It is not an exact count of requests or charges.</string>
     <string name="nm_key_probe_button">Test key</string>
-    <string name="nm_key_probe_help">Sends the key to the official model list. No message is sent. A result does not guarantee model access or cost.</string>
-    <string name="nm_key_probe_accepted">The model list request was accepted. This does not prove the key is valid.</string>
+    <string name="nm_key_probe_help">Check uses the official provider API to read information. It does not send a chat message or run a model.</string>
+    <string name="nm_key_probe_accepted">The provider accepted the check. This does not guarantee access to any model or its cost.</string>
     <string name="nm_key_probe_rejected">The provider rejected the key.</string>
     <string name="nm_key_probe_denied">The provider denied access; the reason is not known.</string>
     <string name="nm_key_probe_unavailable">Could not check the key. Check the connection and try again.</string>
@@ -1545,4 +1545,5 @@
     <string name="nm_free_list_refresh">No current catalogue evidence. Refresh the model list or turn off the filter.</string>
     <string name="nm_usage_reports_note">Usage is based on stored provider reports and may be incomplete. It is not a bill or proof of zero cost.</string>
     <string name="nm_free_chat_choose">Choose a free model or refresh the provider’s model list.</string>
+    <string name="nm_key_probe_no_credit">The provider reported insufficient credit.</string>
 </resources>

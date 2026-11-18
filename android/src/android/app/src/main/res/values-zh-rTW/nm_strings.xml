@@ -1489,8 +1489,8 @@
     <string name="nm_provider_known_title">已知供應商</string>
     <string name="nm_provider_known_help">選擇金鑰所屬的供應商以填入端點。有些供應商依地區使用不同地址。</string>
     <string name="nm_provider_show_all">顯示所有供應商</string>
-    <string name="nm_key_autofill_confirm">已為 %1$s 建議端點。點按確認此供應商。</string>
-    <string name="nm_key_autofill_help">前綴只是一項提示。儲存前請確認供應商，你也可以修改地址。</string>
+    <string name="nm_key_autofill_confirm">建議的服務商：%1$s</string>
+    <string name="nm_key_autofill_help">前綴只是提示。只有點選建議時才會更改地址。</string>
     <string name="nm_endpoint_region">端點地區</string>
     <string name="nm_endpoint_region_help">請選擇帳戶所在的地區。變更地區會取代地址。</string>
     <string name="nm_endpoint_global">全球</string>
@@ -1513,8 +1513,8 @@
     <string name="nm_key_destination_blocked">金鑰和地址不相符。傳送前請開啟服務商設定，修改或確認目標地址。</string>
     <string name="nm_key_destination_invalid">地址無效或未使用HTTPS。請先修改再繼續。</string>
     <string name="nm_key_probe_button">測試金鑰</string>
-    <string name="nm_key_probe_help">將金鑰傳送至官方模型清單，不傳送訊息。結果不保證模型存取或費用。</string>
-    <string name="nm_key_probe_accepted">模型清單請求已被接受，但這不能證明金鑰有效。</string>
+    <string name="nm_key_probe_help">測試只從服務商的官方 API 讀取資訊，不傳送訊息，也不執行模型。</string>
+    <string name="nm_key_probe_accepted">服務商接受了測試請求。這不保證能使用模型，也不代表免費。</string>
     <string name="nm_key_probe_rejected">服務商拒絕了金鑰。</string>
     <string name="nm_key_probe_denied">服務商拒絕存取，原因未知。</string>
     <string name="nm_key_probe_unavailable">無法測試金鑰，請檢查網路連線。</string>
@@ -1532,4 +1532,5 @@
     <string name="nm_usage_reports_note">用量依據已儲存的服務供應商報告，可能不完整。這不是帳單，也不能證明沒有費用。</string>
     <string name="nm_loop_estimate_explanation">本對話的估算值取助理訊息數和工具區塊數中的較大值，並非請求次數或收費次數的準確統計。</string>
     <string name="nm_free_chat_choose">請選擇免費模型，或在服務商設定中更新模型清單。</string>
+    <string name="nm_key_probe_no_credit">服務商回報額度不足。</string>
 </resources>

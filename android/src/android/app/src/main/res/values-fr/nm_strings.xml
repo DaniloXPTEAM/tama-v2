@@ -1524,8 +1524,8 @@
     <string name="nm_provider_known_title">Fournisseurs connus</string>
     <string name="nm_provider_known_help">Choisissez le fournisseur de votre clé pour remplir le point de terminaison. Certains utilisent des adresses régionales différentes.</string>
     <string name="nm_provider_show_all">Afficher tous les fournisseurs</string>
-    <string name="nm_key_autofill_confirm">Point de terminaison suggéré pour %1$s. Touchez pour confirmer le fournisseur.</string>
-    <string name="nm_key_autofill_help">Le préfixe est seulement un indice. Confirmez le fournisseur avant d’enregistrer. Vous pouvez modifier l’adresse.</string>
+    <string name="nm_key_autofill_confirm">Fournisseur suggéré : %1$s</string>
+    <string name="nm_key_autofill_help">Le préfixe est un indice. L’adresse ne change que si vous choisissez la suggestion.</string>
     <string name="nm_endpoint_region">Région du point de terminaison</string>
     <string name="nm_endpoint_region_help">Choisissez la région de votre compte. Changer de région remplace l’adresse.</string>
     <string name="nm_endpoint_global">Global</string>
@@ -1548,8 +1548,8 @@
     <string name="nm_key_destination_blocked">La clé et la destination ne correspondent pas. Ouvrez les paramètres du fournisseur et corrigez ou confirmez la destination avant envoi.</string>
     <string name="nm_key_destination_invalid">La destination est invalide ou ne prévoit pas HTTPS. Corrigez-la avant de continuer.</string>
     <string name="nm_key_probe_button">Tester la clé</string>
-    <string name="nm_key_probe_help">Envoie la clé à la liste officielle des modèles, sans envoyer de message. Le résultat ne garantit ni accès ni coût.</string>
-    <string name="nm_key_probe_accepted">La demande de liste des modèles a été acceptée. Cela ne prouve pas que la clé est valide.</string>
+    <string name="nm_key_probe_help">Le test consulte l’API officielle. Il n’envoie pas de message et ne lance aucun modèle.</string>
+    <string name="nm_key_probe_accepted">Le fournisseur a accepté la vérification. Elle ne garantit ni l’accès aux modèles ni leur coût.</string>
     <string name="nm_key_probe_rejected">Le fournisseur a refusé la clé.</string>
     <string name="nm_key_probe_denied">Le fournisseur a refusé l’accès ; la raison est inconnue.</string>
     <string name="nm_key_probe_unavailable">Impossible de tester la clé. Vérifiez la connexion.</string>
@@ -1567,4 +1567,5 @@
     <string name="nm_usage_reports_note">La consommation repose sur les rapports enregistrés des fournisseurs et peut être incomplète. Ce n’est ni une facture ni une preuve de gratuité.</string>
     <string name="nm_loop_estimate_explanation">Estimation pour cette conversation : le plus grand nombre entre les messages de l’assistant et les blocs d’outils. Ce n’est pas un décompte exact des requêtes ou des frais.</string>
     <string name="nm_free_chat_choose">Choisissez un modèle gratuit ou actualisez la liste du fournisseur.</string>
+    <string name="nm_key_probe_no_credit">Le fournisseur signale un crédit insuffisant.</string>
 </resources>

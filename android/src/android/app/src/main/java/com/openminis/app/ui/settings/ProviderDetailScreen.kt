@@ -237,9 +237,8 @@ fun ProviderDetailScreen(
         val isOAuthProvider =
             instance.credentialType == com.openminis.app.data.model.ProviderCredential.oauth
         // nanoMuse: review the saved route; editing the field does not change the live route yet.
-        val nmLiveDestination = if (nmParallel && !isOAuthProvider) ai.tama.providers.ProviderEndpoints.factoryBase(
-            instance.providerType, instance.customBaseURL, instance.appendV1Suffix,
-        ) else null
+        val nmLiveDestination = if (!nmParallel || isOAuthProvider) null else if (instance.azureMode) instance.customBaseURL
+            else ai.tama.providers.ProviderEndpoints.factoryBase(instance.providerType, instance.customBaseURL, instance.appendV1Suffix)
         val nmReviewedKey = if (isEditingKey) editKeyValue else storedKey
         val nmDestinationAllowed = if (nmParallel && !isOAuthProvider)
             ai.tama.providers.KeyDestinationReview(nmReviewedKey, nmLiveDestination) else true
@@ -297,6 +296,18 @@ fun ProviderDetailScreen(
                     )
                     if (keySaveFailed) Text(stringResource(R.string.nm_provider_save_failed), // nanoMuse
                         color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 8.dp))
+                }
+            }
+        }
+
+        // nanoMuse: the saved route can be checked here as well as on the add form.
+        if (nmHasOwnKey && !isEditingKey) {
+            val version = ai.tama.router.AutoModelRuntime.accountVersion(instanceId)
+            ai.tama.providers.KeyProbeSection(instance.providerType, storedKey, nmLiveDestination, nmDestinationAllowed, version) { result ->
+                val isZero = result?.zeroSpendLimit
+                if (isZero != null && providerRepository.tamaRecordZeroSpendLimit(instanceId, version, isZero) &&
+                    isZero && providerRepository.tamaEligibleFreeModelIds(instanceId) == null) {
+                    providerRepository.refreshModelsInBackground(instance)
                 }
             }
         }
@@ -383,6 +394,15 @@ fun ProviderDetailScreen(
                         placeholder = stringResource(R.string.provider_detail_https_api_example_placeholder),
                         fieldModifier = Modifier.bringIntoViewOnFocus(),
                     )
+                }
+                // nanoMuse: fix the common old OpenAI + blank-address Groq setup with two explicit taps.
+                if (nmHasOwnKey && instance.providerType == ProviderType.openAI && !instance.useResponsesAPI &&
+                    storedKey.trim().startsWith("gsk_") && (customBaseURL.isBlank() ||
+                        ai.tama.providers.ProviderEndpoints.isOfficialOpenAIBase(customBaseURL))) {
+                    ai.tama.providers.KeyProviderHint("Groq") {
+                        customBaseURL = "https://api.groq.com/openai"
+                        appendV1Suffix = true
+                    }
                 }
                 HorizontalDivider(
                     modifier = Modifier.padding(horizontal = 16.dp),
@@ -479,7 +499,7 @@ fun ProviderDetailScreen(
             }
         } else if (nmParallel) {
             // nanoMuse: OpenRouter's transport uses this fixed endpoint.
-            ai.tama.providers.FixedEndpointSection("https://openrouter.ai/api/v1")
+            ai.tama.providers.OpenRouterEndpointSection()
         }
 
         // ─── API Format (OpenAI API-key only) ───────────────────────

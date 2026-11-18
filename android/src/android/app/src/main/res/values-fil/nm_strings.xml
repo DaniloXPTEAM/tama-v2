@@ -1523,8 +1523,8 @@
     <string name="nm_provider_known_title">Mga kilalang provider</string>
     <string name="nm_provider_known_help">Piliin ang provider ng iyong key upang punan ang endpoint. May mga provider na iba ang address bawat rehiyon.</string>
     <string name="nm_provider_show_all">Ipakita ang lahat ng provider</string>
-    <string name="nm_key_autofill_confirm">Iminungkahing endpoint para sa %1$s. I-tap upang kumpirmahin ang provider.</string>
-    <string name="nm_key_autofill_help">Pahiwatig lamang ang prefix. Kumpirmahin ang provider bago mag-save. Maaari mong baguhin ang address.</string>
+    <string name="nm_key_autofill_confirm">Mungkahing provider: %1$s</string>
+    <string name="nm_key_autofill_help">Pahiwatig lang ang prefix. Magbabago lang ang address kung pipiliin ang mungkahi.</string>
     <string name="nm_endpoint_region">Rehiyon ng endpoint</string>
     <string name="nm_endpoint_region_help">Piliin ang rehiyon ng iyong account. Papalitan ng pagbabago ng rehiyon ang address.</string>
     <string name="nm_endpoint_global">Global</string>
@@ -1547,8 +1547,8 @@
     <string name="nm_key_destination_blocked">Hindi magkatugma ang key at address. Buksan ang setting ng provider at ayusin o kumpirmahin ang patutunguhan bago magpadala.</string>
     <string name="nm_key_destination_invalid">Hindi valid ang address o hindi ito gumagamit ng HTTPS. Ayusin ito bago magpatuloy.</string>
     <string name="nm_key_probe_button">Subukan ang key</string>
-    <string name="nm_key_probe_help">Ipinapadala ang key sa opisyal na listahan ng modelo, hindi ang mensahe. Hindi ginagarantiya ng resulta ang access o gastos.</string>
-    <string name="nm_key_probe_accepted">Tinanggap ang kahilingan sa listahan ng modelo. Hindi nito pinatutunayang valid ang key.</string>
+    <string name="nm_key_probe_help">Nagbabasa ang pagsubok sa opisyal na API. Hindi ito nagpapadala ng mensahe o nagpapatakbo ng modelo.</string>
+    <string name="nm_key_probe_accepted">Tinanggap ng provider ang pagsubok. Hindi nito ginagarantiya ang access sa modelo o gastos.</string>
     <string name="nm_key_probe_rejected">Tinanggihan ng provider ang key.</string>
     <string name="nm_key_probe_denied">Tinanggihan ng provider ang access; hindi alam ang dahilan.</string>
     <string name="nm_key_probe_unavailable">Hindi masubukan ang key. Suriin ang koneksyon.</string>
@@ -1566,4 +1566,5 @@
     <string name="nm_usage_reports_note">Batay ang paggamit sa mga naka-save na ulat ng provider at maaaring hindi kumpleto. Hindi ito bill o patunay na walang gastos.</string>
     <string name="nm_loop_estimate_explanation">Tantiya sa usapang ito: ang mas mataas sa bilang ng mensahe ng assistant o mga bloke ng tool. Hindi ito eksaktong bilang ng request o bayarin.</string>
     <string name="nm_free_chat_choose">Pumili ng libreng modelo o i-update ang listahan ng provider.</string>
+    <string name="nm_key_probe_no_credit">Iniulat ng provider na kulang ang credit.</string>
 </resources>

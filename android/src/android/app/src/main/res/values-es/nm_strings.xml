@@ -1523,8 +1523,8 @@
     <string name="nm_provider_known_title">Proveedores conocidos</string>
     <string name="nm_provider_known_help">Elige el proveedor de tu clave para completar el endpoint. Algunos usan direcciones distintas según la región.</string>
     <string name="nm_provider_show_all">Mostrar todos los proveedores</string>
-    <string name="nm_key_autofill_confirm">Endpoint sugerido para %1$s. Toca para confirmar el proveedor.</string>
-    <string name="nm_key_autofill_help">El prefijo es solo una pista. Confirma el proveedor antes de guardar. Puedes editar la dirección.</string>
+    <string name="nm_key_autofill_confirm">Proveedor sugerido: %1$s</string>
+    <string name="nm_key_autofill_help">El prefijo solo orienta. La dirección cambia si eliges la sugerencia.</string>
     <string name="nm_endpoint_region">Región del endpoint</string>
     <string name="nm_endpoint_region_help">Elige la región de tu cuenta. Cambiar la región sustituye la dirección.</string>
     <string name="nm_endpoint_global">Global</string>
@@ -1547,8 +1547,8 @@
     <string name="nm_key_destination_blocked">La clave y la dirección no coinciden. Abra los ajustes del proveedor y corrija o confirme el destino antes de enviar.</string>
     <string name="nm_key_destination_invalid">La dirección no es válida o no usa HTTPS. Corríjala antes de continuar.</string>
     <string name="nm_key_probe_button">Probar clave</string>
-    <string name="nm_key_probe_help">Envía la clave a la lista oficial de modelos. No envía mensajes. El resultado no garantiza acceso ni coste.</string>
-    <string name="nm_key_probe_accepted">Se aceptó la consulta de modelos. Esto no demuestra que la clave sea válida.</string>
+    <string name="nm_key_probe_help">La prueba consulta la API oficial. No envía mensajes ni ejecuta modelos.</string>
+    <string name="nm_key_probe_accepted">El proveedor aceptó la consulta. No garantiza el acceso a los modelos ni su costo.</string>
     <string name="nm_key_probe_rejected">El proveedor rechazó la clave.</string>
     <string name="nm_key_probe_denied">El proveedor denegó el acceso; se desconoce el motivo.</string>
     <string name="nm_key_probe_unavailable">No se pudo probar la clave. Comprueba la conexión.</string>
@@ -1566,4 +1566,5 @@
     <string name="nm_usage_reports_note">El uso se basa en informes guardados de proveedores y puede estar incompleto. No es una factura ni prueba de coste cero.</string>
     <string name="nm_loop_estimate_explanation">Estimación de esta conversación: el mayor número entre mensajes del asistente y bloques de herramientas. No es un recuento exacto de solicitudes ni de cargos.</string>
     <string name="nm_free_chat_choose">Elige un modelo gratuito o actualiza la lista del proveedor.</string>
+    <string name="nm_key_probe_no_credit">El proveedor indicó que no hay crédito suficiente.</string>
 </resources>

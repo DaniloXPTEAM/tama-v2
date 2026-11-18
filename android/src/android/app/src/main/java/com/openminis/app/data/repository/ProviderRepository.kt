@@ -2342,11 +2342,12 @@ class ProviderRepository(private val context: Context) {
             instance.providerType == ProviderType.openRouter && tamaOwnApiKey(instance) != null
 
     /** Only the exact official OpenRouter account may be restricted by a key limit response. */
-    internal fun tamaRecordZeroSpendLimit(instanceId: String, accountVersion: Long): Boolean = synchronized(configLock) {
+    internal fun tamaRecordZeroSpendLimit(instanceId: String, accountVersion: Long, zero: Boolean = true): Boolean = synchronized(configLock) {
         val live = instance(instanceId) ?: return@synchronized false
         if (live.providerType != ProviderType.openRouter || tamaOwnApiKey(live) == null) return@synchronized false
         ai.tama.router.AutoModelRuntime.runIfCurrent(instanceId, accountVersion) {
-            nmZeroSpendLimits.value = nmZeroSpendLimits.value + (instanceId to accountVersion)
+            val previous = nmZeroSpendLimits.value
+            nmZeroSpendLimits.value = if (zero) previous + (instanceId to accountVersion) else previous - instanceId
         }
     }
 

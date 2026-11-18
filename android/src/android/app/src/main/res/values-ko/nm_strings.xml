@@ -1519,8 +1519,8 @@
     <string name="nm_provider_known_title">알려진 제공업체</string>
     <string name="nm_provider_known_help">키의 제공업체를 선택하면 엔드포인트가 채워집니다. 일부 제공업체는 지역별 주소가 다릅니다.</string>
     <string name="nm_provider_show_all">모든 제공업체 표시</string>
-    <string name="nm_key_autofill_confirm">%1$s의 엔드포인트가 제안되었습니다. 탭하여 제공업체를 확인하세요.</string>
-    <string name="nm_key_autofill_help">접두사는 단서일 뿐입니다. 저장하기 전에 제공업체를 확인하세요. 주소는 수정할 수 있습니다.</string>
+    <string name="nm_key_autofill_confirm">추천 제공자: %1$s</string>
+    <string name="nm_key_autofill_help">접두사는 참고용입니다. 추천 항목을 선택해야 주소가 바뀝니다.</string>
     <string name="nm_endpoint_region">엔드포인트 지역</string>
     <string name="nm_endpoint_region_help">계정의 지역을 선택하세요. 지역을 변경하면 주소가 바뀝니다.</string>
     <string name="nm_endpoint_global">글로벌</string>
@@ -1543,8 +1543,8 @@
     <string name="nm_key_destination_blocked">키와 주소가 일치하지 않습니다. 전송하기 전에 제공자 설정에서 대상을 수정하거나 확인하세요.</string>
     <string name="nm_key_destination_invalid">주소가 잘못되었거나 HTTPS를 사용하지 않습니다. 계속하기 전에 수정하세요.</string>
     <string name="nm_key_probe_button">키 테스트</string>
-    <string name="nm_key_probe_help">공식 모델 목록에 키를 보냅니다. 메시지는 보내지 않습니다. 모델 접근이나 비용은 보장하지 않습니다.</string>
-    <string name="nm_key_probe_accepted">모델 목록 요청이 수락되었습니다. 키가 유효하다는 증거는 아닙니다.</string>
+    <string name="nm_key_probe_help">공식 API에서 정보를 읽습니다. 메시지를 보내거나 모델을 실행하지 않습니다.</string>
+    <string name="nm_key_probe_accepted">제공자가 확인 요청을 수락했습니다. 모델 접근 권한이나 비용은 보장되지 않습니다.</string>
     <string name="nm_key_probe_rejected">제공자가 키를 거부했습니다.</string>
     <string name="nm_key_probe_denied">제공자가 접근을 거부했습니다. 이유는 알 수 없습니다.</string>
     <string name="nm_key_probe_unavailable">키를 확인할 수 없습니다. 연결을 확인하세요.</string>
@@ -1562,4 +1562,5 @@
     <string name="nm_usage_reports_note">사용량은 저장된 제공업체 보고를 기반으로 하며 불완전할 수 있습니다. 청구서나 무료 사용의 증거가 아닙니다.</string>
     <string name="nm_loop_estimate_explanation">이 대화의 추정치입니다. 어시스턴트 메시지와 도구 블록 중 더 큰 수이며, 요청이나 청구의 정확한 횟수가 아닙니다.</string>
     <string name="nm_free_chat_choose">무료 모델을 선택하거나 제공자의 모델 목록을 새로고침하세요.</string>
+    <string name="nm_key_probe_no_credit">제공자가 크레딧이 부족하다고 알렸습니다.</string>
 </resources>
