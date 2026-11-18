@@ -50,5 +50,35 @@ fun main() {
     equal(false, ProviderKeySuggestion.mayFill(true, false, false))
     equal(false, ProviderKeySuggestion.mayFill(false, true, false))
     equal(true, ProviderKeySuggestion.mayFill(false, false, false))
-    println("PASSOU: presets, armazenamento, seleção de base extraída e proteção de edição manual; sem rede")
+
+    val groqKey = "gsk_synthetic"
+    val routerKey = "sk-or-synthetic"
+    val openAI = ProviderEndpoints.factoryBase(ProviderType.openAI, null, true)
+    equal("https://api.openai.com/v1", openAI)
+    equal(null, KeyDestinationGuard.review(groqKey, "https://api.groq.com/openai/v1"))
+    equal(null, KeyDestinationGuard.review(routerKey, "https://openrouter.ai/api/v1"))
+    equal(null, KeyDestinationGuard.review("ordinary-synthetic", openAI))
+    equal(false, KeyDestinationGuard.permits(groqKey, openAI))
+    equal(false, KeyDestinationGuard.permits(routerKey, null))
+    equal(false, KeyDestinationGuard.confirm(routerKey, null))
+    equal(false, KeyDestinationGuard.confirm(routerKey, "http://local.example/api/v1"))
+    equal(false, KeyDestinationGuard.confirm(routerKey, "https://user:pass@other.example/v1"))
+    equal(false, KeyDestinationGuard.confirm(routerKey, "https://other.example/v1?key=private"))
+    equal(false, KeyDestinationGuard.permits(groqKey, "https://api.groq.com.example/openai/v1"))
+    equal(false, KeyDestinationGuard.permits(groqKey, "https://api.groq.com/other/v1"))
+    try {
+        KeyDestinationGuard.requireAllowed(true, groqKey, openAI)
+        error("Mismatched destination was not blocked")
+    } catch (_: KeyDestinationGuard.Blocked) { }
+    KeyDestinationGuard.requireAllowed(false, groqKey, openAI) // Normal app remains unchanged.
+    equal(true, KeyDestinationGuard.confirm(groqKey, openAI))
+    equal(true, KeyDestinationGuard.permits(groqKey, openAI))
+    equal(false, KeyDestinationGuard.permits(groqKey + "2", openAI))
+    equal(false, KeyDestinationGuard.permits(groqKey, "https://other.example/v1"))
+    equal(false, KeyDestinationGuard.permits(routerKey, openAI))
+    equal(true, KeyDestinationGuard.causedByBlock(IllegalStateException(KeyDestinationGuard.Blocked())))
+    equal(false, KeyDestinationGuard.causedByBlock(IllegalStateException("fixture")))
+    equal("https://api.anthropic.com", ProviderEndpoints.factoryBase(ProviderType.anthropic, null, true))
+    equal("/v1", ProviderEndpoints.factoryBase(ProviderType.openAI, "", true))
+    println("PASSOU: presets e confirmação de destinatário em lógica JVM; sem rede")
 }

@@ -24,7 +24,27 @@ form = (main / 'com/openminis/app/ui/settings/AddProviderScreen.kt').read_text()
 assert 'ai.tama.providers.KnownProviderSection(onSelect = onSelectVoiceTemplate)' in form
 assert 'voiceTemplate?.baseURL ?: if (nmParallel) ai.tama.providers.ProviderEndpoints.editableDefault(providerType)' in form
 assert 'ai.tama.providers.ProviderEndpoints.storageBase(providerType, trimmedBase, appendV1Suffix)' in form
-assert '(!nmParallel || !autoSuggested)' in form
+assert '(!nmParallel || (!autoSuggested && nmDestinationAllowed))' in form
+assert 'KeyDestinationGuard.permits(apiKey, nmDestination)' in form
+provider = (main / 'com/openminis/app/provider/openai/OpenAIProvider.kt').read_text()
+assert provider.index('KeyDestinationGuard.requireAllowed(') < provider.index('val body = if (isCodexImageModel)')
+repo = (main / 'com/openminis/app/data/repository/ProviderRepository.kt').read_text()
+start_refresh = repo.index('private suspend fun nmRunRefresh(')
+assert repo.index('KeyDestinationGuard.permits(refresh.key.key, base)', start_refresh) < repo.index('nmRefreshFreeModels(refresh)', start_refresh)
+chat = (main / 'com/openminis/app/ui/chat/ChatViewModel.kt').read_text()
+assert 'actual is ai.tama.providers.KeyDestinationGuard.Blocked -> context.getString(R.string.nm_key_destination_blocked)' in chat
+assert 'actual is ai.tama.providers.KeyDestinationGuard.Blocked) throw actual' in chat
+for name in ('anthropic/AnthropicProvider.kt', 'gemini/GeminiProvider.kt'):
+    provider_source = (main / 'com/openminis/app/provider' / name).read_text()
+    assert provider_source.count('KeyDestinationGuard.requireAllowed(') == 2
+record = (main / 'io/github/nanomuse/cloud/OwnTurns.kt').read_text()
+assert record.count('KeyDestinationGuard.causedByBlock(e)') == 4
+ui = (main / 'ai/tama/providers/ProviderSetupUi.kt').read_text()
+assert 'KeyDestinationGuard.confirm(key, endpoint)' in ui
+assert 'remember(key, endpoint)' in ui
+detail = (main / 'com/openminis/app/ui/settings/ProviderDetailScreen.kt').read_text()
+assert 'KeyDestinationReview(nmReviewedKey, nmLiveDestination)' in detail
+assert 'KeyDestinationGuard.permits(editKeyValue, nmLiveDestination)' in detail
 source = (main / 'com/openminis/app/data/model/ProviderConfig.kt').read_text()
 start = source.index('@Serializable\ndata class ProviderInstance(')
 end = source.index('\n@Serializable\ndata class ModelOverrides(', start)
@@ -44,5 +64,6 @@ sed 's/import com.openminis.app.data.model.ProviderType/import com.openminis.app
 kotlinc -nowarn -include-runtime -d "$OUT/endpoints.jar" \
   "$HERE"/stubs/*.kt "$OUT/Extracted.kt" "$OUT/EndpointHostTest.kt" \
   "$MAIN/ai/tama/providers/ProviderEndpoints.kt" \
+  "$MAIN/ai/tama/providers/KeyDestinationGuard.kt" \
   "$MAIN/io/github/nanomuse/cloud/OwnKeyPresets.kt"
 java -jar "$OUT/endpoints.jar"

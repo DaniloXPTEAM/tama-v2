@@ -46,6 +46,27 @@ class ProviderEndpointsTest {
         )) assertFalse(base, ProviderEndpoints.isOfficialOpenAIBase(base))
     }
 
+    @Test fun `mismatched key needs exact process confirmation without changing the normal app`() {
+        val key = "gsk_test_only"
+        val otherKey = "gsk_test_other"
+        val groq = "https://api.groq.com/openai/v1"
+        val openai = ProviderEndpoints.factoryBase(ProviderType.openAI, null, true)
+        assertNull(KeyDestinationGuard.review(key, groq))
+        assertFalse(KeyDestinationGuard.permits(key, openai))
+        assertFalse(KeyDestinationGuard.confirm(key, "http://example.invalid/v1"))
+        try {
+            KeyDestinationGuard.requireAllowed(true, key, openai)
+            fail("expected a local refusal")
+        } catch (_: KeyDestinationGuard.Blocked) { }
+        KeyDestinationGuard.requireAllowed(false, key, openai)
+        assertTrue(KeyDestinationGuard.confirm(key, openai))
+        assertTrue(KeyDestinationGuard.permits(key, openai))
+        assertFalse(KeyDestinationGuard.permits(otherKey, openai))
+        assertFalse(KeyDestinationGuard.permits(key, "https://example.invalid/v1"))
+        assertFalse(KeyDestinationGuard.permits("sk-or-test-only", groq))
+        assertTrue(KeyDestinationGuard.causedByBlock(IllegalStateException(KeyDestinationGuard.Blocked())))
+    }
+
     @Test fun `only unique informative hints match and manual endpoints are never overwritten`() {
         val hints = listOf(
             "router" to "sk-or-v1-…", "groq" to "gsk_…", "one" to "sk-…",
