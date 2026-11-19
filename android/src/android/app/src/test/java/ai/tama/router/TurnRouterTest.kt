@@ -95,6 +95,24 @@ class TurnRouterTest {
         assertEquals(Profile.FULL, TurnRouter.route("oi", override = Profile.FULL).profile)
     }
 
+    @Test fun `personal chat can write code without weakening tool or continuity needs`() {
+        for (text in listOf("Escreva um código de exemplo", "Faz um script em Python", "Write a Python function")) {
+            val route = TurnRouter.route(text, preferTextCode = true)
+            assertTrue(text, route.codeRequested)
+            assertEquals(text, Profile.LEAN, route.profile)
+            assertEquals(text, setOf(Need.CHAT), route.needs)
+        }
+        val code = "Escreva um script"
+        val actions = listOf("$code e rode", "$code no arquivo", "$code e busque na web", "Write a script and run it", "Write a function and run it")
+        actions.forEach { assertTrue(it, Need.TOOLS in TurnRouter.route(it, preferTextCode = true).needs) }
+        assertTrue(Need.TOOLS in TurnRouter.route(code).needs)
+        assertTrue(Need.TOOLS in TurnRouter.route(code, hasFileAttachment = true, preferTextCode = true).needs)
+        assertTrue(Need.TOOLS in TurnRouter.route(code, override = Profile.BASIC, preferTextCode = true).needs)
+        val follow = TurnRouter.route(code, SessionState(Profile.BASIC, setOf(ToolGroup.FILES), true), preferTextCode = true)
+        assertTrue(Need.TOOLS in follow.needs)
+        assertTrue(ToolGroup.FILES in follow.hints)
+    }
+
     @Test fun `spent minute lowers the profile before rejecting an account`() {
         val route = TurnRouter.route("faça login e pesquise no site")
         assertEquals(Profile.FULL, route.profile)

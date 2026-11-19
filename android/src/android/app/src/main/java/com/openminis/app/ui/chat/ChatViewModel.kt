@@ -1341,7 +1341,7 @@ class ChatViewModel(
     )
 
     /** Reclassify a new user turn, including queued messages and attachments. */
-    private fun nmRouteLatest(): Route.Chat {
+    private fun nmRouteLatest(preferTextCode: Boolean): Route.Chat {
         val user = agentHistory.lastOrNull { message ->
             message.role == LLMMessage.Role.USER &&
                 !message.content.trimStart().startsWith("<system-reminder>") &&
@@ -1359,6 +1359,7 @@ class ChatViewModel(
             hasFileAttachment = user?.contentParts?.any {
                 it is AgentContentPart.Text && it.text.contains("<user-attached-files>")
             } == true,
+            preferTextCode = preferTextCode, // nanoMuse: no tool schema for explicit text-only code requests.
         )
     }
 
@@ -9393,7 +9394,7 @@ class ChatViewModel(
 
         // nanoMuse: this state belongs to the user turn, not the provider. A fallback
         // rebuilds prefix, tools, limits and estimates for its own actual request.
-        var nmRoute = nmRouteLatest()
+        var nmRoute = nmRouteLatest(preferTextCode = nmOwnKeyTurn)
         var nmCurrentInput = promptInput
         var nmUsedTools = false
         // At most one native image call per explicit person turn. A failure can
@@ -11935,7 +11936,7 @@ class ChatViewModel(
                     // nanoMuse: a queued interruption is a new user turn, not the old
                     // prompt under a new bubble. Keep continuity and classify its content.
                     nmPreviousRoute = SessionState(nmRoute.profile, nmRoute.hints, nmUsedTools)
-                    nmRoute = nmRouteLatest()
+                    nmRoute = nmRouteLatest(preferTextCode = nmOwnKeyTurn)
                     nmCurrentInput = nmCapturePromptInput()
                     nmUsedTools = false
                     nmImageGuard.newTurn(handled.explicitImageRequest)

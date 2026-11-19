@@ -11,6 +11,7 @@ import ai.tama.pricing.FreeModelImport // nanoMuse: free-only import is separate
 import ai.tama.pricing.FreeModelImportStatus
 import ai.tama.pricing.FreeModelImportEvidence
 import ai.tama.pricing.ModelRefreshGate
+import ai.tama.pricing.OpenRouterPricing // nanoMuse: classify explicit chat rates, not spending permission
 import com.openminis.app.backup.BackupSecrets
 import com.openminis.app.data.db.ProviderConfigDao
 import com.openminis.app.data.db.ProviderConfigMetaKeys

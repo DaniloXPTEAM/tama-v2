@@ -33,11 +33,13 @@ class FailureSummary(unittest.TestCase):
             ('Compile parallel Compose instrumentation locally', 'tama-compose-compile.log'),
         ):
             body = workflow.split(f'- name: {step}', 1)[1].split('- name:', 1)[0]
-            for part in ('set -o pipefail', 'status=$?', 'exit "$status"', 'summarize-build-failure.py',
+            for part in ('umask 077', 'status=$?', 'exit "$status"', 'summarize-build-failure.py',
+                         f'> "$RUNNER_TEMP/{log}" 2>&1',
                          f'rm -f "$RUNNER_TEMP/{log}"'):
                 self.assertIn(part, body)
             self.assertIn(f'"$RUNNER_TEMP/{log}"', workflow.split('- name: Remove private test signer', 1)[1])
             self.assertNotIn(f'cat "$RUNNER_TEMP/{log}"', workflow)
+            self.assertNotIn(f'tee "$RUNNER_TEMP/{log}"', workflow)
         self.assertLess(workflow.index('- name: Verify separate APK identities locally'),
                         workflow.index('- name: Run parallel routing, key probe and history tests'))
         self.assertLess(workflow.index('- name: Run normal debug isolation tests'),

@@ -54,13 +54,15 @@ fun main() {
     check(ProviderDirectory.endpoint(unknownVendor) == null)
     check(!ProviderDirectory.validCustomAddress("https://example.com/v1?key=fixture"))
     check(ProviderDirectory.validCustomAddress("https://example.com/v1"))
-    val code = TurnRouter.route("Escreva um código de exemplo")
-    check(code.codeRequested && !TurnRouter.route("Conte uma história").codeRequested)
+    val code = TurnRouter.route("Escreva um código de exemplo", preferTextCode = true)
+    check(code.codeRequested && code.needs == setOf(Need.CHAT) && code.profile == Profile.LEAN)
+    check(Need.TOOLS in TurnRouter.route("Escreva um código e rode", preferTextCode = true).needs)
+    check(!TurnRouter.route("Conte uma história").codeRequested)
     val coder = advertisedFree.copy(entryId = "coder", codePreference = CodeModelPreference.rank(nvidia.base,
         "qwen/qwen3-coder-480b-a35b-instruct"))
     check(coder.codePreference > 0)
     fun winner(list: List<ModelRouter.Candidate>) =
-        (ModelRouter.pick(list, setOf(Need.CHAT), "free") as ModelRouter.Choice.Selected).candidate.entryId
+        (ModelRouter.pick(list, code.needs, "free") as ModelRouter.Choice.Selected).candidate.entryId
     check(winner(listOf(advertisedFree, coder)) == "coder")
     check(winner(listOf(advertisedFree, coder.copy(automaticApproved = false))) == "free")
     check(winner(listOf(advertisedFree, coder.copy(automaticCostAllowed = false))) == "free")

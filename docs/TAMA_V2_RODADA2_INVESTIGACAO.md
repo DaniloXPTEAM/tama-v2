@@ -66,6 +66,6 @@ Na falta de lista ao vivo para uma chave própria, o catálogo embutido só pree
 - No seletor do chat com chave própria, veja a rota em uso e o modo **Automático/Manual**. A opção de modo vale para todos os chats, não aprova modelos e não altera permissões de custo. A troca fica desativada no seletor enquanto há uma resposta em andamento.
 - As etiquetas **Entrada** e **Saída** descrevem modalidades do modelo, não a capacidade do app de gerar mídia naquela rota. **Ferramentas** indica suporte de chat, não autorização para executar ações.
 - Em **Configurações → Modelos → Configurações avançadas de custo** ficam as duas permissões independentes. Não ative nenhuma delas para fazer um teste que exige custo zero.
-- As linhas longas dos blocos de código podem ser quebradas só na exibição; copiar continua levando o texto original.
+- As linhas longas dos blocos de código podem ser quebradas só na exibição; copiar continua levando o texto original. Pedidos explícitos de código como resposta podem usar um modelo só de texto; executar, salvar, anexar arquivos ou continuar uma ação mantém as exigências de ferramentas.
 
 O OpenRouter pode anunciar uma variante de chat gratuita sem provar o custo final do pedido. O teste de chave e a importação não validam BYOK, plug-ins ou outros serviços da conta. O app não emite ticket de custo do OpenRouter. Não há ticket de custo de imagem nesta versão.
