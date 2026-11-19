@@ -141,6 +141,15 @@ class ChatRepository(internal val dao: ChatDao) {
             dao.getSession(sessionId)?.let { ai.tama.chat.SessionBindingSnapshot(it.modelBinding, it.modelId) }
         }.await()
 
+    // nanoMuse: bind a CLI image attempt to the persisted chat, not the default chat slot.
+    internal suspend fun nmObserveBinding(sessionId: String): Pair<ai.tama.chat.SessionBindingSnapshot, () -> Boolean>? {
+        val read = nmBindingWrites.readVersioned(sessionId) {
+            dao.getSession(sessionId)?.let { ai.tama.chat.SessionBindingSnapshot(it.modelBinding, it.modelId) }
+        }
+        val snapshot = read.result.await() ?: return null
+        return snapshot to { nmBindingWrites.isCurrent(sessionId, read.version) }
+    }
+
     // nanoMuse: compare in SQLite, including null, so a different row value is not overwritten.
     internal suspend fun nmCompareAndSetBinding(
         sessionId: String, expected: ai.tama.chat.SessionBindingSnapshot,

@@ -9322,6 +9322,8 @@ class ChatViewModel(
             if (nmOwnKeyOrigin?.let { providerRepository.instance(it)?.let(providerRepository::tamaFreeChatOnly) } == true) {
                 nmForceFreeRemainder = true
             }
+            if (nmForceFreeRemainder && nmLoopJob != null)
+                ai.tama.media.CliImageScope.markFreeTurn(nmLoopSession, nmLoopJob) // nanoMuse: also covers managed shell calls.
             return nmForceFreeRemainder
         }
         nmRequireFree() // nanoMuse: relaxing the preference cannot widen an already-started turn.
@@ -10532,6 +10534,9 @@ class ChatViewModel(
                         if (ownInstance != null && !nmOwnKeyRecipientAllowed(ownInstance)) {
                             throw ai.tama.providers.KeyDestinationGuard.Blocked()
                         }
+                        // nanoMuse: a provisional own-key route can still require free-only tools.
+                        if (ownInstance != null && nmLoopJob != null && providerRepository.tamaFreeChatOnly(ownInstance))
+                            ai.tama.media.CliImageScope.markFreeTurn(nmLoopSession, nmLoopJob)
                         val freeChat = own?.let {
                             providerRepository.tamaFreeChatTicket(it.providerId, it.accountVersion,
                                 nmRouteFingerprint(currentProvider), currentProvider.model.id)

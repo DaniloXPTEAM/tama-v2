@@ -4,6 +4,7 @@ import io.github.nanomuse.media.*
 
 import android.content.Context
 import android.graphics.Bitmap
+import com.openminis.app.MinisApp
 import io.github.nanomuse.avatar.ImageGen
 import ai.tama.router.AutoModelStore
 import java.io.OutputStream
@@ -20,6 +21,8 @@ internal interface MediaImageServices {
     fun accountRevision(): Long
     /** The dispatcher must check this independently from route and image approval. */
     fun freeImagesOnly(endpoint: ImageGen.Endpoint? = null): Boolean = false
+    suspend fun observeCliImageScope(sessionId: String?): () -> CliImageScope.State =
+        { CliImageScope.State.UNRESTRICTED }
     fun modelCostAllowed(): Boolean
     /** Revocation witness spanning a single attempt; it is not a permission. */
     fun observeModelCost(): () -> Boolean
@@ -52,6 +55,23 @@ internal class AndroidMediaImageServices(private val context: Context) : MediaIm
     override fun freeImagesOnly(endpoint: ImageGen.Endpoint?) =
         ImageGen.freeImagesOnly(context) || if (endpoint == null) ImageGen.noFreeImageAvailable(context)
         else ImageGen.freeImagesOnly(context, endpoint.instanceId)
+    override suspend fun observeCliImageScope(sessionId: String?): () -> CliImageScope.State {
+        val changed = CliImageScope.State.CHANGED
+        val app = context.applicationContext as? MinisApp ?: return { changed }
+        val providers = app.providerRepositoryOrNull ?: return { changed }
+        val chat = app.chatRepositoryOrNull ?: return { changed }
+        val (binding, current) = chat.nmObserveBinding(sessionId ?: return { changed }) ?: return { changed }
+        val accounts = CliImageScope.chatAccounts(binding, providers.config.value)
+        return {
+            val config = providers.config.value
+            when {
+                !current() || accounts.isEmpty() || accounts != CliImageScope.chatAccounts(binding, config) ||
+                    accounts.any { id -> config.instances.none { it.id == id } } -> changed
+                config.instances.any { it.id in accounts && providers.tamaFreeChatOnly(it) } -> CliImageScope.State.FREE_ONLY
+                else -> CliImageScope.State.UNRESTRICTED
+            }
+        }
+    }
     override fun modelCostAllowed() = ai.tama.pricing.ModelCostGuard.permits()
     override fun observeModelCost(): () -> Boolean {
         val observation = ai.tama.pricing.ModelCostGuard.observe()

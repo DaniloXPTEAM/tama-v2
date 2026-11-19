@@ -87,6 +87,9 @@ class MediaOffloadImageTest {
         var costRevision = 0L
         var freeOnly = false
         override fun freeImagesOnly(endpoint: ImageGen.Endpoint?) = freeOnly
+        val cliScopes = mutableMapOf<String, CliImageScope.State>()
+        override suspend fun observeCliImageScope(sessionId: String?): () -> CliImageScope.State =
+            { sessionId?.let(cliScopes::get) ?: CliImageScope.State.UNRESTRICTED }
         var mode = true
             set(value) { if (field != value) autoRevision++; field = value }
         var costAllowed = true
@@ -212,6 +215,29 @@ class MediaOffloadImageTest {
         assertTrue("Do not retry" in failure.getString("tell_user"))
         assertEquals(1, fake.submissions)
         assertEquals(0, fake.downloads)
+    }
+
+    @Test fun `a side chat CLI cannot inherit a paid default or stale authorization`() {
+        org.junit.Assume.assumeTrue(com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test")
+        val sideChat = UUID.randomUUID().toString()
+        val defaultChat = UUID.randomUUID().toString()
+        val fake = FakeImages().apply {
+            mode = false
+            cliScopes[sideChat] = CliImageScope.State.FREE_ONLY
+        }
+        var permissions = 0
+        val gate = testGate { _, _, _, _, _ -> permissions++; true }
+        val handler = MediaOffloadHandler(context(), fake, gate)
+        val blocked = handler.handle(request(sideChat, "--prompt", "Draw a bird"))
+        assertEquals("no_verified_free_image_generator", JSONObject(blocked.output).getString("error"))
+        assertEquals(0, fake.manualCalls)
+        assertEquals(0, permissions)
+        assertEquals(0, fake.submissions)
+        assertEquals(0, handler.handle(request(defaultChat, "--prompt", "Draw a bird")).exitCode)
+        fake.beforeStage = { fake.cliScopes[defaultChat] = CliImageScope.State.CHANGED }
+        val changed = handler.handle(request(defaultChat, "--prompt", "Draw a bird"))
+        assertEquals("image_authorization_changed", JSONObject(changed.output).getString("error"))
+        assertEquals(1, fake.submissions)
     }
 
     @Test fun `unverified automatic cost blocks before selection and before send`() {

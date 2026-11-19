@@ -135,14 +135,23 @@ class MediaOffloadHandler internal constructor(
             false
         }
         val automatic = images.automatic()
-        // nanoMuse: refuse before choosing a generator or asking for permission.
-        fun allowedImage(endpoint: ImageGen.Endpoint? = null): Boolean =
-            !parallel || OwnKeyImagePolicy.mayRequest(freeOnly || images.freeImagesOnly(endpoint))
-        if (!allowedImage()) return noFreeImage()
-        // nanoMuse: manual image approval does not prove a free request either.
-        if (!costStillCurrent()) return modelCostError("image")
-        if (automatic && !images.automaticCostAllowed()) return automaticImageError(
-            "automatic_image_cost_unverified", com.openminis.app.R.string.nm_auto_reason_unverified_cost)
+        // nanoMuse: the host socket has already bound a CLI request to its managed chat.
+        val freeAtStart = freeOnly || (parallel && CliImageScope.freeDuringTurn(sessionId))
+        val sessionScope = if (parallel && !freeAtStart && origin == ImageOrigin.CLI) try {
+            images.observeCliImageScope(sessionId)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            { CliImageScope.State.CHANGED }
+        } else null
+        fun requireImageScope(endpoint: ImageGen.Endpoint? = null) {
+            if (!parallel) return
+            val scope = sessionScope?.invoke()
+            if (!OwnKeyImagePolicy.mayRequest(freeAtStart || CliImageScope.freeDuringTurn(sessionId) ||
+                    images.freeImagesOnly(endpoint) || scope == CliImageScope.State.FREE_ONLY))
+                throw OwnKeyImagePolicy.NoVerifiedFreeGenerator()
+            if (scope == CliImageScope.State.CHANGED) throw ImageDispatch.AuthorizationChanged()
+        }
         val size = requestedSize ?: "1024x1024"
         var sentEndpoint: ImageGen.Endpoint? = null
         var selection: AutoImageSelection.Selection? = null
@@ -161,6 +170,12 @@ class MediaOffloadHandler internal constructor(
             false
         }
         val outcome = try {
+            // nanoMuse: no endpoint selection or permission prompt before the scope checks.
+            attempt?.requireActive()
+            requireImageScope()
+            if (!costStillCurrent()) return modelCostError("image")
+            if (automatic && !images.automaticCostAllowed()) return automaticImageError(
+                "automatic_image_cost_unverified", com.openminis.app.R.string.nm_auto_reason_unverified_cost)
             ImageDispatch.run(
                 automatic = automatic,
                 hasReference = referencePath != null,
@@ -171,7 +186,7 @@ class MediaOffloadHandler internal constructor(
                 // The legacy CLI can be invoked by scripts or automated turns, so
                 // a remembered native-tool grant is not sufficient for this call.
                 authorize = { endpoint ->
-                    if (!allowedImage(endpoint)) throw OwnKeyImagePolicy.NoVerifiedFreeGenerator()
+                    requireImageScope(endpoint)
                     attempt?.requireActive()
                     if (parallel) {
                         permissionObservation = try {
@@ -190,6 +205,7 @@ class MediaOffloadHandler internal constructor(
                     // nanoMuse: do not even read the reference after a session or
                     // settings revocation which happened as the dialog closed.
                     attempt?.requireActive()
+                    requireImageScope(endpoint)
                     if (!permissionStillCurrent()) throw ImageDispatch.AuthorizationChanged()
                     if (!costStillCurrent()) throw ai.tama.pricing.ModelCostGuard.Blocked()
                     // Only manual editing may read a private reference. DashScope can
@@ -204,7 +220,7 @@ class MediaOffloadHandler internal constructor(
                     // nanoMuse: re-read mode, approval, route and credential at the
                     // actual transport edge, not just before request preparation.
                     val requireCurrentImage = {
-                        if (!allowedImage(endpoint)) throw OwnKeyImagePolicy.NoVerifiedFreeGenerator()
+                        requireImageScope(endpoint)
                         attempt?.requireActive()
                         if (!costStillCurrent()) throw ai.tama.pricing.ModelCostGuard.Blocked()
                         val unchanged = try {

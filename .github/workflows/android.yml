@@ -150,6 +150,8 @@ jobs:
             --tests 'ai.tama.providers.ProviderModelsWireTest' \
             --tests 'ai.tama.media.ImageToolPresentationTest' \
             --tests 'ai.tama.media.MediaOffloadImageTest' \
+            --tests 'ai.tama.media.CliImageScopeTest' \
+            --tests 'ai.tama.chat.SessionBindingWritesTest' \
             --tests 'ai.tama.media.ImageRawToolFilterTest' \
             --tests 'ai.tama.providers.ProviderEndpointsTest' \
             --max-workers=1 --console=plain --no-daemon \

@@ -4,6 +4,7 @@ set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/../../.." && pwd)
 HERE="$ROOT/tests/host_android/media_handlers"
 MAIN="$ROOT/android/src/android/app/src/main/java"
+TEST="$ROOT/android/src/android/app/src/test/java"
 : "${TAMA_JARS_DIR:?Set TAMA_JARS_DIR to the directory containing the host dependency JARs}"
 KOTLINC=$(command -v kotlinc)
 KOTLIN_HOME=$(cd "$(dirname "$(readlink -f "$KOTLINC")")/.." && pwd)
@@ -35,6 +36,10 @@ kotlinc -nowarn -cp "$CP" -include-runtime -d "$OUT/media-host.jar" \
     "$MAIN/ai/tama/sandbox/OffloadPeerBindings.kt" \
     "$MAIN/ai/tama/pricing/ModelCostGuard.kt" \
     "$MAIN/ai/tama/chat/ChatSessionJobs.kt" \
+    "$MAIN/ai/tama/chat/SessionBindingWrites.kt" \
+    "$MAIN/ai/tama/media/CliImageScope.kt" \
+    "$TEST/ai/tama/media/CliImageScopeTest.kt" \
+    "$TEST/ai/tama/chat/SessionBindingWritesTest.kt" \
     "$MAIN/ai/tama/media/ImageAttemptTracker.kt" \
     "$MAIN/ai/tama/media/VideoAttemptTracker.kt" \
     "$MAIN/ai/tama/media/AutomaticVideoGuard.kt" \

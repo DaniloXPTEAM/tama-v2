@@ -30,6 +30,7 @@ def test_tool_dispatch_is_extracted_and_receives_loop_state() -> None:
         "turn = turn",
         "petRunGeneration = petRunGeneration",
         "onToolDispatched = { nmUsedTools = true }",
+        "freeImageOnly = nmRequireFree()",
     ):
         assert binding in call
     assert (
@@ -53,7 +54,7 @@ def test_tool_guards_precede_the_dispatch_and_usage_callback() -> None:
     image_gate = dispatch.index("val decision = nmImageGuard.consume()")
     mark_used = dispatch.index("onToolDispatched()")
     execute = dispatch.index(
-        "executeTool(name, argsStr, id, allToolBlocks, assistantId, accumulatedText)"
+        "executeTool(name, argsStr, id, allToolBlocks, assistantId, accumulatedText, freeImageOnly)"
     )
     assert (
         sequential_loop < offered < repair < detector < preflight < image_gate < mark_used < execute
@@ -85,6 +86,12 @@ def test_stream_compaction_restarts_only_after_the_stream_block_returns() -> Non
         "ContextMaintenance.Action.STOP", 1
     )[0]
     assert compaction.index("resumeAfterCompaction()") < compaction.index("return@streamBlock true")
-    assert block.count("return@streamBlock true") == 1
+    larger_window = block.split("ContextMaintenance.Action.STOP -> {", 1)[1].split(
+        "throw LLMError.ProviderError", 1
+    )[0]
+    assert larger_window.index("nmAutoSelect(null, largerThanWindow = requestBudget.window)") < larger_window.index(
+        "nmAutoActivate(larger, largerWindow = true)"
+    ) < larger_window.index("return@streamBlock true")
+    assert block.count("return@streamBlock true") == 2
     assert "continue@agentTurns" not in block
     assert "firstChunkWatchdog.cancel()" in block
