@@ -16,6 +16,15 @@ class FreeBulkIntegration(unittest.TestCase):
             self.assertIn(guard, refresh)
         self.assertNotIn("replaceEntries(", refresh)
 
+    def test_first_choice_rechecks_account_route_and_live_filter(self):
+        slots = (MAIN / "io/github/nanomuse/models/ModelSlots.kt").read_text()
+        body = slots.split("suspend fun applyProvider", 1)[1].split("private fun pickEntry", 1)[0]
+        for guard in ("tamaFreeChatOnly(inst)", "nmOAuthKeySnapshot(inst.id)", "nmOAuthKeyStillCurrent(ownKey)",
+                      "routeFingerprint(live)", "tamaFreeChatOnly(live) == freeOnly",
+                      "freeOnly && slot != Slot.CHAT", "!followPick(context, option.entryId)"):
+            self.assertIn(guard, body)
+        self.assertIn("if (!stillCurrent()) return emptySet()", body.split("repo.refreshModels(inst)", 1)[1])
+
     def test_revalidated_and_cost_policy_is_not_changed(self):
         repo = (MAIN / "com/openminis/app/data/repository/ProviderRepository.kt").read_text()
         section = repo.split("private fun tamaApproveFreeChatModels", 1)[1].split("/** Fresh exact-model", 1)[0]

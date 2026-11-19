@@ -427,7 +427,18 @@ object ModelSlots {
         // nanoMuse: a free-only setup must not quietly select a paid seed or
         // an unimported image/video default. Wait for the form's in-flight
         // catalogue check and select chat only from its fresh exact-id evidence.
-        val freeOnly = com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test" && inst.tamaImportFreeOnly
+        val nmParallel = com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test"
+        val freeOnly = nmParallel && repo.tamaFreeChatOnly(inst)
+        val ownKey = if (nmParallel && repo.tamaOwnApiKey(inst) != null) repo.nmOAuthKeySnapshot(inst.id) else null
+        val route = if (nmParallel) ai.tama.router.AutoModelStore.routeFingerprint(inst) else null
+        fun stillCurrent(): Boolean {
+            if (!nmParallel) return true
+            val live = repo.instance(inst.id) ?: return false
+            return live.isEnabled && ai.tama.router.AutoModelStore.routeFingerprint(live) == route &&
+                (ownKey != null) == (repo.tamaOwnApiKey(live) != null) &&
+                (ownKey == null || repo.nmOAuthKeyStillCurrent(ownKey)) && repo.tamaFreeChatOnly(live) == freeOnly
+        }
+        if (!stillCurrent()) return emptySet()
         val eligible = if (freeOnly) {
             if (repo.nmFreeImportStatus.value[inst.id] == ai.tama.pricing.FreeModelImportStatus.Checking) {
                 val completed = withTimeoutOrNull(30_000) {
@@ -435,7 +446,10 @@ object ModelSlots {
                 }
                 if (completed == null) return emptySet()
             }
-            if (repo.tamaEligibleFreeModelIds(inst.id) == null) repo.refreshModels(inst)
+            if (!stillCurrent()) return emptySet()
+            val known = repo.tamaEligibleFreeModelIds(inst.id)
+            if (known == null || (known.isEmpty() && repo.nmFreeImportStatus.value[inst.id] == null)) repo.refreshModels(inst)
+            if (!stillCurrent()) return emptySet()
             repo.tamaEligibleFreeModelIds(inst.id) ?: return emptySet()
         } else {
             if (repo.entriesFor(inst.id).none { !it.isHidden }) {
@@ -445,14 +459,10 @@ object ModelSlots {
             }
             null
         }
-        if (freeOnly) {
-            val live = repo.instance(inst.id) ?: return emptySet()
-            if (!live.isEnabled || !live.tamaImportFreeOnly ||
-                ai.tama.router.AutoModelStore.routeFingerprint(live) != ai.tama.router.AutoModelStore.routeFingerprint(inst)) return emptySet()
-        }
         val done = mutableSetOf<Slot>()
         for (slot in Slot.values()) {
             if (slot !in slots || (freeOnly && slot != Slot.CHAT)) continue
+            if (!stillCurrent()) break
             val option = when (slot) {
                 Slot.CHAT -> pickEntry(
                     chatEntriesOf(context, inst).filter { eligible == null || it.model.id in eligible },
@@ -468,9 +478,11 @@ object ModelSlots {
                         ?.let { Option(inst, it) }
                 }
             } ?: continue
-            if (freeOnly && (repo.tamaEligibleFreeModelIds(inst.id)?.contains(option.modelId) != true ||
-                    option.entryId == null || !followPick(context, option.entryId))) continue
-            if (freeOnly) lastChanged.value = slot else choose(context, slot, option)
+            if (nmParallel && slot == Slot.CHAT) {
+                if (!stillCurrent() || (freeOnly && repo.tamaEligibleFreeModelIds(inst.id)?.contains(option.modelId) != true) ||
+                    option.entryId == null || !followPick(context, option.entryId)) continue
+                lastChanged.value = slot
+            } else choose(context, slot, option)
             done += slot
         }
         return done
