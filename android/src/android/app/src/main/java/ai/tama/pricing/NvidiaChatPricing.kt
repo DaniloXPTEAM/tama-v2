@@ -4,12 +4,14 @@ import org.json.JSONObject
 
 /** Price evidence from the exact bundled NVIDIA NIM catalogue, not a general-purpose NIM licence. */
 internal object NvidiaChatPricing {
-    // The catalogue describes these retrieval models as text output, but they
-    // have embeddings/ranking endpoints, not /chat/completions.
-    private val retrieval = setOf(
-        "nvidia/llama-nemotron-embed-vl-1b-v2", "nvidia/nv-embedcode-7b-v1", "nvidia/nv-embed-v1",
-        "nvidia/llama-nemotron-rerank-vl-1b-v2", "nvidia/rerank-qa-mistral-4b",
-        "nvidia/llama-3_2-nemoretriever-300m-embed-v1",
+    // The bundled modalities only describe payloads. Some non-chat NIMs
+    // also have text in/out; they belong to separate API families.
+    // https://docs.api.nvidia.com/nim/reference/models-1
+    private val nonChat = setOf(
+        "baai/bge-m3", "nvidia/llama-nemotron-embed-vl-1b-v2", "nvidia/nv-embedcode-7b-v1", "nvidia/nv-embed-v1",
+        "nvidia/llama-nemotron-rerank-vl-1b-v2", "nvidia/rerank-qa-mistral-4b", "nvidia/llama-3_2-nemoretriever-300m-embed-v1",
+        "nvidia/studiovoice", "nvidia/nemotron-voicechat", "nvidia/riva-translate-4b-instruct-v1.1",
+        "meta/esmfold", "meta/esm2-650m", "nvidia/gliner-pii", "nvidia/usdvalidate",
     )
 
     fun isZero(cost: JSONObject?): Boolean = cost != null && cost.has("input") && cost.has("output") &&
@@ -20,5 +22,5 @@ internal object NvidiaChatPricing {
 
     fun allows(base: String?, id: String, zero: Boolean, inputs: List<String>?, outputs: List<String>?, now: Long): Boolean =
         base == DocumentedFreeChat.NVIDIA_BASE && zero && DocumentedFreeChat.catalogueReviewCurrent(now) &&
-            id !in retrieval && inputs?.contains("text") == true && outputs?.toSet() == setOf("text")
+            id !in nonChat && inputs?.contains("text") == true && outputs?.toSet() == setOf("text")
 }

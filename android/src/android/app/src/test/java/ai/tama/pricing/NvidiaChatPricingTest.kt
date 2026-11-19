@@ -31,6 +31,8 @@ class NvidiaChatPricingTest {
         assertFalse(allowed(free, at = Instant.parse("2027-02-18T00:00:00Z").toEpochMilli()))
         assertFalse(allowed("qwen/qwen-image"))
         assertFalse(allowed("nvidia/nv-embed-v1"))
+        assertFalse(allowed("baai/bge-m3"))
+        assertFalse(allowed("nvidia/riva-translate-4b-instruct-v1.1"))
         assertFalse(allowed("nvidia/nemotron-3-super-120b-a12b"))
     }
 
