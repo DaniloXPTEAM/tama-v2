@@ -8,7 +8,7 @@ import java.util.Locale
 internal object KeyProbePlan {
     data class Plan(
         val url: String, val header: String, val anthropicVersion: Boolean = false, val openRouterKeyInfo: Boolean = false,
-        val groqModelList: Boolean = false,
+        val groqModelList: Boolean = false, val agnesModelList: Boolean = false,
     )
 
     fun create(type: ProviderType, base: String?): Plan? {
@@ -22,6 +22,8 @@ internal object KeyProbePlan {
                 Plan("https://openrouter.ai/api/v1/key", "Authorization", openRouterKeyInfo = true)
             type in setOf(ProviderType.openAI, ProviderType.openAIResponses) && host == "api.openai.com" && path == "/v1" ->
                 Plan("https://api.openai.com/v1/models", "Authorization")
+            type in setOf(ProviderType.openAI, ProviderType.openAIResponses) && ProviderEndpoints.isAgnesBase(base) ->
+                Plan("${ProviderEndpoints.AGNES_BASE}/models", "Authorization", agnesModelList = true)
             type == ProviderType.openAI && host == "api.groq.com" && path == "/openai/v1" ->
                 Plan("https://api.groq.com/openai/v1/models", "Authorization", groqModelList = true)
             type == ProviderType.xAI && host == "api.x.ai" && path == "/v1" ->

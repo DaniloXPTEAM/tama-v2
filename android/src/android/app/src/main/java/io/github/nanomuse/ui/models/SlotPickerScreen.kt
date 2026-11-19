@@ -71,7 +71,9 @@ import io.github.nanomuse.ui.home.MuseTones
  * by model id or display name, with no cap while a query is present.
  */
 @Composable
-fun SlotPickerScreen(slot: Slot, onBack: () -> Unit, onAddProvider: () -> Unit) {
+fun SlotPickerScreen(
+    slot: Slot, onBack: () -> Unit, onAddProvider: () -> Unit, onReviewImageModel: (String, String) -> Unit,
+) {
     val context = LocalContext.current
     val repo = (context.applicationContext as? MinisApp)?.providerRepositoryOrNull
     val config = repo?.config?.collectAsState()?.value
@@ -111,6 +113,26 @@ fun SlotPickerScreen(slot: Slot, onBack: () -> Unit, onAddProvider: () -> Unit) 
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 16.dp).padding(top = 12.dp),
         )
+        if (slot == Slot.IMAGE && parallelTest) {
+            // Use the same registered identity as the automatic selector, not a legacy custom duplicate.
+            val agnes = current?.takeIf { ai.tama.media.AgnesImages.route(it.instance) && ai.tama.media.AgnesImages.model(it.modelId) != null }
+            val registered = agnes?.let { value ->
+                val matching = config?.modelEntries.orEmpty().filter {
+                    it.providerInstanceId == value.instance.id && it.baseModel.id == value.modelId
+                }
+                ai.tama.media.AgnesImages.registeredEntry(matching)?.takeUnless { it.isHidden }
+            }
+            if (registered != null) {
+                SettingsSection(footer = stringResource(R.string.nm_agnes_review_image_help)) {
+                    SettingsRow(
+                        title = stringResource(R.string.nm_agnes_review_image),
+                        subtitle = registered.model.displayName,
+                        onClick = { onReviewImageModel(registered.providerInstanceId, registered.id) },
+                        showDivider = false,
+                    )
+                }
+            }
+        }
         // nanoMuse: distinguish an untried video check from a provider failure.
         if (slot == Slot.VIDEO && parallelTest) {
             Text(

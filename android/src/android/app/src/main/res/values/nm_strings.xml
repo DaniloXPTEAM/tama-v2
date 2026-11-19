@@ -1619,4 +1619,12 @@
     <string name="nm_agnes_image_reference_format">Agnes references must be PNG, JPEG or WebP.</string>
     <string name="nm_image_actual_aspect">Image aspect ratio: %1$s</string>
     <string name="nm_agnes_auto_image_permission">Allow automatic image generation with this exact model and account. Chat permission does not authorize images.</string>
+    <string name="nm_agnes_key_probe_help">Test key reads only the Agnes model list. It does not generate an image or confirm that this key can generate one.</string>
+    <string name="nm_agnes_key_probe_accepted">Agnes returned its model list. Image generation and cost were not tested. The image models may be absent from this list.</string>
+    <string name="nm_agnes_key_format">Enter just the Agnes API key, without Bearer or spaces. No test request was sent.</string>
+    <string name="nm_agnes_image_authentication">Agnes rejected the key on the image request (401). Check the key saved for this Agnes account.</string>
+    <string name="nm_agnes_image_access_denied">Agnes denied access to image generation (403). The key check does not verify this permission.</string>
+    <string name="nm_agnes_review_image">Review automatic image permission</string>
+    <string name="nm_agnes_review_image_help">In Automatic mode, allow automatic image generation for this exact model and tap Save. Choosing a model or changing a group does not grant permission.</string>
+    <string name="nm_vision_group_not_image_generation">The Vision Group reads images. Group fallback does not configure image generation; use Settings → Models → Make pictures instead.</string>
 </resources>

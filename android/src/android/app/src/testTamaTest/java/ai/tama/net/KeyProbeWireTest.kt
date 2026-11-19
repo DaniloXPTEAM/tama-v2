@@ -48,6 +48,48 @@ class KeyProbeWireTest {
             assertEquals(fixtures.size, server.requestCount)
         }
     }
+
+    @Test fun agnesChecksOnlyTheModelListWithoutBillingOrImageAccessClaims() = runBlocking {
+        MockWebServer().use { server ->
+            server.dispatcher = QueueDispatcher().apply { setFailFast(true) }
+            server.start()
+            val official = checkNotNull(KeyProbePlan.create(ProviderType.openAI, "https://apihub.agnes-ai.com/v1"))
+            assertEquals("https://apihub.agnes-ai.com/v1/models", official.url)
+            val plan = official.copy(url = server.url("/v1/models").toString())
+            val fixtures = listOf(
+                Triple(200, """{"object":"list","data":[{"id":"agnes-2.5-flash"}]}""", Outcome.ACCEPTED),
+                Triple(200, """{"data":[]}""", Outcome.ACCEPTED),
+                Triple(200, """{"data":[],"error":{"message":"Denied"}}""", Outcome.UNAVAILABLE),
+                Triple(200, "<html>not a models list</html>", Outcome.UNAVAILABLE),
+                Triple(401, "{}", Outcome.REJECTED),
+                Triple(403, """{"error":{"message":"Access denied"}}""", Outcome.DENIED),
+                Triple(404, "{}", Outcome.UNAVAILABLE),
+                Triple(307, "", Outcome.UNAVAILABLE),
+                Triple(503, "", Outcome.UNAVAILABLE),
+            )
+            for ((i, fixture) in fixtures.withIndex()) {
+                val (status, body, expectation) = fixture
+                server.enqueue(MockResponse().setResponseCode(status).setBody(body).apply {
+                    if (status == 307) setHeader("Location", server.url("/unexpected"))
+                    if (status == 503) setHeader("Retry-After", "0")
+                })
+                val result = KeyProbe.check(plan, "agnes-fixture-key")
+                assertEquals("HTTP $status", expectation, result.outcome)
+                assertEquals(null, result.zeroSpendLimit)
+                assertEquals("HTTP $status", i + 1, server.requestCount)
+                val request = checkNotNull(server.takeRequest(2, TimeUnit.SECONDS))
+                assertEquals("GET", request.method)
+                assertEquals("/v1/models", request.path)
+                assertEquals("Bearer agnes-fixture-key", request.getHeader("Authorization"))
+                assertEquals(0L, request.bodySize)
+            }
+            for (invalid in listOf("", "Bearer fixture-key", "fixture\nkey")) {
+                assertEquals(Outcome.UNAVAILABLE, KeyProbe.check(plan, invalid).outcome)
+            }
+            assertEquals(fixtures.size, server.requestCount)
+        }
+    }
+
     @Test fun groqRequiresNormalModelsPayloadAndDoesNotTreatQuotasAsPayment() = runBlocking {
         MockWebServer().use { server ->
             server.start()

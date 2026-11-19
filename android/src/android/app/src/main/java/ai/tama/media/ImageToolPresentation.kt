@@ -8,7 +8,7 @@ internal object ImageToolPresentation {
         PREPARING, GENERATED, NO_MODEL, NO_APPROVAL, UNVERIFIED_COST, MODEL_COST_UNVERIFIED,
         AUTHORIZATION_CHANGED, PERMISSION_DENIED, EDIT_UNAVAILABLE, MODEL_CHANGE_BLOCKED, AMBIGUOUS, ALREADY_HANDLED, INVALID, FAILED,
         NO_CONFIRMED_GENERATOR, NO_VERIFIED_FREE_GENERATOR, CHAT_ONLY, ROUTE_UNCONFIRMED,
-        KEY_MISSING, NVIDIA_NATIVE, ENDPOINT_REJECTED,
+        KEY_MISSING, NVIDIA_NATIVE, ENDPOINT_REJECTED, AGNES_AUTHENTICATION, AGNES_ACCESS_DENIED,
     }
 
     fun summary(
@@ -33,6 +33,8 @@ internal object ImageToolPresentation {
             "image_chat_only" -> Summary.CHAT_ONLY
             "image_route_unconfirmed", "agnes_image_unavailable" -> Summary.ROUTE_UNCONFIRMED
             "image_key_missing" -> Summary.KEY_MISSING
+            "agnes_image_authentication" -> Summary.AGNES_AUTHENTICATION
+            "agnes_image_access_denied" -> Summary.AGNES_ACCESS_DENIED
             "image_nvidia_native" -> Summary.NVIDIA_NATIVE
             "image_endpoint_rejected" -> Summary.ENDPOINT_REJECTED
             "no_approved_image_model" -> Summary.NO_APPROVAL

@@ -787,7 +787,14 @@ class MediaOffloadImageTest {
 
     @Test fun `automatic Agnes fallback is payment-only and requests new permission for the other free model`() = runBlocking {
         assumeTrue(BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test")
-        for (failure in listOf(AgnesImageApi.Problem.PAYMENT, AgnesImageApi.Problem.QUEUE, AgnesImageApi.Problem.TIMEOUT)) {
+        val failures = mapOf(
+            AgnesImageApi.Problem.PAYMENT to "agnes_image_payment",
+            AgnesImageApi.Problem.QUEUE to "agnes_image_queue",
+            AgnesImageApi.Problem.TIMEOUT to "agnes_image_timeout",
+            AgnesImageApi.Problem.AUTHENTICATION to "agnes_image_authentication",
+            AgnesImageApi.Problem.ACCESS_DENIED to "agnes_image_access_denied",
+        )
+        for ((failure, expectedError) in failures) {
             val base = FakeImages().apply { modelCostAllowed = false; costAllowed = false; freeOnly = true }
             val provider = endpoint.instance.copy(customBaseURL = "https://apihub.agnes-ai.com/v1")
             val endpoints = AgnesImages.models.map { ImageGen.Endpoint(provider, endpoint.apiKey, it.id) }
@@ -826,8 +833,8 @@ class MediaOffloadImageTest {
                 assertEquals(listOf(first to false, endpoints[1].model to true), approved)
                 assertEquals(listOf(emptySet(), setOf(provider.id to first)), excludedChecks)
             } else {
-                val error = if (failure == AgnesImageApi.Problem.QUEUE) "agnes_image_queue" else "agnes_image_timeout"
-                assertEquals(error, JSONObject(result.output).getString("error"))
+                assertEquals(expectedError, JSONObject(result.output).getString("error"))
+                assertEquals(listOf(emptySet<Pair<String, String>>()), excludedChecks)
                 assertEquals(listOf(first), sent)
                 assertEquals(listOf(first to false), approved)
             }

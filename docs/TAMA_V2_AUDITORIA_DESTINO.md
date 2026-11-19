@@ -63,3 +63,10 @@ esgotado. Só mostra falta de crédito diante de uma indicação explícita. Um 
 aceito não é teste de conversa. Em gateways o teste oficial fica indisponível,
 sem bloquear a configuração existente. Alterar a chave ou o destino descarta o
 resultado antigo.
+
+Na Agnes, a sonda do Tama V2 Test consulta somente `GET /v1/models` com Bearer
+no endereço oficial `https://apihub.agnes-ai.com/v1`. O [guia Agnes para Cherry
+Studio](https://wiki.agnes-ai.com/en/docs/cid6) descreve a listagem e diferencia
+os modelos de imagem. O app não precisa encontrá-los nessa lista para testar a
+chave. Uma lista recebida não afirma saldo, preço ou permissão para o
+`POST /v1/images/generations`, e não altera a seleção, autorizações ou custo.

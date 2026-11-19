@@ -39,10 +39,11 @@ internal fun KeyProbeSection(
     val plan = remember(type, destination) { KeyProbePlan.create(type, destination) }
     val probeKey = apiKey.trim()
     val enabled = plan != null && allowed && KeyProbePlan.validKey(probeKey) && !running
-    SettingsSection(footer = stringResource(R.string.nm_key_probe_help)) {
+    SettingsSection(footer = stringResource(if (plan?.agnesModelList == true)
+        R.string.nm_agnes_key_probe_help else R.string.nm_key_probe_help)) {
         MinisButton(
             onClick = {
-                if (plan != null && enabled && current() && KeyDestinationGuard.permits(probeKey, destination)) {
+                if (plan != null && enabled && !running && current() && KeyDestinationGuard.permits(probeKey, destination)) {
                     running = true
                     result = null
                     onResult(null)
@@ -62,16 +63,23 @@ internal fun KeyProbeSection(
             enabled = enabled,
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
         ) { Text(stringResource(if (running) R.string.quicktest_testing else R.string.nm_key_probe_button)) }
-        val message = if (plan == null) R.string.nm_key_probe_unsupported else when (result?.outcome) {
-            KeyProbePlan.Outcome.ACCEPTED -> if (plan.groqModelList &&
-                result?.availableModels?.any(ai.tama.pricing.DocumentedFreeChat::groqOffers) == true)
-                R.string.nm_key_probe_groq_offers else R.string.nm_key_probe_accepted
-            KeyProbePlan.Outcome.REJECTED -> R.string.nm_key_probe_rejected
-            KeyProbePlan.Outcome.ZERO_SPEND -> R.string.nm_reach_key_zero_body
-            KeyProbePlan.Outcome.NO_CREDIT -> R.string.nm_key_probe_no_credit
-            KeyProbePlan.Outcome.DENIED -> R.string.nm_key_probe_denied
-            KeyProbePlan.Outcome.UNAVAILABLE -> R.string.nm_key_probe_unavailable
-            null -> null
+        val message = when {
+            plan == null -> R.string.nm_key_probe_unsupported
+            plan.agnesModelList && probeKey.isNotEmpty() && !KeyProbePlan.validKey(probeKey) -> R.string.nm_agnes_key_format
+            else -> when (result?.outcome) {
+                KeyProbePlan.Outcome.ACCEPTED -> when {
+                    plan.agnesModelList -> R.string.nm_agnes_key_probe_accepted
+                    plan.groqModelList && result?.availableModels?.any(ai.tama.pricing.DocumentedFreeChat::groqOffers) == true ->
+                        R.string.nm_key_probe_groq_offers
+                    else -> R.string.nm_key_probe_accepted
+                }
+                KeyProbePlan.Outcome.REJECTED -> R.string.nm_key_probe_rejected
+                KeyProbePlan.Outcome.ZERO_SPEND -> R.string.nm_reach_key_zero_body
+                KeyProbePlan.Outcome.NO_CREDIT -> R.string.nm_key_probe_no_credit
+                KeyProbePlan.Outcome.DENIED -> R.string.nm_key_probe_denied
+                KeyProbePlan.Outcome.UNAVAILABLE -> R.string.nm_key_probe_unavailable
+                null -> null
+            }
         }
         if (message != null) Text(stringResource(message), modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
     }

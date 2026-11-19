@@ -5,6 +5,8 @@ object R { object string {
     const val nm_image_key_missing = 103
     const val nm_image_nvidia_native = 104
     const val nm_image_endpoint_rejected = 105
+    const val nm_agnes_image_authentication = 6017
+    const val nm_agnes_image_access_denied = 6018
     const val nm_agnes_image_unavailable = 208
     const val nm_agnes_image_queue = 201
     const val nm_agnes_image_limit = 202

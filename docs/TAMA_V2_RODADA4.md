@@ -35,3 +35,29 @@ O dono mostrou uma geração concluída no Agnes Studio v4 com **Agnes Image 2.1
 - A exceção continua sendo uma recusa explícita de pagamento/crédito durante a tentativa Automática: somente outro modelo Agnes declarado grátis e já aprovado pode ser oferecido, com nova permissão; após uma escolha explícita, o alternativo também deve ser da mesma conta. Timeout, fila cheia e envio incerto não abrem alternativa.
 - **Adicionar modelo personalizado** reconhece os dois IDs do catálogo Agnes e oferece **Usar para criar imagens**, sem criar uma segunda entrada. Se já houver uma duplicata personalizada antiga, o app usa a única entrada original do catálogo quando inequívoca; não apaga a duplicata nem transfere aprovação. Em Automático, revise e aprove a entrada original, não a cópia personalizada.
 - Os testes automatizados usam chaves fictícias. O sucesso visto no Studio não comprova cobrança nem substitui o teste do APK no aparelho. No Poco, atualize por cima, selecione **Agnes Image 2.1 Flash** em **Criar imagens**, mantenha as permissões de custo desligadas, autorize a imagem e confira o modelo mostrado no pedido do gato astronauta.
+
+## Teste da chave e diagnóstico da imagem no Poco
+
+A mensagem **“O teste de chave não está disponível para este endereço. Nenhuma
+chave foi enviada.”** no APK anterior era da lista local de destinos do botão,
+que ainda não incluía Agnes. Não era recusa do provedor nem resultado de um
+pedido de imagem. O Tama V2 Test `1.0.9-tama.1-teste.2` aceita testar a chave
+no endereço oficial, apenas com a consulta de catálogo descrita na
+[auditoria de destino](TAMA_V2_AUDITORIA_DESTINO.md). Não envia prompt, não
+executa modelo e não muda qualquer autorização. Em separado, o pedido de
+imagem diferencia recusa de autenticação (401) de acesso negado (403); nem
+uma nem outra abre fallback de imagem.
+
+1. Atualize o Test por cima do anterior sem limpar dados. Não recadastre a
+   conta, o modelo ou o grupo. Abra a conta Agnes já salva em **Provedores** e
+   use **Testar chave**. Confira o resultado sem copiar ou mostrar a chave.
+2. No Automático, **Criar imagens → Revisar autorização de imagem automática**
+   abre a entrada do modelo selecionado. Use a autorização dessa tela e
+   **Salvar** se ainda faltar. A seleção do modelo, a aprovação de chat e o
+   fallback do grupo de visão não dão autorização de imagem.
+3. Mantendo as proteções de custo, peça **“crie uma imagem de um gato astronauta”**.
+   Confira o modelo no pedido de permissão, aceite se for o esperado e verifique
+   retorno inline, abrir, compartilhar e reabrir o chat depois de fechar o app.
+   Se não sair imagem, anote o modo e o texto do balão de geração separadamente
+   do resultado do teste de chave. Uma consulta aceita não prova que a imagem
+   pode ser gerada nem comprova gratuidade.

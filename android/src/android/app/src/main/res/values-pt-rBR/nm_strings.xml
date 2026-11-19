@@ -1640,4 +1640,12 @@
     <string name="nm_agnes_image_reference_format">Use referências em PNG, JPEG ou WebP para a Agnes.</string>
     <string name="nm_image_actual_aspect">Proporção da imagem: %1$s</string>
     <string name="nm_agnes_auto_image_permission">Permita criar imagens no modo Automático com este modelo e esta conta. A autorização do chat não vale para imagens.</string>
+    <string name="nm_agnes_key_probe_help">Testar chave só consulta a lista de modelos da Agnes. Não gera imagem nem confirma que a chave pode gerar uma.</string>
+    <string name="nm_agnes_key_probe_accepted">A Agnes retornou a lista de modelos. Geração de imagem e custo não foram testados. Os modelos de imagem podem não aparecer nessa lista.</string>
+    <string name="nm_agnes_key_format">Cole só a chave da Agnes, sem Bearer nem espaços. Nenhuma consulta foi enviada.</string>
+    <string name="nm_agnes_image_authentication">A Agnes recusou a chave no pedido de imagem (401). Confira a chave salva para essa conta.</string>
+    <string name="nm_agnes_image_access_denied">A Agnes negou acesso à geração de imagens (403). O teste da chave não verifica essa permissão.</string>
+    <string name="nm_agnes_review_image">Revisar autorização de imagem automática</string>
+    <string name="nm_agnes_review_image_help">No modo Automático, ative a autorização de geração de imagens para este modelo e toque em Salvar. Escolher um modelo ou mudar o grupo não dá autorização.</string>
+    <string name="nm_vision_group_not_image_generation">O Grupo de visão lê imagens. O Fallback do grupo não configura a geração. Para gerar, use Configurações → Modelos → Criar imagens.</string>
 </resources>

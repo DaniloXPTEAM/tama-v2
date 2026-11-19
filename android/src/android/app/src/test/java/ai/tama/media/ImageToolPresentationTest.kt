@@ -74,6 +74,8 @@ class ImageToolPresentationTest {
             "permission_denied" to ImageToolPresentation.Summary.PERMISSION_DENIED,
             "automatic_image_edit_unavailable" to ImageToolPresentation.Summary.EDIT_UNAVAILABLE,
             "media_model_change_blocked" to ImageToolPresentation.Summary.MODEL_CHANGE_BLOCKED,
+            "agnes_image_authentication" to ImageToolPresentation.Summary.AGNES_AUTHENTICATION,
+            "agnes_image_access_denied" to ImageToolPresentation.Summary.AGNES_ACCESS_DENIED,
             "image_failed" to ImageToolPresentation.Summary.FAILED,
         )
         reasons.forEach { (code, expected) ->

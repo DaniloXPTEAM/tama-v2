@@ -114,6 +114,36 @@ class KeyProbeSectionInstrumentedTest {
         }
     }
 
+    @Test fun agnesCatalogResultIsDistinctAndRequiresAReviewedDestinationAndRawKey() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val apiKey = mutableStateOf("Bearer fixture-key")
+        val allowed = mutableStateOf(false)
+        var calls = 0
+        compose.setContent {
+            MinisTheme {
+                KeyProbeSection(ProviderType.openAI, apiKey.value, ProviderEndpoints.AGNES_BASE,
+                    allowed = allowed.value, check = { plan, supplied ->
+                        calls++
+                        assertEquals("fixture-key", supplied)
+                        assertEquals("https://apihub.agnes-ai.com/v1/models", plan.url)
+                        KeyProbePlan.Result(KeyProbePlan.Outcome.ACCEPTED, availableModels = emptySet())
+                    }, onResult = {})
+            }
+        }
+        val button = compose.onNodeWithText(context.getString(R.string.nm_key_probe_button))
+        button.assertIsNotEnabled()
+        compose.onNodeWithText(context.getString(R.string.nm_agnes_key_format)).assertExists()
+        compose.runOnIdle { apiKey.value = "fixture-key" }
+        button.assertIsNotEnabled()
+        compose.runOnIdle { allowed.value = true }
+        button.assertIsEnabled()
+        compose.runOnIdle { assertEquals(0, calls) }
+        button.performClick()
+        compose.onNodeWithText(context.getString(R.string.nm_agnes_key_probe_accepted)).assertExists()
+        compose.onNodeWithText(context.getString(R.string.nm_key_probe_accepted)).assertDoesNotExist()
+        compose.runOnIdle { assertEquals(1, calls) }
+    }
+
     @Test fun noKeyKeepsTheCheckDisabled() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         compose.setContent {

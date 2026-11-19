@@ -303,7 +303,9 @@ fun ProviderDetailScreen(
         }
 
         // nanoMuse: the saved route can be checked here as well as on the add form.
-        if (nmHasOwnKey && !isEditingKey) {
+        // An Azure route is not the Agnes bearer-key integration, even if its URL was pasted here.
+        val nmAzureAgnes = instance.azureMode && ai.tama.providers.ProviderEndpoints.isAgnesBase(nmLiveDestination)
+        if (nmHasOwnKey && !isEditingKey && !nmAzureAgnes) {
             val snapshot = providerRepository.nmOAuthKeySnapshot(instanceId)
             val version = snapshot.version
             val route = ai.tama.router.AutoModelStore.routeFingerprint(instance)

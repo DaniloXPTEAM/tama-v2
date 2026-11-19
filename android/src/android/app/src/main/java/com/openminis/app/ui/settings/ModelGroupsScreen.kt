@@ -342,6 +342,9 @@ fun ModelGroupsScreen(
                     SectionFooter(
                         text = stringResource(R.string.model_groups_primary_is_used_for_main_agent_tasks_sub),
                     )
+                    if (com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test") {
+                        SectionFooter(text = stringResource(R.string.nm_vision_group_not_image_generation))
+                    }
                 }
             }
 

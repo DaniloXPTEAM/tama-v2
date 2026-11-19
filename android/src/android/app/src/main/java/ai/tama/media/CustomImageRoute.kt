@@ -18,6 +18,8 @@ internal object CustomImageRoute {
         AGNES_QUEUE("agnes_image_queue", R.string.nm_agnes_image_queue),
         AGNES_LIMIT("agnes_image_limit", R.string.nm_agnes_image_limit),
         AGNES_PAYMENT("agnes_image_payment", R.string.nm_agnes_image_payment),
+        AGNES_AUTHENTICATION("agnes_image_authentication", R.string.nm_agnes_image_authentication),
+        AGNES_ACCESS_DENIED("agnes_image_access_denied", R.string.nm_agnes_image_access_denied),
         AGNES_TIMEOUT("agnes_image_timeout", R.string.nm_agnes_image_timeout),
         AGNES_NO_IMAGE("agnes_image_missing", R.string.nm_agnes_image_missing),
         AGNES_REFERENCE_SIZE("agnes_image_reference_size", R.string.nm_agnes_image_reference_size),
@@ -29,6 +31,8 @@ internal object CustomImageRoute {
         AgnesImageApi.Problem.QUEUE -> Problem.AGNES_QUEUE
         AgnesImageApi.Problem.LIMIT -> Problem.AGNES_LIMIT
         AgnesImageApi.Problem.PAYMENT -> Problem.AGNES_PAYMENT
+        AgnesImageApi.Problem.AUTHENTICATION -> Problem.AGNES_AUTHENTICATION
+        AgnesImageApi.Problem.ACCESS_DENIED -> Problem.AGNES_ACCESS_DENIED
         AgnesImageApi.Problem.TIMEOUT -> Problem.AGNES_TIMEOUT
         AgnesImageApi.Problem.NO_IMAGE -> Problem.AGNES_NO_IMAGE
         AgnesImageApi.Problem.REFERENCE_SIZE -> Problem.AGNES_REFERENCE_SIZE

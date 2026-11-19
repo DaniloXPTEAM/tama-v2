@@ -27,7 +27,7 @@ import org.json.JSONObject
 internal class AgnesImageApi(http: OkHttpClient, private val timeoutMs: Long = 120_000) {
     private val client = http.singleUseImageClient().newBuilder().callTimeout(timeoutMs, TimeUnit.MILLISECONDS).build()
 
-    enum class Problem { QUEUE, LIMIT, PAYMENT, TIMEOUT, NO_IMAGE, REFERENCE_SIZE, REFERENCE_FORMAT, FAILED }
+    enum class Problem { QUEUE, LIMIT, PAYMENT, AUTHENTICATION, ACCESS_DENIED, TIMEOUT, NO_IMAGE, REFERENCE_SIZE, REFERENCE_FORMAT, FAILED }
     class Failure(val problem: Problem) : IOException(problem.name)
     private data class Reply(val status: Int, val json: JSONObject?)
     private data class Error(val message: String, val codes: List<String>)
@@ -66,9 +66,11 @@ internal class AgnesImageApi(http: OkHttpClient, private val timeoutMs: Long = 1
             error = errorOf(reply.json)
         }
         if (reply.status == 503) throw Failure(Problem.QUEUE)
+        if (reply.status == 401) throw Failure(Problem.AUTHENTICATION)
         val payload = firstImage(reply.json)
         if (paymentRequired(reply.status, error, payload == null)) throw Failure(Problem.PAYMENT)
         if (reply.status == 429 || (payload == null && limit.containsMatchIn(error.message))) throw Failure(Problem.LIMIT)
+        if (reply.status == 403) throw Failure(Problem.ACCESS_DENIED)
         if (reply.status !in 200..299) throw Failure(Problem.FAILED)
         if (payload == null) throw Failure(Problem.NO_IMAGE)
         val bytes = if (payload.startsWith("https://", true)) {

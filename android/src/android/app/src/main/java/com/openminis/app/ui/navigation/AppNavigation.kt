@@ -669,6 +669,9 @@ fun AppNavigation(
                 slot = slot,
                 onBack = { navController.safePopBackStack() },
                 onAddProvider = { navController.safeNavigate(Routes.ADD_PROVIDER) },
+                onReviewImageModel = { instanceId, entryId ->
+                    navController.safeNavigate(Routes.modelEntryDetail(instanceId, entryId))
+                },
             )
         }
         composable(

@@ -185,7 +185,8 @@ class AgnesImageApiTest {
             Triple(400, """{"message":"Insufficient credits"}""", AgnesImageApi.Problem.PAYMENT),
             Triple(402, "{}", AgnesImageApi.Problem.PAYMENT),
             Triple(200, """{"message":"Saldo insuficiente"}""", AgnesImageApi.Problem.PAYMENT),
-            Triple(403, """{"message":"Access denied"}""", AgnesImageApi.Problem.FAILED),
+            Triple(401, """{"error":{"message":"Invalid API key"}}""", AgnesImageApi.Problem.AUTHENTICATION),
+            Triple(403, """{"message":"Access denied"}""", AgnesImageApi.Problem.ACCESS_DENIED),
             Triple(200, """{"data":[],"images":[]}""", AgnesImageApi.Problem.NO_IMAGE),
         )
         MockWebServer().use { server ->

@@ -41,6 +41,10 @@ internal object KeyProbe {
 
     private suspend fun execute(plan: KeyProbePlan.Plan, key: String, client: OkHttpClient): KeyProbePlan.Result =
         suspendCancellableCoroutine { continuation ->
+            if (!KeyProbePlan.validKey(key)) {
+                continuation.resume(unavailable)
+                return@suspendCancellableCoroutine
+            }
             try {
                 val request = Request.Builder().url(plan.url).get().header(
                     plan.header, if (plan.header == "Authorization") "Bearer $key" else key,
@@ -66,7 +70,8 @@ internal object KeyProbe {
     private fun readResult(plan: KeyProbePlan.Plan, response: Response): KeyProbePlan.Result {
         val status = response.code
         val readInfo = plan.openRouterKeyInfo && response.isSuccessful
-        val readModels = plan.groqModelList && response.isSuccessful
+        // A 2xx login page or error envelope is not a successful model-list check.
+        val readModels = (plan.groqModelList || plan.agnesModelList) && response.isSuccessful
         val readError = status == 402 || status == 403
         val body = if (readInfo || readModels || readError) runCatching { JSONObject(response.peekBody(65_536).string()) }.getOrNull() else null
         val models = if (readModels) {
