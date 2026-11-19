@@ -340,6 +340,7 @@ object ImageGen {
     }
 
     private fun provider(context: Context, ep: Endpoint, modelId: String): LLMProvider {
+        if (customOpenAi(ep.instance)) ai.tama.providers.KeyDestinationGuard.requireAllowed(true, ep.apiKey, ep.baseUrl)
         if (!ImageModelRequests.supportsModel(ep.instance.providerType, modelId)) {
             throw ImageGenException(context.getString(com.openminis.app.R.string.nm_avatar_no_model))
         }
@@ -380,7 +381,7 @@ object ImageGen {
         if (ep.isDashScope) return@withContext generateDashScope(ep, prompt, size, singleAttempt = !allowFormatRetry, beforeRequest = costChecked)
         val response = try {
             ImageModelRequests.request(provider(context, ep, ep.model), prompt, size,
-                allowFormatRetry = allowFormatRetry, beforeRequest = costChecked)
+                allowFormatRetry = allowFormatRetry && !customOpenAi(ep.instance), beforeRequest = costChecked)
         } catch (e: CustomImageRoute.Rejected) {
             throw e
         } catch (e: com.openminis.app.data.model.LLMError.ProviderError) {

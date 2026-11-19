@@ -1784,6 +1784,9 @@ class OpenAIProvider private constructor(
             val imageClient = if (retryAllowed) client else client.singleUseImageClient()
             // nanoMuse: revalidate before every image POST, including a format retry.
             beforeDirectRequest?.invoke()
+            if (com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test") {
+                ai.tama.providers.KeyDestinationGuard.requireAllowed(true, apiKey, if (isAzure) azureBase else basePath)
+            }
             ai.tama.pricing.ModelCostGuard.requireAllowed()
             val response = imageClient.newCall(request).execute()
             val statusCode = response.code

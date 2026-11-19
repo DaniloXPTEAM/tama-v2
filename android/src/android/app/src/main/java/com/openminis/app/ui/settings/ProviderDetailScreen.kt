@@ -345,7 +345,7 @@ fun ProviderDetailScreen(
             )
             // nanoMuse: one tap enables the filter, fetches catalogue metadata if needed,
             // and approves the visible free chat routes. It does not run inference.
-            if (nmHasFreeCatalogue && nmHasOwnKey && instance.isEnabled) {
+            if (providerRepository.tamaHasFreeChatRoute(instance) && nmHasOwnKey && instance.isEnabled) {
                 var nmBulkBusy by remember(instanceId) { mutableStateOf(false) }
                 var nmBulkResult by remember(instanceId, storedKey, instance.customBaseURL) { mutableStateOf<Int?>(null) }
                 SettingsSection(footer = stringResource(R.string.nm_free_bulk_help)) {

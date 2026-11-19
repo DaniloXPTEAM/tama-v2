@@ -30,6 +30,7 @@ class CustomProviderKeyInstrumentedTest {
             assertTrue(repo.addApiKeyInstanceChecked(provider, "  fixture-original  "))
             assertFalse(repo.addApiKeyInstanceChecked(provider, "fixture-duplicate"))
             val opened = ProviderRepository(context)
+            opened.ensureConfigLoaded()
             assertEquals(provider.customBaseURL, opened.instance(id)?.customBaseURL)
             assertEquals("fixture-original", opened.loadApiKey(id))
             assertTrue(opened.saveApiKeyChecked(id, "fixture-edited"))

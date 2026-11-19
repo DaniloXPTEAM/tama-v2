@@ -2432,6 +2432,8 @@ class ProviderRepository(private val context: Context) {
         gemini = instance.providerType == ProviderType.gemini, openRouter = instance.providerType == ProviderType.openRouter,
     )
 
+    internal fun tamaHasFreeChatRoute(instance: ProviderInstance): Boolean = tamaFreeRoute(instance) != null
+
     internal fun tamaHasFreeCatalogue(instance: ProviderInstance): Boolean = DocumentedFreeChat.hasCatalogue(
         tamaModelBase(instance), openAiChat = instance.providerType == ProviderType.openAI && !instance.useResponsesAPI,
         gemini = instance.providerType == ProviderType.gemini, openRouter = instance.providerType == ProviderType.openRouter,

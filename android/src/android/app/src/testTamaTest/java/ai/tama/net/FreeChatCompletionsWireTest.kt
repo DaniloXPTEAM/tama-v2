@@ -315,6 +315,12 @@ class FreeChatCompletionsWireTest {
                 assertEquals(0, server.requestCount)
                 ModelCostGuard.setAllowedForCurrentProcess(true)
                 try {
+                    if (id == agnes) {
+                        val wrongRecipient = OpenAIProvider("gsk_fixture", LLMModel(id, id, "fixture"), base, client)
+                        val refused = runCatching { wrongRecipient.generateImage("test picture", allowFormatRetry = false) }
+                        assertTrue(ai.tama.providers.KeyDestinationGuard.causedByBlock(checkNotNull(refused.exceptionOrNull())))
+                        assertEquals(0, server.requestCount)
+                    }
                     server.enqueue(MockResponse().setBody("""{"data":[{"url":"${server.url("/result.png")}"}]}"""))
                     server.enqueue(MockResponse().setHeader("Content-Type", "image/png").setBody("synthetic attachment"))
                     val response = provider.generateImage("test picture", allowFormatRetry = false)

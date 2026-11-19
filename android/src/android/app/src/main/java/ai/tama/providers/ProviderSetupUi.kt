@@ -219,7 +219,9 @@ internal fun FreeModelImportSection(
     hasCatalogue: Boolean = true,
     hasKey: Boolean = true,
 ) {
-    val enabled = hasCatalogue && hasKey && !lockedByZeroLimit
+    // A legacy filter must remain removable after the endpoint changes or
+    // loses its supported catalogue. Only enabling requires a catalogue.
+    val enabled = (hasCatalogue || checked) && hasKey && !lockedByZeroLimit
     val statusText = freeModelImportStatusText(status)
     val help = stringResource(when {
         lockedByZeroLimit -> R.string.nm_reach_key_zero_body
@@ -232,7 +234,7 @@ internal fun FreeModelImportSection(
         SettingsSwitchRow(
             title = stringResource(R.string.nm_free_import_title),
             checked = checked,
-            onCheckedChange = { if (enabled) onCheckedChange(it) },
+            onCheckedChange = { if (enabled && (!it || hasCatalogue)) onCheckedChange(it) },
             enabled = enabled,
             showDivider = false,
         )
