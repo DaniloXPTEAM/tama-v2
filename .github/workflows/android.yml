@@ -168,7 +168,8 @@ jobs:
             rm -f "$RUNNER_TEMP/tama-unit-tests.log"
           else
             status=$?
-            python3 ../../../scripts/android/summarize-build-failure.py "$RUNNER_TEMP/tama-unit-tests.log" "$status" || true
+            python3 ../../../scripts/android/summarize-build-failure.py "$RUNNER_TEMP/tama-unit-tests.log" "$status" \
+              app/build/test-results/testTamaTestUnitTest || true
             rm -f "$RUNNER_TEMP/tama-unit-tests.log"
             exit "$status"
           fi

@@ -57,6 +57,29 @@ class FailureSummary(unittest.TestCase):
                     f'e: file://{file}:18:9 duplicate\n')
             self.assertEqual([(relative, 18)], module.compiler_locations(text, root))
 
+    def test_junit_locations_are_limited_to_checkout_test_sources(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            relative = 'android/src/android/app/src/test/java/fixture/FixtureTest.kt'
+            file = root / relative
+            file.parent.mkdir(parents=True)
+            file.write_text('package fixture\nclass FixtureTest {\n    fun `an assertion`() {}\n}\n')
+            reports = root / 'reports'
+            reports.mkdir()
+            (reports / 'TEST-fixture.FixtureTest.xml').write_text('''<testsuite>
+                <testcase classname="fixture.FixtureTest" name="an assertion">
+                    <failure message="fixture-private-text">fixture-private-text
+                        at fixture.FixtureTest$an assertion$1.invokeSuspend(FixtureTest.kt:3)
+                    </failure>
+                </testcase>
+                <testcase classname="fixture.FixtureTest" name="an assertion()">
+                    <failure message="fixture-private-text"/>
+                </testcase>
+                <testcase classname="fixture.UntrackedTest" name="fixture-private-text"><failure/></testcase>
+                <testcase classname="fixture.FixtureTest" name="fixture-private-text"/>
+            </testsuite>''')
+            self.assertEqual([(relative, 3)], module.unit_test_locations(reports, root))
+
     def test_log_data_is_never_echoed(self):
         fixture = "fixture-private-token-XYZ123"
         with tempfile.TemporaryDirectory() as tmp:
