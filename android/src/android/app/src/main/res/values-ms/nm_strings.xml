@@ -1563,4 +1563,19 @@
     <string name="nm_loop_estimate_explanation">Anggaran untuk perbualan ini: jumlah yang lebih besar antara mesej pembantu dan blok alat. Ini bukan bilangan tepat permintaan atau caj.</string>
     <string name="nm_free_chat_choose">Pilih model percuma atau muat semula senarai model penyedia.</string>
     <string name="nm_key_probe_no_credit">Penyedia melaporkan kredit tidak mencukupi.</string>
+    <string name="nm_model_badge_image">Imej</string>
+    <string name="nm_model_badge_audio">Audio</string>
+    <string name="nm_model_badge_tools">Alat</string>
+    <string name="nm_model_badge_input">Input: %1$s</string>
+    <string name="nm_model_badge_output">Output: %1$s</string>
+    <string name="nm_chat_current_route">Sedang digunakan: %1$s · %2$s</string>
+    <string name="nm_chat_mode_manual">Manual</string>
+    <string name="nm_chat_mode_global">Tetapan ini terpakai pada semua sembang. Tetapan ini tidak mengubah kebenaran kos atau model.</string>
+    <string name="nm_auto_reason_code">keutamaan untuk pengekodan</string>
+    <string name="nm_models_cost_advanced">Tetapan kos lanjutan</string>
+    <string name="nm_models_cost_advanced_sub">Semak kebenaran kos secara berasingan.</string>
+    <string name="nm_code_block_label">Kod</string>
+    <string name="nm_code_wrap">Balut baris</string>
+    <string name="nm_code_unwrap">Tatal baris panjang</string>
+    <string name="nm_free_image_unavailable">Mod percuma versi ini tidak mempunyai penjana imej yang disahkan percuma.</string>
 </resources>

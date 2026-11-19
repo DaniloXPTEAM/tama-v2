@@ -1567,4 +1567,19 @@
     <string name="nm_loop_estimate_explanation">Schätzung für diese Unterhaltung: der höhere Wert aus Assistentennachrichten und Werkzeugblöcken. Keine genaue Anzahl von Anfragen oder Kosten.</string>
     <string name="nm_free_chat_choose">Wähle ein kostenloses Modell oder aktualisiere die Modellliste des Anbieters.</string>
     <string name="nm_key_probe_no_credit">Der Anbieter meldet unzureichendes Guthaben.</string>
+    <string name="nm_model_badge_image">Bild</string>
+    <string name="nm_model_badge_audio">Audio</string>
+    <string name="nm_model_badge_tools">Werkzeuge</string>
+    <string name="nm_model_badge_input">Eingabe: %1$s</string>
+    <string name="nm_model_badge_output">Ausgabe: %1$s</string>
+    <string name="nm_chat_current_route">Aktiv: %1$s · %2$s</string>
+    <string name="nm_chat_mode_manual">Manuell</string>
+    <string name="nm_chat_mode_global">Diese Einstellung gilt für alle Chats. Kosten- und Modellberechtigungen bleiben unverändert.</string>
+    <string name="nm_auto_reason_code">bevorzugt für Programmierung</string>
+    <string name="nm_models_cost_advanced">Erweiterte Kosteneinstellungen</string>
+    <string name="nm_models_cost_advanced_sub">Prüfe die Kostenberechtigungen separat.</string>
+    <string name="nm_code_block_label">Code</string>
+    <string name="nm_code_wrap">Zeilen umbrechen</string>
+    <string name="nm_code_unwrap">Lange Zeilen scrollen</string>
+    <string name="nm_free_image_unavailable">In dieser Version gibt es im kostenlosen Modus keinen Bildgenerator mit bestätigten Gratisanfragen.</string>
 </resources>

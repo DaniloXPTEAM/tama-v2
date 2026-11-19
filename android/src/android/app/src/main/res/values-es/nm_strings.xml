@@ -1567,4 +1567,19 @@
     <string name="nm_loop_estimate_explanation">Estimación de esta conversación: el mayor número entre mensajes del asistente y bloques de herramientas. No es un recuento exacto de solicitudes ni de cargos.</string>
     <string name="nm_free_chat_choose">Elige un modelo gratuito o actualiza la lista del proveedor.</string>
     <string name="nm_key_probe_no_credit">El proveedor indicó que no hay crédito suficiente.</string>
+    <string name="nm_model_badge_image">Imagen</string>
+    <string name="nm_model_badge_audio">Audio</string>
+    <string name="nm_model_badge_tools">Herramientas</string>
+    <string name="nm_model_badge_input">Entrada: %1$s</string>
+    <string name="nm_model_badge_output">Salida: %1$s</string>
+    <string name="nm_chat_current_route">En uso: %1$s · %2$s</string>
+    <string name="nm_chat_mode_manual">Manual</string>
+    <string name="nm_chat_mode_global">Este ajuste se aplica a todos los chats. No cambia los permisos de coste ni de modelos.</string>
+    <string name="nm_auto_reason_code">preferencia para programar</string>
+    <string name="nm_models_cost_advanced">Ajustes avanzados de coste</string>
+    <string name="nm_models_cost_advanced_sub">Revisa por separado los permisos de coste.</string>
+    <string name="nm_code_block_label">Código</string>
+    <string name="nm_code_wrap">Ajustar líneas</string>
+    <string name="nm_code_unwrap">Desplazar líneas largas</string>
+    <string name="nm_free_image_unavailable">El modo gratuito de esta versión no tiene un generador de imágenes con gratuidad confirmada.</string>
 </resources>

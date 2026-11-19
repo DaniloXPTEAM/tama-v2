@@ -1575,4 +1575,19 @@
     <string name="nm_loop_estimate_explanation">Szacunek dla tej rozmowy: większa liczba wiadomości asystenta lub bloków narzędzi. To nie jest dokładna liczba żądań ani opłat.</string>
     <string name="nm_free_chat_choose">Wybierz bezpłatny model lub odśwież listę modeli dostawcy.</string>
     <string name="nm_key_probe_no_credit">Dostawca zgłosił brak wystarczających środków.</string>
+    <string name="nm_model_badge_image">Obraz</string>
+    <string name="nm_model_badge_audio">Dźwięk</string>
+    <string name="nm_model_badge_tools">Narzędzia</string>
+    <string name="nm_model_badge_input">Wejście: %1$s</string>
+    <string name="nm_model_badge_output">Wyjście: %1$s</string>
+    <string name="nm_chat_current_route">W użyciu: %1$s · %2$s</string>
+    <string name="nm_chat_mode_manual">Ręczny</string>
+    <string name="nm_chat_mode_global">To ustawienie dotyczy wszystkich czatów. Nie zmienia zezwoleń na koszty ani użycie modeli.</string>
+    <string name="nm_auto_reason_code">preferowany przy programowaniu</string>
+    <string name="nm_models_cost_advanced">Zaawansowane ustawienia kosztów</string>
+    <string name="nm_models_cost_advanced_sub">Sprawdź oddzielnie zezwolenia na koszty.</string>
+    <string name="nm_code_block_label">Kod</string>
+    <string name="nm_code_wrap">Zawijaj wiersze</string>
+    <string name="nm_code_unwrap">Przewijaj długie wiersze</string>
+    <string name="nm_free_image_unavailable">Tryb bezpłatny w tej wersji nie ma generatora obrazów o potwierdzonej bezpłatności.</string>
 </resources>

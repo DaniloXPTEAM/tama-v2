@@ -9714,7 +9714,13 @@ class ChatViewModel(
                             is ai.tama.router.AutoSwitchReason.Cause.Failure -> nmAutoFailureReason(cause.reason)
                             is ai.tama.router.AutoSwitchReason.Cause.Local -> cause.explanation
                             is ai.tama.router.AutoSwitchReason.Cause.Rejected -> nmAutoReason(cause.reason)
-                            null -> null
+                            null -> if (tamaV2Test && nmOwnKeyTurn && nmRoute.codeRequested &&
+                                selection.candidate.preference == null && selection.candidate.codePreference > 0 &&
+                                choices.any { it.entry.id == _activeEntryId.value &&
+                                    it.entry.id != selection.candidate.entryId &&
+                                    it.candidate.verifiedFree == selection.candidate.verifiedFree &&
+                                    it.candidate.codePreference < selection.candidate.codePreference })
+                                context.getString(R.string.nm_auto_reason_code) else null
                         }
                         // The actual reservation below checks the live ledger again atomically.
                         return selected.copy(candidate = selection.candidate, switchReason = why)

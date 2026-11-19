@@ -1568,4 +1568,19 @@
     <string name="nm_loop_estimate_explanation">Estimation pour cette conversation : le plus grand nombre entre les messages de l’assistant et les blocs d’outils. Ce n’est pas un décompte exact des requêtes ou des frais.</string>
     <string name="nm_free_chat_choose">Choisissez un modèle gratuit ou actualisez la liste du fournisseur.</string>
     <string name="nm_key_probe_no_credit">Le fournisseur signale un crédit insuffisant.</string>
+    <string name="nm_model_badge_image">Image</string>
+    <string name="nm_model_badge_audio">Audio</string>
+    <string name="nm_model_badge_tools">Outils</string>
+    <string name="nm_model_badge_input">Entrée : %1$s</string>
+    <string name="nm_model_badge_output">Sortie : %1$s</string>
+    <string name="nm_chat_current_route">Actif : %1$s · %2$s</string>
+    <string name="nm_chat_mode_manual">Manuel</string>
+    <string name="nm_chat_mode_global">Ce réglage concerne toutes les discussions. Il ne modifie pas les autorisations de coût ou de modèle.</string>
+    <string name="nm_auto_reason_code">préférence pour le code</string>
+    <string name="nm_models_cost_advanced">Paramètres avancés de coût</string>
+    <string name="nm_models_cost_advanced_sub">Vérifiez séparément les autorisations de coût.</string>
+    <string name="nm_code_block_label">Code</string>
+    <string name="nm_code_wrap">Renvoyer à la ligne</string>
+    <string name="nm_code_unwrap">Faire défiler les lignes longues</string>
+    <string name="nm_free_image_unavailable">Dans cette version, le mode gratuit ne comprend aucun générateur d’images dont la gratuité est confirmée.</string>
 </resources>

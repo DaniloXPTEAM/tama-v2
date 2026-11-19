@@ -4,6 +4,8 @@ import android.content.Context
 import com.openminis.app.data.model.ModelEntry
 import com.openminis.app.data.model.ProviderInstance
 import java.security.MessageDigest
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 /**
  * Device-local consent and capability evidence for an exact model route. None of these
@@ -126,6 +128,10 @@ object AutoModelStore {
         AutoModelRuntime.invalidateAccount(providerId)
     }
 
+    // UI invalidation only. Dispatch always reads the saved mode and rechecks authorization.
+    private val _modeChanges = MutableStateFlow(0L)
+    internal val modeChanges = _modeChanges.asStateFlow()
+
     /** Manual is the safe default until the person turns automatic selection on. */
     fun enabled(context: Context): Boolean = prefs(context).getBoolean(MODE, false)
 
@@ -138,6 +144,7 @@ object AutoModelStore {
     fun setEnabled(context: Context, enabled: Boolean) {
         advanceAutomaticPolicy()
         prefs(context).edit().putBoolean(MODE, enabled).apply()
+        _modeChanges.value = automaticPolicyRevision
     }
 
     /**

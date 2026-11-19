@@ -725,11 +725,12 @@ private fun ColumnScope.ApiKeyConfigSection(
     }
 
     // nanoMuse: a prefix suggests an owner, not consent to send a key to another host.
-    val nmDestination = if (nmParallel) ai.tama.providers.ProviderEndpoints.factoryBase(
-        providerType, ai.tama.providers.ProviderEndpoints.storageBase(providerType, customBaseURL, appendV1Suffix), appendV1Suffix,
-    ) else null
+    // nanoMuse: never display or test a stock destination for an empty custom field.
     val nmCustomAddressMissing = nmParallel && requireCustomAddress &&
         !ai.tama.providers.ProviderDirectory.validCustomAddress(customBaseURL)
+    val nmDestination = if (nmParallel && !nmCustomAddressMissing) ai.tama.providers.ProviderEndpoints.factoryBase(
+        providerType, ai.tama.providers.ProviderEndpoints.storageBase(providerType, customBaseURL, appendV1Suffix), appendV1Suffix,
+    ) else null
     val nmDestinationAllowed = if (nmCustomAddressMissing) false
         else if (nmParallel) ai.tama.providers.KeyDestinationReview(apiKey, nmDestination) else true
     var probeResult by remember(providerType, apiKey, nmDestination, nmDestinationAllowed) {

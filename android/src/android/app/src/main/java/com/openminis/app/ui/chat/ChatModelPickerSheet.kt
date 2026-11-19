@@ -310,6 +310,8 @@ internal fun ModelPickerSheet(
      *  section header — dismisses the sheet and navigates to the Model Groups
      *  management screen. Null hides the button (callers without a route). */
     onEditGroups: (() -> Unit)? = null,
+    // nanoMuse: the chat can display and change the saved mode; other pickers cannot.
+    ownChatModeBusy: Boolean? = null,
 ) {
     val openTime = remember { System.nanoTime() }
 
@@ -363,6 +365,18 @@ internal fun ModelPickerSheet(
     val nmCatalogueStatuses by providerRepository.nmFreeImportStatus.collectAsState()
     val nmSpendLimits by providerRepository.tamaZeroSpendLimits.collectAsState()
     val nmPaymentRefusals by providerRepository.tamaPaymentRefusals.collectAsState()
+    val tamaPicker = com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test"
+    val nmActive = config.modelEntries.firstOrNull { it.id == activeEntryId }
+    val nmActiveInstance = config.instances.firstOrNull { it.id == nmActive?.providerInstanceId }
+    val nmModeControl = tamaPicker && ownChatModeBusy != null &&
+        nmActiveInstance?.let { providerRepository.tamaOwnApiKey(it) != null } == true
+    @Composable
+    fun Badges(entry: ModelEntry, instance: com.openminis.app.data.model.ProviderInstance?) {
+        val metadata = remember(config, entry, instance, nmCatalogueStatuses, nmPaymentRefusals) {
+            if (tamaPicker && instance != null) providerRepository.tamaModelMetadata(entry, instance) else null
+        }
+        ai.tama.providers.ModelBadges(entry, metadata)
+    }
     val allInstancesWithEntries = remember(config, searchText, nmCatalogueStatuses, nmSpendLimits, nmPaymentRefusals) {
         val t0 = System.nanoTime()
         var totalCount = 0
@@ -542,6 +556,33 @@ internal fun ModelPickerSheet(
                     .fillMaxWidth()
                     .weight(1f, fill = false),
             ) {
+                // nanoMuse: show the current selection and the mode without changing route consent.
+                if (nmModeControl && nmActive != null && nmActiveInstance != null) item {
+                    val modeRevision by ai.tama.router.AutoModelStore.modeChanges.collectAsState()
+                    val automatic = remember(modeRevision) { ai.tama.router.AutoModelStore.enabled(nmContext) }
+                    com.openminis.app.ui.settings.SettingsSwitchRow(
+                        title = stringResource(R.string.nm_auto_models_title),
+                        subtitle = stringResource(if (automatic) R.string.soul_lang_auto else R.string.nm_chat_mode_manual) +
+                            " · " + stringResource(
+                            R.string.nm_chat_current_route,
+                            nmActiveInstance.label.ifBlank { nmActiveInstance.providerType.displayName },
+                            nmActive.model.displayName,
+                        ),
+                        checked = automatic,
+                        enabled = ownChatModeBusy == false,
+                        onCheckedChange = { enabled ->
+                            val live = providerRepository.instance(nmActiveInstance.id)
+                            if (ownChatModeBusy == false && live?.let { providerRepository.tamaOwnApiKey(it) != null } == true)
+                                ai.tama.router.AutoModelStore.setEnabled(nmContext, enabled)
+                        },
+                    )
+                    Text(
+                        stringResource(R.string.nm_chat_mode_global),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp),
+                    )
+                }
                 // ── Model Groups (grouped section card with embedded header) ──
                 if (filteredGroups.isNotEmpty()) {
                     // Section card: header + rows live in the same surface so
@@ -877,6 +918,10 @@ internal fun ModelPickerSheet(
                                                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
                                                         )
                                                     }
+                                                    // nanoMuse: group members need the same modality distinctions.
+                                                    if (tamaPicker && instance?.let { providerRepository.tamaOwnApiKey(it) != null } == true) {
+                                                        FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) { Badges(entry, instance) }
+                                                    }
                                                 }
                                                 if (isActive) {
                                                     Text(
@@ -1053,9 +1098,8 @@ internal fun ModelPickerSheet(
                                                     displayEntry.model.displayName,
                                                     style = MaterialTheme.typography.bodyMedium,
                                                 )
-                                                com.openminis.app.ui.components.modalityBadges(displayEntry.model).forEach { badge ->
-                                                    com.openminis.app.ui.components.ModalityBadge(badge)
-                                                }
+                                                // nanoMuse: exact input and output labels for own-key models.
+                                                Badges(displayEntry, instance)
                                             }
                                             // [T-android-model-picker-polish]
                                             // Quick Test, not a model count. The
@@ -1210,9 +1254,8 @@ internal fun ModelPickerSheet(
                                                         style = MaterialTheme.typography.labelSmall,
                                                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
                                                     )
-                                                    com.openminis.app.ui.components.modalityBadges(entry.model).forEach { badge ->
-                                                        com.openminis.app.ui.components.ModalityBadge(badge)
-                                                    }
+                                                    // nanoMuse: use the same metadata as automatic selection.
+                                                    Badges(entry, instance)
                                                 }
                                             }
                                             if (selectedGroupId != null && activeEntryId == entry.id) {

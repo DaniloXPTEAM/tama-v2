@@ -1563,4 +1563,19 @@
     <string name="nm_loop_estimate_explanation">이 대화의 추정치입니다. 어시스턴트 메시지와 도구 블록 중 더 큰 수이며, 요청이나 청구의 정확한 횟수가 아닙니다.</string>
     <string name="nm_free_chat_choose">무료 모델을 선택하거나 제공자의 모델 목록을 새로고침하세요.</string>
     <string name="nm_key_probe_no_credit">제공자가 크레딧이 부족하다고 알렸습니다.</string>
+    <string name="nm_model_badge_image">이미지</string>
+    <string name="nm_model_badge_audio">오디오</string>
+    <string name="nm_model_badge_tools">도구</string>
+    <string name="nm_model_badge_input">입력: %1$s</string>
+    <string name="nm_model_badge_output">출력: %1$s</string>
+    <string name="nm_chat_current_route">사용 중: %1$s · %2$s</string>
+    <string name="nm_chat_mode_manual">수동</string>
+    <string name="nm_chat_mode_global">이 설정은 모든 채팅에 적용됩니다. 비용이나 모델 권한은 변경하지 않습니다.</string>
+    <string name="nm_auto_reason_code">코딩에 우선 적용</string>
+    <string name="nm_models_cost_advanced">고급 비용 설정</string>
+    <string name="nm_models_cost_advanced_sub">비용 권한을 별도로 검토하세요.</string>
+    <string name="nm_code_block_label">코드</string>
+    <string name="nm_code_wrap">줄 바꿈</string>
+    <string name="nm_code_unwrap">긴 줄 가로 스크롤</string>
+    <string name="nm_free_image_unavailable">이 버전의 무료 모드에는 무료로 확인된 이미지 생성 모델이 없습니다.</string>
 </resources>

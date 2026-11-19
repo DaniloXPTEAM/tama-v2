@@ -1540,5 +1540,19 @@
     <string name="nm_loop_estimate_explanation">本对话的估算值取助手消息数和工具块数中的较大值，并非请求次数或收费次数的准确统计。</string>
     <string name="nm_free_chat_choose">请选择免费模型，或在服务商设置中更新模型列表。</string>
     <string name="nm_key_probe_no_credit">服务商报告额度不足。</string>
-    <string name="nm_free_image_unavailable">没有启用免费的图像模型。请在设置 → 模型中添加已确认免费的图像生成模型。未发送图像请求。</string>
+    <string name="nm_free_image_unavailable">此版本的仅免费模式没有已确认免费的图片生成模型。</string>
+    <string name="nm_model_badge_image">图片</string>
+    <string name="nm_model_badge_audio">音频</string>
+    <string name="nm_model_badge_tools">工具</string>
+    <string name="nm_model_badge_input">输入：%1$s</string>
+    <string name="nm_model_badge_output">输出：%1$s</string>
+    <string name="nm_chat_current_route">当前：%1$s · %2$s</string>
+    <string name="nm_chat_mode_manual">手动</string>
+    <string name="nm_chat_mode_global">此设置适用于所有对话，不会更改费用或模型权限。</string>
+    <string name="nm_auto_reason_code">优先选择代码模型</string>
+    <string name="nm_models_cost_advanced">高级费用设置</string>
+    <string name="nm_models_cost_advanced_sub">单独查看费用权限。</string>
+    <string name="nm_code_block_label">代码</string>
+    <string name="nm_code_wrap">自动换行</string>
+    <string name="nm_code_unwrap">横向滚动长行</string>
 </resources>

@@ -4,6 +4,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+- Showed chat mode, the active personal-key route and separate input/output capabilities in the Android Test picker. Added code wrapping without changing copied text.
+
 - Added a searchable bundled provider directory and a dedicated custom compatible form to Android Test. Automatic code requests prefer capable, approved models.
 
 - Kept unverified image generators out of free-only Android Test requests and choices.

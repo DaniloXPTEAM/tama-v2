@@ -50,6 +50,9 @@ import androidx.compose.material.icons.outlined.BrokenImage
 import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconToggleButton
+import androidx.compose.material.icons.filled.WrapText
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -1704,6 +1707,9 @@ private fun RenderBlock(block: MdBlock) {
             io.github.nanomuse.ui.chat.NanoMuseBlock(block.language, block.code)
         } else {
             val clipboardManager = LocalClipboardManager.current
+            // nanoMuse: read long code on a phone without changing what Copy returns.
+            val tamaCode = com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test"
+            var wrap by remember { mutableStateOf(false) }
             var copied by remember { mutableStateOf(false) }
             if (copied) {
                 LaunchedEffect(Unit) {
@@ -1726,12 +1732,31 @@ private fun RenderBlock(block: MdBlock) {
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        text = block.language.ifEmpty { "code" },
+                        text = block.language.ifEmpty { if (tamaCode) stringResource(R.string.nm_code_block_label) else "code" },
+                        maxLines = if (tamaCode) 1 else Int.MAX_VALUE,
                         fontSize = 11.sp,
                         color = MdCodeLangColor,
                         modifier = Modifier.weight(1f),
                     )
-                    Icon(
+                    if (tamaCode) {
+                        IconToggleButton(checked = wrap, onCheckedChange = { wrap = it }) {
+                            Icon(
+                                Icons.Default.WrapText,
+                                contentDescription = stringResource(if (wrap) R.string.nm_code_unwrap else R.string.nm_code_wrap),
+                                tint = if (wrap) MaterialTheme.colorScheme.primary else colors.codeText,
+                            )
+                        }
+                        IconButton(onClick = {
+                            clipboardManager.setText(AnnotatedString(block.code))
+                            copied = true
+                        }) {
+                            Icon(
+                                if (copied) Icons.Default.Check else Icons.Default.ContentCopy,
+                                contentDescription = stringResource(if (copied) R.string.nm_sysfile_copied else R.string.common_copy),
+                                tint = if (copied) Color(0xFF34C759) else colors.codeText,
+                            )
+                        }
+                    } else Icon(
                         imageVector = if (copied) Icons.Default.Check else Icons.Default.ContentCopy,
                         contentDescription = if (copied) "Copied" else "Copy code",
                         tint = if (copied) Color(0xFF34C759) else Color.White.copy(alpha = 0.4f),
@@ -1761,8 +1786,7 @@ private fun RenderBlock(block: MdBlock) {
                         .padding(bottom = 8.dp),
                 ) {
                     Box(
-                        modifier = Modifier
-                            .horizontalScroll(hScroll)
+                        modifier = (if (tamaCode && wrap) Modifier.fillMaxWidth() else Modifier.horizontalScroll(hScroll))
                             .padding(horizontal = 12.dp, vertical = 4.dp),
                     ) {
                         Text(

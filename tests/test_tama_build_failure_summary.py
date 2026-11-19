@@ -43,6 +43,18 @@ class FailureSummary(unittest.TestCase):
         self.assertLess(workflow.index('- name: Run normal debug isolation tests'),
                         workflow.index('- name: Deliver only to a new restricted Drive folder'))
 
+    def test_compiler_locations_include_only_checkout_kotlin_file_and_line(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            relative = 'android/src/android/app/src/main/java/Fixture.kt'
+            file = root / relative
+            file.parent.mkdir(parents=True)
+            file.write_text('package fixture')
+            text = (f'e: file://{file}:18:7 fictional-sensitive-detail\n'
+                    'e: file:///tmp/private/Hidden.kt:18:9 denied\n'
+                    f'e: file://{file}:18:9 duplicate\n')
+            self.assertEqual([(relative, 18)], module.compiler_locations(text, root))
+
     def test_log_data_is_never_echoed(self):
         fixture = "fixture-private-token-XYZ123"
         with tempfile.TemporaryDirectory() as tmp:

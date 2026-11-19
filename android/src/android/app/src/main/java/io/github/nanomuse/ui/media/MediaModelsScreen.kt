@@ -200,7 +200,7 @@ fun MediaModelsScreen(
                     onChange = { imageModel = it; ImageGen.save(context, imageInst.id, it) },
                 )
             }
-            if (imageInstances.isEmpty()) {
+            if (imageInstances.isEmpty() && !ImageGen.noFreeImageAvailable(context)) { // nanoMuse
                 SettingsRow(title = stringResource(R.string.nm_media_add_provider), onClick = onOpenProviders, showDivider = false)
             }
         }

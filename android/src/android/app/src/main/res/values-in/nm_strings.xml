@@ -1563,4 +1563,19 @@
     <string name="nm_loop_estimate_explanation">Perkiraan percakapan ini: jumlah terbesar antara pesan asisten dan blok alat. Ini bukan jumlah pasti permintaan atau biaya.</string>
     <string name="nm_free_chat_choose">Pilih model gratis atau perbarui daftar model penyedia.</string>
     <string name="nm_key_probe_no_credit">Penyedia melaporkan kredit tidak cukup.</string>
+    <string name="nm_model_badge_image">Gambar</string>
+    <string name="nm_model_badge_audio">Audio</string>
+    <string name="nm_model_badge_tools">Alat</string>
+    <string name="nm_model_badge_input">Masukan: %1$s</string>
+    <string name="nm_model_badge_output">Keluaran: %1$s</string>
+    <string name="nm_chat_current_route">Digunakan: %1$s · %2$s</string>
+    <string name="nm_chat_mode_manual">Manual</string>
+    <string name="nm_chat_mode_global">Pengaturan ini berlaku untuk semua chat. Izin biaya dan model tidak berubah.</string>
+    <string name="nm_auto_reason_code">prioritas untuk pemrograman</string>
+    <string name="nm_models_cost_advanced">Pengaturan biaya lanjutan</string>
+    <string name="nm_models_cost_advanced_sub">Tinjau izin biaya secara terpisah.</string>
+    <string name="nm_code_block_label">Kode</string>
+    <string name="nm_code_wrap">Lipat baris</string>
+    <string name="nm_code_unwrap">Gulir baris panjang</string>
+    <string name="nm_free_image_unavailable">Mode gratis di versi ini tidak memiliki generator gambar yang terverifikasi gratis.</string>
 </resources>

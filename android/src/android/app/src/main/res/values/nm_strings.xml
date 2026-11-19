@@ -1564,7 +1564,7 @@
     <string name="nm_free_plan_action">The provider lists a free plan, but this API does not confirm your key’s plan. Choose a confirmed free model in Providers.</string>
     <string name="nm_free_unknown_action">There is no confirmed free price for this model. Refresh the list in Providers or choose a confirmed free model.</string>
     <string name="nm_auto_no_routes">In Providers, add a confirmed free model and approve it for automatic selection.</string>
-    <string name="nm_free_image_unavailable">No free image model is active. In Settings → Models, add a confirmed free image generator. No image request was sent.</string>
+    <string name="nm_free_image_unavailable">The free-only mode has no verified free image generator in this build.</string>
     <string name="nm_provider_custom">Custom OpenAI-compatible provider</string>
     <string name="nm_provider_custom_url">API address</string>
     <string name="nm_provider_custom_url_required">Enter the provider API address, including its version path.</string>
@@ -1573,4 +1573,18 @@
     <string name="nm_provider_catalogue_count">%1$d of %2$d catalogue providers</string>
     <string name="nm_provider_no_preset">No preset for this API</string>
     <string name="nm_provider_more_results">Show more results</string>
+    <string name="nm_model_badge_image">Image</string>
+    <string name="nm_model_badge_audio">Audio</string>
+    <string name="nm_model_badge_tools">Tools</string>
+    <string name="nm_model_badge_input">Input: %1$s</string>
+    <string name="nm_model_badge_output">Output: %1$s</string>
+    <string name="nm_chat_current_route">Using: %1$s · %2$s</string>
+    <string name="nm_chat_mode_manual">Manual</string>
+    <string name="nm_chat_mode_global">This setting applies to all chats. It does not change cost or model permissions.</string>
+    <string name="nm_auto_reason_code">preference for coding</string>
+    <string name="nm_models_cost_advanced">Advanced cost settings</string>
+    <string name="nm_models_cost_advanced_sub">Review cost permissions separately.</string>
+    <string name="nm_code_block_label">Code</string>
+    <string name="nm_code_wrap">Wrap lines</string>
+    <string name="nm_code_unwrap">Scroll long lines</string>
 </resources>

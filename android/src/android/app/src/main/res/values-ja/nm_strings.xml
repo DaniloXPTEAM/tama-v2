@@ -1563,4 +1563,19 @@
     <string name="nm_loop_estimate_explanation">この会話の推定値です。アシスタントのメッセージ数とツールブロック数の多い方で、リクエスト数や請求数の正確な値ではありません。</string>
     <string name="nm_free_chat_choose">無料モデルを選択するか、プロバイダーのモデル一覧を更新してください。</string>
     <string name="nm_key_probe_no_credit">プロバイダーからクレジット不足が報告されました。</string>
+    <string name="nm_model_badge_image">画像</string>
+    <string name="nm_model_badge_audio">音声</string>
+    <string name="nm_model_badge_tools">ツール</string>
+    <string name="nm_model_badge_input">入力：%1$s</string>
+    <string name="nm_model_badge_output">出力：%1$s</string>
+    <string name="nm_chat_current_route">使用中：%1$s · %2$s</string>
+    <string name="nm_chat_mode_manual">手動</string>
+    <string name="nm_chat_mode_global">この設定はすべてのチャットに適用されます。費用やモデルの権限は変更されません。</string>
+    <string name="nm_auto_reason_code">コーディングを優先</string>
+    <string name="nm_models_cost_advanced">詳細な費用設定</string>
+    <string name="nm_models_cost_advanced_sub">費用に関する許可を個別に確認します。</string>
+    <string name="nm_code_block_label">コード</string>
+    <string name="nm_code_wrap">行を折り返す</string>
+    <string name="nm_code_unwrap">長い行を横にスクロール</string>
+    <string name="nm_free_image_unavailable">このバージョンの無料モードに、無料と確認できた画像生成モデルはありません。</string>
 </resources>

@@ -459,10 +459,9 @@ object ModelsDevApi {
     internal fun bundledProvider(base: String?): ProviderEntry? {
         val url = base?.trimEnd('/') ?: return null
         val providers = bundledRegistrySnapshot()
-        val candidates = normalizedCandidates(url)
-        val matches = providers.values.filter { it.api?.trimEnd('/') in candidates }
-        return matches.firstOrNull { it.api?.trimEnd('/') == url && matches.count { other -> other.api?.trimEnd('/') == url } == 1 }
-            ?: matches.singleOrNull() ?: when (url) {
+        val matches = providers.values.filter { it.api?.trimEnd('/') == url }
+        if (matches.isNotEmpty()) return matches.singleOrNull()
+        return when (url) {
             "https://api.groq.com/openai/v1" -> providers["groq"]
             "https://generativelanguage.googleapis.com/v1beta", "https://generativelanguage.googleapis.com/v1beta/openai" -> providers["google"]
             "https://api.cerebras.ai/v1" -> providers["cerebras"]

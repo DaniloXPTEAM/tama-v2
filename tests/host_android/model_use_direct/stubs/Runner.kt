@@ -10,6 +10,8 @@ fun main(args: Array<String>) {
         ai.tama.pricing.ModelCostGuardTest::class.java,
         ModelUseHandlerHostTest::class.java,
         StreamReceiptHostTest::class.java,
+        *(if (args.firstOrNull() == "normal") emptyArray<Class<*>>()
+          else arrayOf(ai.tama.net.GeminiDocumentedChatWireTest::class.java)),
     )
     result.failures.forEach { System.err.println(it.trace) }
     println("identity=${com.openminis.app.BuildConfig.APPLICATION_ID} run=${result.runCount} ignored=${result.ignoreCount} assumptions=${result.assumptionFailureCount} failures=${result.failureCount}")

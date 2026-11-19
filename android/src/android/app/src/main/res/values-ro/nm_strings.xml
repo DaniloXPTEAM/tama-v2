@@ -1571,4 +1571,19 @@
     <string name="nm_loop_estimate_explanation">Estimare pentru această conversație: numărul mai mare dintre mesajele asistentului și blocurile de instrumente. Nu este numărul exact de cereri sau taxe.</string>
     <string name="nm_free_chat_choose">Alege un model gratuit sau actualizează lista furnizorului.</string>
     <string name="nm_key_probe_no_credit">Furnizorul a raportat credit insuficient.</string>
+    <string name="nm_model_badge_image">Imagine</string>
+    <string name="nm_model_badge_audio">Audio</string>
+    <string name="nm_model_badge_tools">Instrumente</string>
+    <string name="nm_model_badge_input">Intrare: %1$s</string>
+    <string name="nm_model_badge_output">Ieșire: %1$s</string>
+    <string name="nm_chat_current_route">În uz: %1$s · %2$s</string>
+    <string name="nm_chat_mode_manual">Manual</string>
+    <string name="nm_chat_mode_global">Setarea se aplică tuturor conversațiilor. Nu schimbă permisiunile pentru costuri sau modele.</string>
+    <string name="nm_auto_reason_code">preferință pentru programare</string>
+    <string name="nm_models_cost_advanced">Setări avansate pentru costuri</string>
+    <string name="nm_models_cost_advanced_sub">Verifică separat permisiunile pentru costuri.</string>
+    <string name="nm_code_block_label">Cod</string>
+    <string name="nm_code_wrap">Încadrează liniile</string>
+    <string name="nm_code_unwrap">Derulează liniile lungi</string>
+    <string name="nm_free_image_unavailable">Modul gratuit din această versiune nu are niciun generator de imagini confirmat ca gratuit.</string>
 </resources>

@@ -1575,4 +1575,19 @@
     <string name="nm_loop_estimate_explanation">Оценка для этой беседы: большее из числа сообщений помощника и блоков инструментов. Это не точное число запросов или списаний.</string>
     <string name="nm_free_chat_choose">Выберите бесплатную модель или обновите список моделей у провайдера.</string>
     <string name="nm_key_probe_no_credit">Провайдер сообщил о недостатке средств.</string>
+    <string name="nm_model_badge_image">Изображение</string>
+    <string name="nm_model_badge_audio">Аудио</string>
+    <string name="nm_model_badge_tools">Инструменты</string>
+    <string name="nm_model_badge_input">Вход: %1$s</string>
+    <string name="nm_model_badge_output">Выход: %1$s</string>
+    <string name="nm_chat_current_route">Используется: %1$s · %2$s</string>
+    <string name="nm_chat_mode_manual">Ручной</string>
+    <string name="nm_chat_mode_global">Настройка действует для всех чатов. Она не меняет разрешения на расходы и модели.</string>
+    <string name="nm_auto_reason_code">предпочтение для кода</string>
+    <string name="nm_models_cost_advanced">Расширенные настройки расходов</string>
+    <string name="nm_models_cost_advanced_sub">Проверьте разрешения на расходы отдельно.</string>
+    <string name="nm_code_block_label">Код</string>
+    <string name="nm_code_wrap">Переносить строки</string>
+    <string name="nm_code_unwrap">Прокручивать длинные строки</string>
+    <string name="nm_free_image_unavailable">В бесплатном режиме этой версии нет генератора изображений с подтверждённой бесплатной работой.</string>
 </resources>

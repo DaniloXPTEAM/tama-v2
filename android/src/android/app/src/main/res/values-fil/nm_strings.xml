@@ -1567,4 +1567,19 @@
     <string name="nm_loop_estimate_explanation">Tantiya sa usapang ito: ang mas mataas sa bilang ng mensahe ng assistant o mga bloke ng tool. Hindi ito eksaktong bilang ng request o bayarin.</string>
     <string name="nm_free_chat_choose">Pumili ng libreng modelo o i-update ang listahan ng provider.</string>
     <string name="nm_key_probe_no_credit">Iniulat ng provider na kulang ang credit.</string>
+    <string name="nm_model_badge_image">Larawan</string>
+    <string name="nm_model_badge_audio">Audio</string>
+    <string name="nm_model_badge_tools">Mga tool</string>
+    <string name="nm_model_badge_input">Input: %1$s</string>
+    <string name="nm_model_badge_output">Output: %1$s</string>
+    <string name="nm_chat_current_route">Ginagamit: %1$s · %2$s</string>
+    <string name="nm_chat_mode_manual">Manwal</string>
+    <string name="nm_chat_mode_global">Para sa lahat ng chat ang setting na ito. Hindi nito binabago ang mga pahintulot sa gastos o modelo.</string>
+    <string name="nm_auto_reason_code">priyoridad sa pag-code</string>
+    <string name="nm_models_cost_advanced">Mga advanced na setting ng gastos</string>
+    <string name="nm_models_cost_advanced_sub">Suriin nang hiwalay ang mga pahintulot sa gastos.</string>
+    <string name="nm_code_block_label">Code</string>
+    <string name="nm_code_wrap">I-wrap ang mga linya</string>
+    <string name="nm_code_unwrap">I-scroll ang mahahabang linya</string>
+    <string name="nm_free_image_unavailable">Walang beripikadong libreng generator ng larawan sa libreng mode ng bersyong ito.</string>
 </resources>

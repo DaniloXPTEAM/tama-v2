@@ -7205,6 +7205,7 @@ fun ChatScreen(
             defaultPrimaryGroupId = config.defaultPrimaryGroupId,
             config = config,
             providerRepository = providerRepository,
+            ownChatModeBusy = isStreaming, // nanoMuse: do not interrupt an in-flight turn from the picker
             onSelectGroup = { groupId ->
                 val group = availableGroups.firstOrNull { it.id == groupId }
                 val firstEntry = group?.memberEntryIds?.firstNotNullOfOrNull(::entryById)

@@ -1563,4 +1563,19 @@
     <string name="nm_loop_estimate_explanation">ค่าประมาณของบทสนทนานี้ใช้จำนวนที่มากกว่าระหว่างข้อความผู้ช่วยกับบล็อกเครื่องมือ ไม่ใช่จำนวนคำขอหรือค่าบริการที่แน่นอน</string>
     <string name="nm_free_chat_choose">เลือกโมเดลฟรีหรือรีเฟรชรายการโมเดลของผู้ให้บริการ</string>
     <string name="nm_key_probe_no_credit">ผู้ให้บริการแจ้งว่าเครดิตไม่พอ</string>
+    <string name="nm_model_badge_image">รูปภาพ</string>
+    <string name="nm_model_badge_audio">เสียง</string>
+    <string name="nm_model_badge_tools">เครื่องมือ</string>
+    <string name="nm_model_badge_input">อินพุต: %1$s</string>
+    <string name="nm_model_badge_output">เอาต์พุต: %1$s</string>
+    <string name="nm_chat_current_route">กำลังใช้: %1$s · %2$s</string>
+    <string name="nm_chat_mode_manual">กำหนดเอง</string>
+    <string name="nm_chat_mode_global">การตั้งค่านี้ใช้กับทุกแชต โดยไม่เปลี่ยนการอนุญาตค่าใช้จ่ายหรือโมเดล</string>
+    <string name="nm_auto_reason_code">ให้ความสำคัญกับการเขียนโค้ด</string>
+    <string name="nm_models_cost_advanced">การตั้งค่าค่าใช้จ่ายขั้นสูง</string>
+    <string name="nm_models_cost_advanced_sub">ตรวจสอบการอนุญาตค่าใช้จ่ายแยกต่างหาก</string>
+    <string name="nm_code_block_label">โค้ด</string>
+    <string name="nm_code_wrap">ตัดบรรทัด</string>
+    <string name="nm_code_unwrap">เลื่อนบรรทัดยาว</string>
+    <string name="nm_free_image_unavailable">โหมดฟรีในรุ่นนี้ไม่มีตัวสร้างรูปภาพที่ยืนยันว่าใช้ฟรี</string>
 </resources>

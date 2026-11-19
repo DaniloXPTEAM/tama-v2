@@ -1585,7 +1585,7 @@
     <string name="nm_free_plan_action">O provedor anuncia um plano gratuito, mas a API não confirma o plano da chave. Escolha um modelo gratuito confirmado em Provedores.</string>
     <string name="nm_free_unknown_action">Não há preço gratuito confirmado para este modelo. Atualize a lista em Provedores ou escolha um modelo gratuito confirmado.</string>
     <string name="nm_auto_no_routes">Adicione um modelo gratuito confirmado em Provedores e autorize seu uso na seleção automática.</string>
-    <string name="nm_free_image_unavailable">Nenhum modelo gratuito de imagem está ativo. Em Configurações → Modelos, adicione um gerador com gratuidade confirmada. Nenhum pedido de imagem foi enviado.</string>
+    <string name="nm_free_image_unavailable">O modo gratuito não tem um gerador de imagens com gratuidade verificada nesta versão.</string>
     <string name="nm_provider_custom">Provedor personalizado compatível com OpenAI</string>
     <string name="nm_provider_custom_url">Endereço da API</string>
     <string name="nm_provider_custom_url_required">Informe o endereço da API do provedor, incluindo a versão no caminho.</string>
@@ -1594,4 +1594,18 @@
     <string name="nm_provider_catalogue_count">%1$d de %2$d provedores do catálogo</string>
     <string name="nm_provider_no_preset">Sem configuração pronta para esta API</string>
     <string name="nm_provider_more_results">Mostrar mais resultados</string>
+    <string name="nm_model_badge_image">Imagem</string>
+    <string name="nm_model_badge_audio">Áudio</string>
+    <string name="nm_model_badge_tools">Ferramentas</string>
+    <string name="nm_model_badge_input">Entrada: %1$s</string>
+    <string name="nm_model_badge_output">Saída: %1$s</string>
+    <string name="nm_chat_current_route">Em uso: %1$s · %2$s</string>
+    <string name="nm_chat_mode_manual">Manual</string>
+    <string name="nm_chat_mode_global">Esta opção vale para todos os chats. Não muda as permissões de custo nem dos modelos.</string>
+    <string name="nm_auto_reason_code">preferência para código</string>
+    <string name="nm_models_cost_advanced">Configurações avançadas de custo</string>
+    <string name="nm_models_cost_advanced_sub">Revise as permissões de custo separadamente.</string>
+    <string name="nm_code_block_label">Código</string>
+    <string name="nm_code_wrap">Quebrar linhas</string>
+    <string name="nm_code_unwrap">Rolar linhas longas</string>
 </resources>

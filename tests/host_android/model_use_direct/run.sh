@@ -84,6 +84,7 @@ kotlinc -nowarn -cp "$CP" -include-runtime -d "$OUT/model-use-host.jar" \
     "$MAIN/com/openminis/app/provider/gemini/GeminiProvider.kt" \
     "$TEST/ai/tama/net/AnthropicDirectModelUseTransportTest.kt" \
     "$TEST/ai/tama/net/DirectModelUseTransportTest.kt" \
+    "$ROOT/android/src/android/app/src/testTamaTest/java/ai/tama/net/GeminiDocumentedChatWireTest.kt" \
     "$TEST/ai/tama/net/DirectModelUseGuardTest.kt" \
     "$TEST/ai/tama/net/ModelUseAttemptTrackerTest.kt" \
     "$TEST/ai/tama/pricing/ModelCostGuardTest.kt" \

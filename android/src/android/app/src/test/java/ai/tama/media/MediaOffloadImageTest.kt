@@ -187,6 +187,11 @@ class MediaOffloadImageTest {
         val gate = testGate { _, _, _, _, _ -> permissions++; true }
         val handler = MediaOffloadHandler(context(), fake, gate)
         val blocked = handler.handle(request(sid, "--prompt", "Draw a bird"))
+        if (com.openminis.app.BuildConfig.APPLICATION_ID != "ai.tama.assistant.tamav2test") {
+            assertEquals(0, blocked.exitCode)
+            assertEquals(1, fake.submissions)
+            return
+        }
         assertEquals("no_verified_free_image_generator", JSONObject(blocked.output).getString("error"))
         assertEquals(0, permissions)
         assertEquals(0, fake.manualCalls)
@@ -197,6 +202,16 @@ class MediaOffloadImageTest {
         assertEquals("no_verified_free_image_generator", JSONObject(refused.output).getString("error"))
         assertEquals(1, permissions)
         assertEquals(0, fake.submissions)
+
+        fake.freeOnly = false
+        fake.simulateDownload = true
+        fake.beforeStage = { if (it == 1) fake.freeOnly = true }
+        val afterPost = handler.handle(request(sid, "--prompt", "Draw a bird"))
+        val failure = JSONObject(afterPost.output)
+        assertEquals("image_failed", failure.getString("error"))
+        assertTrue("Do not retry" in failure.getString("tell_user"))
+        assertEquals(1, fake.submissions)
+        assertEquals(0, fake.downloads)
     }
 
     @Test fun `unverified automatic cost blocks before selection and before send`() {

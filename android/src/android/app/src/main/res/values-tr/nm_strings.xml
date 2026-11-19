@@ -1567,4 +1567,19 @@
     <string name="nm_loop_estimate_explanation">Bu konuşma için tahmin: asistan mesajları ile araç bloklarından sayısı daha büyük olan. Tam istek veya ücret sayısı değildir.</string>
     <string name="nm_free_chat_choose">Ücretsiz bir model seçin veya sağlayıcının model listesini yenileyin.</string>
     <string name="nm_key_probe_no_credit">Sağlayıcı kredinin yetersiz olduğunu bildirdi.</string>
+    <string name="nm_model_badge_image">Görüntü</string>
+    <string name="nm_model_badge_audio">Ses</string>
+    <string name="nm_model_badge_tools">Araçlar</string>
+    <string name="nm_model_badge_input">Girdi: %1$s</string>
+    <string name="nm_model_badge_output">Çıktı: %1$s</string>
+    <string name="nm_chat_current_route">Kullanılan: %1$s · %2$s</string>
+    <string name="nm_chat_mode_manual">Elle</string>
+    <string name="nm_chat_mode_global">Bu ayar tüm sohbetler için geçerlidir. Maliyet veya model izinlerini değiştirmez.</string>
+    <string name="nm_auto_reason_code">kodlama tercihi</string>
+    <string name="nm_models_cost_advanced">Gelişmiş maliyet ayarları</string>
+    <string name="nm_models_cost_advanced_sub">Maliyet izinlerini ayrı olarak incele.</string>
+    <string name="nm_code_block_label">Kod</string>
+    <string name="nm_code_wrap">Satırları kaydır</string>
+    <string name="nm_code_unwrap">Uzun satırları yatay kaydır</string>
+    <string name="nm_free_image_unavailable">Bu sürümün ücretsiz modunda, ücretsiz olduğu doğrulanmış bir görüntü üretici yok.</string>
 </resources>
