@@ -1703,7 +1703,7 @@ class OpenAIProvider private constructor(
         // nanoMuse: image capability and approval do not verify image pricing.
         ai.tama.pricing.ModelCostGuard.requireAllowed()
         val agnes = com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test" &&
-            ai.tama.media.CustomImageRoute.agnes(basePath) && model.id == ai.tama.media.CustomImageRoute.AGNES_FLASH &&
+            ai.tama.media.CustomImageRoute.agnes(basePath) && model.id == ai.tama.media.AgnesImages.DEFAULT &&
             !isAzure && imagePathOverride == null && absoluteEndpointOverride == null && imageExtraBody.isEmpty()
         val retryAllowed = allowFormatRetry && !singleUseDirectRequest && !agnes
         val token = getToken()

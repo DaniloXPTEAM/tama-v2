@@ -7077,6 +7077,7 @@ class ChatViewModel(
                 settingsLabel = context.getString(R.string.nm_drawer_settings),
                 safeFailureMessages = if (com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test")
                     ai.tama.tools.ImageGenerationTool.failureMessages(context) else null,
+                aspectLabel = { ratio -> context.getString(R.string.nm_image_actual_aspect, ratio) },
             ) { prompt ->
                 ai.tama.tools.ImageGenerationTool.execute(
                     JSONObject().put("prompt", prompt).toString(), sid, context, ownKeyChat = ownKeyChat,

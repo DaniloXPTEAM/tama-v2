@@ -47,7 +47,11 @@ assert 'if (recipientBlocked && !nmOwnKeyTurn) throw actual' in chat
 for name in ('anthropic/AnthropicProvider.kt', 'gemini/GeminiProvider.kt'):
     provider_source = (main / 'com/openminis/app/provider' / name).read_text()
     assert provider_source.count('KeyDestinationGuard.requireAllowed(') == 2
-    assert provider_source.count('if (com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test") {\n            ai.tama.providers.KeyDestinationGuard.requireAllowed(') == 2
+    guarded = provider_source.count('if (com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test") {\n            ai.tama.providers.KeyDestinationGuard.requireAllowed(')
+    if name.startswith('gemini/'):
+        assert 'val parallel = com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test"' in provider_source
+        guarded += provider_source.count('if (parallel) {\n            ai.tama.providers.KeyDestinationGuard.requireAllowed(')
+    assert guarded == 2
 assert 'if (com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test") {\n            ai.tama.providers.KeyDestinationGuard.requireAllowed(' in provider
 record = (main / 'io/github/nanomuse/cloud/OwnTurns.kt').read_text()
 assert record.count('KeyDestinationGuard.causedByBlock(e)') == 4
@@ -76,6 +80,7 @@ sed 's/import com.openminis.app.data.model.ProviderType/import com.openminis.app
 kotlinc -nowarn -include-runtime -d "$OUT/endpoints.jar" \
   "$HERE"/stubs/*.kt "$OUT/Extracted.kt" "$OUT/EndpointHostTest.kt" \
   "$MAIN/ai/tama/providers/ProviderEndpoints.kt" \
+  "$MAIN/ai/tama/providers/ProviderDirectory.kt" \
   "$MAIN/ai/tama/providers/KeyDestinationGuard.kt" \
   "$MAIN/ai/tama/providers/KeyProbePlan.kt" \
   "$MAIN/io/github/nanomuse/cloud/OwnKeyPresets.kt"

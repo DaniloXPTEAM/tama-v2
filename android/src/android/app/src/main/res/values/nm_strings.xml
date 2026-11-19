@@ -1533,7 +1533,7 @@
     <string name="nm_key_destination_body">This key looks like %1$s, but will be sent to %2$s. Confirm only if you trust this destination. This does not authorize charges.</string>
     <string name="nm_key_destination_blocked">The key and address do not match. Open provider settings and correct or confirm the destination before sending.</string>
     <string name="nm_key_destination_invalid">The address is invalid or does not use HTTPS. Correct it before continuing.</string>
-    <string name="nm_loop_estimate_explanation">Estimated from this session: the larger of assistant messages or tool blocks. It is not an exact count of requests or charges.</string>
+    <string name="nm_loop_estimate_explanation">A loop is one round of the assistant: it responds or uses tools to move the task forward. The estimate uses the larger count of assistant messages or tool blocks. It is not an exact count of requests or charges.</string>
     <string name="nm_key_probe_button">Test key</string>
     <string name="nm_key_probe_help">Check uses the official provider API to read information. It does not send a chat message or run a model.</string>
     <string name="nm_key_probe_accepted">The provider accepted the check. This does not guarantee access to any model or its cost.</string>
@@ -1604,4 +1604,16 @@
     <string name="nm_code_block_label">Code</string>
     <string name="nm_code_wrap">Wrap lines</string>
     <string name="nm_code_unwrap">Scroll long lines</string>
+    <string name="nm_agnes_free_image">Agnes Image %1$s Flash · Free</string>
+    <string name="nm_agnes_free_source">Free — reported by the owner (not verified in provider documentation), %1$s.</string>
+    <string name="nm_own_key_required">API key required</string>
+    <string name="nm_agnes_image_queue">The Agnes queue is full. Wait a bit before asking for a new image.</string>
+    <string name="nm_agnes_image_limit">Agnes reported a usage limit. Check your account before asking again.</string>
+    <string name="nm_agnes_image_payment">Agnes requires payment or credits for this model on this account. No paid route was opened.</string>
+    <string name="nm_agnes_image_timeout">Agnes did not return an image within 120 seconds. The request was not repeated.</string>
+    <string name="nm_agnes_image_missing">Agnes replied without a usable image. The request was not repeated.</string>
+    <string name="nm_agnes_image_reference_size">Each Agnes reference must be at most 10 MB.</string>
+    <string name="nm_agnes_image_reference_format">Agnes references must be PNG, JPEG or WebP.</string>
+    <string name="nm_image_actual_aspect">Image aspect ratio: %1$s</string>
+    <string name="nm_agnes_auto_image_permission">Allow automatic image generation with this exact model and account. Chat permission does not authorize images.</string>
 </resources>

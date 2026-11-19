@@ -36,6 +36,17 @@ class ProviderEndpointsTest {
         assertNull(ProviderEndpoints.storageBase(ProviderType.openRouter, "https://service.example", false))
     }
 
+    @Test fun `custom HTTPS scheme is case insensitive without accepting URLs with credentials`() {
+        val base = "HTTPS://APIHUB.AGNES-AI.COM/v1"
+        assertTrue(ProviderDirectory.validCustomAddress(base))
+        assertTrue(ProviderEndpoints.isAgnesBase(base))
+        for (bad in listOf("http://apihub.agnes-ai.com/v1", "$base?k=synthetic", "$base#fragment", "$base/gateway",
+            "https://apihub.agnes-ai.com.example/v1", "https://apihub.agnes-ai.com:567/v1", "https://user@apihub.agnes-ai.com/v1")) {
+            assertFalse(bad, ProviderEndpoints.isAgnesBase(bad))
+        }
+        assertFalse(ProviderDirectory.validCustomAddress("HTTPS://user@apihub.agnes-ai.com/v1"))
+    }
+
     @Test fun `official OpenAI fallback requires the exact HTTPS base`() {
         assertTrue(ProviderEndpoints.isOfficialOpenAIBase("https://api.openai.com/v1/"))
         assertTrue(ProviderEndpoints.isOfficialOpenAIBase("https://CHATGPT.COM"))

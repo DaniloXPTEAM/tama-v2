@@ -298,7 +298,7 @@ class FreeChatCompletionsWireTest {
 
 
     @Test fun selectedCustomImageUsesExactlyItsImagesGenerationEndpoint() = runBlocking {
-        val agnes = ai.tama.media.CustomImageRoute.AGNES_FLASH
+        val agnes = ai.tama.media.AgnesImages.DEFAULT
         for ((base, id) in listOf("https://images.example.test/v1" to "fixture/image", ai.tama.pricing.DocumentedFreeChat.AGNES_BASE to agnes)) {
             server().use { server ->
                 val client = OkHttpClient.Builder().proxy(Proxy.NO_PROXY).callTimeout(5, TimeUnit.SECONDS).addInterceptor { chain ->

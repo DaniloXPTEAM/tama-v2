@@ -23,6 +23,9 @@ internal interface MediaImageServices {
     fun freeImagesOnly(endpoint: ImageGen.Endpoint? = null): Boolean = false
     suspend fun observeCliImageScope(sessionId: String?): () -> CliImageScope.State =
         { CliImageScope.State.UNRESTRICTED }
+    fun hasDeclaredFreeImage(): Boolean = false
+    fun declaredFree(endpoint: ImageGen.Endpoint): Boolean = false
+    fun chooseDeclaredFree(excluded: Set<Pair<String, String>>): AutoImageSelection.Selection? = null
     fun modelCostAllowed(): Boolean
     /** Revocation witness spanning a single attempt; it is not a permission. */
     fun observeModelCost(): () -> Boolean
@@ -41,9 +44,13 @@ internal interface MediaImageServices {
         endpoint: ImageGen.Endpoint, reference: Bitmap, prompt: String,
         beforeRequest: (() -> Unit)? = null,
     ): MediaPicture
+    suspend fun editAgnes(
+        endpoint: ImageGen.Endpoint, references: List<ByteArray>, prompt: String, size: String, beforeRequest: (() -> Unit)?,
+    ): MediaPicture = throw ImageDispatch.AuthorizationChanged()
 }
 
 internal fun interface MediaPicture {
+    val aspectRatio: String? get() = null
     fun writeTo(output: OutputStream): Boolean
 }
 
@@ -73,6 +80,9 @@ internal class AndroidMediaImageServices(private val context: Context) : MediaIm
             }
         }
     }
+    override fun hasDeclaredFreeImage() = ImageGen.hasDeclaredFreeImage(context)
+    override fun declaredFree(endpoint: ImageGen.Endpoint) = ImageGen.declaredFree(context, endpoint)
+    override fun chooseDeclaredFree(excluded: Set<Pair<String, String>>) = AutoImageSelection.choose(context, freeOnly = true, excluded = excluded)
     override fun modelCostAllowed() = ai.tama.pricing.ModelCostGuard.permits()
     override fun observeModelCost(): () -> Boolean {
         val observation = ai.tama.pricing.ModelCostGuard.observe()
@@ -91,7 +101,8 @@ internal class AndroidMediaImageServices(private val context: Context) : MediaIm
     override suspend fun generate(
         endpoint: ImageGen.Endpoint, prompt: String, size: String, allowFormatRetry: Boolean,
         beforeRequest: (() -> Unit)?,
-    ): MediaPicture = picture(ImageGen.generate(context, endpoint, prompt, size, allowFormatRetry, beforeRequest))
+    ): MediaPicture = picture(ImageGen.generate(context, endpoint, prompt, size, allowFormatRetry, beforeRequest),
+        AgnesImages.route(endpoint.instance))
 
     override suspend fun edit(
         endpoint: ImageGen.Endpoint, reference: Bitmap, prompt: String, beforeRequest: (() -> Unit)?,
@@ -99,5 +110,12 @@ internal class AndroidMediaImageServices(private val context: Context) : MediaIm
         allowFormatRetry = com.openminis.app.BuildConfig.APPLICATION_ID != "ai.tama.assistant.tamav2test",
         beforeRequest = beforeRequest))
 
-    private fun picture(bitmap: Bitmap) = MediaPicture { output -> bitmap.compress(Bitmap.CompressFormat.PNG, 100, output) }
+    override suspend fun editAgnes(
+        endpoint: ImageGen.Endpoint, references: List<ByteArray>, prompt: String, size: String, beforeRequest: (() -> Unit)?,
+    ): MediaPicture = picture(ImageGen.editAgnes(context, endpoint, prompt, size, references, beforeRequest), true)
+
+    private fun picture(bitmap: Bitmap, agnes: Boolean = false) = object : MediaPicture {
+        override val aspectRatio = if (agnes) AgnesImages.aspectRatio(bitmap.width, bitmap.height) else null
+        override fun writeTo(output: OutputStream) = bitmap.compress(Bitmap.CompressFormat.PNG, 100, output)
+    }
 }

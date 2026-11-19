@@ -5,15 +5,15 @@ internal object OwnKeyImagePolicy {
     enum class Reason { NO_GENERATOR, NO_VERIFIED_FREE_GENERATOR }
     class NoVerifiedFreeGenerator : Exception()
 
-    // There is no transport with verified zero image cost in this build.
-    fun mayRequest(freeOnly: Boolean): Boolean = !freeOnly
+    // A chat label is not image pricing. The caller can only pass exact-route
+    // evidence, never approval, model capability or the key's chat tariff.
+    fun mayRequest(freeOnly: Boolean, declaredFree: Boolean = false): Boolean = !freeOnly || declaredFree
 
     fun generates(compatible: Boolean, outputs: List<String>?, capabilities: Set<String>): Boolean =
         compatible && (outputs.orEmpty().any { it.equals("image", true) || it.equals("image_output", true) } ||
             "image_gen" in capabilities)
 
-    // No image transport in this build enforces a zero price at dispatch.
-    // A catalogue's free chat labels must never open an image request.
+    // Explain a refusal. A catalogue's free chat labels never open an image request.
     fun reason(hasCompatibleGenerator: Boolean): Reason = if (hasCompatibleGenerator)
         Reason.NO_VERIFIED_FREE_GENERATOR else Reason.NO_GENERATOR
 }

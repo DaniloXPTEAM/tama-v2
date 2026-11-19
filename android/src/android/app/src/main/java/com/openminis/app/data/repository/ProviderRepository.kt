@@ -3,6 +3,7 @@ package com.openminis.app.data.repository
 import android.content.Context
 import android.content.SharedPreferences
 import android.util.Base64
+import ai.tama.media.AgnesImages
 import ai.tama.pricing.DocumentedChatDispatch
 import ai.tama.pricing.DocumentedFreeChat
 import ai.tama.router.AutoModelRuntime
@@ -276,6 +277,7 @@ class ProviderRepository(private val context: Context) {
             // heal corrupted modality). Mirrors iOS ProviderConfigStore.init.
             try {
                 ensureVoiceTemplateModels()
+                ensureAgnesImageModels()
             } catch (e: Exception) {
                 android.util.Log.w("ProviderRepo", "[Voice] ensureVoiceTemplateModels failed: ${e.message}")
             }
@@ -687,7 +689,8 @@ class ProviderRepository(private val context: Context) {
     // delete the key written by the first tap. Keep both writes under the
     // ordered route/credential locks; the DB and keystore aren't crash-atomic.
     internal fun addApiKeyInstanceChecked(instance: ProviderInstance, apiKey: String): Boolean {
-        if (instance.credentialType != ProviderCredential.apiKey) return false
+        if (instance.credentialType != ProviderCredential.apiKey ||
+            (AgnesImages.account(instance) && apiKey.isBlank())) return false
         val secrets = try { encryptedPrefs } catch (_: Exception) { return false }
         return synchronized(configLock) {
             try { ensureConfigLoaded() } catch (_: Exception) { return@synchronized false }
@@ -791,6 +794,7 @@ class ProviderRepository(private val context: Context) {
                 "[Voice] addInstance seeded ${voiceSeeds.size} voice-template models for ${instance.label}",
             )
         }
+        seedAgnesImages(config, instance)
         if (checked) {
             if (!saveConfigChecked(config)) return@synchronized false // nanoMuse
         } else saveConfig(config)
@@ -798,6 +802,32 @@ class ProviderRepository(private val context: Context) {
         // triggerBackgroundRefreshIfStale call) will fetch it.
         invalidateModelCache(instance.id)
         true // nanoMuse
+    }
+
+    private fun seedAgnesImages(config: ProviderConfig, instance: ProviderInstance): Boolean {
+        if (!AgnesImages.account(instance)) return false
+        var changed = false
+        for (spec in AgnesImages.models) {
+            val model = spec.metadata()
+            val existing = config.modelEntries.filter { it.providerInstanceId == instance.id && it.baseModel.id == model.id }
+            if (existing.isEmpty()) {
+                config.modelEntries.add(ModelEntry(providerInstanceId = instance.id, baseModel = model))
+                changed = true
+            } else for (entry in existing) {
+                if (entry.baseModel == model) continue
+                val index = config.modelEntries.indexOf(entry)
+                config.modelEntries[index] = entry.copy(baseModel = model)
+                changed = true
+            }
+        }
+        return changed
+    }
+
+    private fun ensureAgnesImageModels() = synchronized(configLock) {
+        if (_config.value.instances.none(AgnesImages::account)) return@synchronized
+        val config = workingCopy()
+        val changed = config.instances.fold(false) { prior, instance -> seedAgnesImages(config, instance) || prior }
+        if (changed) saveConfig(config)
     }
 
     /**
@@ -931,6 +961,7 @@ class ProviderRepository(private val context: Context) {
             }
             ai.tama.router.AutoModelStore.synchronizeRoute(context, updated.id, newRoute)
             config.instances[idx] = updated
+            seedAgnesImages(config, updated)
             if (checked) {
                 if (!saveConfigChecked(config)) return@synchronized false // nanoMuse
             } else saveConfig(config)
@@ -1266,7 +1297,7 @@ class ProviderRepository(private val context: Context) {
         return instance.isEnabled
     }
 
-    fun replaceEntries(instanceId: String, models: List<LLMModel>) = synchronized(configLock) {
+    fun replaceEntries(instanceId: String, refreshed: List<LLMModel>) = synchronized(configLock) {
         ensureConfigLoaded()
         // Hot path for concurrent autoRefreshModels coroutines (one per
         // enabled instance) — without this lock, two replaceEntries() calls
@@ -1279,6 +1310,9 @@ class ProviderRepository(private val context: Context) {
             val current = config.instances.firstOrNull { it.id == instanceId }
             if (current == null || current.tamaImportFreeOnly) return@synchronized
         }
+        val agnes = config.instances.firstOrNull { it.id == instanceId }?.let(AgnesImages::account) == true
+        val models = if (agnes) refreshed.filter { AgnesImages.model(it.id) == null } + AgnesImages.models.map { it.metadata() }
+            else refreshed
         val existing = config.modelEntries.filter { it.providerInstanceId == instanceId }
         val existingEntryIds = existing.map { it.id }.toSet()
 
@@ -2424,8 +2458,11 @@ class ProviderRepository(private val context: Context) {
     internal fun tamaPaymentRefused(instanceId: String, modelId: String): Boolean =
         _tamaPaymentRefusals.value[instanceId to modelId] == AutoModelRuntime.accountVersion(instanceId)
 
-    private fun tamaModelBase(instance: ProviderInstance): String? = if (instance.azureMode) null else
-        ai.tama.providers.ProviderEndpoints.factoryBase(instance.providerType, instance.customBaseURL, instance.appendV1Suffix)
+    private fun tamaModelBase(instance: ProviderInstance): String? = when {
+        instance.azureMode -> null
+        AgnesImages.account(instance) -> ai.tama.providers.ProviderEndpoints.AGNES_BASE
+        else -> ai.tama.providers.ProviderEndpoints.factoryBase(instance.providerType, instance.customBaseURL, instance.appendV1Suffix)
+    }
 
     private fun tamaFreeRoute(instance: ProviderInstance): DocumentedFreeChat.Route? = DocumentedFreeChat.route(
         tamaModelBase(instance), openAiChat = instance.providerType == ProviderType.openAI && !instance.useResponsesAPI,
@@ -2454,6 +2491,16 @@ class ProviderRepository(private val context: Context) {
         val safeBase = base?.takeUnless { it == DocumentedFreeChat.GEMINI_BASE && instance.providerType != ProviderType.gemini }
         return DocumentedFreeChat.status(safeBase, id, now, priced)
     }
+
+    internal fun tamaAgnesImageStatus(instance: ProviderInstance, modelId: String): DocumentedFreeChat.Status? {
+        if (!AgnesImages.route(instance) || AgnesImages.model(modelId) == null || tamaOwnApiKey(instance) == null) return null
+        return if (tamaPaymentRefused(instance.id, modelId)) DocumentedFreeChat.Status.PAYMENT_REQUIRED
+            else DocumentedFreeChat.Status.FREE
+    }
+
+    // Image evidence is for display here; it cannot authorize any chat transport.
+    internal fun tamaProviderModelStatus(instance: ProviderInstance, modelId: String): DocumentedFreeChat.Status =
+        tamaAgnesImageStatus(instance, modelId) ?: tamaFreeChatStatus(instance, modelId)
 
     internal fun tamaFreeChatStatus(instance: ProviderInstance, modelId: String): DocumentedFreeChat.Status {
         if (tamaOwnApiKey(instance) == null) return DocumentedFreeChat.Status.UNKNOWN
@@ -2504,6 +2551,7 @@ class ProviderRepository(private val context: Context) {
 
     /** This check excludes unknown/paid routes. It cannot grant either cost permission. */
     internal fun tamaAllowsChatModel(instance: ProviderInstance, modelId: String, requireFree: Boolean = false): Boolean {
+        if (AgnesImages.account(instance) && AgnesImages.model(modelId) != null) return false
         val restricted = requireFree || tamaFreeChatOnly(instance)
         if (!restricted) return !tamaPaymentRefused(instance.id, modelId)
         return ai.tama.pricing.FreeModelList.canDispatch(tamaFreeChatStatus(instance, modelId),
@@ -2584,10 +2632,25 @@ class ProviderRepository(private val context: Context) {
         }
     }
 
+    /** Applies only to the conversational picker, not the provider catalogue or other slot types. */
+    internal fun tamaIsChatModel(entry: ModelEntry, instance: ProviderInstance): Boolean {
+        val id = entry.model.id
+        if (AgnesImages.account(instance) && AgnesImages.model(id) != null) return false
+        val exact = ModelsDevApi.bundledProvider(tamaModelBase(instance))?.models?.get(id)
+        return ai.tama.providers.ChatModelKind.accepts(id,
+            exact?.inputModalities ?: entry.model.inputModalities,
+            exact?.outputModalities ?: entry.model.outputModalities,
+            io.github.nanomuse.avatar.ImageGen.looksLikeImageModel(id) || io.github.nanomuse.media.VideoGen.looksLikeVideoModel(id),
+        )
+    }
+
     // nanoMuse: exact bundled model metadata is independent of list price.
     // An older free import may have fresher modalities than the saved row.
     internal fun tamaModelMetadata(entry: ModelEntry, instance: ProviderInstance): ai.tama.providers.ModelModalities? {
         if (tamaOwnApiKey(instance) == null || entry.providerInstanceId != instance.id || entry.model.id != entry.baseModel.id) return null
+        if (AgnesImages.account(instance)) AgnesImages.model(entry.model.id)?.metadata()?.let {
+            return ai.tama.providers.ModelModalities.from(it.inputModalities, it.outputModalities)
+        }
         val base = tamaModelBase(instance)
         val exact = ModelsDevApi.bundledProvider(base)?.models?.get(entry.model.id)
         val inputs = entry.baseModel.inputModalities?.takeIf { it.isNotEmpty() } ?: exact?.inputModalities
@@ -2786,8 +2849,9 @@ class ProviderRepository(private val context: Context) {
             }
             val currentIds = nmEligibleFreeIds(instance, System.currentTimeMillis()).orEmpty()
             // An unconfirmed row is not an approved or selectable free route.
-            val visible = ai.tama.pricing.FreeModelList.filterForDisplay(models.distinctBy { it.id }, true) {
-                tamaFreeChatStatus(instance, it.id)
+            val catalogueModels = if (AgnesImages.account(instance)) models + AgnesImages.models.map { it.metadata() } else models
+            val visible = ai.tama.pricing.FreeModelList.filterForDisplay(catalogueModels.distinctBy { it.id }, true) {
+                tamaProviderModelStatus(instance, it.id)
             }
             val config = workingCopy()
             val additions = FreeModelImport.additions(instance.id, config.modelEntries, visible)
@@ -2996,16 +3060,9 @@ class ProviderRepository(private val context: Context) {
                     // [T-android-provider-type-parity] openAIResponses lists
                     // models from the same /v1/models endpoint — only the
                     // completion endpoint differs.
-                    ProviderType.openAI, ProviderType.openAIResponses -> {
-                        val discovered = OpenAIModelsApi.fetchModels(apiKey, baseURL, customUserAgent = instance.customUserAgent)
-                        val known = ai.tama.media.CustomImageRoute.AGNES_FLASH
-                        if (nmParallel && apiKey.isNotBlank() && discovered.isNotEmpty() &&
-                            ai.tama.media.CustomImageRoute.agnes(baseURL) && discovered.none { it.id == known }) {
-                            // Agnes documents Images separately from its text catalogue.
-                            discovered + LLMModel(known, "Agnes Image 2.1 Flash", "Agnes AI",
-                                inputModalities = listOf("text"), outputModalities = listOf("image"))
-                        } else discovered
-                    }
+                    ProviderType.openAI, ProviderType.openAIResponses -> OpenAIModelsApi.fetchModels(
+                        apiKey, baseURL, customUserAgent = instance.customUserAgent,
+                    )
                     ProviderType.openRouter -> {
                         val snapshot = nmKeySnapshot
                         val check = snapshot?.let { nmBeginCatalogueCheck(instance, it) }

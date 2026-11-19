@@ -14,6 +14,8 @@ internal object NvidiaChatPricing {
         "meta/esmfold", "meta/esm2-650m", "nvidia/gliner-pii", "nvidia/usdvalidate",
     )
 
+    fun isChatId(id: String): Boolean = id !in nonChat
+
     fun isZero(cost: JSONObject?): Boolean = cost != null && cost.has("input") && cost.has("output") &&
         cost.keys().asSequence().all { name ->
             val value = cost.opt(name)
@@ -22,5 +24,5 @@ internal object NvidiaChatPricing {
 
     fun allows(base: String?, id: String, zero: Boolean, inputs: List<String>?, outputs: List<String>?, now: Long): Boolean =
         base == DocumentedFreeChat.NVIDIA_BASE && zero && DocumentedFreeChat.catalogueReviewCurrent(now) &&
-            id !in nonChat && inputs?.contains("text") == true && outputs?.toSet() == setOf("text")
+            isChatId(id) && inputs?.contains("text") == true && outputs?.toSet() == setOf("text")
 }

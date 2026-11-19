@@ -791,7 +791,7 @@ private fun ColumnScope.ApiKeyConfigSection(
         // keep requiring a credential. Mirrors iOS AddProviderView.
         // nanoMuse: no saving while the endpoint is a plain http:// address off the local network
         enabled = nmDestinationAllowed && io.github.nanomuse.net.LanOnly.refusedHost(customBaseURL) == null && (
-            apiKey.isNotBlank() || (
+            apiKey.isNotBlank() || (!ai.tama.providers.ProviderEndpoints.isAgnesBase(nmDestination) &&
                 (if (nmParallel) ai.tama.providers.ProviderEndpoints.storageBase(providerType, customBaseURL, appendV1Suffix) != null
                     else customBaseURL.isNotBlank()) &&
                     (providerType == ProviderType.openAI || providerType == ProviderType.anthropic)

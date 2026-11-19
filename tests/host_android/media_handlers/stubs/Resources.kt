@@ -5,6 +5,13 @@ object R { object string {
     const val nm_image_key_missing = 103
     const val nm_image_nvidia_native = 104
     const val nm_image_endpoint_rejected = 105
+    const val nm_agnes_image_queue = 201
+    const val nm_agnes_image_limit = 202
+    const val nm_agnes_image_payment = 203
+    const val nm_agnes_image_timeout = 204
+    const val nm_agnes_image_missing = 205
+    const val nm_agnes_image_reference_size = 206
+    const val nm_agnes_image_reference_format = 207
 
  const val nm_auto_image_missing=1
  const val nm_auto_image_changed=2

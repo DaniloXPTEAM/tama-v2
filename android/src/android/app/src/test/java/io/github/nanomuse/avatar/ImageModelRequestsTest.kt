@@ -230,6 +230,28 @@ class ImageModelRequestsTest {
         Unit
     }
 
+    @Test fun `OpenRouter keeps its existing Images API request and bearer`() = runBlocking {
+        MockWebServer().use { server ->
+            val model = "google/gemini-2.5-flash-image"
+            server.enqueue(MockResponse().setBody("""{"data":[]}"""))
+            val client = okhttp3.OkHttpClient.Builder().addInterceptor { chain ->
+                val request = chain.request()
+                assertEquals("https://openrouter.ai/api/v1/images/generations", request.url.toString())
+                chain.proceed(request.newBuilder().url(server.url(request.url.encodedPath)).build())
+            }.build()
+            val provider = OpenAIProvider("fixture-key", LLMModel(model, model, "OpenRouter"),
+                "https://openrouter.ai/api/v1", client)
+            ImageModelRequests.request(provider, "Draw", allowFormatRetry = false)
+            val wire = requireNotNull(server.takeRequest(5, TimeUnit.SECONDS))
+            assertEquals("Bearer fixture-key", wire.getHeader("Authorization"))
+                val body = JSONObject(wire.body.readUtf8())
+            assertEquals(model, body.getString("model"))
+            assertEquals("b64_json", body.getString("response_format"))
+            assertEquals(1, server.requestCount)
+        }
+        Unit
+    }
+
     @Test fun `single attempt edit does not retry a rejected response format`() = runBlocking {
         val server = MockWebServer()
         server.start()

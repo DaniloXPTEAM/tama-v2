@@ -191,9 +191,10 @@ object ModelSlots {
     fun chatEntriesOf(context: Context, inst: ProviderInstance): List<ModelEntry> {
         val providers = repo(context) ?: return emptyList()
         val cfg = providers.config.value
+        val test = com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test"
         val all = cfg.modelEntries.filter {
-            it.providerInstanceId == inst.id && !it.isHidden && it.model.isTextOutput &&
-                !ImageGen.looksLikeImageModel(it.model.id) && !VideoGen.looksLikeVideoModel(it.model.id)
+            it.providerInstanceId == inst.id && !it.isHidden && if (test) providers.tamaIsChatModel(it, inst)
+            else it.model.isTextOutput && !ImageGen.looksLikeImageModel(it.model.id) && !VideoGen.looksLikeVideoModel(it.model.id)
         }
         if (!isCloud(context, inst)) return if (providers.tamaFreeChatOnly(inst))
             ai.tama.pricing.FreeModelList.filter(all, true, providers.tamaEligibleFreeModelIds(inst.id)) { it.model.id }
@@ -453,9 +454,13 @@ object ModelSlots {
             val known = repo.tamaEligibleFreeModelIds(inst.id)
             if (known == null || (known.isEmpty() && repo.nmFreeImportStatus.value[inst.id] == null)) repo.refreshModels(inst)
             if (!stillCurrent()) return emptySet()
-            repo.tamaEligibleFreeModelIds(inst.id) ?: return emptySet()
+            repo.tamaEligibleFreeModelIds(inst.id) ?: if (ai.tama.media.AgnesImages.route(inst)) emptySet() else return emptySet()
         } else {
-            if (repo.entriesFor(inst.id).none { !it.isHidden }) {
+            val agnes = ai.tama.media.AgnesImages.account(inst)
+            val needsCatalogue = !agnes || slots.any { it == Slot.CHAT || it == Slot.HANDS }
+            if (needsCatalogue && repo.entriesFor(inst.id).none {
+                    !it.isHidden && (!agnes || ai.tama.media.AgnesImages.model(it.model.id) == null)
+                }) {
                 try { repo.refreshModels(inst) }
                 catch (e: kotlinx.coroutines.CancellationException) { throw e }
                 catch (_: Exception) { /* Keep the current choices. */ }
@@ -464,7 +469,8 @@ object ModelSlots {
         }
         val done = mutableSetOf<Slot>()
         for (slot in Slot.values()) {
-            if (slot !in slots || (freeOnly && slot != Slot.CHAT)) continue
+            if (slot !in slots || (freeOnly && slot != Slot.CHAT &&
+                    !(slot == Slot.IMAGE && ai.tama.media.AgnesImages.route(inst)))) continue
             if (!stillCurrent()) break
             val option = when (slot) {
                 Slot.CHAT -> pickEntry(

@@ -75,7 +75,9 @@ fun ModelEntryDetailScreen(
         instance?.let {
             io.github.nanomuse.cloud.ProviderCatalogue.match(
                 io.github.nanomuse.cloud.ProviderCatalogue.load(context), it,
-            )?.models?.get(entry.model.id)?.capabilities
+            )?.models?.get(entry.model.id)?.capabilities.orEmpty() +
+                if (ai.tama.media.AgnesImages.route(it) && ai.tama.media.AgnesImages.model(entry.model.id) != null)
+                    setOf("image_gen") else emptySet()
         }.orEmpty()
     }
     // nanoMuse: refresh changes ephemeral catalogue evidence without changing the entry.
@@ -330,7 +332,11 @@ fun ModelEntryDetailScreen(
             AlertDialog(
                 onDismissRequest = { confirmAutoImage = false },
                 title = { Text(stringResource(R.string.nm_auto_image_consent_title)) },
-                text = { Text(stringResource(R.string.nm_auto_image_consent_body)) },
+                text = {
+                    val agnesFree = instance?.let { providerRepository.tamaAgnesImageStatus(it, entry.model.id) } ==
+                        ai.tama.pricing.DocumentedFreeChat.Status.FREE
+                    Text(stringResource(if (agnesFree) R.string.nm_agnes_auto_image_permission else R.string.nm_auto_image_consent_body))
+                },
                 confirmButton = {
                     MinisTextButton(onClick = { autoImageApproved = true; confirmAutoImage = false }) {
                         Text(stringResource(R.string.nm_auto_image_allow))

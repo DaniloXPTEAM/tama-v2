@@ -292,7 +292,8 @@ object MediaModels {
                 "$model via $provider"
             }
         }
-        return MediaPrompt.build(imageStatus, video?.let { "${it.model} via ${it.label}" }, DEEP_LINK, automatic)
+        return MediaPrompt.build(imageStatus, video?.let { "${it.model} via ${it.label}" }, DEEP_LINK, automatic,
+            reportImageAspect = image?.let { ai.tama.media.AgnesImages.route(it.instance) } == true)
     }
 
     /** The one-turn addendum when an avatar change was asked for but cannot be drawn. */

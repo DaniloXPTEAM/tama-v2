@@ -4,6 +4,8 @@ fun main(args: Array<String>) {
     val result = JUnitCore.runClasses(
         ai.tama.net.AnthropicDirectModelUseTransportTest::class.java,
         ai.tama.net.DirectModelUseTransportTest::class.java,
+        ai.tama.media.AgnesImageApiTest::class.java,
+        ai.tama.providers.ChatModelKindTest::class.java,
         ai.tama.router.AutoModelStoreTest::class.java,
         ai.tama.net.ModelUseAttemptTrackerTest::class.java,
         ai.tama.net.DirectModelUseGuardTest::class.java,

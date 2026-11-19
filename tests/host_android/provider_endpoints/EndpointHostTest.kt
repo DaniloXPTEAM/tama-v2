@@ -11,6 +11,16 @@ private fun equal(expected: Any?, actual: Any?) = check(expected == actual) {
 }
 
 fun main() {
+    val agnes = OwnKeyPresets.agnesPreset()
+    val agnesInstance = ProviderInstance("fixture-agnes", agnes.name, agnes.providerType, ProviderCredential.apiKey,
+        customBaseURL = agnes.baseURL, appendV1Suffix = agnes.appendV1)
+    equal("Agnes", agnes.name)
+    equal(ProviderEndpoints.AGNES_BASE, agnesInstance.effectiveBaseURL)
+    equal(false, agnesInstance.allowsEmptyAPIKey)
+    equal(true, agnesInstance.copy(customBaseURL = "https://local.example/v1").allowsEmptyAPIKey)
+    equal(true, ProviderDirectory.validCustomAddress("HTTPS://APIHUB.AGNES-AI.COM/v1"))
+    equal(true, ProviderEndpoints.isAgnesBase("HTTPS://APIHUB.AGNES-AI.COM/v1"))
+    equal(false, ProviderEndpoints.isAgnesBase("https://apihub.agnes-ai.com.example/v1"))
     val groq = OwnKeyPresets.template(
         CatalogueProvider("groq", "openai", "https://api.groq.com/openai/v1"), false, false,
     )

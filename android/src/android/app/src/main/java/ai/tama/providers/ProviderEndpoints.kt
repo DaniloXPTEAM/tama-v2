@@ -10,6 +10,14 @@ import com.openminis.app.data.model.ProviderType
 internal object ProviderEndpoints {
     const val OPENROUTER_BASE = "https://openrouter.ai/api"
     private const val OPENROUTER = "$OPENROUTER_BASE/v1"
+    const val AGNES_BASE = "https://apihub.agnes-ai.com/v1"
+
+    fun isAgnesBase(value: String?): Boolean = value != null && try {
+        val uri = java.net.URI(value.trim())
+        uri.scheme.equals("https", ignoreCase = true) && uri.host.equals("apihub.agnes-ai.com", ignoreCase = true) &&
+            (uri.port == -1 || uri.port == 443) && uri.userInfo == null && uri.rawQuery == null &&
+            uri.rawFragment == null && uri.rawPath?.trimEnd('/') == "/v1"
+    } catch (_: Exception) { false }
 
     /** Only the actual public OpenAI base can receive its built-in model list. */
     fun isOfficialOpenAIBase(value: String): Boolean = try {

@@ -31,8 +31,9 @@ internal object ImageModelRequests {
         if (!supports(instance) || id.isBlank() || id.contains("edit", ignoreCase = true) ||
             !supportsModel(instance.providerType, id)) return false
         val base = ImageGen.baseUrlOf(instance)
-        if (com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test" &&
-            ai.tama.media.CustomImageRoute.agnes(base) && id != ai.tama.media.CustomImageRoute.AGNES_FLASH) return false
+        if (ai.tama.media.AgnesImages.account(instance)) {
+            return ai.tama.media.AgnesImages.route(instance) && ai.tama.media.AgnesImages.model(id) != null
+        }
         val dashScope = ImageGen.speaksDashScope(base)
         if (dashScope) {
             // The native endpoint is neither the forced Images API nor forced Chat route.

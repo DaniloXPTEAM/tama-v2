@@ -725,7 +725,7 @@ fun ProviderDetailScreen(
         val nmFreeIds = if (nmOnlyFree && nmImportStatus !is ai.tama.pricing.FreeModelImportStatus.Checking)
             remember(instance, entries, nmFreeEvidence, nmImportStatus, nmPaymentRefusals, storedKey) { providerRepository.tamaEligibleFreeModelIds(instanceId) } else null
         val nmDisplayedEntries = ai.tama.pricing.FreeModelList.filterForDisplay(entries, nmOnlyFree) {
-            providerRepository.tamaFreeChatStatus(instance, it.model.id)
+            providerRepository.tamaProviderModelStatus(instance, it.model.id)
         }
         SettingsSection(
             header = stringResource(R.string.provider_detail_models_count_header, nmDisplayedEntries.size),
@@ -828,9 +828,11 @@ fun ProviderDetailScreen(
                         outputModalities.any { it in modalityOutputIconKeys }
                     // nanoMuse: plan availability and list prices are separate.
                     val priceStatus = remember(entry.model.id, instance, nmPaymentRefusals, nmFreeIds, nmHasOwnKey, nmFreeEvidence) {
-                        if (nmHasOwnKey) providerRepository.tamaFreeChatStatus(instance, entry.model.id) else null
+                        if (nmHasOwnKey) providerRepository.tamaProviderModelStatus(instance, entry.model.id) else null
                     }
-                    val priceHint = priceStatus?.let { stringResource(ai.tama.pricing.freeStatusLabel(it)) }
+                    val agnesFree = providerRepository.tamaAgnesImageStatus(instance, entry.model.id) == ai.tama.pricing.DocumentedFreeChat.Status.FREE
+                    val priceHint = if (agnesFree) stringResource(R.string.nm_agnes_free_source, ai.tama.media.AgnesImages.REVIEW_DATE)
+                        else priceStatus?.let { stringResource(ai.tama.pricing.freeStatusLabel(it)) }
                     val codingHint = if (metadata?.coding == true) stringResource(R.string.nm_model_badge_coding) else null
                     SettingsRow(
                         title = entry.model.displayName,

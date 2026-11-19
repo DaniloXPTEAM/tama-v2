@@ -5,10 +5,7 @@ import com.openminis.app.R
 
 /** Documentary evidence only. The image call still needs the normal cost and permission gates. */
 internal object CustomImageRoute {
-    const val AGNES_FLASH = "agnes-image-2.1-flash"
-
-    // https://wiki.agnes-ai.com/en/docs/agnes-image-21-flash
-    fun agnes(base: String?): Boolean = base?.trimEnd('/') == DocumentedFreeChat.AGNES_BASE
+    fun agnes(base: String?): Boolean = ai.tama.providers.ProviderEndpoints.isAgnesBase(base)
     fun nvidia(base: String?): Boolean = base?.trimEnd('/') == DocumentedFreeChat.NVIDIA_BASE
 
     enum class Problem(val code: String, val message: Int) {
@@ -17,6 +14,25 @@ internal object CustomImageRoute {
         NEEDS_KEY("image_key_missing", R.string.nm_image_key_missing),
         NVIDIA_NATIVE("image_nvidia_native", R.string.nm_image_nvidia_native),
         ENDPOINT_REJECTED("image_endpoint_rejected", R.string.nm_image_endpoint_rejected),
+        AGNES_QUEUE("agnes_image_queue", R.string.nm_agnes_image_queue),
+        AGNES_LIMIT("agnes_image_limit", R.string.nm_agnes_image_limit),
+        AGNES_PAYMENT("agnes_image_payment", R.string.nm_agnes_image_payment),
+        AGNES_TIMEOUT("agnes_image_timeout", R.string.nm_agnes_image_timeout),
+        AGNES_NO_IMAGE("agnes_image_missing", R.string.nm_agnes_image_missing),
+        AGNES_REFERENCE_SIZE("agnes_image_reference_size", R.string.nm_agnes_image_reference_size),
+        AGNES_REFERENCE_FORMAT("agnes_image_reference_format", R.string.nm_agnes_image_reference_format),
+        AGNES_FAILED("agnes_image_failed", R.string.nm_image_detail_failed),
+    }
+
+    fun problem(error: AgnesImageApi.Failure): Problem = when (error.problem) {
+        AgnesImageApi.Problem.QUEUE -> Problem.AGNES_QUEUE
+        AgnesImageApi.Problem.LIMIT -> Problem.AGNES_LIMIT
+        AgnesImageApi.Problem.PAYMENT -> Problem.AGNES_PAYMENT
+        AgnesImageApi.Problem.TIMEOUT -> Problem.AGNES_TIMEOUT
+        AgnesImageApi.Problem.NO_IMAGE -> Problem.AGNES_NO_IMAGE
+        AgnesImageApi.Problem.REFERENCE_SIZE -> Problem.AGNES_REFERENCE_SIZE
+        AgnesImageApi.Problem.REFERENCE_FORMAT -> Problem.AGNES_REFERENCE_FORMAT
+        AgnesImageApi.Problem.FAILED -> Problem.AGNES_FAILED
     }
 
     class Rejected : Exception()

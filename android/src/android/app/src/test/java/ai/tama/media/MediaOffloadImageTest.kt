@@ -69,6 +69,7 @@ class MediaOffloadImageTest {
         Mockito.`when`(context.getString(R.string.nm_free_image_unavailable)).thenReturn("No verified free generator")
         Mockito.`when`(context.getString(R.string.nm_auto_image_edit_blocked)).thenReturn("Automatic edit unavailable")
         Mockito.`when`(context.getString(R.string.nm_image_permission_denied)).thenReturn("Permission denied")
+        Mockito.`when`(context.getString(R.string.nm_agnes_image_queue)).thenReturn("A fila da Agnes está cheia")
         Mockito.`when`(context.getString(R.string.nm_image_detail_failed)).thenReturn("Image could not be completed")
         Mockito.`when`(context.getString(R.string.nm_image_request_failed)).thenReturn("Image may have been charged; do not retry")
         Mockito.`when`(context.getString(R.string.nm_models_image_title)).thenReturn("Image")
@@ -732,4 +733,90 @@ class MediaOffloadImageTest {
         assertTrue(JSONObject(result.output).getString("tell_user").contains("may have been charged"))
         assertTrue(AutoImageNotices.takeFor(sid).isEmpty())
     }
+
+    @Test fun `Agnes passes free-only and both cost gates without skipping image permission`() = runBlocking {
+        assumeTrue(BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test")
+        val base = FakeImages().apply { modelCostAllowed = false; costAllowed = false; mode = false; freeOnly = true }
+        val agnes = endpoint.copy(instance = endpoint.instance.copy(customBaseURL = "https://apihub.agnes-ai.com/v1"),
+            model = AgnesImages.DEFAULT)
+        var permits = 0
+        val service = object : MediaImageServices by base {
+            override fun hasDeclaredFreeImage() = true
+            override fun declaredFree(endpoint: ImageGen.Endpoint) = endpoint == agnes
+            override fun manualEndpoint() = agnes
+            override suspend fun generate(endpoint: ImageGen.Endpoint, prompt: String, size: String, allowFormatRetry: Boolean,
+                beforeRequest: (() -> Unit)?): MediaPicture {
+                assertEquals(agnes, endpoint)
+                assertEquals("1024x576", size)
+                beforeRequest?.invoke()
+                return object : MediaPicture {
+                    override val aspectRatio = "4:3" // Actual result, not requested 21:9 or sent 16:9.
+                    override fun writeTo(output: java.io.OutputStream): Boolean {
+                        output.write(byteArrayOf(1, 2, 3)); return true
+                    }
+                }
+            }
+        }
+        val gate = testGate { ep, _, _, _, _ -> assertEquals(agnes, ep); permits++; true }
+        val handler = MediaOffloadHandler(context(), service, gate)
+        val result = handler.generateImage("crie uma imagem de um gato astronauta em 21:9", null, "agnes-fixture", freeOnly = true)
+        assertEquals(result.output, 0, result.exitCode)
+        assertEquals(1, permits)
+        val json = JSONObject(result.output)
+        assertEquals("4:3", json.getString("aspect_ratio"))
+        assertTrue(json.getString("markdown").contains("](minis://attachments/"))
+        val paragraph = MediaPrompt.build("${agnes.model} via ${agnes.label}", null, "minis://settings/media")
+        assertTrue(paragraph.contains(AgnesImages.DEFAULT))
+        assertFalse(paragraph.contains("No image model is set"))
+    }
+
+    @Test fun `automatic Agnes fallback is payment-only and requests new permission for the other free model`() = runBlocking {
+        assumeTrue(BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test")
+        for (failure in listOf(AgnesImageApi.Problem.PAYMENT, AgnesImageApi.Problem.QUEUE)) {
+            val base = FakeImages().apply { modelCostAllowed = false; costAllowed = false; freeOnly = true }
+            val provider = endpoint.instance.copy(customBaseURL = "https://apihub.agnes-ai.com/v1")
+            val endpoints = AgnesImages.models.map { ImageGen.Endpoint(provider, endpoint.apiKey, it.id) }
+            val approved = mutableListOf<Pair<String, Boolean>>()
+            val sent = mutableListOf<String>()
+            val excludedChecks = mutableListOf<Set<Pair<String, String>>>()
+            val learned = mutableSetOf<String>()
+            val service = object : MediaImageServices by base {
+                override fun hasDeclaredFreeImage() = endpoints.any(::declaredFree)
+                override fun declaredFree(endpoint: ImageGen.Endpoint) = endpoint in endpoints && endpoint.model !in learned
+                override fun chooseDeclaredFree(excluded: Set<Pair<String, String>>): AutoImageSelection.Selection? {
+                    excludedChecks.add(excluded.toSet())
+                    val next = endpoints.firstOrNull { declaredFree(it) && (it.instanceId to it.model) !in excluded } ?: return null
+                    return selection.copy(modelId = next.model)
+                }
+                override fun revalidate(selection: AutoImageSelection.Selection) = endpoints.firstOrNull {
+                    it.model == selection.modelId && declaredFree(it)
+                }
+                override suspend fun generate(endpoint: ImageGen.Endpoint, prompt: String, size: String, allowFormatRetry: Boolean,
+                    beforeRequest: (() -> Unit)?): MediaPicture {
+                    beforeRequest?.invoke()
+                    sent.add(endpoint.model)
+                    if (endpoint.model == AgnesImages.DEFAULT) {
+                        if (failure == AgnesImageApi.Problem.PAYMENT) learned.add(endpoint.model)
+                        throw AgnesImageApi.Failure(failure)
+                    }
+                    return MediaPicture { true }
+                }
+            }
+            val gate = testGate { ep, _, _, _, fresh -> approved += ep.model to fresh; true }
+            val result = MediaOffloadHandler(context(), service, gate).generateImage("Draw", null, "agnes-fallback-$failure")
+            val first = AgnesImages.DEFAULT
+            if (failure == AgnesImageApi.Problem.PAYMENT) {
+                assertEquals(result.output, 0, result.exitCode)
+                assertEquals(endpoints.map { it.model }, sent)
+                assertEquals(listOf(first to false, endpoints[1].model to true), approved)
+                assertEquals(listOf(emptySet(), setOf(provider.id to first)), excludedChecks)
+            } else {
+                assertEquals("agnes_image_queue", JSONObject(result.output).getString("error"))
+                assertEquals(listOf(first), sent)
+                assertEquals(listOf(first to false), approved)
+            }
+            assertEquals(0, base.selects) // No unverified-cost selector on either path.
+        }
+    }
+
 }

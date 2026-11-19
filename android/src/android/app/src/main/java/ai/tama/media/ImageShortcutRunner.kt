@@ -15,6 +15,7 @@ internal object ImageShortcutRunner {
         failureMessage: String,
         settingsLabel: String,
         safeFailureMessages: Map<String, String>? = null,
+        aspectLabel: ((String) -> String)? = null,
         execute: suspend (String) -> ToolExecutionResult,
     ): Reply {
         val result = try {
@@ -29,7 +30,9 @@ internal object ImageShortcutRunner {
             val markdown = body.optString("markdown", "").takeIf {
                 it.startsWith("![") && it.contains("](minis://attachments/") && it.endsWith(")")
             } ?: return Reply(failureMessage, false)
-            return Reply(markdown, true)
+            val ratio = (body.opt("aspect_ratio") as? String)?.takeIf { it.matches(Regex("[1-9][0-9]{0,6}:[1-9][0-9]{0,6}")) }
+            val label = ratio?.let { aspectLabel?.invoke(it) }
+            return Reply(if (label == null) markdown else "$markdown\n\n$label", true)
         }
         // Provider errors may echo the person's prompt or secrets. In the parallel
         // build even an unexpected error code receives only a locally authored text.

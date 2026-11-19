@@ -349,12 +349,28 @@ internal fun ModelPickerSheet(
      */
     var quickTestEntry by remember { mutableStateOf<ModelEntry?>(null) }
 
+    val tamaPicker = com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test"
+    val chatOnly = tamaPicker && ownChatModeBusy != null
+    val chatEntryIds = remember(config, chatOnly) {
+        if (!chatOnly) emptySet() else {
+            val providers = config.instances.filter { it.isEnabled }.associateBy { it.id }
+            config.modelEntries.filter { entry ->
+                !entry.isHidden && providers[entry.providerInstanceId]?.let { providerRepository.tamaIsChatModel(entry, it) } == true
+            }.mapTo(mutableSetOf()) { it.id }
+        }
+    }
+    val pickerGroups = remember(groups, chatOnly, chatEntryIds) {
+        if (!chatOnly) groups else groups.mapNotNull { group ->
+            val chatMembers = group.memberEntryIds.filter { it in chatEntryIds }
+            if (chatMembers.isEmpty()) null else group.copy(memberEntryIds = chatMembers.toMutableList())
+        }
+    }
     // Filtered groups
-    val filteredGroups = remember(groups, searchText) {
-        if (searchText.isEmpty()) groups
+    val filteredGroups = remember(pickerGroups, searchText) {
+        if (searchText.isEmpty()) pickerGroups
         else {
             val t0 = System.nanoTime()
-            val result = groups.filter { fuzzyMatch(it.name, searchText) }
+            val result = pickerGroups.filter { fuzzyMatch(it.name, searchText) }
             val ms = (System.nanoTime() - t0) / 1_000_000.0
             AppLogger.info("ModelPicker", "[ModelPicker] filter groups: ${result.size}/${groups.size}, ${"%.1f".format(ms)}ms")
             result
@@ -366,7 +382,6 @@ internal fun ModelPickerSheet(
     val nmFreeEvidence by providerRepository.tamaFreeEvidence.collectAsState()
     val nmSpendLimits by providerRepository.tamaZeroSpendLimits.collectAsState()
     val nmPaymentRefusals by providerRepository.tamaPaymentRefusals.collectAsState()
-    val tamaPicker = com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test"
     val nmActive = config.modelEntries.firstOrNull { it.id == activeEntryId }
     val nmActiveInstance = config.instances.firstOrNull { it.id == nmActive?.providerInstanceId }
     val nmModeControl = tamaPicker && ownChatModeBusy != null &&
@@ -386,7 +401,7 @@ internal fun ModelPickerSheet(
         if (price != null) Text(stringResource(ai.tama.pricing.freeStatusLabel(price)), style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
-    val allInstancesWithEntries = remember(config, searchText, nmCatalogueStatuses, nmSpendLimits, nmPaymentRefusals, nmFreeEvidence) {
+    val allInstancesWithEntries = remember(config, searchText, nmCatalogueStatuses, nmSpendLimits, nmPaymentRefusals, nmFreeEvidence, chatEntryIds, chatOnly) {
         val t0 = System.nanoTime()
         var totalCount = 0
         val result = config.instances
@@ -394,7 +409,7 @@ internal fun ModelPickerSheet(
             .map { instance ->
                 val pt = System.nanoTime()
                 var entries = config.modelEntries.filter {
-                    it.providerInstanceId == instance.id && !it.isHidden
+                    it.providerInstanceId == instance.id && !it.isHidden && (!chatOnly || it.id in chatEntryIds)
                 }
                 if (providerRepository.tamaFreeChatOnly(instance)) {
                     entries = ai.tama.pricing.FreeModelList.filterForDisplay(entries, true) {
@@ -681,7 +696,13 @@ internal fun ModelPickerSheet(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .clip(groupShape)
-                                        .clickable { onSelectGroup(group.id) }
+                                        .clickable {
+                                            // A mixed group remains editable elsewhere. Never let its
+                                            // non-chat members win the default search in this picker.
+                                            if (chatOnly && groups.firstOrNull { it.id == group.id }?.memberEntryIds != group.memberEntryIds)
+                                                onSelectGroupEntry(group.id, group.memberEntryIds.first())
+                                            else onSelectGroup(group.id)
+                                        }
                                         .padding(horizontal = 16.dp, vertical = 12.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {

@@ -1554,7 +1554,7 @@
     <string name="nm_key_destination_body">A chave parece ser da %1$s, mas será enviada para %2$s. Confirme somente se confiar nesse destino. Isso não autoriza cobranças.</string>
     <string name="nm_key_destination_blocked">A chave e o endereço não correspondem. Abra as configurações do provedor e corrija ou confirme o destino antes de enviar.</string>
     <string name="nm_key_destination_invalid">O endereço é inválido ou não usa HTTPS. Corrija antes de continuar.</string>
-    <string name="nm_loop_estimate_explanation">Estimativa desta conversa: o maior entre mensagens do assistente e blocos de ferramentas. Não é uma contagem exata de pedidos nem de cobranças.</string>
+    <string name="nm_loop_estimate_explanation">Um loop é uma rodada do assistente: ele responde ou usa ferramentas para avançar na tarefa. A estimativa usa o maior número entre mensagens do assistente e blocos de ferramentas; não conta pedidos nem cobranças com exatidão.</string>
     <string name="nm_key_probe_button">Testar chave</string>
     <string name="nm_key_probe_help">O teste consulta a API oficial do provedor. Não envia mensagens nem executa modelos.</string>
     <string name="nm_key_probe_accepted">O provedor aceitou o teste. Isso não garante que a chave funcione com todos os modelos nem que o uso seja gratuito.</string>
@@ -1625,4 +1625,16 @@
     <string name="nm_code_block_label">Código</string>
     <string name="nm_code_wrap">Quebrar linhas</string>
     <string name="nm_code_unwrap">Rolar linhas longas</string>
+    <string name="nm_agnes_free_image">Agnes Imagem %1$s Flash · Grátis</string>
+    <string name="nm_agnes_free_source">Grátis — informado pelo dono (não verificado em documentação do provedor), %1$s.</string>
+    <string name="nm_own_key_required">Chave de API necessária</string>
+    <string name="nm_agnes_image_queue">A fila da Agnes está cheia. Aguarde um pouco antes de pedir uma nova imagem.</string>
+    <string name="nm_agnes_image_limit">A Agnes informou um limite de uso. Confira sua conta antes de pedir novamente.</string>
+    <string name="nm_agnes_image_payment">A Agnes exige pagamento ou crédito para este modelo nesta conta. Nenhuma rota paga foi aberta.</string>
+    <string name="nm_agnes_image_timeout">A Agnes não entregou a imagem em até 120 segundos. O pedido não foi repetido.</string>
+    <string name="nm_agnes_image_missing">A Agnes respondeu sem uma imagem utilizável. O pedido não foi repetido.</string>
+    <string name="nm_agnes_image_reference_size">Cada referência para a Agnes deve ter até 10 MB.</string>
+    <string name="nm_agnes_image_reference_format">Use referências em PNG, JPEG ou WebP para a Agnes.</string>
+    <string name="nm_image_actual_aspect">Proporção da imagem: %1$s</string>
+    <string name="nm_agnes_auto_image_permission">Permita criar imagens no modo Automático com este modelo e esta conta. A autorização do chat não vale para imagens.</string>
 </resources>

@@ -280,7 +280,9 @@ data class ProviderInstance(
     val allowsEmptyAPIKey: Boolean
         get() = credentialType == ProviderCredential.apiKey &&
             !customBaseURL.isNullOrBlank() &&
-            (providerType == ProviderType.openAI || providerType == ProviderType.anthropic)
+            (providerType == ProviderType.openAI || providerType == ProviderType.anthropic) &&
+            !(com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test" &&
+                ai.tama.providers.ProviderEndpoints.isAgnesBase(effectiveBaseURL))
 
     /**
      * [T-android-image-endpoint-mode] Whether the "Image Generation" endpoint

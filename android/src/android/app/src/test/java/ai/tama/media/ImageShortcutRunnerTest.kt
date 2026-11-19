@@ -27,6 +27,18 @@ class ImageShortcutRunnerTest {
         assertEquals(1, imageCalls)
     }
 
+    @Test fun `astronaut cat renders inline with the actual Agnes aspect ratio`() = runBlocking {
+        val command = ShortcutParser.parse("crie uma imagem de um gato astronauta") as Shortcut.Image
+        val markdown = "![gato](minis://attachments/gato.png)"
+        val answer = ImageShortcutRunner.run(command.prompt, failure, "Configurações",
+            aspectLabel = { "Proporção da imagem: $it" }) { prompt ->
+            assertEquals("um gato astronauta", prompt)
+            ToolExecutionResult(JSONObject().put("markdown", markdown).put("aspect_ratio", "4:3").toString(), true)
+        }
+        assertEquals("$markdown\n\nProporção da imagem: 4:3", answer.text)
+        assertEquals(true, answer.success)
+    }
+
     @Test fun `missing provider keeps the exact message and a settings link`() = runBlocking {
         val message = "Nenhum provedor de imagem configurado — abra Configurações → Modelos de imagem e vídeo"
         val answer = ImageShortcutRunner.run("bird", failure, "Configurações") {

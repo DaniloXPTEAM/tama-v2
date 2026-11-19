@@ -76,12 +76,13 @@ fun SlotPickerScreen(slot: Slot, onBack: () -> Unit, onAddProvider: () -> Unit) 
     val repo = (context.applicationContext as? MinisApp)?.providerRepositoryOrNull
     val config = repo?.config?.collectAsState()?.value
     var tick by remember { mutableIntStateOf(0) }
-    val groups = remember(config, tick) { ModelSlots.groups(context, slot) }
-    val current = remember(config, tick) { ModelSlots.current(context, slot) }
+    val paymentRefusals = repo?.tamaPaymentRefusals?.collectAsState()?.value
+    val groups = remember(config, paymentRefusals, tick) { ModelSlots.groups(context, slot) }
+    val current = remember(config, paymentRefusals, tick) { ModelSlots.current(context, slot) }
     val videoOff = remember(tick) { slot == Slot.VIDEO && ModelSlots.videoOff(context) }
     // the three dependent slots have an *Automatic* row: nothing stored, the slot follows the order
     val chosen = remember(config, tick) { ModelSlots.isChosen(context, slot) }
-    val automatic = remember(config, tick) { if (slot == Slot.CHAT) null else ModelSlots.automatic(context, slot) }
+    val automatic = remember(config, paymentRefusals, tick) { if (slot == Slot.CHAT) null else ModelSlots.automatic(context, slot) }
     var checking by remember { mutableStateOf(false) }
     // the groups expanded past eight rows (by provider id), and the search field's text; both last as long as the picker is open
     // kept across a rotation and a process restart on the way back from Add a provider
@@ -170,10 +171,13 @@ fun SlotPickerScreen(slot: Slot, onBack: () -> Unit, onAddProvider: () -> Unit) 
         shownGroups.forEach { group ->
             val title = ModelSlots.providerLabel(context, group.instance)
             val shown = PickerList.collapse(group.options, expanded = searching || group.instance.id in expanded)
-            SettingsSection(header = title) {
+            val agnes = slot == Slot.IMAGE && ai.tama.media.AgnesImages.route(group.instance)
+            SettingsSection(header = title, footer = if (agnes) stringResource(R.string.nm_agnes_free_source,
+                ai.tama.media.AgnesImages.REVIEW_DATE) else null) {
                 shown.rows.forEachIndexed { i, option ->
+                    val model = if (agnes) ai.tama.media.AgnesImages.model(option.modelId) else null
                     SettingsChoiceRow(
-                        title = option.modelId,
+                        title = if (model == null) option.modelId else stringResource(R.string.nm_agnes_free_image, model.generation),
                         selected = chosen && !videoOff && current != null && current.instance.id == option.instance.id && current.modelId == option.modelId,
                         onSelect = {
                             ModelSlots.choose(context, slot, option)

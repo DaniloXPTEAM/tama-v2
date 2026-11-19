@@ -34,7 +34,7 @@ internal object ProviderDirectory {
 
     fun validCustomAddress(value: String): Boolean {
         val url = runCatching { URI(value.trim()) }.getOrNull() ?: return false
-        return url.scheme in setOf("https", "http") && !url.host.isNullOrBlank() &&
+        return url.scheme?.lowercase(Locale.ROOT) in setOf("https", "http") && !url.host.isNullOrBlank() &&
             url.userInfo == null && url.query == null && url.fragment == null
     }
 

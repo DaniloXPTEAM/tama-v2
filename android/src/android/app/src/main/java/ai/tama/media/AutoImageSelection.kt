@@ -35,12 +35,13 @@ internal object AutoImageSelection {
         val identity: AutoModelStore.Identity,
     )
 
-    private fun entries(context: Context, repo: ProviderRepository): List<Entry> {
+    private fun entries(context: Context, repo: ProviderRepository, freeOnly: Boolean = false): List<Entry> {
         val config = repo.config.value
         val eligible = ImageGen.eligibleInstances(context).mapTo(mutableSetOf()) { it.id }
         val cloudId = NanoMuseCloud.instance(context)?.id
         val menu = if (cloudId == null) emptySet() else NanoMuseCloud.menuModelIds(context).toSet()
         val catalogue = ProviderCatalogue.load(context)
+        val allowUnverifiedCost = !freeOnly && ai.tama.router.AutomaticCostGuard.permits(context)
         // ImageGen resolves model metadata by provider/model, so duplicates could
         // otherwise use a different entry from the one the person approved.
         val duplicateProviders = config.instances.groupingBy { it.id }.eachCount().filterValues { it > 1 }.keys
@@ -50,10 +51,13 @@ internal object AutoImageSelection {
             val instance = config.instances.find { it.id == entry.providerInstanceId } ?: return@mapNotNull null
             val identity = AutoModelStore.identity(entry, instance)
             val vendor = ProviderCatalogue.match(catalogue, instance)
-            val capabilities = AutoModelStore.capabilities(context, identity,
-                vendor?.models?.get(entry.model.id)?.capabilities.orEmpty())
             val id = entry.model.id
-            val supported = instance.id !in duplicateProviders && (instance.id to id) !in duplicateModels &&
+            val agnes = AgnesImages.account(instance)
+            val confirmedByRoute = AgnesImages.route(instance) && AgnesImages.model(id) != null
+            val capabilities = AutoModelStore.capabilities(context, identity, if (confirmedByRoute) setOf("image_gen")
+                else vendor?.models?.get(id)?.capabilities.orEmpty())
+            val priceAllowed = if (agnes) confirmedByRoute && id in ImageGen.availableModels(context, instance) else allowUnverifiedCost
+            val supported = priceAllowed && instance.id !in duplicateProviders && (instance.id to id) !in duplicateModels &&
                 instance.id in eligible && ImageModelRequests.supportsAutomaticGeneration(instance, id) &&
                 (instance.id != cloudId || id in menu)
             val candidate = AutoImageRouter.Candidate(
@@ -80,11 +84,11 @@ internal object AutoImageSelection {
     }
 
     /** Does not make a network call or retain credentials. */
-    fun choose(context: Context): Selection? {
-        if (!AutoModelStore.enabled(context) || !ai.tama.router.AutomaticCostGuard.permits(context)) return null
+    fun choose(context: Context, freeOnly: Boolean = false, excluded: Set<Pair<String, String>> = emptySet()): Selection? {
+        if (!AutoModelStore.enabled(context)) return null
         val app = context.applicationContext as? MinisApp ?: return null
         val repo = app.providerRepositoryOrNull ?: return null
-        val candidates = entries(context, repo)
+        val candidates = entries(context, repo, freeOnly).filter { (it.instance.id to it.model.model.id) !in excluded }
         val preferred = ImageGen.endpoint(context)
         val choice = AutoImageRouter.pick(candidates.map { it.candidate }, preferred?.instanceId, preferred?.model)
             as? AutoImageRouter.Choice.Selected ?: return null
@@ -99,7 +103,7 @@ internal object AutoImageSelection {
 
     /** Re-read route, consent, capability, account generation and the current key before sending. */
     fun endpointIfStillAllowed(context: Context, selection: Selection): ImageGen.Endpoint? {
-        if (!AutoModelStore.enabled(context) || !ai.tama.router.AutomaticCostGuard.permits(context)) return null
+        if (!AutoModelStore.enabled(context)) return null
         val parallel = com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test"
         fun reviewCurrent(): Boolean = !parallel || AutoModelStore.imageReviewCurrent(
             context, selection.identity, selection.accountVersion, selection.reviewVersion,
@@ -116,11 +120,13 @@ internal object AutoImageSelection {
             current.model.model.id != selection.modelId ||
             AutoModelRuntime.accountVersion(selection.providerId) != selection.accountVersion) return null
         val key = repo.usableApiKey(current.instance) ?: return null
-        if (!AutoModelStore.enabled(context) || !ai.tama.router.AutomaticCostGuard.permits(context) ||
+        val endpoint = ImageGen.Endpoint(current.instance.copy(), key, selection.modelId)
+        if (!AutoModelStore.enabled(context) ||
+            !(ImageGen.declaredFree(context, endpoint) || ai.tama.router.AutomaticCostGuard.permits(context)) ||
             !AutoModelStore.imageApproved(context, current.identity) || !reviewCurrent() ||
             AutoModelRuntime.accountVersion(selection.providerId) != selection.accountVersion) return null
         // The repository instance is mutable. Dispatch uses this snapshot rather
         // than following later UI edits to a route that was not approved.
-        return ImageGen.Endpoint(current.instance.copy(), key, selection.modelId)
+        return endpoint
     }
 }

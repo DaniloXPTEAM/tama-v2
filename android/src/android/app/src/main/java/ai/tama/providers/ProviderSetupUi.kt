@@ -56,6 +56,7 @@ internal fun KnownProviderSection(onSelect: (VoiceProviderTemplate) -> Unit) {
     }
     val results = remember(directory, query) { ProviderDirectory.search(directory, query) }
     fun template(vendor: ProviderDirectory.Vendor): VoiceProviderTemplate? {
+        if (vendor.id == OwnKeyPresets.AGNES) return OwnKeyPresets.agnesPreset()
         val key = if (vendor.id == "google") "gemini" else vendor.id
         providers.firstOrNull { it.id == key }?.let { return OwnKeyPresets.template(it, mainland, chinese) }
         val endpoint = ProviderDirectory.endpoint(vendor) ?: return null
@@ -67,6 +68,10 @@ internal fun KnownProviderSection(onSelect: (VoiceProviderTemplate) -> Unit) {
         header = stringResource(R.string.nm_provider_known_title),
         footer = stringResource(R.string.nm_provider_known_help),
     ) {
+        if (!showAll) {
+            val agnes = OwnKeyPresets.agnesPreset()
+            SettingsRow(title = agnes.name, subtitle = agnes.baseURL, onClick = { onSelect(agnes) })
+        }
         if (!showAll) featured.forEach { provider ->
             val preset = OwnKeyPresets.template(provider, mainland, chinese)
             SettingsRow(
