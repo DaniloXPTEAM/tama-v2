@@ -2770,9 +2770,13 @@ fun ChatScreen(
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis,
                                             style = noFontPad,
-                                            // Yield first when space is tight; the
-                                            // badge to the right stays intrinsic.
-                                            modifier = Modifier.weight(1f, fill = false),
+                                            // In Test the model text opens its info and usage;
+                                            // the group row above still opens the model picker.
+                                            modifier = Modifier.weight(1f, fill = false).then(
+                                                if (nmReserveHeader) Modifier.clickable(
+                                                    onClickLabel = stringResource(R.string.nm_chat_model_info_title),
+                                                ) { showTokenUsageSheet = true } else Modifier,
+                                            ),
                                         )
                                         // Show the badge whenever thinking is on,
                                         // and ALSO when it's Off but the active
@@ -7119,9 +7123,29 @@ fun ChatScreen(
 
     // Session Token Usage bottom sheet
     if (showTokenUsageSheet) {
+        val parallelTest = com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test"
+        val info = if (parallelTest) {
+            val config by providerRepository.config.collectAsState()
+            val activeEntryId by viewModel.activeEntryId.collectAsState()
+            val evidence by providerRepository.tamaFreeEvidence.collectAsState()
+            val refusals by providerRepository.tamaPaymentRefusals.collectAsState()
+            val entry = config.modelEntries.singleOrNull { it.id == activeEntryId }
+            val instance = config.instances.singleOrNull { it.id == entry?.providerInstanceId }
+            val metadata = remember(entry, instance, evidence, refusals) {
+                if (entry != null && instance != null) providerRepository.tamaModelMetadata(entry, instance) else null
+            }
+            ActiveChatModelInfo(modelName, providerName, entry, metadata)
+        } else null
         TokenUsageSheet(
             viewModel = viewModel,
             onDismiss = { showTokenUsageSheet = false },
+            activeModel = info,
+            displayedSessionId = nmDisplayedSessionId,
+            streaming = isStreaming,
+            onChangeModel = {
+                showTokenUsageSheet = false
+                showModelPicker = true
+            },
         )
     }
 

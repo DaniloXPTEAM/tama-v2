@@ -1,6 +1,8 @@
 package com.openminis.app.ui.chat
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -13,6 +15,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -26,8 +29,18 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import ai.tama.providers.ModelBadges
+import ai.tama.providers.ModelModalities
 import com.openminis.app.R
+import com.openminis.app.data.model.ModelEntry
 import com.openminis.app.i18n.uppercaseForDisplay
+
+internal data class ActiveChatModelInfo(
+    val modelName: String,
+    val providerName: String,
+    val entry: ModelEntry?,
+    val metadata: ModelModalities?,
+)
 
 /**
  * Session Token Usage bottom sheet — mirrors iOS `TokenUsageSheet` and uses
@@ -45,28 +58,35 @@ import com.openminis.app.i18n.uppercaseForDisplay
  * sheet appears; we intentionally don't hold a live subscription — token
  * counters change per API call, not per keystroke, so pull-on-open is enough.
  */
+@OptIn(ExperimentalFoundationApi::class, androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
-fun TokenUsageSheet(
+internal fun TokenUsageSheet(
     viewModel: ChatViewModel,
     onDismiss: () -> Unit,
+    activeModel: ActiveChatModelInfo? = null,
+    displayedSessionId: String = "",
+    streaming: Boolean = false,
+    onChangeModel: () -> Unit = {},
 ) {
-    var stats by remember { mutableStateOf<ChatViewModel.SessionTokenStats?>(null) }
-    val contextWindow = remember { viewModel.currentModelContextWindow }
-    val maxOutput = remember { viewModel.currentModelMaxOutputTokens }
-    val thinking = remember { viewModel.thinkingInfo() }
+    val parallelTest = activeModel != null
+    var stats by remember(if (parallelTest) displayedSessionId else "") { mutableStateOf<ChatViewModel.SessionTokenStats?>(null) }
+    val contextWindow = if (parallelTest) viewModel.currentModelContextWindow else remember { viewModel.currentModelContextWindow }
+    val maxOutput = if (parallelTest) viewModel.currentModelMaxOutputTokens else remember { viewModel.currentModelMaxOutputTokens }
+    val thinking = if (parallelTest) viewModel.thinkingInfo() else remember { viewModel.thinkingInfo() }
 
-    LaunchedEffect(Unit) {
-        stats = viewModel.loadSessionTokenStats()
+    LaunchedEffect(if (parallelTest) displayedSessionId else "", parallelTest && streaming) {
+        // Refresh after completion, not after each streamed token.
+        if (!parallelTest || !streaming || stats == null) stats = viewModel.loadSessionTokenStats()
     }
 
     StandardChatSheet(
-        title = stringResource(R.string.token_usage_sheet_title),
+        title = stringResource(if (parallelTest) R.string.nm_chat_model_info_title else R.string.token_usage_sheet_title),
         onDismiss = onDismiss,
         // T148: iOS uses .presentationDetents([.medium]) for the same sheet
         // (AIChatView.swift:508). Match that proportion on Android so the
         // half-screen feel is consistent — the token-usage view holds maybe
         // a screenful of stat rows max and looked overgrown at 90%.
-        heightFraction = 0.5f,
+        heightFraction = if (parallelTest) 0.8f else 0.5f,
     ) {
         Column(
             modifier = Modifier
@@ -76,19 +96,44 @@ fun TokenUsageSheet(
                 .padding(top = 12.dp, bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
+            if (activeModel != null) {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(activeModel.modelName.ifBlank { stringResource(R.string.nm_chat_model_info_unselected) },
+                        style = MaterialTheme.typography.titleMedium)
+                    if (activeModel.providerName.isNotBlank()) Text(activeModel.providerName,
+                        style = MaterialTheme.typography.bodyMedium)
+                    activeModel.entry?.let { entry ->
+                        Text(entry.model.id, style = MaterialTheme.typography.bodySmall)
+                        // These are catalog claims, not permissions or successful wire tests.
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            ModelBadges(entry, activeModel.metadata)
+                        }
+                        Text(stringResource(R.string.nm_chat_model_info_catalogue), style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    TextButton(onClick = onChangeModel, enabled = !streaming) {
+                        Text(stringResource(R.string.nm_chat_model_info_change))
+                    }
+                }
+            }
             val s = stats
             // nanoMuse: unknown or not-yet-loaded usage is not a measured zero.
-            val parallelTest = com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test"
             val usageKnown = !parallelTest || s?.hasReportedUsage == true
             val onText = stringResource(R.string.common_on)
             val offText = stringResource(R.string.common_off)
             val yesText = stringResource(R.string.common_yes)
             val noText = stringResource(R.string.common_no)
             StatSection(title = stringResource(R.string.token_usage_section_context)) {
-                StatRow(stringResource(R.string.token_usage_context_used),
+                StatRow(stringResource(if (parallelTest) R.string.nm_usage_last_reported_context else R.string.token_usage_context_used),
                     if (parallelTest && (s == null || s.context <= 0)) "—" else formatTokens(s?.context ?: 0))
-                contextWindow?.let { StatRow(stringResource(R.string.token_usage_context_window), formatTokens(it)) }
-                maxOutput?.let { StatRow(stringResource(R.string.token_usage_max_output), formatTokens(it)) }
+                if (parallelTest) {
+                    StatRow(stringResource(R.string.token_usage_context_window), contextWindow?.let(::formatTokens) ?: "—")
+                    StatRow(stringResource(R.string.token_usage_max_output), maxOutput?.let(::formatTokens) ?: "—")
+                } else {
+                    contextWindow?.let { StatRow(stringResource(R.string.token_usage_context_window), formatTokens(it)) }
+                    maxOutput?.let { StatRow(stringResource(R.string.token_usage_max_output), formatTokens(it)) }
+                }
             }
 
             thinking?.let { t ->
@@ -164,9 +209,9 @@ private fun StatRow(label: String, value: String) {
             text = label,
             fontSize = 14.sp,
             color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f),
         )
         Spacer(modifier = Modifier.width(12.dp))
-        Spacer(modifier = Modifier.weight(1f))
         Text(
             text = value,
             fontSize = 14.sp,

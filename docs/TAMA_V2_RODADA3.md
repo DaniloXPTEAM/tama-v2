@@ -20,3 +20,7 @@ As etiquetas no seletor e nos provedores descrevem o catálogo, não uma autoriz
 | [Nemotron 3 Nano Omni 30B A3B Reasoning](https://huggingface.co/nvidia/Nemotron-3-Nano-Omni-30B-A3B-Reasoning-BF16) | Texto, imagem, vídeo e áudio → texto; 256K nominal. | Omni lê mídia; não gera imagem, áudio ou vídeo. |
 
 Os limites nominais acima não substituem a janela efetiva do app ou a do provedor. Sem prova da chave/rota em aparelho: **NÃO VERIFICADO (sem acesso)**.
+
+## R3-5: modelo ativo e uso da conversa
+
+No Test, o **nome do modelo** no cabeçalho abre **Modelo e uso**; o grupo continua abrindo o seletor. A mesma folha é acessível pelo menu de uso quando o cabeçalho está oculto. Mostra provedor, ID, entradas/saídas do catálogo, janela efetiva e máximo de saída quando conhecido. **Trocar modelo** abre o seletor existente e não interrompe uma resposta em andamento. O uso é da conversa, não do modelo atual isoladamente: último contexto informado, uso salvo, cache e etapas confirmadas da resposta quando aplicável. Sem relatório utilizável, mostra `—`; não é fatura. O app normal mantém o atalho anterior.

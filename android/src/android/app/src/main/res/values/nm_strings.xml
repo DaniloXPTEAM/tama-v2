@@ -1552,6 +1552,11 @@
     <string name="nm_free_list_filter">Show only models advertised as free</string>
     <string name="nm_free_list_help">This filters this list only. It does not delete models or guarantee their cost. Turn it off to see all saved entries.</string>
     <string name="nm_free_list_refresh">Free use is not confirmed. Refresh the provider’s model list.</string>
+    <string name="nm_chat_model_info_title">Model and usage</string>
+    <string name="nm_chat_model_info_unselected">No model selected</string>
+    <string name="nm_chat_model_info_catalogue">Catalog capabilities may differ from what this route accepts.</string>
+    <string name="nm_chat_model_info_change">Change model</string>
+    <string name="nm_usage_last_reported_context">Last reported context</string>
     <string name="nm_usage_reports_note">Usage is based on stored provider reports and may be incomplete. It is not a bill or proof of zero cost.</string>
     <string name="nm_free_chat_choose">Choose a free model or refresh the provider’s model list.</string>
     <string name="nm_key_probe_no_credit">The provider reported insufficient credit.</string>

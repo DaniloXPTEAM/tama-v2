@@ -1573,6 +1573,11 @@
     <string name="nm_free_list_filter">Mostrar só modelos anunciados como grátis</string>
     <string name="nm_free_list_help">Filtra apenas esta lista. Não apaga modelos nem garante o custo. Desligue o filtro para ver todos os modelos salvos.</string>
     <string name="nm_free_list_refresh">Gratuidade não confirmada. Atualize a lista de modelos do provedor.</string>
+    <string name="nm_chat_model_info_title">Modelo e uso</string>
+    <string name="nm_chat_model_info_unselected">Nenhum modelo selecionado</string>
+    <string name="nm_chat_model_info_catalogue">As capacidades do catálogo podem diferir das aceitas nesta rota.</string>
+    <string name="nm_chat_model_info_change">Trocar modelo</string>
+    <string name="nm_usage_last_reported_context">Último contexto informado</string>
     <string name="nm_usage_reports_note">O uso se baseia nos relatórios salvos dos provedores e pode estar incompleto. Não é uma fatura nem prova de custo zero.</string>
     <string name="nm_free_chat_choose">Escolha um modelo gratuito ou atualize a lista nas configurações do provedor.</string>
     <string name="nm_key_probe_no_credit">O provedor informou que não há crédito suficiente.</string>
