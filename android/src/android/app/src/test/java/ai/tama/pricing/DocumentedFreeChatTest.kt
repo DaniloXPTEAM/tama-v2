@@ -32,6 +32,20 @@ class DocumentedFreeChatTest {
         assertEquals(com.openminis.app.R.string.nm_free_unknown_action, freeStatusAction(nvidia))
     }
 
+    @Test fun `Groq combines documented offers with an accepted exact list and explicit payment only`() {
+        val groq = DocumentedFreeChat.GROQ_BASE
+        val offered = "openai/gpt-oss-120b"
+        val undisclosed = "fixture/not-on-the-free-plan"
+        val verified = FreeChatCatalogue.Groq(date, setOf(offered, undisclosed))
+        assertEquals(DocumentedFreeChat.Status.FREE, verified.status(offered, date))
+        assertEquals(DocumentedFreeChat.Status.FREE, DocumentedFreeChat.status(groq, offered, date, true, verified.models))
+        assertEquals(DocumentedFreeChat.Status.UNKNOWN, DocumentedFreeChat.status(groq, undisclosed, date, true, verified.models))
+        assertEquals(DocumentedFreeChat.Status.FREE_PLAN_UNCONFIRMED, verified.status("openai/gpt-oss-20b", date))
+        assertEquals(DocumentedFreeChat.Status.FREE_PLAN_UNCONFIRMED, verified.status(offered, date + OpenRouterPricing.MAX_AGE_MILLIS + 1))
+        assertEquals(DocumentedFreeChat.Status.PAYMENT_REQUIRED,
+            FreeChatCatalogue.Groq(date, emptySet(), paymentRequired = true).status(offered, date))
+    }
+
     @Test fun `ticket applies only to matching Gemini text route and current account`() {
         assumeTrue(BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test")
         ModelCostGuard.setAllowedForCurrentProcess(false)

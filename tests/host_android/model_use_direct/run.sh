@@ -5,6 +5,8 @@ ROOT=$(cd "$(dirname "$0")/../../.." && pwd)
 HERE="$ROOT/tests/host_android/model_use_direct"
 MAIN="$ROOT/android/src/android/app/src/main/java"
 TEST="$ROOT/android/src/android/app/src/test/java"
+TEST_TAMA="$ROOT/android/src/android/app/src/testTamaTest/java"
+cd "$ROOT"
 : "${TAMA_JARS_DIR:?Set TAMA_JARS_DIR to the directory containing the host dependency JARs}"
 KOTLINC=$(command -v kotlinc)
 KOTLIN_HOME=$(cd "$(dirname "$(readlink -f "$KOTLINC")")/.." && pwd)
@@ -75,16 +77,30 @@ kotlinc -nowarn -cp "$CP" -include-runtime -d "$OUT/model-use-host.jar" \
     "$MAIN/ai/tama/net/OwnKeyFailureSignals.kt" \
     "$MAIN/ai/tama/pricing/ModelCostGuard.kt" \
     "$MAIN/ai/tama/pricing/DocumentedChatDispatch.kt" \
+    "$MAIN/ai/tama/pricing/DocumentedOpenAIChatBody.kt" \
     "$MAIN/ai/tama/pricing/DocumentedGeminiBody.kt" \
     "$MAIN/ai/tama/pricing/DocumentedFreeChat.kt" \
+    "$MAIN/ai/tama/pricing/FreeModelImport.kt" \
+    "$MAIN/ai/tama/pricing/NvidiaChatPricing.kt" \
+    "$MAIN/ai/tama/pricing/OpenRouterPricing.kt" \
+    "$MAIN/ai/tama/providers/KeyProbePlan.kt" \
+    "$MAIN/ai/tama/providers/KeyProbe.kt" \
     "$MAIN/ai/tama/providers/KeyDestinationGuard.kt" \
+    "$MAIN/ai/tama/router/AutomaticCostGuard.kt" \
+    "$MAIN/com/openminis/app/provider/ModelsDevApi.kt" \
+    "$MAIN/com/openminis/app/provider/openrouter/OpenRouterModelsApi.kt" \
     "$MAIN/com/openminis/app/provider/anthropic/AnthropicProvider.kt" \
     "$MAIN/com/openminis/app/provider/openai/OpenAIProvider.kt" \
     "$MAIN/com/openminis/app/provider/openai/ThinkPrefixStreamParser.kt" \
     "$MAIN/com/openminis/app/provider/gemini/GeminiProvider.kt" \
     "$TEST/ai/tama/net/AnthropicDirectModelUseTransportTest.kt" \
     "$TEST/ai/tama/net/DirectModelUseTransportTest.kt" \
-    "$ROOT/android/src/android/app/src/testTamaTest/java/ai/tama/net/GeminiDocumentedChatWireTest.kt" \
+    "$TEST_TAMA/ai/tama/net/GeminiDocumentedChatWireTest.kt" \
+    "$TEST_TAMA/ai/tama/net/FreeChatCompletionsWireTest.kt" \
+    "$TEST_TAMA/ai/tama/net/KeyProbeWireTest.kt" \
+    "$TEST/ai/tama/pricing/NvidiaChatPricingTest.kt" \
+    "$TEST/ai/tama/pricing/FreeModelImportTest.kt" \
+    "$TEST/ai/tama/pricing/OpenRouterPricingTest.kt" \
     "$TEST/ai/tama/net/DirectModelUseGuardTest.kt" \
     "$TEST/ai/tama/net/ModelUseAttemptTrackerTest.kt" \
     "$TEST/ai/tama/pricing/ModelCostGuardTest.kt" \

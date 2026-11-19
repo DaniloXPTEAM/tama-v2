@@ -1533,7 +1533,7 @@
     <string name="nm_endpoint_fixed_help">O OpenRouter usa este endereço fixo.</string>
     <string name="nm_endpoint_auto_help">O endereço vem do provedor escolhido. Você pode alterá-lo; colar uma chave não substitui um endereço personalizado.</string>
     <string name="nm_free_import_title">Usar somente modelos gratuitos</string>
-    <string name="nm_free_import_help">Importa somente modelos de chat anunciados como gratuitos no catálogo atual do OpenRouter. Modelos já existentes permanecem. Isto não autoriza chamadas nem impede cobranças; preços e serviços extras podem mudar.</string>
+    <string name="nm_free_import_help">Usa modelos de chat de texto com preço zero no catálogo atual do OpenRouter. Os modelos salvos são preservados. Preços e limites do provedor podem mudar.</string>
     <string name="nm_free_import_unsupported">O preço deste provedor e desta conta não pode ser verificado aqui. Com a opção ligada, nenhum modelo novo será importado. Desligue para importar a lista completa.</string>
     <string name="nm_free_import_checking">Consultando o catálogo...</string>
     <string name="nm_free_import_missing_key">Adicione uma chave antes de consultar o catálogo.</string>
@@ -1550,6 +1550,7 @@
     <string name="nm_key_probe_button">Testar chave</string>
     <string name="nm_key_probe_help">O teste consulta a API oficial do provedor. Não envia mensagens nem executa modelos.</string>
     <string name="nm_key_probe_accepted">O provedor aceitou o teste. Isso não garante que a chave funcione com todos os modelos nem que o uso seja gratuito.</string>
+    <string name="nm_key_probe_groq_offers">A Groq aceitou o teste. Os modelos da oferta gratuita de chat ficam disponíveis, sujeitos aos limites de uso. O teste não informa o plano de cobrança.</string>
     <string name="nm_key_probe_rejected">O provedor recusou a chave.</string>
     <string name="nm_key_probe_denied">O provedor negou o acesso; o motivo não é conhecido.</string>
     <string name="nm_key_probe_unavailable">Não foi possível testar a chave. Confira a conexão e tente novamente.</string>
@@ -1574,7 +1575,7 @@
     <string name="nm_confirmed_reply_steps_title">Etapas de resposta</string>
     <string name="nm_confirmed_reply_steps_total">Etapas concluídas</string>
     <string name="nm_confirmed_reply_steps_note">Conta só as respostas concluídas e salvas a partir desta versão. Tentativas que falharam não entram na conta. Este número não indica cobranças.</string>
-    <string name="nm_free_direct_help">Mostra só modelos com gratuidade confirmada. O provedor pode limitar o uso. Um plano anunciado não confirma o plano da chave.</string>
+    <string name="nm_free_direct_help">Mostra apenas os modelos de chat de texto elegíveis como gratuitos. Preços e limites do provedor podem mudar.</string>
     <string name="nm_free_no_confirmed">Nenhum modelo gratuito confirmado para esta chave e este endereço. Atualize a lista ou escolha um provedor com opções confirmadas.</string>
     <string name="nm_free_status_limited">Gratuito, com limite de uso</string>
     <string name="nm_free_status_priced">Preço de tabela informado</string>

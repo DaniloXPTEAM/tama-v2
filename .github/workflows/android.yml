@@ -135,6 +135,7 @@ jobs:
             --tests 'ai.tama.net.ProviderHistoryInteroperabilityTest' \
             --tests 'ai.tama.net.AutomaticFailureWireTest' \
             --tests 'ai.tama.net.GeminiDocumentedChatWireTest' \
+            --tests 'ai.tama.net.FreeChatCompletionsWireTest' \
             --tests 'ai.tama.net.KeyProbeWireTest' \
             --tests 'ai.tama.router.ModelRouteHistoryTest' \
             --tests 'ai.tama.router.AutoFailureSimulationTest' \
@@ -146,6 +147,7 @@ jobs:
             --tests 'ai.tama.router.AutomaticCostGuardTest' \
             --tests 'ai.tama.pricing.FreeModelImportTest' \
             --tests 'ai.tama.pricing.DocumentedFreeChatTest' \
+            --tests 'ai.tama.pricing.NvidiaChatPricingTest' \
             --tests 'ai.tama.pricing.OpenRouterPricingTest' \
             --tests 'ai.tama.providers.ProviderModelsWireTest' \
             --tests 'ai.tama.media.ImageToolPresentationTest' \

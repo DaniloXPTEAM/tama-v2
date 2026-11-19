@@ -63,7 +63,9 @@ internal fun KeyProbeSection(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
         ) { Text(stringResource(if (running) R.string.quicktest_testing else R.string.nm_key_probe_button)) }
         val message = if (plan == null) R.string.nm_key_probe_unsupported else when (result?.outcome) {
-            KeyProbePlan.Outcome.ACCEPTED -> R.string.nm_key_probe_accepted
+            KeyProbePlan.Outcome.ACCEPTED -> if (plan.groqModelList &&
+                result?.availableModels?.any(ai.tama.pricing.DocumentedFreeChat::groqOffers) == true)
+                R.string.nm_key_probe_groq_offers else R.string.nm_key_probe_accepted
             KeyProbePlan.Outcome.REJECTED -> R.string.nm_key_probe_rejected
             KeyProbePlan.Outcome.ZERO_SPEND -> R.string.nm_reach_key_zero_body
             KeyProbePlan.Outcome.NO_CREDIT -> R.string.nm_key_probe_no_credit

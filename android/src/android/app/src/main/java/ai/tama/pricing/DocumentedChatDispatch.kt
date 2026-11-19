@@ -8,10 +8,19 @@ import kotlin.coroutines.CoroutineContext
 internal class DocumentedChatDispatch(
     private val modelId: String,
     private val credential: String,
+    private val route: DocumentedFreeChat.Route = DocumentedFreeChat.Route.GEMINI,
     private val current: () -> Boolean,
 ) : AbstractCoroutineContextElement(Key) {
     fun requireCurrent() {
         if (!current()) throw ModelCostGuard.Blocked()
+    }
+
+    /** Check at stream entry and again after building the actual wire request. */
+    fun checkOpenAI(base: String, key: String?, id: String, compatible: Boolean): DocumentedFreeChat.Route {
+        if (route == DocumentedFreeChat.Route.GEMINI || base != route.base || key != credential ||
+            id != modelId || !compatible) throw ModelCostGuard.Blocked()
+        requireCurrent()
+        return route
     }
 
     companion object Key : CoroutineContext.Key<DocumentedChatDispatch> {
@@ -24,7 +33,7 @@ internal class DocumentedChatDispatch(
         ) {
             val ticket = ticket(context)
             if (ticket == null) return ModelCostGuard.requireAllowed()
-            if (!supportedBody || id != ticket.modelId || key != ticket.credential ||
+            if (ticket.route != DocumentedFreeChat.Route.GEMINI || !supportedBody || id != ticket.modelId || key != ticket.credential ||
                 DocumentedFreeChat.status(base, id, nowMillis, false) != DocumentedFreeChat.Status.FREE) {
                 throw ModelCostGuard.Blocked()
             }

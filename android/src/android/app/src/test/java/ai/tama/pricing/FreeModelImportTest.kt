@@ -45,7 +45,7 @@ class FreeModelImportTest {
         assertEquals(3, original.size)
     }
 
-    @Test fun `only fresh evidence for exact free variants is eligible`() {
+    @Test fun `only fresh evidence for exact zero-price IDs is eligible`() {
         val raw = JSONArray().put(quote("vendor/a:free")).put(quote("openrouter/free"))
             .put(quote("vendor/paid:free", "0.01"))
             .put(quote("vendor/incomplete:free", completion = null))
@@ -54,7 +54,7 @@ class FreeModelImportTest {
         val catalogue = OpenRouterPricing.parse(raw, now)
         val list = listOf("vendor/a:free", "openrouter/free", "vendor/paid:free", "vendor/incomplete:free",
             "vendor/not-a-variant", "vendor/duplicate:free", "vendor/absent:free", "vendor/a:free").map(::model)
-        assertEquals(listOf("vendor/a:free", "openrouter/free"), FreeModelImport.eligible(list, catalogue, now).map { it.id })
+        assertEquals(listOf("vendor/a:free", "openrouter/free", "vendor/not-a-variant"), FreeModelImport.eligible(list, catalogue, now).map { it.id })
         assertTrue(FreeModelImport.eligible(list, null, now).isEmpty())
         assertTrue(FreeModelImport.eligible(list, catalogue, now + OpenRouterPricing.MAX_AGE_MILLIS + 1).isEmpty())
     }
@@ -98,44 +98,35 @@ class FreeModelImportTest {
         assertFalse(gate.isCurrent(other, true, "route-a"))
     }
 
-    @Test fun `fresh exact free import supplies chat and declared tools but never unknown or stale models`() {
-        val gate = ModelRefreshGate()
-        val ticket = gate.begin("one", true, "route-a")
-        val withTools = quote("vendor/tools:free").put("supported_parameters", JSONArray().put("tools"))
+    @Test fun `fresh exact catalogue supplies chat and declared tools without the import flag`() {
+        val withTools = quote("vendor/tools").put("supported_parameters", JSONArray().put("tools"))
         val withoutTools = quote("vendor/simple:free")
         val paid = quote("vendor/paid:free", "0.1").put("supported_parameters", JSONArray().put("tools"))
-        val catalogue = OpenRouterPricing.parse(JSONArray().put(withTools).put(withoutTools).put(paid), now)
-        val evidence = FreeModelImportEvidence(ticket, 7, catalogue,
-            setOf("vendor/tools:free", "vendor/simple:free", "vendor/paid:free"))
-        fun caps(id: String, time: Long = now, version: Long = 7, route: String = "route-a", enabled: Boolean = true) =
-            evidence.currentCapabilities(gate, enabled, route, version, time, id)
-        assertEquals(setOf("chat", "tools"), caps("vendor/tools:free"))
+        val catalogue = FreeChatCatalogue.OpenRouter(OpenRouterPricing.parse(JSONArray().put(withTools).put(withoutTools).put(paid), now))
+        val evidence = FreeChatCatalogueEvidence("route-a", 7, catalogue)
+        fun caps(id: String, time: Long = now, version: Long = 7, route: String = "route-a") =
+            (evidence.current(route, version, time) as? FreeChatCatalogue.OpenRouter)?.capabilities(id, time).orEmpty()
+        assertEquals(setOf("chat", "tools"), caps("vendor/tools"))
         assertEquals(setOf("chat"), caps("vendor/simple:free"))
-        for (id in listOf("vendor/paid:free", "vendor/missing:free", "vendor/tools")) assertTrue(caps(id).isEmpty())
-        assertTrue(caps("vendor/tools:free", time = now + OpenRouterPricing.MAX_AGE_MILLIS + 1).isEmpty())
-        assertTrue(caps("vendor/tools:free", version = 8).isEmpty())
-        assertTrue(caps("vendor/tools:free", route = "other").isEmpty())
-        assertTrue(caps("vendor/tools:free", enabled = false).isEmpty())
-        gate.invalidate("one")
-        assertTrue(caps("vendor/tools:free").isEmpty())
+        for (id in listOf("vendor/paid:free", "vendor/missing:free", "vendor/tools:free")) assertTrue(caps(id).isEmpty())
+        assertTrue(caps("vendor/tools", time = now + OpenRouterPricing.MAX_AGE_MILLIS + 1).isEmpty())
+        assertTrue(caps("vendor/tools", version = 8).isEmpty())
+        assertTrue(caps("vendor/tools", route = "other").isEmpty())
     }
 
-    @Test fun `post import candidates require current route account mode and fresh exact evidence`() {
-        val gate = ModelRefreshGate()
-        val ticket = gate.begin("one", true, "route-a")
+    @Test fun `send candidates require the saved route account and unexpired quote`() {
         val soon = quote("vendor/soon:free").put("expiration_date", java.time.Instant.ofEpochMilli(now + 1_000).toString())
-        val catalogue = OpenRouterPricing.parse(JSONArray().put(quote("vendor/a:free")).put(soon)
-            .put(quote("vendor/paid:free", "0.1")), now)
-        val evidence = FreeModelImportEvidence(ticket, 7, catalogue,
-            setOf("vendor/a:free", "vendor/soon:free", "vendor/paid:free", "vendor/missing:free"))
-        assertEquals(setOf("vendor/a:free", "vendor/soon:free"), evidence.current(gate, true, "route-a", 7, now))
-        assertEquals(setOf("vendor/a:free"), evidence.current(gate, true, "route-a", 7, now + 1_000))
-        assertNull(evidence.current(gate, false, "route-a", 7, now))
-        assertNull(evidence.current(gate, true, "route-b", 7, now))
-        assertNull(evidence.current(gate, true, "route-a", 8, now)) // key A → B → A still has a new generation
-        assertNull(evidence.current(gate, true, "route-a", 7, now - 1))
-        assertNull(evidence.current(gate, true, "route-a", 7, now + OpenRouterPricing.MAX_AGE_MILLIS + 1))
-        gate.begin("one", true, "route-a")
-        assertNull(evidence.current(gate, true, "route-a", 7, now))
+        val catalogue = FreeChatCatalogue.OpenRouter(OpenRouterPricing.parse(JSONArray().put(quote("vendor/a")).put(soon)
+            .put(quote("vendor/paid:free", "0.1")), now))
+        val evidence = FreeChatCatalogueEvidence("route-a", 7, catalogue)
+        val current = evidence.current("route-a", 7, now) as FreeChatCatalogue.OpenRouter
+        assertEquals(DocumentedFreeChat.Status.FREE, current.status("vendor/a", now))
+        assertEquals(DocumentedFreeChat.Status.PAID, current.status("vendor/paid:free", now))
+        assertEquals(DocumentedFreeChat.Status.FREE, current.status("vendor/soon:free", now))
+        assertEquals(DocumentedFreeChat.Status.UNKNOWN, current.status("vendor/soon:free", now + 1_000))
+        assertNull(evidence.current("route-b", 7, now))
+        assertNull(evidence.current("route-a", 8, now)) // key A → B → A still has a new generation
+        assertNull(evidence.current("route-a", 7, now - 1))
+        assertNull(evidence.current("route-a", 7, now + OpenRouterPricing.MAX_AGE_MILLIS + 1))
     }
 }

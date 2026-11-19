@@ -48,4 +48,27 @@ class KeyProbeWireTest {
             assertEquals(fixtures.size, server.requestCount)
         }
     }
+    @Test fun groqRequiresNormalModelsPayloadAndDoesNotTreatQuotasAsPayment() = runBlocking {
+        MockWebServer().use { server ->
+            server.start()
+            val official = checkNotNull(KeyProbePlan.create(ProviderType.openAI, "https://api.groq.com/openai/v1"))
+            val plan = official.copy(url = server.url("/openai/v1/models").toString())
+            val rows = listOf(
+                Triple(200, """{"data":[{"id":"openai/gpt-oss-120b"}]}""", Outcome.ACCEPTED),
+                Triple(200, """{"data":[{"name":"not a models row"}]}""", Outcome.UNAVAILABLE),
+                Triple(200, "<html>not a models list</html>", Outcome.UNAVAILABLE),
+                Triple(402, "{}", Outcome.NO_CREDIT),
+                Triple(403, """{"error":{"message":"This model requires a paid plan"}}""", Outcome.NO_CREDIT),
+                Triple(403, """{"error":{"message":"No permission for this key"}}""", Outcome.DENIED),
+                Triple(429, """{"error":{"code":"insufficient_credits"}}""", Outcome.UNAVAILABLE),
+            )
+            for ((status, json, expectation) in rows) {
+                server.enqueue(MockResponse().setResponseCode(status).setBody(json))
+                val checked = KeyProbe.check(plan, "fixture-key")
+                assertEquals(expectation, checked.outcome)
+                assertEquals(if (expectation == Outcome.ACCEPTED) setOf("openai/gpt-oss-120b") else null, checked.availableModels)
+            }
+            assertEquals(rows.size, server.requestCount)
+        }
+    }
 }

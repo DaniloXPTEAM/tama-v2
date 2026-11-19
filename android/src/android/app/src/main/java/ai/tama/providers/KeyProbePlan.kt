@@ -8,6 +8,7 @@ import java.util.Locale
 internal object KeyProbePlan {
     data class Plan(
         val url: String, val header: String, val anthropicVersion: Boolean = false, val openRouterKeyInfo: Boolean = false,
+        val groqModelList: Boolean = false,
     )
 
     fun create(type: ProviderType, base: String?): Plan? {
@@ -22,7 +23,7 @@ internal object KeyProbePlan {
             type in setOf(ProviderType.openAI, ProviderType.openAIResponses) && host == "api.openai.com" && path == "/v1" ->
                 Plan("https://api.openai.com/v1/models", "Authorization")
             type == ProviderType.openAI && host == "api.groq.com" && path == "/openai/v1" ->
-                Plan("https://api.groq.com/openai/v1/models", "Authorization")
+                Plan("https://api.groq.com/openai/v1/models", "Authorization", groqModelList = true)
             type == ProviderType.xAI && host == "api.x.ai" && path == "/v1" ->
                 Plan("https://api.x.ai/v1/models", "Authorization")
             type == ProviderType.anthropic && host == "api.anthropic.com" && path in setOf("", "/v1") ->
@@ -36,7 +37,11 @@ internal object KeyProbePlan {
     fun validKey(key: String): Boolean = key.length in 1..4096 && key.all { it.code in 33..126 }
 
     enum class Outcome { ACCEPTED, REJECTED, ZERO_SPEND, NO_CREDIT, DENIED, UNAVAILABLE }
-    data class Result(val outcome: Outcome, val zeroSpendLimit: Boolean? = null)
+    data class Result(
+        val outcome: Outcome,
+        val zeroSpendLimit: Boolean? = null,
+        val availableModels: Set<String>? = null,
+    )
 
     fun zeroSpendingLimit(value: Any?): Boolean? = when (value) {
         is Number -> value.toString().toBigDecimalOrNull()?.takeIf { it.signum() >= 0 }?.let { it.signum() == 0 }

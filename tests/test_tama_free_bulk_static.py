@@ -12,7 +12,7 @@ class FreeBulkIntegration(unittest.TestCase):
         self.assertIn("instance.tamaImportFreeOnly || tamaZeroSpendLimit(instance)", mode)
         refresh = repo.split("private suspend fun nmRefreshFreeModels", 1)[1].split("private fun nmRefreshCanStart", 1)[0]
         for guard in ("ModelsDevApi.bundledModels(tamaModelBase(instance))", "nmWithCurrentFreeRefresh(refresh, keySnapshot)",
-                      "models.filter { tamaDocumentedChatAllowed(instance, it.id) }", "FreeModelImport.additions("):
+                      "tamaCheckSavedGroqKey(instance, keySnapshot)", "nmEligibleFreeIds(instance,", "FreeModelImport.additions("):
             self.assertIn(guard, refresh)
         self.assertNotIn("replaceEntries(", refresh)
 
@@ -29,9 +29,8 @@ class FreeBulkIntegration(unittest.TestCase):
         repo = (MAIN / "com/openminis/app/data/repository/ProviderRepository.kt").read_text()
         section = repo.split("private fun tamaApproveFreeChatModels", 1)[1].split("/** Fresh exact-model", 1)[0]
         for guard in ("APPLICATION_ID", "synchronized(configLock)", "matchingInstances.singleOrNull()",
-                      "ProviderType.openRouter",
                       "ProviderCredential.apiKey", "tamaFreeChatOnly(live)", "credentialTransaction",
-                      "evidence.current(", "accountVersion(instanceId)", "FreeModelBulk.select(",
+                      "nmEligibleFreeIds(live,", "nmOAuthKeyStillCurrent(expectedKey)", "FreeModelBulk.select(",
                       "approveFreeChatBatch(context, identities)"):
             self.assertIn(guard, section)
         for excluded in ("setEnabled(", "setAllowUnverifiedAutomaticCost(", "setImageApproved(", "refreshModels("):

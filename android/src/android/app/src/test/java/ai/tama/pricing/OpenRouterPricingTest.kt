@@ -21,7 +21,7 @@ class OpenRouterPricingTest {
     private fun catalogue(vararg models: JSONObject) =
         OpenRouterPricing.parse(JSONArray().apply { models.forEach(::put) }, now)
 
-    @Test fun `free means an exact fresh documented variant with zero prices and a chat endpoint`() {
+    @Test fun `free means an exact fresh catalogue ID with zero prices and a chat endpoint`() {
         val entry = model()
         val c = catalogue(entry)
         assertEquals(OpenRouterPricing.Status.ADVERTISED_FREE, OpenRouterPricing.chatStatus(c, "vendor/example:free", now))
@@ -31,8 +31,11 @@ class OpenRouterPricingTest {
         assertEquals(true, c.quotes.getValue("vendor/example:free").tools)
         val router = catalogue(model(id = "openrouter/free"))
         assertEquals(OpenRouterPricing.Status.ADVERTISED_FREE, OpenRouterPricing.chatStatus(router, "openrouter/free", now))
-        val paidAlias = catalogue(model(id = "vendor/example"))
-        assertEquals(OpenRouterPricing.Status.UNKNOWN, OpenRouterPricing.chatStatus(paidAlias, "vendor/example", now))
+        val preview = catalogue(model(id = "vendor/example"))
+        assertEquals(OpenRouterPricing.Status.ADVERTISED_FREE, OpenRouterPricing.chatStatus(preview, "vendor/example", now))
+        assertEquals(OpenRouterPricing.Status.UNKNOWN, OpenRouterPricing.chatStatus(preview, "vendor/example:free", now))
+        val online = catalogue(model(id = "vendor/example:online"))
+        assertEquals(OpenRouterPricing.Status.UNKNOWN, OpenRouterPricing.chatStatus(online, "vendor/example:online", now))
     }
 
     @Test fun `positive image request and reasoning prices are not free despite zero text prices`() {

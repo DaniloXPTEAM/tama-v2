@@ -439,6 +439,7 @@ object ModelsDevApi {
             declaresNoEffortTiers = declaresNoEffortTiers,
             releaseDate = obj.optString("release_date", "").ifEmpty { null },
             toolCalls = (obj.opt("tool_call") as? Boolean),
+            zeroTokenPrice = ai.tama.pricing.NvidiaChatPricing.isZero(obj.optJSONObject("cost")),
             inputCost = obj.optJSONObject("cost")?.optDouble("input", Double.NaN)?.takeIf { it.isFinite() && it >= 0 },
             outputCost = obj.optJSONObject("cost")
                 ?.optDouble("output", Double.NaN)
@@ -558,5 +559,6 @@ object ModelsDevApi {
         val outputCost: Double?,
         val inputCost: Double? = null, // nanoMuse: bundled list-price hint, not account evidence
         val toolCalls: Boolean? = null,
+        val zeroTokenPrice: Boolean = false, // nanoMuse: never round a small positive price to zero
     )
 }

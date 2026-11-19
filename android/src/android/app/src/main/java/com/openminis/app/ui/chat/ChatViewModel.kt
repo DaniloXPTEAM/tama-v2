@@ -1234,6 +1234,16 @@ class ChatViewModel(
         }
     }
 
+    private suspend fun nmEnsureFreeChatEvidence(client: LLMProvider) {
+        val own = nmOwnClients[client] ?: return
+        val live = providerRepository.instance(own.providerId) ?: return
+        if (!ai.tama.pricing.ModelCostGuard.permits() || !ai.tama.router.AutomaticCostGuard.permits(context) ||
+            providerRepository.tamaFreeChatOnly(live)) {
+            providerRepository.tamaEnsureFreeChatEvidence(own.providerId, client.model.id,
+                own.accountVersion, nmRouteFingerprint(client))
+        }
+    }
+
     private fun nmOwnClientCurrent(client: LLMProvider): Boolean {
         val own = nmOwnClients[client] ?: return true
         val instance = providerRepository.instance(own.providerId) ?: return false
@@ -9327,6 +9337,8 @@ class ChatViewModel(
             return nmForceFreeRemainder
         }
         nmRequireFree() // nanoMuse: relaxing the preference cannot widen an already-started turn.
+        // Read-only preflight for an already selected own-key route, including after app restart.
+        if (nmOwnKeyTurn) nmEnsureFreeChatEvidence(provider)
         fun nmFreeChatAllows(client: LLMProvider): Boolean {
             if (!tamaV2Test || this@ChatViewModel.currentProvider !== client) return true
             val entry = providerRepository.config.value.modelEntries.find { it.id == _activeEntryId.value }
@@ -10263,6 +10275,7 @@ class ChatViewModel(
                 while (!collectDone) {
                     var nmTicket: ModelHealth.Ticket? = null
                     var nmDispatchStarted = false
+                    var nmDispatchedFreeChat = false
                     var nmMeasuredInput = 0
                     var nmMeasuredOutput = 0
                     var nmDispatchAt = 0L
@@ -10537,21 +10550,17 @@ class ChatViewModel(
                         // nanoMuse: a provisional own-key route can still require free-only tools.
                         if (ownInstance != null && nmLoopJob != null && providerRepository.tamaFreeChatOnly(ownInstance))
                             ai.tama.media.CliImageScope.markFreeTurn(nmLoopSession, nmLoopJob)
-                        val freeChat = own?.let {
+                        val needsFreeChat = !ai.tama.pricing.ModelCostGuard.permits() || nmRequireFree() ||
+                            ownInstance?.let(providerRepository::tamaFreeChatOnly) == true ||
+                            (nmAutoTurn != null && !ai.tama.router.AutomaticCostGuard.permits(context))
+                        val freeChat = if (needsFreeChat) own?.let {
                             providerRepository.tamaFreeChatTicket(it.providerId, it.accountVersion,
                                 nmRouteFingerprint(currentProvider), currentProvider.model.id)
-                        }
-                        if (ownInstance != null && providerRepository.tamaDocumentedChatAllowed(ownInstance, currentProvider.model.id) && freeChat == null) {
-                            throw ai.tama.pricing.ModelCostGuard.Blocked()
-                        }
-                        if (!nmFreeChatAllows(currentProvider)) throw ai.tama.pricing.FreeModelList.Blocked(
-                            ownInstance?.let { providerRepository.tamaFreeChatStatus(it, currentProvider.model.id) },
-                        )
-                        if (freeChat == null && ownInstance != null && !ai.tama.pricing.ModelCostGuard.permits()) {
-                            val status = providerRepository.tamaFreeChatStatus(ownInstance, currentProvider.model.id)
-                            if (status != ai.tama.pricing.DocumentedFreeChat.Status.FREE) {
-                                throw ai.tama.pricing.FreeModelList.Blocked(status)
-                            }
+                        } else null
+                        if (!nmFreeChatAllows(currentProvider) || (needsFreeChat && ownInstance != null && freeChat == null)) {
+                            throw ai.tama.pricing.FreeModelList.Blocked(
+                                ownInstance?.let { providerRepository.tamaFreeChatStatus(it, currentProvider.model.id) },
+                            )
                         }
                         nmLastSentRoute = nmRouteFingerprint(currentProvider)
                         // nanoMuse: tag the result with the version that built this client,
@@ -10563,6 +10572,7 @@ class ChatViewModel(
                         nmDispatchAt = android.os.SystemClock.elapsedRealtime()
                         // From here on a provider may have received the request, even on cancellation.
                         nmDispatchStarted = true
+                        nmDispatchedFreeChat = freeChat != null
                         val providerStream = currentProvider.streamMessage(
                             requestMessages,
                             nmSystemPrompt, lastRequestedOutput,
@@ -11166,6 +11176,9 @@ class ChatViewModel(
                             nmLearnZeroSpendLimit(currentProvider, nmDispatchAccountVersion, reach)) {
                             nmForceFreeRemainder = true
                         }
+                        // A failed scoped send is terminal: recovery must not replay it,
+                        // change routes, or promote it into a request that can incur a charge.
+                        if (nmDispatchedFreeChat) throw actual
                         val freeOnlyBlocked = actual is ai.tama.pricing.FreeModelList.Blocked
                         val is5xx = reach?.httpStatus?.let { it in 500..599 } ?: (
                             actual is com.openminis.app.data.model.LLMError.ProviderError &&

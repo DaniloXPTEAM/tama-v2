@@ -40,22 +40,16 @@ fun main() {
     check(FreeModelList.restricted(hasOwnKey = true, requested = false, zeroSpendLimit = true))
     check(FreeModelList.restricted(hasOwnKey = true, requested = true, zeroSpendLimit = false))
     check(!FreeModelList.restricted(hasOwnKey = true, requested = false, zeroSpendLimit = false))
-    val gate = ModelRefreshGate()
-    val ticket = gate.begin("instance", true, "route")
-    val evidence = FreeModelImportEvidence(ticket, 1, prices,
-        setOf("fixture/one:free", "fixture/two:free", "fixture/paid:free"))
-    fun caps(id: String, enabled: Boolean = true, time: Long = now, account: Long = 1, route: String = "route") =
-        evidence.currentCapabilities(gate, enabled, route, account, time, id)
+    val evidence = FreeChatCatalogueEvidence("route", 1, FreeChatCatalogue.OpenRouter(prices))
+    fun caps(id: String, time: Long = now, account: Long = 1, route: String = "route") =
+        (evidence.current(route, account, time) as? FreeChatCatalogue.OpenRouter)?.capabilities(id, time).orEmpty()
     check(caps("fixture/one:free") == setOf("chat", "tools"))
     check(caps("fixture/two:free") == setOf("chat"))
     check(caps("fixture/paid:free").isEmpty())
     check(caps("fixture/unknown:free").isEmpty())
-    check(caps("fixture/one:free", enabled = false).isEmpty())
     check(caps("fixture/one:free", account = 2).isEmpty())
     check(caps("fixture/one:free", route = "changed").isEmpty())
     check(caps("fixture/one:free", time = now + OpenRouterPricing.MAX_AGE_MILLIS + 1).isEmpty())
-    gate.begin("instance", true, "route")
-    check(caps("fixture/one:free").isEmpty())
     val visionIds = listOf("google/gemma-4-31b-it:free", "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free")
     val visionData = JSONArray()
     visionIds.forEach { id ->
@@ -63,10 +57,9 @@ fun main() {
             .put("input_modalities", JSONArray().put("text").put("IMAGE_INPUT"))
             .put("output_modalities", JSONArray().put("TEXT_OUTPUT"))))
     }
-    val capTicket = gate.begin("instance", true, "route")
-    val vision = FreeModelImportEvidence(capTicket, 1, OpenRouterPricing.parse(visionData, now), visionIds.toSet())
+    val vision = FreeChatCatalogue.OpenRouter(OpenRouterPricing.parse(visionData, now))
     visionIds.forEach { id ->
-        check(vision.currentCapabilities(gate, true, "route", 1, now, id) == setOf("chat", "vision", "tools"))
+        check(vision.capabilities(id, now) == setOf("chat", "vision", "tools"))
     }
     val imageReader = ModelModalities.from(listOf("text", "image"), listOf("text"))
     check("vision" in imageReader.chatCapabilities && "image" !in imageReader.outputs.orEmpty())
@@ -85,6 +78,9 @@ fun main() {
     check(DocumentedFreeChat.status(gemini, "gemini-2.5-flash-image", review, true) == DocumentedFreeChat.Status.PAID)
     check(DocumentedFreeChat.status("https://api.groq.com/openai/v1", "openai/gpt-oss-120b", review, true) ==
         DocumentedFreeChat.Status.FREE_PLAN_UNCONFIRMED)
+    val groq = FreeChatCatalogue.Groq(review, setOf("openai/gpt-oss-120b", "fixture/untested"))
+    check(groq.status("openai/gpt-oss-120b", review) == DocumentedFreeChat.Status.FREE)
+    check(groq.status("fixture/untested", review) == DocumentedFreeChat.Status.UNKNOWN)
     var valid = true
     val grant = DocumentedChatDispatch(gemma, "fixture-key") { valid }
     DocumentedChatDispatch.checkGemini(grant, gemini, "fixture-key", gemma, true, review)

@@ -363,6 +363,7 @@ internal fun ModelPickerSheet(
 
     // nanoMuse: the chat list follows the per-key filter and live account metadata.
     val nmCatalogueStatuses by providerRepository.nmFreeImportStatus.collectAsState()
+    val nmFreeEvidence by providerRepository.tamaFreeEvidence.collectAsState()
     val nmSpendLimits by providerRepository.tamaZeroSpendLimits.collectAsState()
     val nmPaymentRefusals by providerRepository.tamaPaymentRefusals.collectAsState()
     val tamaPicker = com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test"
@@ -372,12 +373,17 @@ internal fun ModelPickerSheet(
         nmActiveInstance?.let { providerRepository.tamaOwnApiKey(it) != null } == true
     @Composable
     fun Badges(entry: ModelEntry, instance: com.openminis.app.data.model.ProviderInstance?) {
-        val metadata = remember(config, entry, instance, nmCatalogueStatuses, nmPaymentRefusals) {
+        val metadata = remember(config, entry, instance, nmCatalogueStatuses, nmPaymentRefusals, nmFreeEvidence) {
             if (tamaPicker && instance != null) providerRepository.tamaModelMetadata(entry, instance) else null
         }
         ai.tama.providers.ModelBadges(entry, metadata)
+        val free = remember(config, entry, instance, nmFreeEvidence, nmPaymentRefusals) {
+            tamaPicker && instance != null && providerRepository.tamaDocumentedChatAllowed(instance, entry.model.id)
+        }
+        if (free) Text(stringResource(R.string.nm_free_status_limited), style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
-    val allInstancesWithEntries = remember(config, searchText, nmCatalogueStatuses, nmSpendLimits, nmPaymentRefusals) {
+    val allInstancesWithEntries = remember(config, searchText, nmCatalogueStatuses, nmSpendLimits, nmPaymentRefusals, nmFreeEvidence) {
         val t0 = System.nanoTime()
         var totalCount = 0
         val result = config.instances

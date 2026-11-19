@@ -150,6 +150,7 @@ fun ProviderDetailScreen(
     val nmZeroLimit = nmHasOwnKey && nmLimits.containsKey(instanceId) && providerRepository.tamaZeroSpendLimit(instance)
     val nmOnlyFree = nmHasOwnKey && (instance.tamaImportFreeOnly || nmZeroLimit)
     val nmImportStatuses by providerRepository.nmFreeImportStatus.collectAsState()
+    val nmFreeEvidence by providerRepository.tamaFreeEvidence.collectAsState()
     val nmImportStatus = nmImportStatuses[instanceId]
     var isRefreshing by remember { mutableStateOf(false) }
 
@@ -312,6 +313,10 @@ fun ProviderDetailScreen(
                     providerRepository.instance(instanceId)?.let { live ->
                         ai.tama.router.AutoModelStore.routeFingerprint(live) == route
                     } == true && providerRepository.nmOAuthKeyStillCurrent(snapshot)
+                },
+                check = { plan, key ->
+                    if (plan.groqModelList) providerRepository.tamaCheckSavedGroqKey(instance, snapshot)
+                    else ai.tama.providers.KeyProbe.check(plan, key)
                 },
             ) { result ->
                 val isZero = result?.zeroSpendLimit
@@ -713,10 +718,10 @@ fun ProviderDetailScreen(
 
         // ─── Models ─────────────────────────────────────────────────
         // nanoMuse: the same switch filters this list and own-key chat. Saved entries stay intact.
-        val nmFreeIds = if (nmOnlyFree && nmImportStatus !is ai.tama.pricing.FreeModelImportStatus.Checking)
-            providerRepository.tamaEligibleFreeModelIds(instanceId) else null
-        val nmDisplayedEntries = ai.tama.pricing.FreeModelList.filter(entries, nmOnlyFree, nmFreeIds) { it.model.id }
         val nmPaymentRefusals by providerRepository.tamaPaymentRefusals.collectAsState()
+        val nmFreeIds = if (nmOnlyFree && nmImportStatus !is ai.tama.pricing.FreeModelImportStatus.Checking)
+            remember(instance, entries, nmFreeEvidence, nmImportStatus, nmPaymentRefusals, storedKey) { providerRepository.tamaEligibleFreeModelIds(instanceId) } else null
+        val nmDisplayedEntries = ai.tama.pricing.FreeModelList.filter(entries, nmOnlyFree, nmFreeIds) { it.model.id }
         SettingsSection(
             header = stringResource(R.string.provider_detail_models_count_header, nmDisplayedEntries.size),
             footer = when {
@@ -814,7 +819,7 @@ fun ProviderDetailScreen(
                     val hasBadge = inputModalities.any { it in modalityIconKeys } ||
                         outputModalities.any { it in modalityOutputIconKeys }
                     // nanoMuse: plan availability and list prices are separate.
-                    val priceStatus = remember(entry.model.id, instance, nmPaymentRefusals, nmFreeIds, nmHasOwnKey) {
+                    val priceStatus = remember(entry.model.id, instance, nmPaymentRefusals, nmFreeIds, nmHasOwnKey, nmFreeEvidence) {
                         if (nmHasOwnKey) providerRepository.tamaFreeChatStatus(instance, entry.model.id) else null
                     }
                     val priceHint = priceStatus?.let { stringResource(ai.tama.pricing.freeStatusLabel(it)) }

@@ -16,7 +16,7 @@ import kotlin.coroutines.resume
 internal object KeyProbe {
     private class Attempt(val sent: AtomicBoolean = AtomicBoolean(false))
 
-    private val client = OkHttpClient.Builder()
+    private fun singleExchange(client: OkHttpClient) = client.newBuilder()
         .followRedirects(false).followSslRedirects(false).retryOnConnectionFailure(false)
         // OkHttp can still schedule a follow-up for a 503 with Retry-After: 0.
         // Reject any second HTTP exchange before it can write the key again.
@@ -29,9 +29,17 @@ internal object KeyProbe {
         }
         .callTimeout(15, TimeUnit.SECONDS).build()
 
-    private val unavailable = KeyProbePlan.Result(KeyProbePlan.Outcome.UNAVAILABLE)
+    private val client = singleExchange(OkHttpClient())
 
-    suspend fun check(plan: KeyProbePlan.Plan, key: String): KeyProbePlan.Result =
+    internal val unavailable = KeyProbePlan.Result(KeyProbePlan.Outcome.UNAVAILABLE)
+
+    suspend fun check(plan: KeyProbePlan.Plan, key: String): KeyProbePlan.Result = execute(plan, key, client)
+
+    // Lets a JVM test inspect the real request without sending a live credential.
+    internal suspend fun check(plan: KeyProbePlan.Plan, key: String, client: OkHttpClient): KeyProbePlan.Result =
+        execute(plan, key, singleExchange(client))
+
+    private suspend fun execute(plan: KeyProbePlan.Plan, key: String, client: OkHttpClient): KeyProbePlan.Result =
         suspendCancellableCoroutine { continuation ->
             try {
                 val request = Request.Builder().url(plan.url).get().header(
@@ -58,8 +66,20 @@ internal object KeyProbe {
     private fun readResult(plan: KeyProbePlan.Plan, response: Response): KeyProbePlan.Result {
         val status = response.code
         val readInfo = plan.openRouterKeyInfo && response.isSuccessful
+        val readModels = plan.groqModelList && response.isSuccessful
         val readError = status == 402 || status == 403
-        val body = if (readInfo || readError) runCatching { JSONObject(response.peekBody(65_536).string()) }.getOrNull() else null
+        val body = if (readInfo || readModels || readError) runCatching { JSONObject(response.peekBody(65_536).string()) }.getOrNull() else null
+        val models = if (readModels) {
+            val rows = body?.optJSONArray("data") ?: return unavailable
+            if (body.has("error")) return unavailable
+            buildSet {
+                for (index in 0 until rows.length()) {
+                    val row = rows.optJSONObject(index) ?: return unavailable
+                    val id = (row.opt("id") as? String)?.takeIf { it.isNotBlank() && it.length <= 256 } ?: return unavailable
+                    if (row.opt("active") != false) add(id)
+                }
+            }
+        } else null
         val data = body?.optJSONObject("data")
         if (readInfo && (data == null || !data.has("limit"))) return unavailable
         val limit = if (readInfo) data?.opt("limit") else null
@@ -73,7 +93,11 @@ internal object KeyProbe {
             error?.opt("code") as? String, error?.opt("message") as? String,
             error?.optJSONObject("metadata")?.opt("limit_source") as? String,
         )
-        return KeyProbePlan.Result(KeyProbePlan.classify(status, zeroSpend, noCredit), zeroSpend)
+        val groqPayment = plan.groqModelList && ai.tama.net.OwnKeyFailureSignals.reportsPaymentRequired(
+            status, listOfNotNull(error?.opt("code") as? String, error?.opt("type") as? String),
+            (error?.opt("message") as? String).orEmpty(),
+        )
+        return KeyProbePlan.Result(KeyProbePlan.classify(status, zeroSpend, noCredit || groqPayment), zeroSpend, models)
     }
 
 }
