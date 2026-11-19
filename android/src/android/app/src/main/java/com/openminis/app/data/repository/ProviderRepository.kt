@@ -683,8 +683,33 @@ class ProviderRepository(private val context: Context) {
 
     fun addInstance(instance: ProviderInstance) { addInstanceInternal(instance, checked = false) }
 
-    // nanoMuse: leave the form open when a new provider could not be stored.
-    fun addInstanceChecked(instance: ProviderInstance): Boolean = addInstanceInternal(instance, checked = true)
+    // nanoMuse: a second tap for the same pending ID must never replace or
+    // delete the key written by the first tap. Keep both writes under the
+    // ordered route/credential locks; the DB and keystore aren't crash-atomic.
+    internal fun addApiKeyInstanceChecked(instance: ProviderInstance, apiKey: String): Boolean {
+        if (instance.credentialType != ProviderCredential.apiKey) return false
+        val secrets = try { encryptedPrefs } catch (_: Exception) { return false }
+        return synchronized(configLock) {
+            try { ensureConfigLoaded() } catch (_: Exception) { return@synchronized false }
+            if (!_configLoaded.value) return@synchronized false
+            AutoModelStore.credentialTransaction {
+                val prefKey = "apikey_${instance.id}"
+                val key = apiKey.trim().takeIf { it.isNotEmpty() }
+                ai.tama.providers.ProviderKeyEnrollment.add(
+                    exists = { _config.value.instances.any { it.id == instance.id } },
+                    read = { secrets.getString(prefKey, null) },
+                    key = key,
+                    store = { saveApiKeyChecked(instance.id, it) },
+                    publish = { addInstanceInternal(instance, checked = true) },
+                    restore = { previous ->
+                        val editor = secrets.edit()
+                        if (previous == null) editor.remove(prefKey) else editor.putString(prefKey, previous)
+                        editor.commit()
+                    },
+                )
+            }
+        }
+    }
 
     // nanoMuse: an OAuth login can finish before the person taps Save. Do not
     // add a provider for a signed-out or replaced account. Flush both stores
@@ -2966,8 +2991,16 @@ class ProviderRepository(private val context: Context) {
                     // [T-android-provider-type-parity] openAIResponses lists
                     // models from the same /v1/models endpoint — only the
                     // completion endpoint differs.
-                    ProviderType.openAI, ProviderType.openAIResponses ->
-                        OpenAIModelsApi.fetchModels(apiKey, baseURL, customUserAgent = instance.customUserAgent)
+                    ProviderType.openAI, ProviderType.openAIResponses -> {
+                        val discovered = OpenAIModelsApi.fetchModels(apiKey, baseURL, customUserAgent = instance.customUserAgent)
+                        val known = ai.tama.media.CustomImageRoute.AGNES_FLASH
+                        if (nmParallel && apiKey.isNotBlank() && discovered.isNotEmpty() &&
+                            ai.tama.media.CustomImageRoute.agnes(baseURL) && discovered.none { it.id == known }) {
+                            // Agnes documents Images separately from its text catalogue.
+                            discovered + LLMModel(known, "Agnes Image 2.1 Flash", "Agnes AI",
+                                inputModalities = listOf("text"), outputModalities = listOf("image"))
+                        } else discovered
+                    }
                     ProviderType.openRouter -> {
                         val snapshot = nmKeySnapshot
                         val check = snapshot?.let { nmBeginCatalogueCheck(instance, it) }
@@ -3223,13 +3256,19 @@ class ProviderRepository(private val context: Context) {
     // stays open on failure. This does not expose the credential to logs.
     fun saveApiKeyChecked(instanceId: String, key: String): Boolean {
         val secrets = try { encryptedPrefs } catch (_: Exception) { return false }
+        // A plaintext recovery store may disappear from view on next launch.
+        // Never acknowledge a checked key save there in the isolated app.
+        if (com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test" &&
+            secrets !is androidx.security.crypto.EncryptedSharedPreferences) return false
         return try {
             ai.tama.router.AutoModelStore.credentialTransaction {
                 ai.tama.router.OAuthLoginAttempts.supersede(instanceId)
                 val prefKey = "apikey_$instanceId"
                 val previous = secrets.getString(prefKey, null)
                 if (previous != key) ai.tama.router.AutoModelStore.accountChanged(context, instanceId)
-                val written = try { secrets.edit().putString(prefKey, key).commit() } catch (_: Exception) { false }
+                val written = try {
+                    secrets.edit().putString(prefKey, key).commit() && secrets.getString(prefKey, null) == key
+                } catch (_: Exception) { false }
                 if (!written) {
                     // commit() can update the in-memory preference even when its
                     // disk write fails. Restore it so the displayed key and the

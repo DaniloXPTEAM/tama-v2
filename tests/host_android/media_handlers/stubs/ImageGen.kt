@@ -9,6 +9,7 @@ object ImageGen {
  }
  fun freeImagesOnly(context:Context, instanceId:String? = null) = false
  fun noFreeImageAvailable(context:Context) = false
+ internal fun selectionProblem(context:Context):ai.tama.media.CustomImageRoute.Problem? = null
  fun imageChoiceRevision():Long = 0
  suspend fun generate(context:Context, endpoint:Endpoint, prompt:String, size:String, allowFormatRetry:Boolean, beforeRequest:(()->Unit)?):Bitmap = error("not used by host test")
  suspend fun edit(context:Context, endpoint:Endpoint, reference:Bitmap, prompt:String, allowFormatRetry:Boolean, beforeRequest:(()->Unit)?):Bitmap = error("not used by host test")

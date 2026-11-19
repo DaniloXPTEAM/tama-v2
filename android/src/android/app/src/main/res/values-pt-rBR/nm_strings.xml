@@ -1440,6 +1440,11 @@
     <string name="nm_auto_image_allow">Autorizar geração automática de imagens neste modelo</string>
     <string name="nm_auto_image_consent_title">Autorizar geração automática de imagens?</string>
     <string name="nm_auto_image_consent_body">A geração usa um serviço separado e pode cobrar por imagem, mesmo com preço desconhecido. A autorização do chat não vale para imagens. Ative somente se aceitar esses custos para este modelo.</string>
+    <string name="nm_image_chat_only">O modelo escolhido só anuncia saída de chat. Escolha um modelo que gere imagens em /v1/images/generations.</string>
+    <string name="nm_image_route_unconfirmed">Não há geração de imagens confirmada para esta escolha. Confira com o provedor o ID do modelo e a rota /v1/images/generations.</string>
+    <string name="nm_image_key_missing">Salve a chave do provedor de imagem em Provedores antes de gerar.</string>
+    <string name="nm_image_nvidia_native">FLUX e Qwen Image na NVIDIA usam rotas próprias do NIM que o Tama não oferece. O endereço de chat da NVIDIA não gera imagens aqui.</string>
+    <string name="nm_image_endpoint_rejected">O endereço ou modelo escolhido não aceitou /v1/images/generations. Confira o endereço e o ID exato do modelo de imagem. Não houve nova tentativa.</string>
     <string name="nm_image_provider_missing">Nenhum provedor de imagem configurado — abra Configurações → Modelos de imagem e vídeo</string>
     <string name="nm_image_call_consent">A geração de imagem pode cobrar por pedido, mesmo quando o preço é desconhecido. Autorize somente se aceitar o custo do modelo mostrado.</string>
     <string name="nm_image_permission_denied">A permissão para gerar imagem foi negada ou expirou. Nenhum pedido de imagem foi enviado.</string>

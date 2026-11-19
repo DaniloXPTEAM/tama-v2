@@ -279,13 +279,14 @@ fun ProviderDetailScreen(
                             if (nmParallel && (!nmDestinationAllowed ||
                                     !ai.tama.providers.KeyDestinationGuard.permits(editKeyValue, nmLiveDestination))) return@ApiKeyCredentialBlock
                             val nmFirstKey = storedKey.isBlank() && editKeyValue.isNotBlank() // nanoMuse
-                            val saved = if (nmParallel) providerRepository.saveApiKeyChecked(instanceId, editKeyValue)
+                            val savedValue = if (nmParallel) editKeyValue.trim() else editKeyValue
+                            val saved = if (nmParallel) providerRepository.saveApiKeyChecked(instanceId, savedValue)
                                 else { providerRepository.saveApiKey(instanceId, editKeyValue); true }
                             keySaveFailed = !saved
                             if (saved) {
                                 // [T-android-provider-apikey-save-stale] Reflect the
                                 // just-saved value without re-reading async prefs.
-                                storedKey = editKeyValue
+                                storedKey = savedValue
                                 AppLogger.info(TAG, "Saved API key for ${instance.id}")
                                 isEditingKey = false
                                 editKeyValue = ""

@@ -52,7 +52,8 @@ object ImageGenerationTool {
                 if (ownKeyChat) R.string.nm_image_detail_failed else R.string.nm_image_request_failed,
             ),
             neutralCharge = ownKeyChat,
-            explainCostRefusal = if (ownKeyChat) ({ ai.tama.media.OwnKeyChatImage.costFailureCode(context) }) else null,
+            explainCostRefusal = if (ownKeyChat && !io.github.nanomuse.avatar.ImageGen.isChosen(context))
+                ({ ai.tama.media.OwnKeyChatImage.costFailureCode(context) }) else null,
         ))
     }
 
@@ -70,7 +71,7 @@ object ImageGenerationTool {
         "no_confirmed_image_generator" to context.getString(R.string.nm_own_image_no_generator),
         "no_verified_free_image_generator" to context.getString(R.string.nm_free_image_unavailable),
         "image_failed" to context.getString(if (ownKeyChat) R.string.nm_image_detail_failed else R.string.nm_image_request_failed),
-    )
+    ) + ai.tama.media.CustomImageRoute.Problem.entries.associate { it.code to context.getString(it.message) }
 
     /** Injectable edge for tests; no client is created unless all arguments are valid. */
     internal suspend fun execute(

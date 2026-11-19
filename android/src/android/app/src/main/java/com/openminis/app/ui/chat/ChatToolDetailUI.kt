@@ -317,6 +317,11 @@ internal fun ToolDetailSheet(
             ai.tama.media.ImageToolPresentation.Summary.INVALID -> R.string.nm_image_guard_invalid
             ai.tama.media.ImageToolPresentation.Summary.FAILED -> R.string.nm_image_detail_failed
             ai.tama.media.ImageToolPresentation.Summary.NO_CONFIRMED_GENERATOR -> R.string.nm_own_image_no_generator
+            ai.tama.media.ImageToolPresentation.Summary.CHAT_ONLY -> R.string.nm_image_chat_only
+            ai.tama.media.ImageToolPresentation.Summary.ROUTE_UNCONFIRMED -> R.string.nm_image_route_unconfirmed
+            ai.tama.media.ImageToolPresentation.Summary.KEY_MISSING -> R.string.nm_image_key_missing
+            ai.tama.media.ImageToolPresentation.Summary.NVIDIA_NATIVE -> R.string.nm_image_nvidia_native
+            ai.tama.media.ImageToolPresentation.Summary.ENDPOINT_REJECTED -> R.string.nm_image_endpoint_rejected
             ai.tama.media.ImageToolPresentation.Summary.NO_VERIFIED_FREE_GENERATOR -> R.string.nm_own_image_no_verified_free
         }
         imageContext.getString(resource)

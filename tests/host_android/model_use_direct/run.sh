@@ -60,6 +60,10 @@ kotlinc -nowarn -cp "$CP" -include-runtime -d "$OUT/model-use-host.jar" \
     "$MAIN/ai/tama/router/AutoModelRuntime.kt" \
     "$MAIN/ai/tama/router/AccountVersions.kt" \
     "$MAIN/ai/tama/router/ModelHealth.kt" \
+    "$MAIN/ai/tama/router/AutoModelFailure.kt" \
+    "$MAIN/ai/tama/router/AutoModelTurn.kt" \
+    "$MAIN/ai/tama/router/ModelRouter.kt" \
+    "$MAIN/ai/tama/router/CapabilityEvidence.kt" \
     "$MAIN/ai/tama/router/Profile.kt" \
     "$MAIN/ai/tama/router/TurnRouter.kt" \
     "$MAIN/com/openminis/app/sandbox/offload/OffloadArgs.kt" \
@@ -74,6 +78,9 @@ kotlinc -nowarn -cp "$CP" -include-runtime -d "$OUT/model-use-host.jar" \
     "$MAIN/ai/tama/net/ImageRequestSafety.kt" \
     "$MAIN/ai/tama/net/ProviderCredentials.kt" \
     "$MAIN/ai/tama/net/ProviderErrorDiagnostics.kt" \
+    "$MAIN/ai/tama/net/OpenRouterSpendLimit.kt" \
+    "$MAIN/ai/tama/media/CustomImageRoute.kt" \
+    "$MAIN/ai/tama/providers/ProviderKeyEnrollment.kt" \
     "$MAIN/ai/tama/net/OwnKeyFailureSignals.kt" \
     "$MAIN/ai/tama/pricing/ModelCostGuard.kt" \
     "$MAIN/ai/tama/pricing/DocumentedChatDispatch.kt" \
@@ -83,6 +90,7 @@ kotlinc -nowarn -cp "$CP" -include-runtime -d "$OUT/model-use-host.jar" \
     "$MAIN/ai/tama/pricing/FreeModelImport.kt" \
     "$MAIN/ai/tama/pricing/FreeModelBulk.kt" \
     "$MAIN/ai/tama/pricing/FreeModelList.kt" \
+    "$MAIN/ai/tama/pricing/FreeChatText.kt" \
     "$MAIN/ai/tama/pricing/NvidiaChatPricing.kt" \
     "$MAIN/ai/tama/pricing/OpenRouterPricing.kt" \
     "$MAIN/ai/tama/providers/KeyProbePlan.kt" \
@@ -101,6 +109,8 @@ kotlinc -nowarn -cp "$CP" -include-runtime -d "$OUT/model-use-host.jar" \
     "$TEST_TAMA/ai/tama/net/FreeChatCompletionsWireTest.kt" \
     "$TEST_TAMA/ai/tama/net/KeyProbeWireTest.kt" \
     "$TEST/ai/tama/pricing/NvidiaChatPricingTest.kt" \
+    "$TEST/ai/tama/pricing/DocumentedFreeChatTest.kt" \
+    "$TEST/ai/tama/providers/ProviderKeyEnrollmentTest.kt" \
     "$TEST/ai/tama/pricing/FreeModelImportTest.kt" \
     "$TEST/ai/tama/pricing/OpenRouterPricingTest.kt" \
     "$TEST/ai/tama/net/DirectModelUseGuardTest.kt" \

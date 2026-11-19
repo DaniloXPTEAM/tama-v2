@@ -27,6 +27,8 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.*
 import org.junit.Rule
+import org.junit.Assume.assumeTrue
+import com.openminis.app.BuildConfig
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import org.mockito.Mockito
@@ -82,6 +84,8 @@ class MediaOffloadImageTest {
     )
 
     private inner class FakeImages : MediaImageServices {
+        var problem: CustomImageRoute.Problem? = null
+        override fun selectionProblem() = problem
         var autoRevision = 0L
         var choiceRevision = 0L
         var costRevision = 0L
@@ -638,6 +642,23 @@ class MediaOffloadImageTest {
         assertEquals("image_failed", JSONObject(result.output).getString("error"))
         assertFalse(temp.root.resolve("minis-sessions/$sid/attachments/failed.png").exists())
         assertTrue(AutoImageNotices.takeFor(sid).isEmpty())
+    }
+
+    @Test fun `custom catalogue with only chat output returns its specific reason without asking or sending`() = runBlocking {
+        assumeTrue(BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test")
+        val reason = CustomImageRoute.missingModel("fixture/chat", mapOf("fixture/chat" to setOf("text")))
+        assertEquals(CustomImageRoute.Problem.CHAT_ONLY, reason)
+        assertEquals(CustomImageRoute.Problem.UNCONFIRMED, CustomImageRoute.missingModel("fixture/unknown", emptyMap()))
+        val fake = FakeImages().apply { problem = reason }
+        var prompted = false
+        val handler = MediaOffloadHandler(context(), fake, testGate { _, _, _, _, _ -> prompted = true; true })
+        val result = handler.generateImage("a fixture", null, "fixture-session")
+        assertEquals("image_chat_only", JSONObject(result.output).getString("error"))
+        assertFalse(prompted)
+        assertEquals(0, fake.submissions)
+        val free = handler.generateImage("a fixture", null, "fixture-session", freeOnly = true)
+        assertEquals("no_verified_free_image_generator", JSONObject(free.output).getString("error"))
+        assertFalse(prompted)
     }
 
     @Test fun `missing image provider has the required message without asking or sending`() = runBlocking {

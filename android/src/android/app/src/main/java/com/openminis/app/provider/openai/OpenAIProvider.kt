@@ -1702,7 +1702,10 @@ class OpenAIProvider private constructor(
     ): LLMResponse = withContext(Dispatchers.IO) {
         // nanoMuse: image capability and approval do not verify image pricing.
         ai.tama.pricing.ModelCostGuard.requireAllowed()
-        val retryAllowed = allowFormatRetry && !singleUseDirectRequest
+        val agnes = com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test" &&
+            ai.tama.media.CustomImageRoute.agnes(basePath) && model.id == ai.tama.media.CustomImageRoute.AGNES_FLASH &&
+            !isAzure && imagePathOverride == null && absoluteEndpointOverride == null && imageExtraBody.isEmpty()
+        val retryAllowed = allowFormatRetry && !singleUseDirectRequest && !agnes
         val token = getToken()
         // [T-android-model-use-image-passthrough GH#62] Honor an explicit
         // endpoint-path override (non-standard providers); default otherwise.
@@ -1730,7 +1733,12 @@ class OpenAIProvider private constructor(
                 .put("n", n)
             if (size != null) body.put("size", size)
             if (quality != null) body.put("quality", quality)
-            if (!triedWithoutFormat) body.put("response_format", "b64_json")
+            // Agnes documents return_base64 for text-to-image, not a top-level response_format.
+            if (agnes) {
+                body.remove("n")
+                body.put("size", size ?: "1024x1024")
+                body.put("return_base64", true)
+            } else if (!triedWithoutFormat) body.put("response_format", "b64_json")
             // [T-android-model-use-image-passthrough GH#62] Merge user-supplied
             // passthrough fields. User keys WIN over our defaults (they can
             // override prompt/size or add Seedream's `image`/`watermark`), but

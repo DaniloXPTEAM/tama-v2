@@ -15,6 +15,8 @@ import com.openminis.app.provider.openai.OpenAIProvider
 internal object ImageModelRequests {
     fun supports(instance: ProviderInstance): Boolean =
         instance.isEnabled && instance.credentialType == ProviderCredential.apiKey &&
+            !(com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test" &&
+                ai.tama.media.CustomImageRoute.nvidia(ImageGen.baseUrlOf(instance))) &&
             instance.providerType in setOf(
                 ProviderType.openAI, ProviderType.openAIResponses, ProviderType.openRouter,
                 ProviderType.xAI, ProviderType.gemini,
@@ -29,6 +31,8 @@ internal object ImageModelRequests {
         if (!supports(instance) || id.isBlank() || id.contains("edit", ignoreCase = true) ||
             !supportsModel(instance.providerType, id)) return false
         val base = ImageGen.baseUrlOf(instance)
+        if (com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test" &&
+            ai.tama.media.CustomImageRoute.agnes(base) && id != ai.tama.media.CustomImageRoute.AGNES_FLASH) return false
         val dashScope = ImageGen.speaksDashScope(base)
         if (dashScope) {
             // The native endpoint is neither the forced Images API nor forced Chat route.

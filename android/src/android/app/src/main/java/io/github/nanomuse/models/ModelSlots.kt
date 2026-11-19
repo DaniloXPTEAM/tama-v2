@@ -406,7 +406,10 @@ object ModelSlots {
      */
     fun offeredSlots(context: Context, inst: ProviderInstance): List<Slot> {
         val known = Capabilities.of(context, inst)
-        if (known != null) return Slot.values().filter { it.capability in known }
+        if (known != null) return Slot.values().filter {
+            it.capability in known && (it != Slot.IMAGE || !(ImageGen.freeImagesOnly(context) ||
+                ImageGen.freeImagesOnly(context, inst.id)))
+        }
         return buildList {
             add(Slot.CHAT)
             if (handsEntriesOf(context, inst).isNotEmpty()) add(Slot.HANDS)

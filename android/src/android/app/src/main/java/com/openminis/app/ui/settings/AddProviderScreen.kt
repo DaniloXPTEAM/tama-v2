@@ -763,12 +763,7 @@ private fun ColumnScope.ApiKeyConfigSection(
             // nanoMuse: do not leave the form or start a fetch if either local
             // credential or provider storage rejects the write.
             if (nmParallel) {
-                if (apiKey.isNotBlank() && !providerRepository.saveApiKeyChecked(instance.id, apiKey.trim())) {
-                    saveFailed = true
-                    return@MinisButton
-                }
-                if (!providerRepository.addInstanceChecked(instance)) {
-                    if (apiKey.isNotBlank()) runCatching { providerRepository.deleteApiKey(instance.id) }
+                if (!providerRepository.addApiKeyInstanceChecked(instance, apiKey)) {
                     saveFailed = true
                     return@MinisButton
                 }

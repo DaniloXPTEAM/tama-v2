@@ -296,4 +296,45 @@ class FreeChatCompletionsWireTest {
         }
     }
 
+
+    @Test fun selectedCustomImageUsesExactlyItsImagesGenerationEndpoint() = runBlocking {
+        val agnes = ai.tama.media.CustomImageRoute.AGNES_FLASH
+        for ((base, id) in listOf("https://images.example.test/v1" to "fixture/image", ai.tama.pricing.DocumentedFreeChat.AGNES_BASE to agnes)) {
+            server().use { server ->
+                val client = OkHttpClient.Builder().proxy(Proxy.NO_PROXY).callTimeout(5, TimeUnit.SECONDS).addInterceptor { chain ->
+                    val request = chain.request()
+                    if (request.method == "POST") {
+                        assertTrue(request.url.toString().startsWith("$base/"))
+                        assertEquals("Bearer $key", request.header("Authorization"))
+                        assertTrue(request.body?.isOneShot() == true)
+                    } else assertNull(request.header("Authorization"))
+                    chain.proceed(request.newBuilder().url(server.url(request.url.encodedPath)).build())
+                }.build()
+                val provider = OpenAIProvider(key, LLMModel(id, id, "fixture", outputModalities = listOf("image")), base, client)
+                assertTrue(runCatching { provider.generateImage("test picture", allowFormatRetry = false) }.exceptionOrNull() is ModelCostGuard.Blocked)
+                assertEquals(0, server.requestCount)
+                ModelCostGuard.setAllowedForCurrentProcess(true)
+                try {
+                    server.enqueue(MockResponse().setBody("""{"data":[{"url":"${server.url("/result.png")}"}]}"""))
+                    server.enqueue(MockResponse().setHeader("Content-Type", "image/png").setBody("synthetic attachment"))
+                    val response = provider.generateImage("test picture", allowFormatRetry = false)
+                    assertEquals(1, response.mediaAttachments.size)
+                    val post = checkNotNull(server.takeRequest(3, TimeUnit.SECONDS))
+                    assertEquals("POST", post.method)
+                    assertEquals("/v1/images/generations", post.path)
+                    val body = JSONObject(post.body.readUtf8())
+                    assertEquals(id, body.getString("model"))
+                    if (id == agnes) {
+                        assertTrue(body.getBoolean("return_base64"))
+                        assertFalse(body.has("response_format"))
+                    } else assertEquals("b64_json", body.getString("response_format"))
+                    assertEquals("GET", checkNotNull(server.takeRequest(3, TimeUnit.SECONDS)).method)
+                    assertEquals(2, server.requestCount)
+                } finally {
+                    ModelCostGuard.setAllowedForCurrentProcess(false)
+                }
+            }
+        }
+    }
+
 }

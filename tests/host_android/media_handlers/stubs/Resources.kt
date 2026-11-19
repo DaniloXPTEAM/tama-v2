@@ -1,5 +1,11 @@
 package com.openminis.app
 object R { object string {
+    const val nm_image_chat_only = 101
+    const val nm_image_route_unconfirmed = 102
+    const val nm_image_key_missing = 103
+    const val nm_image_nvidia_native = 104
+    const val nm_image_endpoint_rejected = 105
+
  const val nm_auto_image_missing=1
  const val nm_auto_image_changed=2
  const val nm_auto_reason_unverified_cost=3

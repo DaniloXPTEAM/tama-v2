@@ -184,8 +184,11 @@ object OpenAIModelsApi {
                 // suffixes; the rest of the codebase (models.dev, capability fragments,
                 // ModelEntryDetailScreen toggles) uses the bare form. Normalize at the parse
                 // boundary so persisted overrides round-trip correctly through the toggles.
-                val inputModalities = arch?.optJSONArray("input_modalities")?.toStringList().normalizeModalities()
-                val outputModalities = arch?.optJSONArray("output_modalities")?.toStringList().normalizeModalities()
+                val parallel = com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test"
+                fun modalities(name: String) = (arch?.optJSONArray(name) ?: obj.optJSONArray(name).takeIf { parallel })
+                    ?.toStringList().normalizeModalities()
+                val inputModalities = modalities("input_modalities")
+                val outputModalities = modalities("output_modalities")
 
                 // T119: known reasoning families (GPT-5.x, o-series, Codex
                 // Mini) get supportsReasoning pre-set to true so the

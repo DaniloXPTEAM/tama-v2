@@ -31,6 +31,7 @@ internal interface MediaImageServices {
     fun manualEndpoint(): ImageGen.Endpoint?
     fun agentEndpoint(): ImageGen.Endpoint?
     fun hasConfiguredImage(): Boolean = manualEndpoint() != null
+    fun selectionProblem(): CustomImageRoute.Problem? = null
     /** Called at the transport boundary and, for URL results, before download. */
     suspend fun generate(
         endpoint: ImageGen.Endpoint, prompt: String, size: String, allowFormatRetry: Boolean,
@@ -85,6 +86,7 @@ internal class AndroidMediaImageServices(private val context: Context) : MediaIm
     override fun manualEndpoint() = MediaModels.imageEndpoint(context)?.let { it.copy(instance = it.instance.copy()) }
     override fun agentEndpoint() = MediaModels.agentImageEndpoint(context)
     override fun hasConfiguredImage() = manualEndpoint() != null || AutoImageSelection.hasRegisteredImage(context)
+    override fun selectionProblem() = ImageGen.selectionProblem(context)
 
     override suspend fun generate(
         endpoint: ImageGen.Endpoint, prompt: String, size: String, allowFormatRetry: Boolean,

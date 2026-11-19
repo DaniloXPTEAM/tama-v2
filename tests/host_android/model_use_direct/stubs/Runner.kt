@@ -9,6 +9,8 @@ fun main(args: Array<String>) {
         ai.tama.net.DirectModelUseGuardTest::class.java,
         ai.tama.pricing.ModelCostGuardTest::class.java,
         ai.tama.pricing.FreeModelImportTest::class.java,
+        ai.tama.pricing.DocumentedFreeChatTest::class.java,
+        ai.tama.providers.ProviderKeyEnrollmentTest::class.java,
         ai.tama.pricing.NvidiaChatPricingTest::class.java,
         ai.tama.pricing.OpenRouterPricingTest::class.java,
         ModelUseHandlerHostTest::class.java,

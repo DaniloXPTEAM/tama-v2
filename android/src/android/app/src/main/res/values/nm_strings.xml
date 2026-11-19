@@ -1419,6 +1419,11 @@
     <string name="nm_auto_image_allow">Allow automatic image generation with this model</string>
     <string name="nm_auto_image_consent_title">Allow automatic image generation?</string>
     <string name="nm_auto_image_consent_body">Image generation uses a separate endpoint and may charge per picture, including when the price is unknown. Chat permission does not authorize images. Enable only if you accept these charges for this model.</string>
+    <string name="nm_image_chat_only">The selected model only advertises chat output. Select a model that generates images on /v1/images/generations.</string>
+    <string name="nm_image_route_unconfirmed">No image generation route is confirmed for this selection. Check the model ID and /v1/images/generations with your provider.</string>
+    <string name="nm_image_key_missing">Save the API key for the selected image provider in Providers before generating.</string>
+    <string name="nm_image_nvidia_native">NVIDIA FLUX and Qwen Image use native NIM routes that Tama does not support. The NVIDIA chat endpoint cannot generate images here.</string>
+    <string name="nm_image_endpoint_rejected">The selected address or model did not accept /v1/images/generations. Check the address and exact image model ID. No retry was made.</string>
     <string name="nm_image_provider_missing">No image provider configured: open Settings → Image and video models</string>
     <string name="nm_image_call_consent">Image generation may incur a charge per request, even when the price is unknown. Allow only if you accept the cost for the model shown.</string>
     <string name="nm_image_permission_denied">Image permission was denied or expired. No image request was sent.</string>

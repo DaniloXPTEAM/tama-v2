@@ -173,6 +173,7 @@ class MediaOffloadHandler internal constructor(
             // nanoMuse: no endpoint selection or permission prompt before the scope checks.
             attempt?.requireActive()
             requireImageScope()
+            if (parallel) images.selectionProblem()?.let { return imageRouteError(it) }
             if (!costStillCurrent()) return modelCostError("image")
             if (automatic && !images.automaticCostAllowed()) return automaticImageError(
                 "automatic_image_cost_unverified", com.openminis.app.R.string.nm_auto_reason_unverified_cost)
@@ -282,6 +283,8 @@ class MediaOffloadHandler internal constructor(
             return if (automatic && !images.automaticCostAllowed()) automaticImageError(
                 "automatic_image_cost_unverified", com.openminis.app.R.string.nm_auto_reason_unverified_cost)
             else automaticImageError("image_authorization_changed", com.openminis.app.R.string.nm_auto_image_changed)
+        } catch (_: CustomImageRoute.Rejected) {
+            return imageRouteError(CustomImageRoute.Problem.ENDPOINT_REJECTED)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -347,6 +350,13 @@ class MediaOffloadHandler internal constructor(
 
     private fun safeAttribution(value: String, apiKey: String): String =
         io.github.nanomuse.net.ProviderReach.redactedText(value, listOf(apiKey), 128)
+
+    private fun imageRouteError(problem: CustomImageRoute.Problem): NativeOffloadResult = NativeOffloadResult(
+        if (problem == CustomImageRoute.Problem.ENDPOINT_REJECTED) 1 else 3,
+        JSONObject().put("ok", false).put("error", problem.code).put("message", context.getString(problem.message))
+            .put("settings", MediaModels.DEEP_LINK)
+            .put("tell_user", ImageFailureInstruction.forCode(problem.code)).toString(2) + "\n",
+    )
 
     private fun noFreeImage(): NativeOffloadResult = automaticImageError(
         "no_verified_free_image_generator", com.openminis.app.R.string.nm_free_image_unavailable,
