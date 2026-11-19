@@ -36,7 +36,7 @@ jobs:
             test_tama_free_rank_static test_tama_capability_review_static \
             test_tama_image_raw_static test_tama_image_retry_static \
             test_tama_context_notice test_tama_provider_refresh_label \
-            test_tama_key_probe_static test_tama_destination_audit \
+            test_tama_key_probe_static test_tama_destination_audit test_tama_p0_1_chat_wiring \
             test_tama_test_signing_config test_tama_build_failure_summary \
             test_tama_private_drive test_tama_parallel_screens
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0

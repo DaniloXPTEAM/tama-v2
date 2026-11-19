@@ -81,6 +81,8 @@ kotlinc -nowarn -cp "$CP" -include-runtime -d "$OUT/model-use-host.jar" \
     "$MAIN/ai/tama/pricing/DocumentedGeminiBody.kt" \
     "$MAIN/ai/tama/pricing/DocumentedFreeChat.kt" \
     "$MAIN/ai/tama/pricing/FreeModelImport.kt" \
+    "$MAIN/ai/tama/pricing/FreeModelBulk.kt" \
+    "$MAIN/ai/tama/pricing/FreeModelList.kt" \
     "$MAIN/ai/tama/pricing/NvidiaChatPricing.kt" \
     "$MAIN/ai/tama/pricing/OpenRouterPricing.kt" \
     "$MAIN/ai/tama/providers/KeyProbePlan.kt" \

@@ -351,12 +351,12 @@ object ModelsDevApi {
         while (modelKeys.hasNext()) {
             val modelKey = modelKeys.next()
             val modelObj = modelsObj.optJSONObject(modelKey) ?: continue
-            models[modelKey] = parseModelDevEntry(modelKey, modelObj)
+            models[modelKey] = parseModelDevEntry(modelKey, modelObj, nvidia = id == "nvidia")
         }
         return ProviderEntry(id, name, api, models, sdk, docs)
     }
 
-    private fun parseModelDevEntry(id: String, obj: JSONObject): ModelDevEntry {
+    private fun parseModelDevEntry(id: String, obj: JSONObject, nvidia: Boolean): ModelDevEntry {
         val name = obj.optString("name", "").ifEmpty { null }
         val family = obj.optString("family", "").ifEmpty { null }
 
@@ -439,7 +439,7 @@ object ModelsDevApi {
             declaresNoEffortTiers = declaresNoEffortTiers,
             releaseDate = obj.optString("release_date", "").ifEmpty { null },
             toolCalls = (obj.opt("tool_call") as? Boolean),
-            zeroTokenPrice = ai.tama.pricing.NvidiaChatPricing.isZero(obj.optJSONObject("cost")),
+            zeroTokenPrice = nvidia && ai.tama.pricing.NvidiaChatPricing.isZero(obj.optJSONObject("cost")),
             inputCost = obj.optJSONObject("cost")?.optDouble("input", Double.NaN)?.takeIf { it.isFinite() && it >= 0 },
             outputCost = obj.optJSONObject("cost")
                 ?.optDouble("output", Double.NaN)

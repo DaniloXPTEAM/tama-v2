@@ -72,7 +72,7 @@ internal object KeyProbe {
         val models = if (readModels) {
             val rows = body?.optJSONArray("data") ?: return unavailable
             if (body.has("error")) return unavailable
-            buildSet {
+            buildSet<String> {
                 for (index in 0 until rows.length()) {
                     val row = rows.optJSONObject(index) ?: return unavailable
                     val id = (row.opt("id") as? String)?.takeIf { it.isNotBlank() && it.length <= 256 } ?: return unavailable

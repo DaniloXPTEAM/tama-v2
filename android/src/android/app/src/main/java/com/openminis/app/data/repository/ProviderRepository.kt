@@ -2516,13 +2516,15 @@ class ProviderRepository(private val context: Context) {
 
     /**
      * One explicit action approves chat routes from current free-only evidence.
-     * This never turns on automatic mode or its separate cost permission. A
-     * changed account, route, refresh or disabled import invalidates the evidence.
+     * This never turns on automatic mode or its separate cost permission. The
+     * batch still needs the current account, route and import preference.
      */
     internal suspend fun tamaUseAllFreeChatModels(instanceId: String, key: OAuthKeySnapshot): Int {
         val live = instance(instanceId) ?: return 0
         if (key.providerId != instanceId || !live.isEnabled || !setTamaImportFreeOnly(instanceId, true, key)) return 0
-        if (tamaEligibleFreeModelIds(instanceId).isNullOrEmpty()) nmBeginRefresh(instanceId, key)?.let { nmRunRefresh(it) }
+        // Fresh proof can predate import (or follow a read-only probe). It must
+        // not stop this explicit action from adding the missing model entries.
+        nmBeginRefresh(instanceId, key)?.let { nmRunRefresh(it) }
         return tamaApproveFreeChatModels(instanceId, key)
     }
 
@@ -2620,7 +2622,8 @@ class ProviderRepository(private val context: Context) {
         val check = nmBeginCatalogueCheck(instance, key) ?: return null
         val result = OpenRouterModelsApi.fetchFreeCatalogue(key.key ?: return null)
         kotlinx.coroutines.currentCoroutineContext().ensureActive()
-        return result.takeIf { nmCommitCatalogue(check, key, result?.let { FreeChatCatalogue.OpenRouter(it.prices) }) }
+        if (!nmCommitCatalogue(check, key, result?.let { FreeChatCatalogue.OpenRouter(it.prices) })) return null
+        return result
     }
 
     /** Reopen an expired/missing proof for the selected client. Read-only: no entries or settings change. */
@@ -2720,29 +2723,32 @@ class ProviderRepository(private val context: Context) {
             }
             return
         }
-        val now = System.currentTimeMillis()
         val freeRoute = tamaFreeRoute(instance)
-        val eligible = when (freeRoute) {
+        val models = when (freeRoute) {
             DocumentedFreeChat.Route.OPENROUTER -> nmReadOpenRouterCatalogue(instance, keySnapshot)?.let {
                 FreeModelImport.eligible(it.models, it.prices, System.currentTimeMillis())
             }
             DocumentedFreeChat.Route.GROQ -> {
                 val checked = tamaCheckSavedGroqKey(instance, keySnapshot)
                 if (checked.availableModels == null && checked.outcome != KeyProbePlan.Outcome.NO_CREDIT) null
-                else ModelsDevApi.bundledModels(tamaModelBase(instance)).filter { tamaDocumentedChatAllowed(instance, it.id) }
+                else kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    ModelsDevApi.bundledModels(tamaModelBase(instance))
+                }
             }
             DocumentedFreeChat.Route.NVIDIA, DocumentedFreeChat.Route.GEMINI ->
-                ModelsDevApi.bundledModels(tamaModelBase(instance)).filter { nmBundledFreeStatus(instance, it.id, now) == DocumentedFreeChat.Status.FREE }
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    ModelsDevApi.bundledModels(tamaModelBase(instance))
+                }
             null -> emptyList()
         }
         kotlinx.coroutines.currentCoroutineContext().ensureActive()
         nmWithCurrentFreeRefresh(refresh, keySnapshot) {
-            if (eligible == null) {
+            if (models == null) {
                 _nmFreeImportStatus.value = _nmFreeImportStatus.value + (instance.id to FreeModelImportStatus.Failed)
                 return@nmWithCurrentFreeRefresh
             }
             val currentIds = nmEligibleFreeIds(instance, System.currentTimeMillis()).orEmpty()
-            val current = eligible.filter { it.id in currentIds }
+            val current = models.filter { it.id in currentIds }
             val config = workingCopy()
             val additions = FreeModelImport.additions(instance.id, config.modelEntries, current)
             config.modelEntries.addAll(additions)
