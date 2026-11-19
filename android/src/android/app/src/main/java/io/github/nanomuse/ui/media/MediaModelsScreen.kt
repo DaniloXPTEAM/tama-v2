@@ -73,9 +73,13 @@ fun MediaModelsScreen(
 
     val scope = rememberCoroutineScope()
 
-    // Image: the first eligible provider is the default, so it works without a visit here.
+    val parallelTest = com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test"
+    // Show the route the resolver can actually use. In Test, an unavailable
+    // Agnes or saved selection must not be presented as a different provider.
     val imageInstances = remember(config) { ImageGen.eligibleInstances(context) }
-    var imageInstance by remember(config) { mutableStateOf(ImageGen.endpoint(context)?.instanceId ?: imageInstances.firstOrNull()?.id) }
+    var imageInstance by remember(config) {
+        mutableStateOf(ImageGen.endpoint(context)?.instanceId ?: imageInstances.firstOrNull()?.id?.takeUnless { parallelTest })
+    }
     var imageModel by remember(config) { mutableStateOf(ImageGen.endpoint(context)?.model.orEmpty()) }
     val imageInst = imageInstances.firstOrNull { it.id == imageInstance }
     // The models this key can draw with — the provider's own list, filtered to the ones that
@@ -106,7 +110,6 @@ fun MediaModelsScreen(
     var videoChecking by remember { mutableStateOf(false) }
     // nanoMuse: probing can create billable tasks; no automatic batch runs in the
     // parallel app, and a manual batch needs its own explicit confirmation.
-    val parallelTest = com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test"
     var videoProbePending by remember { mutableStateOf<ProviderInstance?>(null) }
     var videoCostBlocked by remember(videoInstance) { mutableStateOf(false) }
     fun checkVideoModels(inst: ProviderInstance) {
@@ -159,8 +162,12 @@ fun MediaModelsScreen(
         SettingsSection(
             header = stringResource(R.string.nm_media_section_image),
             // C11: no configured provider draws — the one sentence that says which would
-            footer = if (imageInstances.isEmpty()) ImageGen.unavailableLine(context) ?: stringResource(R.string.nm_cap_pictures_unavailable)
-                else stringResource(R.string.nm_media_image_footer),
+            footer = when {
+                imageInstances.isEmpty() -> ImageGen.unavailableLine(context) ?: stringResource(R.string.nm_cap_pictures_unavailable)
+                parallelTest && imageInstance == null -> ImageGen.selectionProblem(context)?.let { stringResource(it.message) }
+                    ?: stringResource(R.string.nm_media_image_footer)
+                else -> stringResource(R.string.nm_media_image_footer)
+            },
         ) {
             StatusRow(
                 icon = Icons.Outlined.Image,

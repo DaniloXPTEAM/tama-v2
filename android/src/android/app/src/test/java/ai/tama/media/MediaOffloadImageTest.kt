@@ -770,9 +770,24 @@ class MediaOffloadImageTest {
         assertFalse(paragraph.contains("No image model is set"))
     }
 
+    @Test fun `an unavailable image pick blocks before permission even with a free and paid alternate`() = runBlocking {
+        assumeTrue(BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test")
+        val base = FakeImages().apply { problem = CustomImageRoute.Problem.AGNES_UNAVAILABLE }
+        val images = object : MediaImageServices by base {
+            override fun hasDeclaredFreeImage() = true
+        }
+        var permits = 0
+        val gate = testGate { _, _, _, _, _ -> permits++; true }
+        val result = MediaOffloadHandler(context(), images, gate).generateImage("crie uma imagem de um gato", null, "agnes-blocked")
+        assertEquals("agnes_image_unavailable", JSONObject(result.output).getString("error"))
+        assertEquals(0, base.selects)
+        assertEquals(0, permits)
+        assertEquals(0, base.submissions)
+    }
+
     @Test fun `automatic Agnes fallback is payment-only and requests new permission for the other free model`() = runBlocking {
         assumeTrue(BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test")
-        for (failure in listOf(AgnesImageApi.Problem.PAYMENT, AgnesImageApi.Problem.QUEUE)) {
+        for (failure in listOf(AgnesImageApi.Problem.PAYMENT, AgnesImageApi.Problem.QUEUE, AgnesImageApi.Problem.TIMEOUT)) {
             val base = FakeImages().apply { modelCostAllowed = false; costAllowed = false; freeOnly = true }
             val provider = endpoint.instance.copy(customBaseURL = "https://apihub.agnes-ai.com/v1")
             val endpoints = AgnesImages.models.map { ImageGen.Endpoint(provider, endpoint.apiKey, it.id) }
@@ -811,7 +826,8 @@ class MediaOffloadImageTest {
                 assertEquals(listOf(first to false, endpoints[1].model to true), approved)
                 assertEquals(listOf(emptySet(), setOf(provider.id to first)), excludedChecks)
             } else {
-                assertEquals("agnes_image_queue", JSONObject(result.output).getString("error"))
+                val error = if (failure == AgnesImageApi.Problem.QUEUE) "agnes_image_queue" else "agnes_image_timeout"
+                assertEquals(error, JSONObject(result.output).getString("error"))
                 assertEquals(listOf(first), sent)
                 assertEquals(listOf(first to false), approved)
             }

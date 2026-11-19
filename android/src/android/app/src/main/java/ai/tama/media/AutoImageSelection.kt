@@ -3,6 +3,7 @@ package ai.tama.media
 import io.github.nanomuse.media.*
 
 import android.content.Context
+import com.openminis.app.BuildConfig
 import com.openminis.app.MinisApp
 import com.openminis.app.data.model.ModelEntry
 import com.openminis.app.data.model.ProviderInstance
@@ -18,6 +19,8 @@ import ai.tama.router.Need
 
 /** Agent picture calls use a separately approved, exact image model and transport. */
 internal object AutoImageSelection {
+    private val parallel: Boolean get() = BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test"
+
     data class Selection(
         val entryId: String,
         val providerId: String,
@@ -26,6 +29,9 @@ internal object AutoImageSelection {
         val accountVersion: Long,
         // The parallel app must not revive a selection after consent or capability ABA.
         val reviewVersion: Long? = null,
+        val slotRevision: Long? = null,
+        val freeOnly: Boolean = false,
+        val paymentRefused: Set<Pair<String, String>> = emptySet(),
     )
 
     private data class Entry(
@@ -45,9 +51,16 @@ internal object AutoImageSelection {
         // ImageGen resolves model metadata by provider/model, so duplicates could
         // otherwise use a different entry from the one the person approved.
         val duplicateProviders = config.instances.groupingBy { it.id }.eachCount().filterValues { it > 1 }.keys
-        val duplicateModels = config.modelEntries.groupingBy { it.providerInstanceId to it.model.id }
+        val agnesIds = config.instances.filter(AgnesImages::account).mapTo(mutableSetOf()) { it.id }
+        val catalogueEntries = config.modelEntries.filterNot { it.providerInstanceId in agnesIds } +
+            agnesIds.flatMap { providerId ->
+                val models = config.modelEntries.filter { it.providerInstanceId == providerId }
+                models.groupBy { it.baseModel.id }.values.mapNotNull(AgnesImages::registeredEntry)
+            }
+        val duplicateModels = catalogueEntries.groupingBy { it.providerInstanceId to it.model.id }
             .eachCount().filterValues { it > 1 }.keys
-        return config.modelEntries.mapNotNull { entry ->
+        val duplicateEntryIds = config.modelEntries.groupingBy { it.id }.eachCount().filterValues { it > 1 }.keys
+        return catalogueEntries.mapNotNull { entry ->
             val instance = config.instances.find { it.id == entry.providerInstanceId } ?: return@mapNotNull null
             val identity = AutoModelStore.identity(entry, instance)
             val vendor = ProviderCatalogue.match(catalogue, instance)
@@ -56,15 +69,17 @@ internal object AutoImageSelection {
             val confirmedByRoute = AgnesImages.route(instance) && AgnesImages.model(id) != null
             val capabilities = AutoModelStore.capabilities(context, identity, if (confirmedByRoute) setOf("image_gen")
                 else vendor?.models?.get(id)?.capabilities.orEmpty())
-            val priceAllowed = if (agnes) confirmedByRoute && id in ImageGen.availableModels(context, instance) else allowUnverifiedCost
+            val priceAllowed = if (agnes) confirmedByRoute && id in ImageGen.availableModels(context, instance)
+                else allowUnverifiedCost && (!parallel || AgnesImages.model(id) == null)
             val supported = priceAllowed && instance.id !in duplicateProviders && (instance.id to id) !in duplicateModels &&
+                (!parallel || entry.id !in duplicateEntryIds) &&
                 instance.id in eligible && ImageModelRequests.supportsAutomaticGeneration(instance, id) &&
                 (instance.id != cloudId || id in menu)
             val candidate = AutoImageRouter.Candidate(
                 entryId = entry.id, providerId = instance.id, modelId = id,
                 enabled = instance.isEnabled, visible = !entry.isHidden,
                 // An explicitly keyless compatible endpoint is represented by an empty string.
-                credentialed = repo.usableApiKey(instance) != null,
+                credentialed = (if (agnes) repo.tamaOwnApiKey(instance) else repo.usableApiKey(instance)) != null,
                 supportedTransport = supported,
                 confirmedImageGeneration = Need.IMAGE_GENERATION in capabilities,
                 imageApproved = AutoModelStore.imageApproved(context, identity),
@@ -83,35 +98,55 @@ internal object AutoImageSelection {
         }
     }
 
+    private fun candidates(
+        context: Context, repo: ProviderRepository, freeOnly: Boolean, excluded: Set<Pair<String, String>>,
+    ): List<Entry> {
+        val candidates = entries(context, repo, freeOnly).filter { (it.instance.id to it.model.model.id) !in excluded }
+        if (!parallel) return candidates
+        val saved = ImageGen.savedChoice(context)
+        if (saved != null) {
+            // Only a payment refusal of this exact pick can open a second,
+            // already approved Agnes image on the same account. Never a paid sibling.
+            val afterPayment = freeOnly && (saved.instanceId to saved.model) in excluded &&
+                repo.tamaPaymentRefused(saved.instanceId, saved.model)
+            return candidates.filter {
+                it.instance.id == saved.instanceId &&
+                    (if (afterPayment) AgnesImages.route(it.instance) else it.model.model.id == saved.model)
+            }
+        }
+        return if (ImageGen.agnesAccounts(context).isNotEmpty()) candidates.filter { AgnesImages.route(it.instance) }
+            else candidates
+    }
+
     /** Does not make a network call or retain credentials. */
     fun choose(context: Context, freeOnly: Boolean = false, excluded: Set<Pair<String, String>> = emptySet()): Selection? {
         if (!AutoModelStore.enabled(context)) return null
         val app = context.applicationContext as? MinisApp ?: return null
         val repo = app.providerRepositoryOrNull ?: return null
-        val candidates = entries(context, repo, freeOnly).filter { (it.instance.id to it.model.model.id) !in excluded }
+        val revision = if (parallel) ImageGen.imageChoiceRevision() else null
+        val candidates = candidates(context, repo, freeOnly, excluded)
         val preferred = ImageGen.endpoint(context)
         val choice = AutoImageRouter.pick(candidates.map { it.candidate }, preferred?.instanceId, preferred?.model)
             as? AutoImageRouter.Choice.Selected ?: return null
         val selected = candidates.first { it.candidate.entryId == choice.candidate.entryId }
-        val review = if (com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test") {
+        if (revision != null && revision != ImageGen.imageChoiceRevision()) return null
+        val review = if (parallel) {
             AutoModelStore.review(context, selected.identity).takeIf { it.imageApproved } ?: return null
         } else null
         return Selection(selected.candidate.entryId, selected.instance.id, selected.model.model.id,
             selected.identity, review?.accountVersion ?: AutoModelRuntime.accountVersion(selected.instance.id),
-            review?.reviewVersion)
+            review?.reviewVersion, revision, freeOnly, excluded.toSet())
     }
 
     /** Re-read route, consent, capability, account generation and the current key before sending. */
     fun endpointIfStillAllowed(context: Context, selection: Selection): ImageGen.Endpoint? {
         if (!AutoModelStore.enabled(context)) return null
-        val parallel = com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test"
-        fun reviewCurrent(): Boolean = !parallel || AutoModelStore.imageReviewCurrent(
-            context, selection.identity, selection.accountVersion, selection.reviewVersion,
-        )
+        fun reviewCurrent(): Boolean = !parallel || (selection.slotRevision == ImageGen.imageChoiceRevision() &&
+            AutoModelStore.imageReviewCurrent(context, selection.identity, selection.accountVersion, selection.reviewVersion))
         if (!reviewCurrent()) return null
         val app = context.applicationContext as? MinisApp ?: return null
         val repo = app.providerRepositoryOrNull ?: return null
-        val candidates = entries(context, repo)
+        val candidates = candidates(context, repo, selection.freeOnly, selection.paymentRefused)
         val choice = AutoImageRouter.pick(candidates.map { it.candidate }, selection.providerId, selection.modelId)
             as? AutoImageRouter.Choice.Selected ?: return null
         if (choice.candidate.entryId != selection.entryId) return null
@@ -119,7 +154,8 @@ internal object AutoImageSelection {
         if (current.identity != selection.identity || current.instance.id != selection.providerId ||
             current.model.model.id != selection.modelId ||
             AutoModelRuntime.accountVersion(selection.providerId) != selection.accountVersion) return null
-        val key = repo.usableApiKey(current.instance) ?: return null
+        val key = (if (AgnesImages.account(current.instance)) repo.tamaOwnApiKey(current.instance)
+            else repo.usableApiKey(current.instance)) ?: return null
         val endpoint = ImageGen.Endpoint(current.instance.copy(), key, selection.modelId)
         if (!AutoModelStore.enabled(context) ||
             !(ImageGen.declaredFree(context, endpoint) || ai.tama.router.AutomaticCostGuard.permits(context)) ||

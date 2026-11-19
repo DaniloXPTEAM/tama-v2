@@ -31,7 +31,7 @@ internal object ImageToolPresentation {
             "no_confirmed_image_generator" -> Summary.NO_CONFIRMED_GENERATOR
             "no_verified_free_image_generator" -> Summary.NO_VERIFIED_FREE_GENERATOR
             "image_chat_only" -> Summary.CHAT_ONLY
-            "image_route_unconfirmed" -> Summary.ROUTE_UNCONFIRMED
+            "image_route_unconfirmed", "agnes_image_unavailable" -> Summary.ROUTE_UNCONFIRMED
             "image_key_missing" -> Summary.KEY_MISSING
             "image_nvidia_native" -> Summary.NVIDIA_NATIVE
             "image_endpoint_rejected" -> Summary.ENDPOINT_REJECTED

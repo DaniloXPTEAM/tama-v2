@@ -7,6 +7,7 @@ import ai.tama.media.AgnesImages
 import ai.tama.pricing.DocumentedFreeChat
 import com.openminis.app.BuildConfig
 import com.openminis.app.data.model.LLMModel
+import com.openminis.app.data.model.ModelEntry
 import io.github.nanomuse.cloud.OwnKeyPresets
 import com.openminis.app.data.model.ProviderCredential
 import com.openminis.app.data.model.ProviderInstance
@@ -43,7 +44,11 @@ class CustomProviderKeyInstrumentedTest {
             assertEquals("fixture-original", opened.usableApiKey(saved))
             // A chat-only /models catalogue cannot remove the reviewed image models.
             opened.replaceEntries(id, listOf(LLMModel("agnes-2.5-flash", "Agnes chat", "Agnes")))
+            // Old builds let adding a custom copy make the registered image ambiguous.
+            val bundled = opened.entriesFor(id).single { it.model.id == AgnesImages.DEFAULT }
+            opened.addEntry(ModelEntry(id, bundled.model.copy(displayName = "Fixture duplicate"), isCustom = true))
             val entries = opened.entriesFor(id)
+            assertEquals(bundled.id, entries.single { it.model.id == AgnesImages.DEFAULT }.id)
             assertEquals(AgnesImages.models.map { it.id }.toSet(), entries.filter { !it.model.isTextOutput }.map { it.model.id }.toSet())
             assertTrue(entries.any { opened.tamaIsChatModel(it, saved) })
             for (model in AgnesImages.models) {

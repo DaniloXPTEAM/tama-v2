@@ -4,6 +4,7 @@ import ai.tama.providers.ProviderEndpoints
 import com.openminis.app.BuildConfig
 import com.openminis.app.data.model.ImageEndpointMode
 import com.openminis.app.data.model.LLMModel
+import com.openminis.app.data.model.ModelEntry
 import com.openminis.app.data.model.ProviderCredential
 import com.openminis.app.data.model.ProviderInstance
 import com.openminis.app.data.model.ProviderType
@@ -34,6 +35,12 @@ internal object AgnesImages {
         instance.imageEndpointMode != ImageEndpointMode.chatCompletions
 
     fun model(id: String): Model? = models.firstOrNull { it.id == id }
+
+    // Old builds let Add custom model duplicate the bundled row. Resolve the
+    // exact same provider/model to its one bundled entry without deleting rows
+    // or moving a custom entry's visibility, capabilities, or approval.
+    fun registeredEntry(matching: List<ModelEntry>): ModelEntry? =
+        matching.singleOrNull() ?: matching.filterNot { it.isCustom }.singleOrNull()
 
     private val sizes = listOf(1024 to 1024, 768 to 1024, 1024 to 768, 576 to 1024, 1024 to 576)
     private val aspect = Regex("(?<![\\d:])([1-9][0-9]{0,3}):([1-9][0-9]{0,3})(?![\\d:])")

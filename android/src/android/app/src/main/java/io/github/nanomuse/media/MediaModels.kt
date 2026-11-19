@@ -73,7 +73,7 @@ object MediaModels {
     /** Agent image requests in automatic mode need their own exact-model consent. */
     internal fun agentImageEndpoint(context: Context): ImageGen.Endpoint? {
         if (!ai.tama.router.AutoModelStore.enabled(context)) return imageEndpoint(context)
-        val selected = AutoImageSelection.choose(context) ?: return null
+        val selected = AutoImageSelection.choose(context, freeOnly = !ai.tama.pricing.ModelCostGuard.permits()) ?: return null
         return AutoImageSelection.endpointIfStillAllowed(context, selected)
     }
 

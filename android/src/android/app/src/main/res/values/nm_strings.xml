@@ -1607,6 +1607,9 @@
     <string name="nm_agnes_free_image">Agnes Image %1$s Flash · Free</string>
     <string name="nm_agnes_free_source">Free — reported by the owner (not verified in provider documentation), %1$s.</string>
     <string name="nm_own_key_required">API key required</string>
+    <string name="nm_agnes_image_unavailable">Agnes images are unavailable for this selection. Check the key, the model ID, and https://apihub.agnes-ai.com/v1. No paid model was substituted.</string>
+    <string name="nm_agnes_use_image">Use for image generation</string>
+    <string name="nm_agnes_use_image_help">This model is already listed. Select it for image generation instead of adding a duplicate. Automatic mode still needs separate image approval.</string>
     <string name="nm_agnes_image_queue">The Agnes queue is full. Wait a bit before asking for a new image.</string>
     <string name="nm_agnes_image_limit">Agnes reported a usage limit. Check your account before asking again.</string>
     <string name="nm_agnes_image_payment">Agnes requires payment or credits for this model on this account. No paid route was opened.</string>

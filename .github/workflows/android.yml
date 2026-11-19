@@ -157,6 +157,7 @@ jobs:
             --tests 'ai.tama.media.AgnesImageApiTest' \
             --tests 'ai.tama.media.ImageShortcutRunnerTest' \
             --tests 'io.github.nanomuse.avatar.ImageModelRequestsTest' \
+            --tests 'ai.tama.media.AutoImageSelectionTest' \
             --tests 'ai.tama.providers.ChatModelKindTest' \
             --tests 'ai.tama.media.CliImageScopeTest' \
             --tests 'ai.tama.chat.SessionBindingWritesTest' \
@@ -181,6 +182,7 @@ jobs:
             --tests 'ai.tama.net.GroqHistoryPolicyTest' \
             --tests 'ai.tama.net.GroqNormalHistoryWireTest' \
             --tests 'io.github.nanomuse.avatar.ImageModelRequestsTest' \
+            --tests 'ai.tama.media.AutoImageSelectionTest' \
             --tests 'ai.tama.router.ModelRouteHistoryTest' \
             --tests 'ai.tama.providers.ProviderEndpointsTest' \
             --max-workers=1 --console=plain --no-daemon \

@@ -14,6 +14,7 @@ internal object CustomImageRoute {
         NEEDS_KEY("image_key_missing", R.string.nm_image_key_missing),
         NVIDIA_NATIVE("image_nvidia_native", R.string.nm_image_nvidia_native),
         ENDPOINT_REJECTED("image_endpoint_rejected", R.string.nm_image_endpoint_rejected),
+        AGNES_UNAVAILABLE("agnes_image_unavailable", R.string.nm_agnes_image_unavailable),
         AGNES_QUEUE("agnes_image_queue", R.string.nm_agnes_image_queue),
         AGNES_LIMIT("agnes_image_limit", R.string.nm_agnes_image_limit),
         AGNES_PAYMENT("agnes_image_payment", R.string.nm_agnes_image_payment),

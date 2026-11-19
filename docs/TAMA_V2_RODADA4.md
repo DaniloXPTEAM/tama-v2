@@ -26,3 +26,12 @@ A interface documentada de [FLUX.1 Schnell](https://docs.api.nvidia.com/nim/refe
 3. Peça **“crie uma imagem de um gato astronauta”**. Confira a imagem inline, a proporção, abrir em tela cheia e compartilhar. Feche e reabra o app e confira a chave mascarada e a escolha.
 
 Testes de contrato usam servidor simulado e chaves fictícias. A compilação da instrumentação de reabertura não substitui a execução em um aparelho. Instalação, interação no Poco, conta e fatura reais não foram verificadas na Arena.
+
+## Correção após o teste no Poco: seleção Agnes sem troca para pagos
+
+O dono mostrou uma geração concluída no Agnes Studio v4 com **Agnes Image 2.1 Flash**. No APK anterior, o seletor Automático só *preferia* a escolha de imagem: se ela não estivesse elegível ou aprovada, podia selecionar outro modelo já aprovado. E cadastrar de novo o ID semeado como modelo personalizado criava uma duplicata.
+
+- No **Tama V2 Test**, uma escolha em **Criar imagens** fixa o par conta/modelo. Se a escolha estiver sem chave, desativada, não aprovada ou indisponível, o pedido não troca para outro provedor. Sem escolha explícita, uma conta Agnes ativa mantém o padrão dentro da Agnes mesmo com ambas as permissões de custo ligadas. Uma escolha paga explícita válida não é alterada ao instalar a correção.
+- A exceção continua sendo uma recusa explícita de pagamento/crédito durante a tentativa Automática: somente outro modelo Agnes declarado grátis e já aprovado pode ser oferecido, com nova permissão; após uma escolha explícita, o alternativo também deve ser da mesma conta. Timeout, fila cheia e envio incerto não abrem alternativa.
+- **Adicionar modelo personalizado** reconhece os dois IDs do catálogo Agnes e oferece **Usar para criar imagens**, sem criar uma segunda entrada. Se já houver uma duplicata personalizada antiga, o app usa a única entrada original do catálogo quando inequívoca; não apaga a duplicata nem transfere aprovação. Em Automático, revise e aprove a entrada original, não a cópia personalizada.
+- Os testes automatizados usam chaves fictícias. O sucesso visto no Studio não comprova cobrança nem substitui o teste do APK no aparelho. No Poco, atualize por cima, selecione **Agnes Image 2.1 Flash** em **Criar imagens**, mantenha as permissões de custo desligadas, autorize a imagem e confira o modelo mostrado no pedido do gato astronauta.

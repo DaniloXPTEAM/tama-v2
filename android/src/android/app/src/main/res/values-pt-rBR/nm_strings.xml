@@ -1628,6 +1628,9 @@
     <string name="nm_agnes_free_image">Agnes Imagem %1$s Flash · Grátis</string>
     <string name="nm_agnes_free_source">Grátis — informado pelo dono (não verificado em documentação do provedor), %1$s.</string>
     <string name="nm_own_key_required">Chave de API necessária</string>
+    <string name="nm_agnes_image_unavailable">A imagem da Agnes está indisponível para esta escolha. Confira a chave, o ID do modelo e https://apihub.agnes-ai.com/v1. O app não trocou para um modelo pago.</string>
+    <string name="nm_agnes_use_image">Usar para criar imagens</string>
+    <string name="nm_agnes_use_image_help">O modelo já está cadastrado. Selecione-o para criar imagens em vez de adicionar uma duplicata. O modo Automático ainda precisa de autorização de imagem.</string>
     <string name="nm_agnes_image_queue">A fila da Agnes está cheia. Aguarde um pouco antes de pedir uma nova imagem.</string>
     <string name="nm_agnes_image_limit">A Agnes informou um limite de uso. Confira sua conta antes de pedir novamente.</string>
     <string name="nm_agnes_image_payment">A Agnes exige pagamento ou crédito para este modelo nesta conta. Nenhuma rota paga foi aberta.</string>

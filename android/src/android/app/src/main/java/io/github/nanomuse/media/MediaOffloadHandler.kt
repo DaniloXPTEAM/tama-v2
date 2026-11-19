@@ -187,10 +187,13 @@ class MediaOffloadHandler internal constructor(
                 if (restricted && !hasDeclaredFree) {
                     if (fallback) return imageRouteError(CustomImageRoute.Problem.AGNES_PAYMENT)
                     val problem = images.selectionProblem()
-                    return if (problem == CustomImageRoute.Problem.AGNES_PAYMENT || problem == CustomImageRoute.Problem.NEEDS_KEY)
-                        imageRouteError(problem) else noFreeImage()
+                    return when (problem) {
+                        CustomImageRoute.Problem.AGNES_PAYMENT, CustomImageRoute.Problem.NEEDS_KEY,
+                        CustomImageRoute.Problem.AGNES_UNAVAILABLE -> imageRouteError(problem)
+                        else -> noFreeImage()
+                    }
                 }
-                if (parallel && !(automatic && hasDeclaredFree)) images.selectionProblem()?.let { return imageRouteError(it) }
+                if (parallel && !fallback) images.selectionProblem()?.let { return imageRouteError(it) }
                 if (!costStillCurrent() && !hasDeclaredFree) return modelCostError("image")
                 if (automatic && !images.automaticCostAllowed() && !hasDeclaredFree) return automaticImageError(
                     "automatic_image_cost_unverified", com.openminis.app.R.string.nm_auto_reason_unverified_cost)
@@ -391,7 +394,8 @@ class MediaOffloadHandler internal constructor(
         io.github.nanomuse.net.ProviderReach.redactedText(value, listOf(apiKey), 128)
 
     private fun imageRouteError(problem: CustomImageRoute.Problem): NativeOffloadResult = NativeOffloadResult(
-        if (problem == CustomImageRoute.Problem.ENDPOINT_REJECTED || problem.code.startsWith("agnes_image_")) 1 else 3,
+        if (problem == CustomImageRoute.Problem.ENDPOINT_REJECTED ||
+            (problem.code.startsWith("agnes_image_") && problem != CustomImageRoute.Problem.AGNES_UNAVAILABLE)) 1 else 3,
         JSONObject().put("ok", false).put("error", problem.code).put("message", context.getString(problem.message))
             .put("settings", MediaModels.DEEP_LINK)
             .put("tell_user", ImageFailureInstruction.forCode(problem.code)).toString(2) + "\n",

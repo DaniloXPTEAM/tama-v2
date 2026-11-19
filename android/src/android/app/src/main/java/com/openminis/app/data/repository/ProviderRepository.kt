@@ -1437,7 +1437,9 @@ class ProviderRepository(private val context: Context) {
     fun addEntry(entry: ModelEntry): Unit = synchronized(configLock) {
         ensureConfigLoaded()
         val config = workingCopy()
-        if (!entry.isCustom) {
+        val agnesImage = AgnesImages.model(entry.baseModel.id) != null &&
+            config.instances.singleOrNull { it.id == entry.providerInstanceId }?.let(AgnesImages::account) == true
+        if (!entry.isCustom || agnesImage) {
             val exists = config.modelEntries.any {
                 it.providerInstanceId == entry.providerInstanceId && it.baseModel.id == entry.baseModel.id
             }
