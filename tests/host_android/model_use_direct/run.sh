@@ -129,5 +129,6 @@ kotlinc -nowarn -cp "$CP" -include-runtime -d "$OUT/model-use-host.jar" \
     "$TEST/ai/tama/net/ModelUseAttemptTrackerTest.kt" \
     "$TEST/ai/tama/pricing/ModelCostGuardTest.kt" \
     "$TEST/ai/tama/router/AutoModelStoreTest.kt"
-java -cp "$OUT/model-use-host.jar:$CP" RunnerKt parallel
-java -cp "$OUT/model-use-host.jar:$CP" RunnerKt normal
+# Match Gradle Test's JVM assertions (coroutine stack recovery can copy exceptions).
+java -ea -cp "$OUT/model-use-host.jar:$CP" RunnerKt parallel
+java -ea -cp "$OUT/model-use-host.jar:$CP" RunnerKt normal

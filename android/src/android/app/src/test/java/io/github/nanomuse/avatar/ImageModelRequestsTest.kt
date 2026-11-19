@@ -397,8 +397,12 @@ class ImageModelRequestsTest {
         val server = MockWebServer()
         server.start()
         try {
-            val failure = ai.tama.media.ImageDispatch.AuthorizationChanged()
+            val failure = ImageDispatch.AuthorizationChanged()
             val preflight: () -> Unit = { throw failure }
+            // Crossing an IO coroutine can recover the stack on a copy of this exception.
+            fun assertBlocked(actual: Throwable?) {
+                assertTrue(actual is ImageDispatch.AuthorizationChanged && (actual === failure || actual.cause === failure))
+            }
             val openai = OpenAIProvider("fixture-key", LLMModel("image", "Image", "openAI"),
                 server.url("/v1").toString().trimEnd('/'))
             val gemini = GeminiProvider("fixture-key", LLMModel("image", "Image", "gemini"),
@@ -406,13 +410,13 @@ class ImageModelRequestsTest {
             val dash = ImageGen.Endpoint(instance(ProviderType.openAI).copy(
                 customBaseURL = server.url("/dashscope/compatible-mode/v1").toString().trimEnd('/'),
             ), "fixture-key", "qwen-image-3.0")
-            assertSame(failure, runCatching {
+            assertBlocked(runCatching {
                 ImageModelRequests.request(openai, "Draw", allowFormatRetry = false, beforeRequest = preflight)
             }.exceptionOrNull())
-            assertSame(failure, runCatching {
+            assertBlocked(runCatching {
                 ImageModelRequests.request(gemini, "Draw", allowFormatRetry = false, beforeRequest = preflight)
             }.exceptionOrNull())
-            assertSame(failure, runCatching {
+            assertBlocked(runCatching {
                 ImageGen.generate(Mockito.mock(Context::class.java), dash, "Draw", allowFormatRetry = false, beforeRequest = preflight)
             }.exceptionOrNull())
             assertEquals(0, server.requestCount)

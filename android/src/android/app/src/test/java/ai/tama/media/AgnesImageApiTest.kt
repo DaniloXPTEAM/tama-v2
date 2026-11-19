@@ -244,7 +244,9 @@ class AgnesImageApiTest {
                 val failure = runCatching { client(server).request(key, AgnesImages.DEFAULT, "Edit", "1024x1024", listOf(png())) {
                     if (++attempts == 2) throw changed
                 } }.exceptionOrNull()
-                assertSame(changed, failure)
+                // With JVM assertions on, coroutine stack recovery may copy the exception.
+                assertTrue(failure === changed || (failure is IllegalStateException && failure.cause === changed))
+                assertEquals(2, attempts)
                 assertEquals(1, server.requestCount)
             }
         }
