@@ -244,7 +244,7 @@ class ImageModelRequestsTest {
             ImageModelRequests.request(provider, "Draw", allowFormatRetry = false)
             val wire = requireNotNull(server.takeRequest(5, TimeUnit.SECONDS))
             assertEquals("Bearer fixture-key", wire.getHeader("Authorization"))
-                val body = JSONObject(wire.body.readUtf8())
+            val body = JSONObject(wire.body.readUtf8())
             assertEquals(model, body.getString("model"))
             assertEquals("b64_json", body.getString("response_format"))
             assertEquals(1, server.requestCount)

@@ -1,12 +1,14 @@
 package ai.tama.media
 
 import ai.tama.providers.ProviderEndpoints
-import java.awt.image.BufferedImage
 import java.io.ByteArrayInputStream
+import java.io.DataInputStream
+import java.io.DataOutputStream
 import java.io.ByteArrayOutputStream
 import java.util.Base64
 import java.util.concurrent.TimeUnit
-import javax.imageio.ImageIO
+import java.util.zip.CRC32
+import java.util.zip.DeflaterOutputStream
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.runBlocking
@@ -35,9 +37,41 @@ class AgnesImageApiTest {
         return AgnesImageApi(http, timeoutMs)
     }
 
-    private fun png(w: Int = 32, h: Int = 32): ByteArray = ByteArrayOutputStream().also {
-        ImageIO.write(BufferedImage(w, h, BufferedImage.TYPE_INT_RGB), "png", it)
+    // Android's JVM test compilation does not expose java.desktop. Make a
+    // standard one-channel PNG with the actual dimensions instead of using AWT.
+    private fun png(w: Int = 32, h: Int = 32): ByteArray = ByteArrayOutputStream().also { bytes ->
+        DataOutputStream(bytes).use { png ->
+            fun chunk(name: String, data: ByteArray) {
+                val type = name.toByteArray(Charsets.US_ASCII)
+                val crc = CRC32().apply { update(type); update(data) }
+                png.writeInt(data.size)
+                png.write(type)
+                png.write(data)
+                png.writeInt(crc.value.toInt())
+            }
+            png.writeLong(0x89504E470D0A1A0AuL.toLong())
+            val header = ByteArrayOutputStream().also { out ->
+                DataOutputStream(out).use { ihdr ->
+                    ihdr.writeInt(w)
+                    ihdr.writeInt(h)
+                    ihdr.write(byteArrayOf(8, 0, 0, 0, 0))
+                }
+            }.toByteArray()
+            val pixels = ByteArrayOutputStream().also { out ->
+                DeflaterOutputStream(out).use { it.write(ByteArray((w + 1) * h)) }
+            }.toByteArray()
+            chunk("IHDR", header)
+            chunk("IDAT", pixels)
+            chunk("IEND", byteArrayOf())
+        }
     }.toByteArray()
+
+    private fun ratio(bytes: ByteArray): String = DataInputStream(ByteArrayInputStream(bytes)).use { png ->
+        assertEquals(0x89504E470D0A1A0AuL.toLong(), png.readLong())
+        assertEquals(13, png.readInt())
+        assertEquals(0x49484452, png.readInt()) // IHDR
+        AgnesImages.aspectRatio(png.readInt(), png.readInt())
+    }
 
     private fun b64(bytes: ByteArray) = Base64.getEncoder().encodeToString(bytes)
     private fun image(bytes: ByteArray = png()) = MockResponse().setBody("""{"data":[{"b64_json":"${b64(bytes)}"}]}""")
@@ -66,8 +100,7 @@ class AgnesImageApiTest {
                 assertEquals("Bearer $key", request.getHeader("Authorization"))
                 assertFalse(body.toString().contains(key))
                 assertArrayEquals(actual, bytes)
-                val decoded = ImageIO.read(ByteArrayInputStream(bytes))
-                assertEquals(aspects[i], AgnesImages.aspectRatio(decoded.width, decoded.height))
+                assertEquals(aspects[i], ratio(bytes))
             }
             assertEquals(samples.size, server.requestCount)
             assertEquals("1024x576", AgnesImages.sizeFromPrompt("crie uma imagem de um gato em 21:9"))
@@ -83,8 +116,7 @@ class AgnesImageApiTest {
             var checks = 0
             val bytes = client(server).request(key, AgnesImages.DEFAULT, prompt, "1024x1024") { checks++ }
             assertArrayEquals(picture, bytes)
-            val decoded = ImageIO.read(ByteArrayInputStream(bytes))
-            assertEquals("4:3", AgnesImages.aspectRatio(decoded.width, decoded.height))
+            assertEquals("4:3", ratio(bytes))
             assertEquals("POST", next(server).method)
             val download = next(server)
             assertEquals("GET", download.method)
