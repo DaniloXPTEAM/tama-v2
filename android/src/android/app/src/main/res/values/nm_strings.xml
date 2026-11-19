@@ -1471,6 +1471,7 @@
     <string name="nm_auto_failure_quota">quota exhausted</string>
     <string name="nm_auto_failure_credit">credit unavailable</string>
     <string name="nm_auto_failure_auth">authentication rejected</string>
+    <string name="nm_auto_failure_forbidden">access denied</string>
     <string name="nm_auto_failure_server">provider error</string>
     <string name="nm_auto_failure_network">connection error</string>
     <string name="nm_auto_failure_size">request too large</string>

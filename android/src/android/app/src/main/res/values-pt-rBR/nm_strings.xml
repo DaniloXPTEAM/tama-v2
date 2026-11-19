@@ -1492,6 +1492,7 @@
     <string name="nm_auto_failure_quota">cota esgotada</string>
     <string name="nm_auto_failure_credit">crédito indisponível</string>
     <string name="nm_auto_failure_auth">autenticação recusada</string>
+    <string name="nm_auto_failure_forbidden">acesso recusado</string>
     <string name="nm_auto_failure_server">erro do provedor</string>
     <string name="nm_auto_failure_network">erro de conexão</string>
     <string name="nm_auto_failure_size">pedido grande demais</string>

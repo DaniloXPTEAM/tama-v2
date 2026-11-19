@@ -8202,7 +8202,7 @@ class ChatViewModel(
         }
     }
 
-    private class LocalAutoNoCandidate(val explanation: String) : Exception()
+    private class LocalAutoNoCandidate(val explanation: String) : Exception(explanation)
 
     // nanoMuse: carry the diagnostic on the exception, including through wrapped Flow errors.
     private fun setInlineError(error: Throwable) {
@@ -9452,6 +9452,8 @@ class ChatViewModel(
         var nmAutoClientAccountVersion: Long? = null
         var nmAutoNewUserTurn = true
         val nmAutoLocalBlocks = mutableMapOf<String, String>()
+        val nmAutoRecheckedAccounts = mutableSetOf<String>()
+        val nmFailedFreeRoutes = mutableSetOf<Pair<String, String>>()
         class AutoDispatchBlocked(val entryId: String, val explanation: String) : Exception(explanation)
 
         data class AutoChoice(
@@ -9476,10 +9478,13 @@ class ChatViewModel(
         }
         // nanoMuse: only the main chat transport can spend this scoped proof.
         // All other automatic call sites retain the separate cost guard.
-        fun nmAutoChatCostAllowed(entry: ModelEntry?, instance: ProviderInstance?): Boolean =
-            (tamaV2Test && instance != null && entry != null &&
-                providerRepository.tamaDocumentedChatAllowed(instance, entry.model.id)) ||
-                ai.tama.router.AutomaticCostGuard.permits(context)
+        fun nmAutoChatCostAllowed(entry: ModelEntry?, instance: ProviderInstance?): Boolean {
+            val automatic = ai.tama.router.AutomaticCostGuard.permits(context)
+            if (!tamaV2Test || instance == null || entry == null || providerRepository.tamaOwnApiKey(instance) == null) return automatic
+            return providerRepository.tamaDocumentedChatAllowed(instance, entry.model.id) ||
+                (automatic && ai.tama.pricing.ModelCostGuard.permits() && !nmRequireFree() &&
+                    !providerRepository.tamaFreeChatOnly(instance))
+        }
 
         fun nmAutoCapabilities(entry: ModelEntry, instance: ProviderInstance): Set<Need> {
             val vendor = io.github.nanomuse.cloud.ProviderCatalogue.match(
@@ -9677,6 +9682,7 @@ class ChatViewModel(
             ModelHealth.Failure.NO_CREDIT -> R.string.nm_auto_failure_credit
             ModelHealth.Failure.KEY_SPEND_LIMIT -> R.string.nm_reach_key_zero_title
             ModelHealth.Failure.AUTH -> R.string.nm_auto_failure_auth
+            ModelHealth.Failure.FORBIDDEN -> R.string.nm_auto_failure_forbidden
             ModelHealth.Failure.SERVER -> R.string.nm_auto_failure_server
             ModelHealth.Failure.NETWORK -> R.string.nm_auto_failure_network
             ModelHealth.Failure.REQUEST_TOO_LARGE -> R.string.nm_auto_failure_size
@@ -9700,8 +9706,8 @@ class ChatViewModel(
                 if (tamaV2Test && nmOwnKeyTurn) "• $reason" else "• ${labels[rejected.entryId] ?: rejected.entryId}: $reason"
             }
             if (tamaV2Test && nmOwnKeyTurn) return LocalAutoNoCandidate(
-                (listOf(context.getString(R.string.nm_auto_none)) +
-                    details.distinct().ifEmpty { listOf(context.getString(R.string.nm_auto_no_routes)) }).joinToString("\n"),
+                (listOf(context.getString(R.string.nm_auto_none)) + details.distinct() +
+                    context.getString(R.string.nm_auto_no_routes)).joinToString("\n"),
             )
             return LLMError.ProviderError((listOf(context.getString(R.string.nm_auto_none)) + details).joinToString("\n"))
         }
@@ -9715,11 +9721,34 @@ class ChatViewModel(
                 val choices = nmAutoCandidates().filter {
                     largerThanWindow == null || ai.tama.router.LargerContext.eligible(largerThanWindow, it.candidate.contextLimit)
                 }
-                when (val selection = turnState.pick(choices.map { it.candidate }, nmAutoNeeds(messages), stickyEntryId) { candidate, snapshot ->
+                for (choice in choices) {
+                    if ((choice.instance.id to choice.model.id) in nmFailedFreeRoutes) turnState.exclude(choice.entry.id)
+                }
+                val needs = nmAutoNeeds(messages)
+                when (val selection = turnState.pick(choices.map { it.candidate }, needs, stickyEntryId) { candidate, snapshot ->
                     nmAutoFit(choices.first { it.candidate === candidate }, messages, snapshot)
                 }) {
-                    is ModelRouter.Choice.None -> if (largerThanWindow != null) throw NoLargerContext()
-                        else throw nmAutoNoCandidate(choices, selection)
+                    is ModelRouter.Choice.None -> {
+                        if (largerThanWindow != null) throw NoLargerContext()
+                        // nanoMuse: other approved accounts may lack ephemeral proof after reopen.
+                        // Recover only if no approved route is ready. No imports or chat calls here.
+                        val costRejected = selection.rejected.filter {
+                            it.reason == ModelRouter.Reason.UNVERIFIED_COST || it.reason == ModelRouter.Reason.NO_CREDENTIAL
+                        }.mapTo(hashSetOf()) { it.entryId }
+                        val recheck = if (tamaV2Test && nmOwnKeyTurn) choices.firstOrNull {
+                            it.entry.id in costRejected && it.candidate.automaticApproved && it.instance.isEnabled &&
+                                !it.entry.isHidden && it.candidate.capabilities.containsAll(needs) &&
+                                providerRepository.tamaOwnApiKey(it.instance) != null &&
+                                nmOwnKeyRecipientAllowed(it.instance) && providerRepository.tamaNeedsFreeChatEvidence(it.instance, it.model.id) &&
+                                nmAutoRecheckedAccounts.add(it.instance.id)
+                        } else null
+                        if (recheck != null) {
+                            providerRepository.tamaEnsureFreeChatEvidence(recheck.instance.id, recheck.model.id,
+                                recheck.accountVersion, AutoModelStore.historyFingerprint(context, recheck.instance))
+                            continue
+                        }
+                        throw nmAutoNoCandidate(choices, selection)
+                    }
                     is ModelRouter.Choice.Selected -> {
                         val selected = choices.first { it.entry.id == selection.candidate.entryId }
                         val why = when (val cause = ai.tama.router.AutoSwitchReason.forSwitch(
@@ -10276,6 +10305,7 @@ class ChatViewModel(
                     var nmTicket: ModelHealth.Ticket? = null
                     var nmDispatchStarted = false
                     var nmDispatchedFreeChat = false
+                    var nmReceivedFreeChatChunk = false
                     var nmMeasuredInput = 0
                     var nmMeasuredOutput = 0
                     var nmDispatchAt = 0L
@@ -10588,6 +10618,7 @@ class ChatViewModel(
                             ai.tama.media.ImageToolStream.filter(sourceStream, context.getString(R.string.nm_image_raw_tool_text))
                         else sourceStream
                         visibleStream.collect { chunk ->
+                    if (nmDispatchedFreeChat) nmReceivedFreeChatChunk = true
                     // [T-STALL-DIAG] Mark first byte back from the provider and log
                     // the time-to-first-chunk once per turn.
                     if (firstChunkSeen.compareAndSet(false, true)) {
@@ -11161,7 +11192,8 @@ class ChatViewModel(
                         if (recipientBlocked && !nmOwnKeyTurn) throw actual
                         val decision = if (nmAutoTurn != null || nmFallbackCommit != null)
                             ai.tama.router.AutoModelFailure.classify(actual, nmRequestTools.isNotEmpty(),
-                                switchOnAmbiguousAccessDenied = !tamaV2Test, ownKeyTurn = nmOwnKeyTurn)
+                                switchOnAmbiguousAccessDenied = !tamaV2Test, ownKeyTurn = nmOwnKeyTurn,
+                                ownKeyAutomatic = nmOwnKeyTurn && nmAutoTurn != null)
                         else null
                         if (nmAutoTurn != null && !AutoModelStore.enabled(context)) throw actual
                         val isRateLimit = actual is com.openminis.app.data.model.LLMError.RateLimited
@@ -11176,9 +11208,16 @@ class ChatViewModel(
                             nmLearnZeroSpendLimit(currentProvider, nmDispatchAccountVersion, reach)) {
                             nmForceFreeRemainder = true
                         }
-                        // A failed scoped send is terminal: recovery must not replay it,
-                        // change routes, or promote it into a request that can incur a charge.
-                        if (nmDispatchedFreeChat) throw actual
+                        // nanoMuse: Manual still never replays scoped chat. Auto can try
+                        // another approved route only before receiving output, and only for
+                        // a classified failure. Cost protection remains on for this turn.
+                        if (nmDispatchedFreeChat) {
+                            if (!ai.tama.router.AutoModelFailure.canSwitchFreeChat(decision,
+                                    nmOwnKeyTurn && nmAutoTurn != null, nmReceivedFreeChatChunk)) throw actual
+                            nmForceFreeRemainder = true
+                            // An alias of the same saved account/model is not an alternate route.
+                            nmAutoCandidate?.let { nmFailedFreeRoutes.add(it.providerId to currentProvider.model.id) }
+                        }
                         val freeOnlyBlocked = actual is ai.tama.pricing.FreeModelList.Blocked
                         val is5xx = reach?.httpStatus?.let { it in 500..599 } ?: (
                             actual is com.openminis.app.data.model.LLMError.ProviderError &&
@@ -11210,7 +11249,7 @@ class ChatViewModel(
                         val ownInputOverflow = nmOwnKeyTurn && !recipientBlocked &&
                             ai.tama.router.LargerContext.serverRejected(reach?.httpStatus, reach?.originalMessage)
                         var recoveredContext = false
-                        if (smallerProfile == null && !contextOverflowRetried &&
+                        if (!nmDispatchedFreeChat && smallerProfile == null && !contextOverflowRetried &&
                             (if (nmOwnKeyTurn) ownInputOverflow else isContextTooLargeError(actual))) {
                             contextOverflowRetried = true
                             val before = measureRawTokens()
@@ -11224,9 +11263,9 @@ class ChatViewModel(
                             ai.tama.router.GroupFallback.canSwitch(decision, sizeRejection)
                         val rateDelay = if (isRateLimit && nmAutoTurn == null && !switchBeforeRetry)
                             ai.tama.net.ProviderRecovery.rateDelay(reach, rateRetried) else null
-                        if (smallerProfile != null ||
+                        if (!nmDispatchedFreeChat && (smallerProfile != null ||
                             (((isTransient && nmAutoTurn == null && !switchBeforeRetry) || recoveredContext || outputRetry != null || rateDelay != null) &&
-                                retryAttempt < AUTO_RETRY_DELAYS_SEC.size)) {
+                                retryAttempt < AUTO_RETRY_DELAYS_SEC.size))) {
                             if (smallerProfile != null) {
                                 nmInstall(smallerProfile)
                                 preparedMessages = null // recalculate the context view for this smaller shape
@@ -11962,6 +12001,8 @@ class ChatViewModel(
                     nmWarnedWithoutTools = false
                     nmAutoTurn?.reset()
                     nmAutoLocalBlocks.clear()
+                    nmFailedFreeRoutes.clear()
+                    nmAutoRecheckedAccounts.clear()
                     nmAutoNewUserTurn = true
                     preparedMessages = null
                     // Switch loop-scope state to the new bubble. Subsequent

@@ -10,6 +10,12 @@ import ai.tama.pricing.ModelCostGuard
 import ai.tama.pricing.NvidiaChatPricing
 import ai.tama.providers.KeyProbe
 import ai.tama.providers.KeyProbePlan
+import ai.tama.router.AutoModelFailure
+import ai.tama.router.AutoModelTurn
+import ai.tama.router.ModelHealth
+import ai.tama.router.ModelRouter
+import ai.tama.router.Need
+import ai.tama.router.Profile
 import ai.tama.router.AutoModelStore
 import ai.tama.router.AutomaticCostGuard
 import com.openminis.app.data.model.LLMError
@@ -29,6 +35,7 @@ import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import okhttp3.mockwebserver.QueueDispatcher
+import okhttp3.mockwebserver.SocketPolicy
 import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Before
@@ -225,4 +232,68 @@ class FreeChatCompletionsWireTest {
             }
         }
     }
+
+    @Test fun automaticFreeChatUsesOnlyAnotherApprovedFreeRouteAfterWireFailures() = runBlocking {
+        val route = Route.GROQ
+        val alternative = "openai/gpt-oss-20b"
+        val catalogue = FreeChatCatalogue.Groq(now, setOf(groq, alternative))
+        val models = listOf(groq, "fixture/paid", alternative)
+        for ((code, reason) in mapOf(429 to ModelHealth.Failure.RATE_LIMIT, 403 to ModelHealth.Failure.FORBIDDEN,
+                503 to ModelHealth.Failure.SERVER, 0 to ModelHealth.Failure.NETWORK)) {
+            server().use { server ->
+                val client = local(server, route.base).newBuilder().readTimeout(250, TimeUnit.MILLISECONDS).build()
+                val turn = AutoModelTurn(ModelHealth { 1_000 }, modelScopedRateLimits = true)
+                val candidates = models.map { id -> ModelRouter.Candidate(id, "same-account", setOf(Need.CHAT),
+                    Profile.LEAN, 10, 32, automaticApproved = true,
+                    automaticCostAllowed = catalogue.status(id, now) == Status.FREE) }
+                fun pick() = turn.pick(candidates, setOf(Need.CHAT), null)
+                suspend fun send(id: String) = provider(route, id, client).streamMessage(history, null, 32)
+                    .flowOn(DocumentedChatDispatch(id, key, route) { catalogue.status(id, now) == Status.FREE }).toList()
+                assertEquals(groq, (pick() as ModelRouter.Choice.Selected).candidate.entryId)
+                server.enqueue(if (code == 0) MockResponse().setSocketPolicy(SocketPolicy.NO_RESPONSE)
+                    else MockResponse().setResponseCode(code).setBody("""{"error":{"message":"fixture access denied"}}"""))
+                val thrown = checkNotNull(runCatching { send(groq) }.exceptionOrNull())
+                val failure = generateSequence(thrown) { it.cause }.firstOrNull {
+                    it is LLMError || it is java.net.SocketTimeoutException
+                } ?: thrown
+                val decision = AutoModelFailure.classify(failure, false, switchOnAmbiguousAccessDenied = false,
+                    ownKeyTurn = true, ownKeyAutomatic = true) as AutoModelFailure.Decision.Cooldown
+                assertEquals(reason, decision.reason)
+                assertTrue(AutoModelFailure.canSwitchFreeChat(decision, ownKeyAutomatic = true, receivedChunk = false))
+                assertFalse(AutoModelFailure.canSwitchFreeChat(decision, ownKeyAutomatic = false, receivedChunk = false))
+                assertFalse(AutoModelFailure.canSwitchFreeChat(decision, ownKeyAutomatic = true, receivedChunk = true))
+                turn.fail(groq, "same-account", decision.reason, decision.retryAfterSeconds, decision.retryAfterPresent)
+                assertEquals(alternative, (pick() as ModelRouter.Choice.Selected).candidate.entryId)
+                val none = turn.pick(candidates.dropLast(1), setOf(Need.CHAT), null) as ModelRouter.Choice.None
+                assertEquals(setOf(ModelRouter.Reason.EXCLUDED, ModelRouter.Reason.UNVERIFIED_COST), none.rejected.map { it.reason }.toSet())
+                server.enqueue(answer())
+                assertEquals("OK", send(alternative).filterIsInstance<LLMStreamChunk.Text>().joinToString("") { it.text })
+                assertEquals(2, server.requestCount)
+                val requests = List(2) { JSONObject(checkNotNull(server.takeRequest(3, TimeUnit.SECONDS)).body.readUtf8()) }
+                assertEquals(listOf(groq, alternative), requests.map { it.getString("model") })
+                assertEquals(requests[0].getJSONArray("messages").toString(), requests[1].getJSONArray("messages").toString())
+            }
+        }
+    }
+
+    @Test fun real403SafetyOrSseDenialCannotTriggerAutomaticFreeFallback() = runBlocking {
+        val route = Route.GROQ
+        server().use { server ->
+            val responses = listOf(
+                MockResponse().setResponseCode(403).setBody("""{"error":{"code":"content_policy_violation","message":"Access denied"}}"""),
+                MockResponse().setHeader("Content-Type", "text/event-stream")
+                    .setBody("data: {\"error\":{\"code\":403,\"message\":\"Access denied\"}}\n\n"),
+            )
+            responses.forEach { response ->
+                server.enqueue(response)
+                val error = runCatching { provider(route, groq, local(server, route.base)).streamMessage(history, null, 32)
+                    .flowOn(DocumentedChatDispatch(groq, key, route) { true }).toList() }.exceptionOrNull()
+                val failure = generateSequence(error) { it.cause }.filterIsInstance<LLMError>().first()
+                assertNull(AutoModelFailure.classify(failure, false, switchOnAmbiguousAccessDenied = false,
+                    ownKeyTurn = true, ownKeyAutomatic = true))
+            }
+            assertEquals(2, server.requestCount)
+        }
+    }
+
 }

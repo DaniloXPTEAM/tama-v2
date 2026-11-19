@@ -2626,13 +2626,18 @@ class ProviderRepository(private val context: Context) {
         return result
     }
 
+    internal fun tamaNeedsFreeChatEvidence(live: ProviderInstance, modelId: String): Boolean {
+        val route = tamaFreeRoute(live)
+        return (route == DocumentedFreeChat.Route.OPENROUTER ||
+            (route == DocumentedFreeChat.Route.GROQ && DocumentedFreeChat.groqOffers(modelId))) &&
+            !tamaPaymentRefused(live.id, modelId) && nmCurrentCatalogue(live, System.currentTimeMillis()) == null
+    }
+
     /** Reopen an expired/missing proof for the selected client. Read-only: no entries or settings change. */
     internal suspend fun tamaEnsureFreeChatEvidence(instanceId: String, modelId: String, account: Long?, route: String?) {
         val live = instance(instanceId) ?: return
         val freeRoute = tamaFreeRoute(live)
-        if (freeRoute != DocumentedFreeChat.Route.OPENROUTER &&
-            (freeRoute != DocumentedFreeChat.Route.GROQ || !DocumentedFreeChat.groqOffers(modelId))) return
-        if (tamaPaymentRefused(instanceId, modelId) || nmCurrentCatalogue(live, System.currentTimeMillis()) != null) return
+        if (!tamaNeedsFreeChatEvidence(live, modelId)) return
         val key = nmOAuthKeySnapshot(instanceId)
         if (key.version != account || AutoModelStore.historyFingerprint(context, live) != route) return
         if (freeRoute == DocumentedFreeChat.Route.GROQ) tamaCheckSavedGroqKey(live, key)

@@ -19,8 +19,23 @@ class P01ChatWiring(unittest.TestCase):
         self.assertNotIn("setAllowUnverifiedAutomaticCost", dispatch)
         self.assertEqual(1, chat.count("flowOn(freeChat)"))
         recovery = chat.split("val actual = unwrapFlowException(e)", 1)[1]
-        self.assertLess(recovery.index("tamaRecordPaymentRefusal("), recovery.index("if (nmDispatchedFreeChat) throw actual"))
-        self.assertLess(recovery.index("if (nmDispatchedFreeChat) throw actual"), recovery.index("val isTransient ="))
+        self.assertLess(recovery.index("tamaRecordPaymentRefusal("), recovery.index("if (nmDispatchedFreeChat) {"))
+        self.assertLess(recovery.index("if (nmDispatchedFreeChat) {"), recovery.index("val isTransient ="))
+        free_failure = recovery.split("if (nmDispatchedFreeChat) {", 1)[1].split("val freeOnlyBlocked", 1)[0]
+        self.assertIn("canSwitchFreeChat(decision,", free_failure)
+        self.assertIn("nmOwnKeyTurn && nmAutoTurn != null, nmReceivedFreeChatChunk", free_failure)
+        self.assertIn("nmForceFreeRemainder = true", free_failure)
+        self.assertIn("if (!nmDispatchedFreeChat && (smallerProfile", recovery)
+
+    def test_automatic_none_rechecks_only_approved_accounts_and_explains_exhaustion(self):
+        chat = (MAIN / "com/openminis/app/ui/chat/ChatViewModel.kt").read_text()
+        select = chat.split("suspend fun nmAutoSelect", 1)[1].split("suspend fun nmAutoActivate", 1)[0]
+        for gate in ("it.candidate.automaticApproved", "nmOwnKeyRecipientAllowed(it.instance)",
+                     "nmAutoRecheckedAccounts.add(it.instance.id)",
+                     "tamaEnsureFreeChatEvidence(", "throw nmAutoNoCandidate(choices, selection)"):
+            self.assertIn(gate, select)
+        self.assertIn("actual is LocalAutoNoCandidate -> actual.explanation", chat)
+        self.assertIn("context.getString(R.string.nm_auto_no_routes)).joinToString", chat)
 
     def test_price_verification_is_not_import_permission(self):
         repo = (MAIN / "com/openminis/app/data/repository/ProviderRepository.kt").read_text()

@@ -8,7 +8,7 @@ package ai.tama.router
  * The supplied clock must be monotonic; rollback is clamped for additional safety.
  */
 class ModelHealth(private val clockMillis: () -> Long) {
-    enum class Failure { RATE_LIMIT, QUOTA, NO_CREDIT, KEY_SPEND_LIMIT, AUTH, SERVER, NETWORK, REQUEST_TOO_LARGE, MODEL_UNAVAILABLE, SPEND_LIMIT }
+    enum class Failure { RATE_LIMIT, QUOTA, NO_CREDIT, KEY_SPEND_LIMIT, AUTH, SERVER, NETWORK, REQUEST_TOO_LARGE, MODEL_UNAVAILABLE, SPEND_LIMIT, FORBIDDEN }
     enum class DeadlineSource { RETRY_AFTER, HEURISTIC, UNKNOWN }
 
     data class Cooldown(val reason: Failure, val untilMillis: Long?, val source: DeadlineSource)
@@ -204,7 +204,7 @@ class ModelHealth(private val clockMillis: () -> Long) {
                 Failure.SERVER -> 30_000L
                 Failure.NETWORK -> 15_000L
                 Failure.REQUEST_TOO_LARGE -> 30_000L
-                Failure.MODEL_UNAVAILABLE -> 60_000L
+                Failure.MODEL_UNAVAILABLE, Failure.FORBIDDEN -> 60_000L
                 else -> error("account blocks do not have a guessed deadline")
             }), DeadlineSource.HEURISTIC)
         }
