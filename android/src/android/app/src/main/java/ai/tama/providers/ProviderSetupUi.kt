@@ -200,10 +200,10 @@ internal fun freeModelImportStatusText(status: FreeModelImportStatus?): String? 
     FreeModelImportStatus.MissingKey -> stringResource(R.string.nm_free_import_missing_key)
     FreeModelImportStatus.Failed -> stringResource(R.string.nm_free_import_failed)
     FreeModelImportStatus.SaveFailed -> stringResource(R.string.nm_provider_save_failed)
-    is FreeModelImportStatus.Complete -> if (status.eligible == 0) {
-        stringResource(R.string.nm_free_import_empty)
-    } else {
-        stringResource(R.string.nm_free_import_found, status.eligible, status.added)
+    is FreeModelImportStatus.Complete -> when {
+        status.unconfirmed > 0 -> stringResource(R.string.nm_free_import_classified, status.eligible, status.unconfirmed)
+        status.eligible == 0 -> stringResource(R.string.nm_free_import_empty)
+        else -> stringResource(R.string.nm_free_import_found, status.eligible, status.added)
     }
     FreeModelImportStatus.Unsupported -> stringResource(R.string.nm_free_import_unsupported)
     null -> null
@@ -216,10 +216,15 @@ internal fun FreeModelImportSection(
     onCheckedChange: (Boolean) -> Unit,
     status: FreeModelImportStatus? = null,
     lockedByZeroLimit: Boolean = false,
+    hasCatalogue: Boolean = true,
+    hasKey: Boolean = true,
 ) {
+    val enabled = hasCatalogue && hasKey && !lockedByZeroLimit
     val statusText = freeModelImportStatusText(status)
     val help = stringResource(when {
         lockedByZeroLimit -> R.string.nm_reach_key_zero_body
+        !hasCatalogue -> R.string.nm_free_no_plan
+        !hasKey -> R.string.nm_free_import_missing_key
         FreeModelImport.supports(type) -> R.string.nm_free_import_help
         else -> R.string.nm_free_direct_help
     })
@@ -227,8 +232,8 @@ internal fun FreeModelImportSection(
         SettingsSwitchRow(
             title = stringResource(R.string.nm_free_import_title),
             checked = checked,
-            onCheckedChange = { if (!lockedByZeroLimit) onCheckedChange(it) },
-            enabled = !lockedByZeroLimit,
+            onCheckedChange = { if (enabled) onCheckedChange(it) },
+            enabled = enabled,
             showDivider = false,
         )
     }

@@ -486,7 +486,6 @@ private fun ConfigureProviderScreen(
         mutableStateOf(voiceTemplate?.appendV1 ?: (providerType != ProviderType.gemini))
     }
     var endpointEdited by remember(providerType, voiceTemplate?.id) { mutableStateOf(false) }
-    var importFreeOnly by remember { mutableStateOf(false) }
     val regionalProvider = remember(voiceTemplate?.id) {
         io.github.nanomuse.cloud.ProviderCatalogue.load(context).firstOrNull {
             it.id == voiceTemplate?.id && !it.baseUrlGlobal.isNullOrBlank()
@@ -518,17 +517,6 @@ private fun ConfigureProviderScreen(
             }
         }
 
-        // nanoMuse: this preference is only for a personal key, not OAuth or keyless gateways.
-        if (nmParallel && credentialType == ProviderCredential.apiKey && apiKey.isNotBlank() &&
-            (providerType == ProviderType.openRouter ||
-                ai.tama.providers.ProviderEndpoints.effective(providerType, customBaseURL, appendV1Suffix) in
-                    ai.tama.pricing.DocumentedFreeChat.offeredBases)) {
-            ai.tama.providers.FreeModelImportSection(
-                type = providerType,
-                checked = importFreeOnly,
-                onCheckedChange = { importFreeOnly = it },
-            )
-        }
         if (nmParallel && credentialType == ProviderCredential.apiKey && regionalProvider != null) {
             ai.tama.providers.EndpointRegionSection(mainland) { selected ->
                 if (selected != mainland) {
@@ -553,7 +541,6 @@ private fun ConfigureProviderScreen(
                 onCustomBaseURLChange = { customBaseURL = it; endpointEdited = true },
                 appendV1Suffix = appendV1Suffix,
                 onAppendV1Change = { appendV1Suffix = it; endpointEdited = true },
-                importFreeOnly = importFreeOnly && apiKey.isNotBlank(),
                 requireCustomAddress = voiceTemplate?.id == "tama-custom",
                 canOfferPreset = ai.tama.providers.ProviderKeySuggestion.mayOfferPreset(endpointEdited, voiceTemplate != null),
                 onSelectSuggestedProvider = onSelectSuggestedProvider,
@@ -584,7 +571,6 @@ private fun ColumnScope.ApiKeyConfigSection(
     onCustomBaseURLChange: (String) -> Unit,
     appendV1Suffix: Boolean, // nanoMuse: shared with the regional endpoint selector
     onAppendV1Change: (Boolean) -> Unit,
-    importFreeOnly: Boolean,
     requireCustomAddress: Boolean,
     canOfferPreset: Boolean,
     onSelectSuggestedProvider: (com.openminis.app.data.model.VoiceProviderTemplate) -> Unit,
@@ -731,6 +717,14 @@ private fun ColumnScope.ApiKeyConfigSection(
     val nmDestination = if (nmParallel && !nmCustomAddressMissing) ai.tama.providers.ProviderEndpoints.factoryBase(
         providerType, ai.tama.providers.ProviderEndpoints.storageBase(providerType, customBaseURL, appendV1Suffix), appendV1Suffix,
     ) else null
+    val nmHasFreeCatalogue = ai.tama.pricing.DocumentedFreeChat.hasCatalogue(nmDestination,
+        openAiChat = providerType == ProviderType.openAI && !useResponsesAPI,
+        gemini = providerType == ProviderType.gemini, openRouter = providerType == ProviderType.openRouter)
+    var importFreeOnly by remember(nmDestination, useResponsesAPI) { mutableStateOf(false) }
+    if (nmParallel) {
+        ai.tama.providers.FreeModelImportSection(type = providerType, checked = importFreeOnly,
+            onCheckedChange = { importFreeOnly = it }, hasCatalogue = nmHasFreeCatalogue, hasKey = apiKey.isNotBlank())
+    }
     val nmDestinationAllowed = if (nmCustomAddressMissing) false
         else if (nmParallel) ai.tama.providers.KeyDestinationReview(apiKey, nmDestination) else true
     var probeResult by remember(providerType, apiKey, nmDestination, nmDestinationAllowed) {
@@ -761,7 +755,8 @@ private fun ColumnScope.ApiKeyConfigSection(
                 credentialType = ProviderCredential.apiKey,
                 customBaseURL = storedBase,
                 appendV1Suffix = appendV1Suffix,
-                tamaImportFreeOnly = nmParallel && (importFreeOnly || probeResult?.zeroSpendLimit == true), // nanoMuse
+                tamaImportFreeOnly = nmParallel && ((importFreeOnly && nmHasFreeCatalogue && apiKey.isNotBlank()) ||
+                    probeResult?.zeroSpendLimit == true), // nanoMuse
                 // Only OpenAI-family providers expose the Responses API toggle.
                 useResponsesAPI = providerType == ProviderType.openAI && useResponsesAPI,
             )

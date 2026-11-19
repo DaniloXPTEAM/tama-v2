@@ -377,10 +377,13 @@ internal fun ModelPickerSheet(
             if (tamaPicker && instance != null) providerRepository.tamaModelMetadata(entry, instance) else null
         }
         ai.tama.providers.ModelBadges(entry, metadata)
-        val free = remember(config, entry, instance, nmFreeEvidence, nmPaymentRefusals) {
-            tamaPicker && instance != null && providerRepository.tamaDocumentedChatAllowed(instance, entry.model.id)
+        val price = remember(config, entry, instance, nmSpendLimits, nmFreeEvidence, nmPaymentRefusals) {
+            if (!tamaPicker || instance == null) null
+            else providerRepository.tamaFreeChatStatus(instance, entry.model.id).takeIf {
+                it == ai.tama.pricing.DocumentedFreeChat.Status.FREE || providerRepository.tamaFreeChatOnly(instance)
+            }
         }
-        if (free) Text(stringResource(R.string.nm_free_status_limited), style = MaterialTheme.typography.labelSmall,
+        if (price != null) Text(stringResource(ai.tama.pricing.freeStatusLabel(price)), style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
     val allInstancesWithEntries = remember(config, searchText, nmCatalogueStatuses, nmSpendLimits, nmPaymentRefusals, nmFreeEvidence) {
@@ -394,8 +397,9 @@ internal fun ModelPickerSheet(
                     it.providerInstanceId == instance.id && !it.isHidden
                 }
                 if (providerRepository.tamaFreeChatOnly(instance)) {
-                    val ids = providerRepository.tamaEligibleFreeModelIds(instance.id)
-                    entries = ai.tama.pricing.FreeModelList.filter(entries, true, ids) { it.model.id }
+                    entries = ai.tama.pricing.FreeModelList.filterForDisplay(entries, true) {
+                        providerRepository.tamaFreeChatStatus(instance, it.model.id)
+                    }
                 }
                 // nanoMuse: the Cloud's menu first, in the menu's order; the catalog beyond
                 // it (models a member may name) after, so the recommended ones are on top.

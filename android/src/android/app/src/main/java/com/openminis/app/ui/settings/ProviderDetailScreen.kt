@@ -328,12 +328,14 @@ fun ProviderDetailScreen(
         }
 
         // nanoMuse: one per-key choice, no deletion and no changes to spending permissions.
-        val nmHasFreeCatalogue = nmHasOwnKey && providerRepository.tamaHasFreeCatalogue(instance)
-        if (nmHasFreeCatalogue || nmOnlyFree) {
+        val nmHasFreeCatalogue = providerRepository.tamaHasFreeCatalogue(instance)
+        if (nmParallel && !isOAuthProvider && instance.id != io.github.nanomuse.cloud.NanoMuseCloud.instance(exportContext)?.id) {
             ai.tama.providers.FreeModelImportSection(
                 type = instance.providerType,
                 checked = nmOnlyFree,
                 lockedByZeroLimit = nmZeroLimit,
+                hasCatalogue = nmHasFreeCatalogue,
+                hasKey = nmHasOwnKey,
                 onCheckedChange = { enabled ->
                     val saved = providerRepository.setTamaImportFreeOnly(instanceId, enabled)
                     if (saved && enabled) providerRepository.refreshModelsInBackground(instance)
@@ -342,7 +344,7 @@ fun ProviderDetailScreen(
             )
             // nanoMuse: one tap enables the filter, fetches catalogue metadata if needed,
             // and approves the visible free chat routes. It does not run inference.
-            if (nmHasFreeCatalogue && instance.isEnabled) {
+            if (nmHasFreeCatalogue && nmHasOwnKey && instance.isEnabled) {
                 var nmBulkBusy by remember(instanceId) { mutableStateOf(false) }
                 var nmBulkResult by remember(instanceId, storedKey, instance.customBaseURL) { mutableStateOf<Int?>(null) }
                 SettingsSection(footer = stringResource(R.string.nm_free_bulk_help)) {
@@ -721,7 +723,9 @@ fun ProviderDetailScreen(
         val nmPaymentRefusals by providerRepository.tamaPaymentRefusals.collectAsState()
         val nmFreeIds = if (nmOnlyFree && nmImportStatus !is ai.tama.pricing.FreeModelImportStatus.Checking)
             remember(instance, entries, nmFreeEvidence, nmImportStatus, nmPaymentRefusals, storedKey) { providerRepository.tamaEligibleFreeModelIds(instanceId) } else null
-        val nmDisplayedEntries = ai.tama.pricing.FreeModelList.filter(entries, nmOnlyFree, nmFreeIds) { it.model.id }
+        val nmDisplayedEntries = ai.tama.pricing.FreeModelList.filterForDisplay(entries, nmOnlyFree) {
+            providerRepository.tamaFreeChatStatus(instance, it.model.id)
+        }
         SettingsSection(
             header = stringResource(R.string.provider_detail_models_count_header, nmDisplayedEntries.size),
             footer = when {

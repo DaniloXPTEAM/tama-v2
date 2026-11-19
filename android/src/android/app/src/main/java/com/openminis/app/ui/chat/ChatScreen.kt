@@ -7260,6 +7260,13 @@ fun ChatScreen(
             },
             onSelectEntry = { entryId ->
                 val entry = entryById(entryId)
+                val instance = entry?.let { providerRepository.instance(it.providerInstanceId) }
+                if (entry != null && instance != null && providerRepository.tamaFreeChatOnly(instance) &&
+                    !providerRepository.tamaAllowsChatModel(instance, entry.model.id)) {
+                    android.widget.Toast.makeText(context, context.getString(ai.tama.pricing.freeStatusAction(
+                        providerRepository.tamaFreeChatStatus(instance, entry.model.id))), android.widget.Toast.LENGTH_LONG).show()
+                    return@ModelPickerSheet
+                }
                 val label = entry?.model?.let(::nonTextLabelFor)
                 if (entry != null && label != null) {
                     pendingNonTextSelection = PendingNonTextSelection.Entry(

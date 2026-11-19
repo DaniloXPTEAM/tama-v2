@@ -35,6 +35,17 @@ fun main() {
     check(FreeModelList.filter(original, true, freeIds) { it } == listOf("fixture/one:free", "fixture/two:free"))
     check(FreeModelList.filter(original, true, null) { it }.isEmpty())
     check(FreeModelList.filter(original, false, null) { it } == original)
+    val knownPrices = mapOf("free" to DocumentedFreeChat.Status.FREE, "paid" to DocumentedFreeChat.Status.PAID,
+        "unconfirmed" to DocumentedFreeChat.Status.UNKNOWN, "no-credit" to DocumentedFreeChat.Status.PAYMENT_REQUIRED)
+    val shown = FreeModelList.filterForDisplay(knownPrices.keys.toList(), true, knownPrices::getValue)
+    check(shown == listOf("free", "unconfirmed"))
+    for ((id, status) in knownPrices) check(FreeModelList.canDispatch(status, true, true) == (id == "free"))
+    check(!FreeModelList.canDispatch(DocumentedFreeChat.Status.FREE, true, false))
+    check(DocumentedFreeChat.route(DocumentedFreeChat.NVIDIA_BASE, true, false, false) == DocumentedFreeChat.Route.NVIDIA)
+    check(DocumentedFreeChat.route(DocumentedFreeChat.GROQ_BASE, true, false, false) == DocumentedFreeChat.Route.GROQ)
+    check(DocumentedFreeChat.route("https://api.openai.com/v1", true, false, false) == null)
+    check(DocumentedFreeChat.hasCatalogue(DocumentedFreeChat.AGNES_BASE, true, false, false))
+    check(DocumentedFreeChat.route(DocumentedFreeChat.AGNES_BASE, true, false, false) == null)
     check(original.size == 3) // filter never removes saved rows
     check(!FreeModelList.restricted(hasOwnKey = false, requested = true, zeroSpendLimit = true))
     check(FreeModelList.restricted(hasOwnKey = true, requested = false, zeroSpendLimit = true))

@@ -9,6 +9,7 @@ internal object DocumentedFreeChat {
     const val GROQ_BASE = "https://api.groq.com/openai/v1"
     const val NVIDIA_BASE = "https://integrate.api.nvidia.com/v1"
     const val OPENROUTER_BASE = "https://openrouter.ai/api/v1"
+    const val AGNES_BASE = "https://apihub.agnes-ai.com/v1"
     const val REVIEWED = "2026-11-18"
     private val recheckAfter = LocalDate.parse("2027-02-18").atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
 
@@ -26,6 +27,9 @@ internal object DocumentedFreeChat {
                 "gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.5-pro", "gemini-3.6-flash",
             )),
         ),
+        // The published free/default tier does not verify a particular key or
+        // guarantee that a promotional price holds at request time.
+        AGNES_BASE to listOf(Offer("https://wiki.agnes-ai.com/en/docs/tokenplan", setOf("agnes-2.5-flash"))),
         GROQ_BASE to listOf(Offer("https://console.groq.com/docs/rate-limits", setOf(
             // Free Plan: 30 RPM, 1,000 RPD, 8,000 TPM, 200,000 TPD. This is the
             // chat subset, not the ASR, TTS, safety or hosted-tool models.
@@ -33,9 +37,17 @@ internal object DocumentedFreeChat {
         ))),
     )
 
-    val offeredBases = offers.keys + setOf(
-        NVIDIA_BASE, "https://api.mistral.ai/v1", "https://api.cerebras.ai/v1",
-    )
+    // A credit trial or an unrelated free web product is not an API free plan.
+    fun route(base: String?, openAiChat: Boolean, gemini: Boolean, openRouter: Boolean): Route? = when (base) {
+        OPENROUTER_BASE -> Route.OPENROUTER.takeIf { openRouter }
+        GEMINI_BASE -> Route.GEMINI.takeIf { gemini }
+        GROQ_BASE -> Route.GROQ.takeIf { openAiChat }
+        NVIDIA_BASE -> Route.NVIDIA.takeIf { openAiChat }
+        else -> null
+    }
+
+    fun hasCatalogue(base: String?, openAiChat: Boolean, gemini: Boolean, openRouter: Boolean): Boolean =
+        route(base, openAiChat, gemini, openRouter) != null || (base == AGNES_BASE && openAiChat)
 
     fun catalogueReviewCurrent(now: Long): Boolean = now in 0 until recheckAfter
 
@@ -56,7 +68,6 @@ internal object DocumentedFreeChat {
             base == GROQ_BASE && offer != null && catalogueReviewCurrent(now) &&
                 availableGroqModels?.contains(id) == true -> Status.FREE
             offer != null -> Status.FREE_PLAN_UNCONFIRMED
-            base == GROQ_BASE -> Status.UNKNOWN
             listedPricePositive -> Status.PAID
             else -> Status.UNKNOWN
         }

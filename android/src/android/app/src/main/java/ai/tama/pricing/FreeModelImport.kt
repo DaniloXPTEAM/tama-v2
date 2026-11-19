@@ -34,7 +34,7 @@ sealed interface FreeModelImportStatus {
     data object MissingKey : FreeModelImportStatus
     data object Failed : FreeModelImportStatus
     data object SaveFailed : FreeModelImportStatus
-    data class Complete(val eligible: Int, val added: Int) : FreeModelImportStatus
+    data class Complete(val eligible: Int, val added: Int, val unconfirmed: Int = 0) : FreeModelImportStatus
 }
 
 /**

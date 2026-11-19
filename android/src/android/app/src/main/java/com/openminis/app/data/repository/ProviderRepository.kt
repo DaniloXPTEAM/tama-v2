@@ -943,7 +943,8 @@ class ProviderRepository(private val context: Context) {
         val index = config.instances.indexOfFirst { it.id == instanceId }
         if (index < 0) return false
         val live = config.instances[index]
-        if (tamaOwnApiKey(live) == null || (!enabled && tamaZeroSpendLimit(live))) return false
+        if (tamaOwnApiKey(live) == null || (enabled && !tamaHasFreeCatalogue(live)) ||
+            (!enabled && tamaZeroSpendLimit(live))) return false
         if (live.tamaImportFreeOnly == enabled) return true
         nmRefreshGate.invalidate(instanceId)
         config.instances[index] = config.instances[index].copy(tamaImportFreeOnly = enabled)
@@ -2401,16 +2402,15 @@ class ProviderRepository(private val context: Context) {
     private fun tamaModelBase(instance: ProviderInstance): String? = if (instance.azureMode) null else
         ai.tama.providers.ProviderEndpoints.factoryBase(instance.providerType, instance.customBaseURL, instance.appendV1Suffix)
 
-    private fun tamaFreeRoute(instance: ProviderInstance): DocumentedFreeChat.Route? = when (instance.providerType) {
-        ProviderType.gemini -> DocumentedFreeChat.Route.GEMINI.takeIf { tamaModelBase(instance) == it.base }
-        ProviderType.openRouter -> DocumentedFreeChat.Route.OPENROUTER.takeIf { tamaModelBase(instance) == it.base }
-        ProviderType.openAI -> if (instance.useResponsesAPI) null else
-            listOf(DocumentedFreeChat.Route.GROQ, DocumentedFreeChat.Route.NVIDIA).firstOrNull { tamaModelBase(instance) == it.base }
-        else -> null
-    }
+    private fun tamaFreeRoute(instance: ProviderInstance): DocumentedFreeChat.Route? = DocumentedFreeChat.route(
+        tamaModelBase(instance), openAiChat = instance.providerType == ProviderType.openAI && !instance.useResponsesAPI,
+        gemini = instance.providerType == ProviderType.gemini, openRouter = instance.providerType == ProviderType.openRouter,
+    )
 
-    internal fun tamaHasFreeCatalogue(instance: ProviderInstance): Boolean =
-        tamaFreeRoute(instance) != null || tamaModelBase(instance) in DocumentedFreeChat.offeredBases
+    internal fun tamaHasFreeCatalogue(instance: ProviderInstance): Boolean = DocumentedFreeChat.hasCatalogue(
+        tamaModelBase(instance), openAiChat = instance.providerType == ProviderType.openAI && !instance.useResponsesAPI,
+        gemini = instance.providerType == ProviderType.gemini, openRouter = instance.providerType == ProviderType.openRouter,
+    )
 
     private fun nmCurrentCatalogue(instance: ProviderInstance, now: Long): FreeChatCatalogue? =
         nmFreeEvidence.value[instance.id]?.current(AutoModelStore.routeFingerprint(instance),
@@ -2434,9 +2434,10 @@ class ProviderRepository(private val context: Context) {
         val now = System.currentTimeMillis()
         return when (tamaFreeRoute(instance)) {
             DocumentedFreeChat.Route.OPENROUTER -> (nmCurrentCatalogue(instance, now) as? FreeChatCatalogue.OpenRouter)
-                ?.status(modelId, now) ?: DocumentedFreeChat.Status.UNKNOWN
+                ?.status(modelId, now) ?: nmBundledFreeStatus(instance, modelId, now)
             DocumentedFreeChat.Route.GROQ -> (nmCurrentCatalogue(instance, now) as? FreeChatCatalogue.Groq)
-                ?.status(modelId, now) ?: DocumentedFreeChat.status(DocumentedFreeChat.GROQ_BASE, modelId, now, false)
+                ?.status(modelId, now)?.takeUnless { it == DocumentedFreeChat.Status.UNKNOWN }
+                ?: nmBundledFreeStatus(instance, modelId, now)
             else -> nmBundledFreeStatus(instance, modelId, now)
         }
     }
@@ -2477,8 +2478,9 @@ class ProviderRepository(private val context: Context) {
     /** This check excludes unknown/paid routes. It cannot grant either cost permission. */
     internal fun tamaAllowsChatModel(instance: ProviderInstance, modelId: String, requireFree: Boolean = false): Boolean {
         val restricted = requireFree || tamaFreeChatOnly(instance)
-        return !tamaPaymentRefused(instance.id, modelId) &&
-            (!restricted || (tamaOwnApiKey(instance) != null && modelId in tamaEligibleFreeModelIds(instance.id).orEmpty()))
+        if (!restricted) return !tamaPaymentRefused(instance.id, modelId)
+        return ai.tama.pricing.FreeModelList.canDispatch(tamaFreeChatStatus(instance, modelId),
+            restricted = true, supportedRoute = tamaFreeRoute(instance) != null)
     }
 
     /**
@@ -2730,21 +2732,21 @@ class ProviderRepository(private val context: Context) {
         }
         val freeRoute = tamaFreeRoute(instance)
         val models = when (freeRoute) {
-            DocumentedFreeChat.Route.OPENROUTER -> nmReadOpenRouterCatalogue(instance, keySnapshot)?.let {
-                FreeModelImport.eligible(it.models, it.prices, System.currentTimeMillis())
-            }
+            DocumentedFreeChat.Route.OPENROUTER -> nmReadOpenRouterCatalogue(instance, keySnapshot)?.models
             DocumentedFreeChat.Route.GROQ -> {
                 val checked = tamaCheckSavedGroqKey(instance, keySnapshot)
-                if (checked.availableModels == null && checked.outcome != KeyProbePlan.Outcome.NO_CREDIT) null
-                else kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                    ModelsDevApi.bundledModels(tamaModelBase(instance))
+                when (val ids = checked.availableModels) {
+                    null -> emptyList<LLMModel>().takeIf { checked.outcome == KeyProbePlan.Outcome.NO_CREDIT }
+                    else -> kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                        val bundled = ModelsDevApi.bundledModels(tamaModelBase(instance)).associateBy { it.id }
+                        ids.map { bundled[it] ?: LLMModel(id = it, displayName = it, provider = "Groq") }
+                    }
                 }
             }
-            DocumentedFreeChat.Route.NVIDIA, DocumentedFreeChat.Route.GEMINI ->
-                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            DocumentedFreeChat.Route.NVIDIA, DocumentedFreeChat.Route.GEMINI, null ->
+                if (tamaHasFreeCatalogue(instance)) kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                     ModelsDevApi.bundledModels(tamaModelBase(instance))
-                }
-            null -> emptyList()
+                } else emptyList()
         }
         kotlinx.coroutines.currentCoroutineContext().ensureActive()
         nmWithCurrentFreeRefresh(refresh, keySnapshot) {
@@ -2753,14 +2755,18 @@ class ProviderRepository(private val context: Context) {
                 return@nmWithCurrentFreeRefresh
             }
             val currentIds = nmEligibleFreeIds(instance, System.currentTimeMillis()).orEmpty()
-            val current = models.filter { it.id in currentIds }
+            // An unconfirmed row is not an approved or selectable free route.
+            val visible = ai.tama.pricing.FreeModelList.filterForDisplay(models.distinctBy { it.id }, true) {
+                tamaFreeChatStatus(instance, it.id)
+            }
             val config = workingCopy()
-            val additions = FreeModelImport.additions(instance.id, config.modelEntries, current)
+            val additions = FreeModelImport.additions(instance.id, config.modelEntries, visible)
             config.modelEntries.addAll(additions)
             _nmFreeImportStatus.value = _nmFreeImportStatus.value + (instance.id to
                 if (additions.isEmpty() || saveConfigChecked(config)) {
                     markInstanceFetched(instance.id)
-                    FreeModelImportStatus.Complete(current.size, additions.size)
+                    val verified = visible.count { it.id in currentIds }
+                    FreeModelImportStatus.Complete(verified, additions.size, visible.size - verified)
                 } else FreeModelImportStatus.SaveFailed)
         }
     }
