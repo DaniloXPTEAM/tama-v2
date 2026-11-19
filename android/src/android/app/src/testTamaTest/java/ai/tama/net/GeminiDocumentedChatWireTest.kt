@@ -9,7 +9,13 @@ import com.openminis.app.data.model.LLMMessage
 import com.openminis.app.data.model.LLMModel
 import com.openminis.app.data.model.LLMStreamChunk
 import com.openminis.app.provider.gemini.GeminiProvider
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import okhttp3.OkHttpClient
@@ -111,6 +117,54 @@ class GeminiDocumentedChatWireTest {
                 assertEquals(index + 1, server.requestCount)
             }
         }
+    }
+
+    @Test fun stopCancelsBlockedGeminiBodyWithoutAnotherPost() = runBlocking {
+        MockWebServer().use { server ->
+            server.start()
+            server.enqueue(MockResponse().setHeader("Content-Type", "text/event-stream")
+                .setBodyDelay(4, TimeUnit.SECONDS).setBody("data: {}\n\n"))
+            val provider = GeminiProvider(key, model, base, client(server)) { now }
+            val ticket = DocumentedChatDispatch(id, key) { true }
+            val reader = launch {
+                provider.streamMessage(history, null, 24).flowOn(Dispatchers.IO + ticket).collect()
+            }
+            assertNotNull(withContext(Dispatchers.IO) { server.takeRequest(3, TimeUnit.SECONDS) })
+            withTimeout(2_000) { reader.cancelAndJoin() }
+            assertTrue(reader.isCancelled)
+            assertEquals(1, server.requestCount)
+        }
+    }
+
+    @Test fun usageRequiresReportedCountsAndDoesNotDoubleCountCachedInput() = runBlocking {
+        MockWebServer().use { server ->
+            server.start()
+            server.enqueue(MockResponse().setHeader("Content-Type", "text/event-stream").setBody(
+                """data: {"usageMetadata":{"promptTokenCount":12}}
+
+                   |data: {"candidates":[{"content":{"parts":[{"text":"ok"}]},"finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":12,"candidatesTokenCount":2,"cachedContentTokenCount":3}}
+
+                """.trimMargin(),
+            ))
+            val provider = GeminiProvider(key, model, base, client(server)) { now }
+            val usage = provider.streamMessage(history, null, 24).flowOn(DocumentedChatDispatch(id, key) { true })
+                .toList().filterIsInstance<LLMStreamChunk.Usage>().single().usage
+            assertEquals(12, usage.latestContextTokens)
+            assertEquals(9, usage.inputTokens)
+            assertEquals(3, usage.cacheReadInputTokens)
+            assertEquals(2, usage.outputTokens)
+        }
+    }
+
+    @Test fun stageTimingDistinguishesHeadersFromFirstAnswerText() {
+        var now = 0L
+        val timing = GeminiStreamTiming { now * 1_000_000L }
+        now = 5; timing.dispatch()
+        now = 35; timing.headers()
+        assertTrue(timing.line(480).contains("first_text_ms=-"))
+        now = 135; timing.firstText()
+        now = 140; timing.firstText()
+        assertEquals("prepare_ms=5 http_headers_ms=30 first_text_ms=130 total_ms=140 request_bytes=480", timing.line(480))
     }
 
     @Test fun hostedExtrasFailClosed() {

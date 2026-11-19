@@ -24,3 +24,9 @@ Os limites nominais acima não substituem a janela efetiva do app ou a do proved
 ## R3-5: modelo ativo e uso da conversa
 
 No Test, o **nome do modelo** no cabeçalho abre **Modelo e uso**; o grupo continua abrindo o seletor. A mesma folha é acessível pelo menu de uso quando o cabeçalho está oculto. Mostra provedor, ID, entradas/saídas do catálogo, janela efetiva e máximo de saída quando conhecido. **Trocar modelo** abre o seletor existente e não interrompe uma resposta em andamento. O uso é da conversa, não do modelo atual isoladamente: último contexto informado, uso salvo, cache e etapas confirmadas da resposta quando aplicável. Sem relatório utilizável, mostra `—`; não é fatura. O app normal mantém o atalho anterior.
+
+## R3-6: Gemini — tempo até a resposta e interrupção
+
+O chat nativo continua em `streamGenerateContent?alt=sse`, sem mudar modelo, instruções, raciocínio, contexto ou permissões de custo. No Test, o produtor cancela a chamada HTTP ao parar, mesmo quando ela espera cabeçalhos ou corpo; não depende de terminar a leitura nem reenvia o POST. O relatório `GeminiStream` registra apenas tempos monotônicos de preparo do cliente, cabeçalhos, primeiro **texto** e total, mais o tamanho serializado em bytes. Primeiro evento, pensamento e primeiro texto são coisas diferentes. Isso é medido no transporte, não do toque até a exibição, e não separa rede de fila no Google. É possível comparar novas conversas com o mesmo modelo, prompt, rede e opções, e depois repetir com histórico maior. Não compartilhar chaves, logs gerais ou conteúdo.
+
+O Gemini agora registra o contexto quando a API informa `promptTokenCount`; cache informado é parte desse total, não uma segunda entrada. Metadados parciais sem contagens necessárias não viram zeros. Tempos reais da conta/aparelho e a causa da lentidão: **NÃO VERIFICADOS (sem acesso)**; os ensaios de transporte são sintéticos, sem inferência paga.

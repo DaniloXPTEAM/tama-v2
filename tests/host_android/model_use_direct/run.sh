@@ -56,6 +56,7 @@ kotlinc -nowarn -cp "$CP" -include-runtime -d "$OUT/model-use-host.jar" \
     "$MAIN/io/github/nanomuse/net/OpenCodeSession.kt" \
     "$MAIN/ai/tama/net/GroqHistoryPolicy.kt" \
     "$MAIN/ai/tama/net/GeminiStreamTermination.kt" \
+    "$MAIN/ai/tama/net/GeminiStreamTiming.kt" \
     "$MAIN/ai/tama/router/AutoModelStore.kt" \
     "$MAIN/ai/tama/router/AutoModelRuntime.kt" \
     "$MAIN/ai/tama/router/AccountVersions.kt" \
