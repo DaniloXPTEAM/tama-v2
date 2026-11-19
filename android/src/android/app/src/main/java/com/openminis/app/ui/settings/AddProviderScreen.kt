@@ -551,7 +551,6 @@ private fun ConfigureProviderScreen(
                 providerType = providerType,
                 label = label,
                 providerRepository = providerRepository,
-                importFreeOnly = importFreeOnly,
                 onSaved = onSaved,
             )
         }
@@ -812,7 +811,6 @@ private fun ColumnScope.OAuthConfigSection(
     providerType: ProviderType,
     label: String,
     providerRepository: ProviderRepository,
-    importFreeOnly: Boolean, // nanoMuse
     onSaved: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -899,7 +897,6 @@ private fun ColumnScope.OAuthConfigSection(
                     label = label.ifBlank { providerType.displayName },
                     providerType = providerType,
                     credentialType = ProviderCredential.oauth,
-                    tamaImportFreeOnly = nmParallel && importFreeOnly, // nanoMuse
                 )
                 if (nmParallel) {
                     val snapshot = authenticatedSnapshot
@@ -1086,7 +1083,6 @@ private fun ColumnScope.OAuthConfigSection(
                     credentialType = ProviderCredential.oauth,
                     customBaseURL = if (nmParallel && providerType == ProviderType.openRouter) null else trimmedBase.ifEmpty { null },
                     appendV1Suffix = appendV1Suffix,
-                    tamaImportFreeOnly = nmParallel && importFreeOnly, // nanoMuse
                 )
                 // nanoMuse: the parallel app stores a real manual bearer in
                 // both OAuth storage and its API-key mirror where applicable.
