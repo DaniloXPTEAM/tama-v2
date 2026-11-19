@@ -1582,6 +1582,9 @@
     <string name="nm_provider_catalogue_count">%1$d of %2$d catalogue providers</string>
     <string name="nm_provider_no_preset">No preset for this API</string>
     <string name="nm_provider_more_results">Show more results</string>
+    <string name="nm_model_badge_text">Text</string>
+    <string name="nm_model_badge_coding">Code (text)</string>
+    <string name="nm_model_badge_reasoning">Reasoning</string>
     <string name="nm_model_badge_image">Image</string>
     <string name="nm_model_badge_audio">Audio</string>
     <string name="nm_model_badge_tools">Tools</string>

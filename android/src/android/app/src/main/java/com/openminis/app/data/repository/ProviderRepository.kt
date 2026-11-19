@@ -2586,15 +2586,18 @@ class ProviderRepository(private val context: Context) {
     // An older free import may have fresher modalities than the saved row.
     internal fun tamaModelMetadata(entry: ModelEntry, instance: ProviderInstance): ai.tama.providers.ModelModalities? {
         if (tamaOwnApiKey(instance) == null || entry.providerInstanceId != instance.id || entry.model.id != entry.baseModel.id) return null
-        val exact = ModelsDevApi.bundledProvider(tamaModelBase(instance))?.models?.get(entry.model.id)
-        val inputs = entry.baseModel.inputModalities ?: exact?.inputModalities
-        val outputs = entry.baseModel.outputModalities ?: exact?.outputModalities
+        val base = tamaModelBase(instance)
+        val exact = ModelsDevApi.bundledProvider(base)?.models?.get(entry.model.id)
+        val inputs = entry.baseModel.inputModalities?.takeIf { it.isNotEmpty() } ?: exact?.inputModalities
+        val outputs = entry.baseModel.outputModalities?.takeIf { it.isNotEmpty() } ?: exact?.outputModalities
         val imported = tamaFreeModelCapabilities(instance.id, entry.model.id)
         return ai.tama.providers.ModelModalities.from(
             inputs, outputs, exact?.toolCalls == true || "tools" in imported, "vision" in imported, "chat" in imported,
             // Voice templates can infer saved legacy voice flags. Do not show
             // these as confirmed audio or video in the chat badge.
             exact?.inputModalities, exact?.outputModalities,
+            coding = ai.tama.providers.ReviewedModelFeatures.coding(base, entry.model.id),
+            reasoning = entry.model.supportsReasoning == true || exact?.reasoning == true,
         )
     }
 

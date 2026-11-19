@@ -819,8 +819,11 @@ fun ProviderDetailScreen(
                     // Surface both directions — input badges are muted, output
                     // badges use a tinted "generate"-style glyph so they read
                     // distinctly. Mirrors iOS #669.
-                    val inputModalities = entry.model.inputModalities.orEmpty()
-                    val outputModalities = entry.model.outputModalities.orEmpty()
+                    val metadata = remember(entry, instance, nmHasOwnKey, nmFreeEvidence, nmPaymentRefusals) {
+                        if (nmHasOwnKey) providerRepository.tamaModelMetadata(entry, instance) else null
+                    }
+                    val inputModalities = if (metadata == null) entry.model.inputModalities.orEmpty() else metadata.inputs.orEmpty().toList()
+                    val outputModalities = if (metadata == null) entry.model.outputModalities.orEmpty() else metadata.outputs.orEmpty().toList()
                     val hasBadge = inputModalities.any { it in modalityIconKeys } ||
                         outputModalities.any { it in modalityOutputIconKeys }
                     // nanoMuse: plan availability and list prices are separate.
@@ -828,11 +831,13 @@ fun ProviderDetailScreen(
                         if (nmHasOwnKey) providerRepository.tamaFreeChatStatus(instance, entry.model.id) else null
                     }
                     val priceHint = priceStatus?.let { stringResource(ai.tama.pricing.freeStatusLabel(it)) }
+                    val codingHint = if (metadata?.coding == true) stringResource(R.string.nm_model_badge_coding) else null
                     SettingsRow(
                         title = entry.model.displayName,
                         subtitle = buildString {
                             append(entry.model.id)
                             if (priceHint != null) append("\n").append(priceHint)
+                            if (codingHint != null) append("\n").append(codingHint)
                             if (entry.isHidden) append(" • Hidden")
                         },
                         // onClick = null so SettingsRow doesn't add a second

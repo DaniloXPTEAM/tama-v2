@@ -81,6 +81,9 @@ kotlinc -nowarn -cp "$CP" -include-runtime -d "$OUT/model-use-host.jar" \
     "$MAIN/ai/tama/net/OpenRouterSpendLimit.kt" \
     "$MAIN/ai/tama/media/CustomImageRoute.kt" \
     "$MAIN/ai/tama/providers/ProviderKeyEnrollment.kt" \
+    "$MAIN/ai/tama/providers/ModelModalities.kt" \
+    "$MAIN/ai/tama/providers/ReviewedModelFeatures.kt" \
+    "$MAIN/ai/tama/router/CodeModelPreference.kt" \
     "$MAIN/ai/tama/net/OwnKeyFailureSignals.kt" \
     "$MAIN/ai/tama/pricing/ModelCostGuard.kt" \
     "$MAIN/ai/tama/pricing/DocumentedChatDispatch.kt" \
@@ -111,6 +114,7 @@ kotlinc -nowarn -cp "$CP" -include-runtime -d "$OUT/model-use-host.jar" \
     "$TEST/ai/tama/pricing/NvidiaChatPricingTest.kt" \
     "$TEST/ai/tama/pricing/DocumentedFreeChatTest.kt" \
     "$TEST/ai/tama/providers/ProviderKeyEnrollmentTest.kt" \
+    "$TEST/ai/tama/providers/ReviewedModelFeaturesTest.kt" \
     "$TEST/ai/tama/pricing/FreeModelImportTest.kt" \
     "$TEST/ai/tama/pricing/OpenRouterPricingTest.kt" \
     "$TEST/ai/tama/net/DirectModelUseGuardTest.kt" \

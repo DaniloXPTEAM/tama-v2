@@ -16,7 +16,10 @@ internal fun ModelBadges(entry: ModelEntry, metadata: ModelModalities?) {
     }
     if ("chat" in metadata.chatCapabilities) ModalityBadge(stringResource(R.string.nm_models_chat_title))
     if ("tools" in metadata.chatCapabilities) ModalityBadge(stringResource(R.string.nm_model_badge_tools))
+    if (metadata.coding) ModalityBadge(stringResource(R.string.nm_model_badge_coding))
+    if (metadata.reasoning) ModalityBadge(stringResource(R.string.nm_model_badge_reasoning))
     for ((kind, label) in listOf(
+        "text" to R.string.nm_model_badge_text,
         "image" to R.string.nm_model_badge_image,
         "audio" to R.string.nm_model_badge_audio,
         "video" to R.string.nm_usage_kind_video,
