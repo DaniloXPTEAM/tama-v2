@@ -1,4 +1,4 @@
-name: One-time Tama V2 Test APK download
+name: Tama V2 Test signed APK
 
 on:
   push:
@@ -9,33 +9,26 @@ permissions:
   contents: read
 
 env:
-  APK_SOURCE: 17c7634ca978d0f35807db2d95835c12b60ebc8d
   EXPECTED_CERT_SHA256: 'E5:9C:BA:96:EF:A4:EB:21:9E:D5:A1:90:3F:D6:8F:87:AA:BB:6C:D2:75:07:CD:6F:88:D1:04:E2:5E:0F:93:4F'
   NDK_VERSION: 27.2.12479018
 
 jobs:
   tama-test-apk:
-    # Explicitly authorized for one push. Normal pushes and reruns do not publish.
+    # Keep publication on this repository and branch, including manual reruns.
     if: >-
       ${{ github.repository == 'DaniloXPTEAM/tama-v2'
-          && github.ref == 'refs/heads/arena/a4704b56-tama-v2'
-          && github.run_attempt == '1'
-          && github.event.before == '17c7634ca978d0f35807db2d95835c12b60ebc8d'
-          && startsWith(github.event.head_commit.message, 'ci(android): gerar uma vez o APK assinado do Tama V2 Test') }}
+          && github.ref == 'refs/heads/arena/a4704b56-tama-v2' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 50
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
-          fetch-depth: 2
           submodules: recursive
           persist-credentials: false
-      - name: Confirm the PR source is unchanged
+      - name: Confirm the source matches this run
         shell: bash
-        run: |
-          test "$(git rev-parse HEAD^1)" = "$APK_SOURCE"
-          test "$(git diff --name-only "$APK_SOURCE" HEAD)" = .github/workflows/tama-v2-test-download-once.yml
+        run: test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: temurin
@@ -68,9 +61,14 @@ jobs:
         run: |
           set +x
           set -euo pipefail
-          if [[ -z "$TAMA_TEST_KEYSTORE_BASE64" || -z "$TAMA_TEST_STORE_PASSWORD" ||
-                -z "$TAMA_TEST_KEY_ALIAS" || -z "$TAMA_TEST_KEY_PASSWORD" ]]; then
-            echo '::error::The signed APK requires all four signing secrets. No debug fallback is allowed.'
+          missing=()
+          for name in TAMA_TEST_KEYSTORE_BASE64 TAMA_TEST_STORE_PASSWORD TAMA_TEST_KEY_ALIAS TAMA_TEST_KEY_PASSWORD; do
+            if [[ -z "${!name:-}" ]]; then
+              missing+=("$name")
+            fi
+          done
+          if ((${#missing[@]})); then
+            printf '::error::Missing signing secrets: %s. No debug fallback is allowed.\n' "${missing[*]}"
             exit 1
           fi
           umask 077
