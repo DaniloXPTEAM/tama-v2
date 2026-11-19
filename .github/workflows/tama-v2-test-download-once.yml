@@ -95,7 +95,7 @@ jobs:
             echo '::error::TAMA_TEST_KEY_ALIAS nao existe neste keystore.'
             exit 1
           fi
-          ks_fp=$(keytool -list -v -keystore "$TAMA_TEST_KEYSTORE_FILE" -storetype PKCS12 -storepass:env TAMA_TEST_STORE_PASSWORD -alias "$TAMA_TEST_KEY_ALIAS" 2>/dev/null | sed -nE 's/^ *SHA256: (.*)$/\1/p' | head -1)
+          ks_fp=$(keytool -list -v -keystore "$TAMA_TEST_KEYSTORE_FILE" -storetype PKCS12 -storepass:env TAMA_TEST_STORE_PASSWORD -alias "$TAMA_TEST_KEY_ALIAS" 2>/dev/null | sed -nE 's/^[[:space:]]*SHA256: (.*)$/\1/p' | head -1)
           if [[ "$ks_fp" != "$EXPECTED_CERT_SHA256" ]]; then
             printf '::error::O certificado do keystore nao e o esperado (recebido: %s).\n' "$ks_fp"
             exit 1
