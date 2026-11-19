@@ -82,6 +82,24 @@ jobs:
             exit 1
           fi
           unset TAMA_TEST_KEYSTORE_BASE64
+          # Fail in seconds, not after a 6-minute build, if the secrets do not match the keystore.
+          if [[ "$TAMA_TEST_STORE_PASSWORD" != "$TAMA_TEST_KEY_PASSWORD" ]]; then
+            echo '::error::TAMA_TEST_STORE_PASSWORD e TAMA_TEST_KEY_PASSWORD sao diferentes; em PKCS12 precisam ser iguais.'
+            exit 1
+          fi
+          if ! keytool -list -keystore "$TAMA_TEST_KEYSTORE_FILE" -storetype PKCS12 -storepass:env TAMA_TEST_STORE_PASSWORD >/dev/null 2>&1; then
+            echo '::error::TAMA_TEST_STORE_PASSWORD nao abre o keystore (senha errada ou keystore corrompido).'
+            exit 1
+          fi
+          if ! keytool -list -keystore "$TAMA_TEST_KEYSTORE_FILE" -storetype PKCS12 -storepass:env TAMA_TEST_STORE_PASSWORD -alias "$TAMA_TEST_KEY_ALIAS" >/dev/null 2>&1; then
+            echo '::error::TAMA_TEST_KEY_ALIAS nao existe neste keystore.'
+            exit 1
+          fi
+          ks_fp=$(keytool -list -v -keystore "$TAMA_TEST_KEYSTORE_FILE" -storetype PKCS12 -storepass:env TAMA_TEST_STORE_PASSWORD -alias "$TAMA_TEST_KEY_ALIAS" 2>/dev/null | sed -nE 's/^ *SHA256: (.*)$/\1/p' | head -1)
+          if [[ "$ks_fp" != "$EXPECTED_CERT_SHA256" ]]; then
+            printf '::error::O certificado do keystore nao e o esperado (recebido: %s).\n' "$ks_fp"
+            exit 1
+          fi
           export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/$NDK_VERSION"
           # Keep Gradle output in memory; only fixed diagnostic categories can reach the Actions log.
           python3 - <<'PY'
@@ -98,6 +116,20 @@ jobs:
               categories = runpy.run_path('../../../scripts/android/summarize-build-failure.py')['categories']
               for category in categories(build.stdout[-8_000_000:].decode('utf-8', 'replace'), build.returncode):
                   print(f'::error title=Tama V2 Test build::{category}. Raw Gradle output was not logged.')
+              lines = build.stdout[-8_000_000:].decode('utf-8', 'replace').splitlines()
+              keep, seen = [], set()
+              for i, line in enumerate(lines):
+                  low = line.lower()
+                  if (line.startswith('e: ') or 'what went wrong' in low or 'execution failed' in low
+                          or 'could not ' in low or 'caused by' in low or 'error:' in low):
+                      for extra in lines[i:i + 4]:
+                          if extra not in seen and 'tama_test' not in extra.lower() and 'keystore' not in extra.lower():
+                              seen.add(extra)
+                              keep.append(extra[:300])
+              print('::group::Trecho do erro do Gradle (filtrado)')
+              for extra in keep[:120]:
+                  print(extra)
+              print('::endgroup::')
               raise SystemExit(max(1, build.returncode))
           PY
       - name: Verify the APK certificate and stage the two files
