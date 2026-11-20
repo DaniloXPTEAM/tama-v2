@@ -41,24 +41,47 @@ jobs:
           set +x
           set -euo pipefail
           if [[ -z "${TAMA_TEST_DRIVE_OAUTH_JSON:-}" ]]; then
-            echo '::error title=Private Drive::TAMA_TEST_DRIVE_OAUTH_JSON is not available to this workflow. No APK will be published.'
+            echo '::error title=Private Drive::TAMA_TEST_DRIVE_OAUTH_JSON did not reach this job. Check Actions Repository secrets in DaniloXPTEAM/tama-v2, not Variables or Environment secrets. No APK will be published.'
             exit 1
           fi
           python3 - <<'PY'
           import json
           import os
           import runpy
+          from urllib.error import HTTPError
+
+          def fail(message):
+              print(f'::error title=Private Drive::{message} No folder or APK was created.')
+              raise SystemExit(1) from None
+
+          try:
+              credentials = json.loads(os.environ['TAMA_TEST_DRIVE_OAUTH_JSON'])
+          except json.JSONDecodeError:
+              fail('The secret was received but is not JSON. Save the OAuth JSON, not a link.')
+          fields = ('client_id', 'client_secret', 'refresh_token')
+          if not isinstance(credentials, dict) or any(
+              not isinstance(credentials.get(field), str) or not credentials[field].strip() for field in fields
+          ):
+              fail('The secret JSON must contain nonempty client_id, client_secret and refresh_token fields.')
 
           try:
               private = runpy.run_path('scripts/android/deliver-private-drive.py')
-              credentials = json.loads(os.environ['TAMA_TEST_DRIVE_OAUTH_JSON'])
               opener = private['build_opener'](private['NoRedirect']())
               token = private['login'](opener, credentials)
               if not isinstance(token, str) or not token:
                   raise ValueError('Missing access token')
+          except HTTPError as error:
+              try:
+                  code = json.loads(error.read(4096)).get('error')
+              except Exception:
+                  code = None
+              if code == 'invalid_grant':
+                  fail('Google rejected the refresh token (invalid_grant). Renew it for this OAuth client.')
+              if code in ('invalid_client', 'unauthorized_client'):
+                  fail('Google rejected the OAuth client. Check the client ID and secret in GitHub.')
+              fail('Google rejected the OAuth token exchange. Check the credential and drive.file scope.')
           except Exception:
-              print('::error title=Private Drive::OAuth check failed. No folder or APK was created.')
-              raise SystemExit(1) from None
+              fail('Could not verify private Drive OAuth. Check that the consent uses only the drive.file scope.')
           print('Private Drive OAuth verified. No folder created yet.')
           PY
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
