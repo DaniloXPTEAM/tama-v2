@@ -1,9 +1,32 @@
 package ai.tama.media
 
+import ai.tama.router.ImageTurnGuard
+import ai.tama.tools.ImageGenerationTool
+import com.openminis.app.BuildConfig
+import com.openminis.app.sandbox.NativeOffloadResult
+import com.openminis.app.tools.ToolExecutionResult
+import com.openminis.app.ui.chat.AssistantBlock
+import com.openminis.app.ui.chat.ChatMessage
+import com.openminis.app.ui.chat.FlatChatItem
+import com.openminis.app.ui.chat.ToolBlockStatus
+import com.openminis.app.ui.chat.buildFlatChatItems
+import java.awt.image.BufferedImage
+import javax.imageio.ImageIO
+import kotlinx.coroutines.runBlocking
+import org.json.JSONObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Assume.assumeTrue
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TemporaryFolder
 
 class ImageToolPresentationTest {
+    @get:Rule val temp = TemporaryFolder()
+
+    private val filename = "nanomuse-20260101-010203-00000000-0000-0000-0000-000000000001.png"
     private val ambiguous = "Não consegui confirmar o pedido."
     private val repeated = "Não vou repetir automaticamente."
     private val invalid = "Esta tentativa não foi enviada."
@@ -19,6 +42,60 @@ class ImageToolPresentationTest {
         assertEquals(ImageToolPresentation.Summary.GENERATED, summarize("{\"ok\":true,\"markdown\":\"secret\"}", success = true))
         assertEquals(ImageToolPresentation.Summary.FAILED, summarize("{\"ok\":false}", success = true))
         assertEquals(ImageToolPresentation.Summary.FAILED, summarize("{\"ok\":true}", success = false))
+    }
+
+    @Test fun `one structured request shows its saved PNG even with no model text or steps`() = runBlocking {
+        assumeTrue(BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test")
+        val dir = temp.newFolder("session-attachments")
+        val file = dir.resolve(filename)
+        val prompt = "Crie uma imagem de um gato colorido, em fundo branco."
+        val args = JSONObject().put("prompt", prompt).toString()
+        val guard = ImageTurnGuard(explicitPersonRequest = true)
+        var submissions = 0
+        assertEquals(ImageTurnGuard.Decision.ALLOW, guard.consume())
+        val result = ImageGenerationTool.execute(args, "Image", dir) { received, size ->
+            assertEquals(prompt, received)
+            assertNull(size)
+            submissions++
+            assertTrue(ImageIO.write(BufferedImage(3, 2, BufferedImage.TYPE_INT_RGB), "png", file))
+            NativeOffloadResult(0, JSONObject().put("ok", true)
+                .put("path", "/var/minis/attachments/$filename").put("bytes", file.length()).toString())
+        }
+        assertTrue(result.success)
+        assertEquals(1, submissions)
+        assertEquals(ImageTurnGuard.Decision.ALREADY_ATTEMPTED, guard.consume())
+        assertEquals(file.canonicalPath, result.imageFilePath)
+        assertEquals(3, ImageIO.read(file).width)
+        val block = AssistantBlock(id = "image-call", kind = "tool_use", toolStatus = ToolBlockStatus.SUCCESS,
+            toolName = ImageGenerationTool.NAME, content = result.output, imageFilePath = result.imageFilePath)
+        fun imageRows(tool: AssistantBlock, showSteps: Boolean) = buildFlatChatItems(
+            listOf(ChatMessage("reply", "assistant", "", toolBlocks = listOf(tool))), showSteps = showSteps,
+        ).filterIsInstance<FlatChatItem.AssistantMarkdownBlock>()
+        for (showSteps in listOf(false, true)) {
+            val row = imageRows(block, showSteps).single()
+            assertEquals("image-call:generated-image", row.parentBlockId)
+            assertEquals("![](minis://attachments/$filename)", row.rawText)
+        }
+        // A text-only transcript or a failed call doesn't get the app's image row.
+        assertTrue(imageRows(block.copy(imageFilePath = null), false).isEmpty())
+        assertTrue(imageRows(block.copy(toolStatus = ToolBlockStatus.FAILED), false).isEmpty())
+    }
+
+    @Test fun `a missing or different session attachment is not a successful picture`() {
+        val here = temp.newFolder("here")
+        val other = temp.newFolder("other").resolve(filename)
+        assertTrue(ImageIO.write(BufferedImage(1, 1, BufferedImage.TYPE_INT_RGB), "png", other))
+        val body = JSONObject().put("ok", true).put("bytes", other.length())
+        for (path in listOf("/var/minis/attachments/$filename", other.path, "/var/minis/attachments/../other/$filename")) {
+            val result = ImageToolPresentation.attachSavedPng(ToolExecutionResult(body.put("path", path).toString(), true), here)
+            assertFalse(result.success)
+            assertNull(result.imageFilePath)
+            assertEquals(ImageToolPresentation.Summary.ATTACHMENT_MISSING, summarize(result.output))
+            val failure = JSONObject(ImageToolPresentation.sanitizedFailure(result.output, emptyMap(), "Failed to load image"))
+            assertTrue(failure.getString("tell_user").contains("may have been charged. Do not retry"))
+        }
+        val denied = ToolExecutionResult("""{"ok":false,"error":"permission_denied"}""", false)
+        assertEquals(denied, ImageToolPresentation.attachSavedPng(denied, here))
     }
 
     @Test fun `guard outcomes use only the exact local messages`() {

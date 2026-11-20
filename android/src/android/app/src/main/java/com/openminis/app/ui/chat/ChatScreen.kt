@@ -2398,18 +2398,16 @@ fun ChatScreen(
                     refs.add(Ref(msg.id, src, title))
                 }
             }
-            if (refs.isEmpty()) {
-                // Defensive: tap arrived for a URL that isn't in the visible
-                // window (compacted away, just deleted, etc.). Fall back to
-                // the single-item URL handler so the user still sees the
-                // tapped image rather than swallowing the tap silently.
-                urlClickHandler(tappedUrl)
-                return@handler
-            }
             val startIndex = refs.indexOfFirst { it.messageId == tappedMessageId && it.source == tappedUrl }
                 .takeIf { it >= 0 }
                 ?: refs.indexOfFirst { it.source == tappedUrl }.takeIf { it >= 0 }
-                ?: 0
+                ?: run {
+                    if (refs.isNotEmpty() && BuildConfig.APPLICATION_ID != "ai.tama.assistant.tamav2test") return@run 0
+                    // nanoMuse: native image receipts are not in the model's text gallery.
+                    // Open the tapped attachment itself, even if other replies have images.
+                    urlClickHandler(tappedUrl)
+                    return@handler
+                }
             val items = refs.map { ref ->
                 // Resolve minis://... / file:// / /abs → host File so Coil
                 // doesn't have to re-walk PRootKernel for every page swipe.

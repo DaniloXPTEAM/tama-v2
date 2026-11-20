@@ -1,11 +1,37 @@
 package ai.tama.media
 
+import com.openminis.app.tools.ToolExecutionResult
 import org.json.JSONObject
+import java.io.File
 
 /** Only an allowlisted outcome reaches the image detail UI, never raw tool arguments or JSON. */
 internal object ImageToolPresentation {
+    private const val ATTACHMENTS = "/var/minis/attachments/"
+    private const val MISSING_PNG = "image_attachment_missing"
+    private val generatedName = Regex("nanomuse-[0-9]{8}-[0-9]{6}-[a-f0-9-]{36}\\.png")
+
+    /** Bind a local handler receipt, never model text, to the existing tool artifact field. */
+    fun attachSavedPng(result: ToolExecutionResult, attachmentsDir: File): ToolExecutionResult {
+        if (!result.success) return result
+        val file = runCatching {
+            val receipt = JSONObject(result.output)
+            val path = receipt.optString("path")
+            if (!receipt.optBoolean("ok") || !path.startsWith(ATTACHMENTS)) return@runCatching null
+            val name = path.removePrefix(ATTACHMENTS).takeIf(generatedName::matches) ?: return@runCatching null
+            val expected = File(attachmentsDir.canonicalFile, name)
+            val bytes = receipt.optLong("bytes", 0)
+            expected.takeIf { bytes > 0 && it.canonicalFile == it && it.isFile && it.length() == bytes }
+        }.getOrNull()
+        return if (file != null) result.copy(imageFilePath = file.absolutePath)
+        else result.copy(success = false, output = """{"ok":false,"error":"$MISSING_PNG"}""")
+    }
+
+    /** The markup is made by the app; it does not contain the model's reply or tool JSON. */
+    fun generatedMarkdown(filePath: String?): String? = filePath?.substringAfterLast('/')
+        ?.takeIf(generatedName::matches)?.let { "![](minis://attachments/$it)" }
+
     enum class Summary {
-        PREPARING, GENERATED, NO_MODEL, NO_APPROVAL, UNVERIFIED_COST, MODEL_COST_UNVERIFIED,
+        PREPARING, GENERATED, ATTACHMENT_MISSING, NO_MODEL, NO_APPROVAL, UNVERIFIED_COST, MODEL_COST_UNVERIFIED,
         AUTHORIZATION_CHANGED, PERMISSION_DENIED, EDIT_UNAVAILABLE, MODEL_CHANGE_BLOCKED, AMBIGUOUS, ALREADY_HANDLED, INVALID, FAILED,
         NO_CONFIRMED_GENERATOR, NO_VERIFIED_FREE_GENERATOR, CHAT_ONLY, ROUTE_UNCONFIRMED,
         KEY_MISSING, NVIDIA_NATIVE, ENDPOINT_REJECTED, AGNES_AUTHENTICATION, AGNES_ACCESS_DENIED,
@@ -28,6 +54,7 @@ internal object ImageToolPresentation {
         val json = runCatching { JSONObject(raw) }.getOrNull() ?: return Summary.FAILED
         if (success && json.optBoolean("ok", false)) return Summary.GENERATED
         return when (json.optString("error", "")) {
+            MISSING_PNG -> Summary.ATTACHMENT_MISSING
             "no_image_model" -> Summary.NO_MODEL
             "no_confirmed_image_generator" -> Summary.NO_CONFIRMED_GENERATOR
             "no_verified_free_image_generator" -> Summary.NO_VERIFIED_FREE_GENERATOR
@@ -69,7 +96,7 @@ internal object ImageToolPresentation {
             "no_image_model", "no_approved_image_model", "automatic_image_cost_unverified", "image_cost_unverified",
             "image_authorization_changed", "permission_denied", "automatic_image_edit_unavailable", "invalid_image_request",
             "media_model_change_blocked", "image_failed", "no_confirmed_image_generator",
-            "no_verified_free_image_generator" -> code
+            "no_verified_free_image_generator", MISSING_PNG -> code
             else -> if (raw in setOf(
                     "Invalid generate_image arguments; no image was requested.",
                     "Unsupported generate_image parameter; no image was requested.",

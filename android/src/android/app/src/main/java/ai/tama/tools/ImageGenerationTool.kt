@@ -3,24 +3,29 @@ package ai.tama.tools
 import com.openminis.app.tools.*
 
 import android.content.Context
+import com.openminis.app.BuildConfig
 import com.openminis.app.R
 import com.openminis.app.data.model.AgentToolDefinition
 import com.openminis.app.data.model.AgentToolParam
 import com.openminis.app.sandbox.NativeOffloadResult
 import ai.tama.media.ImageDispatch
+import ai.tama.media.ImageToolPresentation
 import io.github.nanomuse.media.MediaOffloadHandler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import java.io.File
 
 /** Native text-to-image tool. It shares the CLI's consent, route and output handling. */
 object ImageGenerationTool {
     const val NAME = "generate_image"
+    private val parallel get() = BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test"
 
     fun definition() = AgentToolDefinition(
         name = NAME,
         description = "Generate one image only when the user asks. May incur a charge. " +
-            "Use the returned markdown in the answer. Do not retry a failed image request.",
+            (if (parallel) "The app shows a saved image. Do not print the tool JSON or image path. "
+                else "Use the returned markdown in the answer. ") + "Do not retry a failed image request.",
         parameters = mapOf(
             "prompt" to AgentToolParam("string", "Description of the image to generate."),
             "size" to AgentToolParam("string", "Optional WIDTHxHEIGHT, each from 128 to 4096, for example 1024x1024."),
@@ -32,11 +37,13 @@ object ImageGenerationTool {
     suspend fun execute(
         argsJson: String, sessionId: String, context: Context, ownKeyChat: Boolean = false, freeOnly: Boolean = false,
     ): ToolExecutionResult {
-        val parallel = com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test"
         val title = context.getString(R.string.nm_models_image_title)
         val result = try {
-            execute(argsJson, title) { prompt, size ->
-                withContext(Dispatchers.IO) { MediaOffloadHandler(context).generateImage(prompt, size, sessionId, freeOnly) }
+            withContext(Dispatchers.IO) {
+                val attachments = if (parallel) File(context.filesDir, "minis-sessions/$sessionId/attachments") else null
+                execute(argsJson, title, attachments) { prompt, size ->
+                    MediaOffloadHandler(context).generateImage(prompt, size, sessionId, freeOnly)
+                }
             }
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
@@ -47,7 +54,7 @@ object ImageGenerationTool {
         if (!parallel || result.success) return result
         // The provider may echo the person's prompt or a credential in any error.
         // Only locally authored text and fixed settings links enter history or the model.
-        return result.copy(output = ai.tama.media.ImageToolPresentation.sanitizedFailure(
+        return result.copy(output = ImageToolPresentation.sanitizedFailure(
             result.output, failureMessages(context, ownKeyChat), context.getString(
                 if (ownKeyChat) R.string.nm_image_detail_failed else R.string.nm_image_request_failed,
             ),
@@ -70,6 +77,7 @@ object ImageGenerationTool {
         "invalid_image_request" to context.getString(R.string.nm_image_guard_invalid),
         "no_confirmed_image_generator" to context.getString(R.string.nm_own_image_no_generator),
         "no_verified_free_image_generator" to context.getString(R.string.nm_free_image_unavailable),
+        "image_attachment_missing" to context.getString(R.string.filepreview_image_load_error),
         "image_failed" to context.getString(if (ownKeyChat) R.string.nm_image_detail_failed else R.string.nm_image_request_failed),
     ) + ai.tama.media.CustomImageRoute.Problem.entries.associate { it.code to context.getString(it.message) }
 
@@ -77,6 +85,7 @@ object ImageGenerationTool {
     internal suspend fun execute(
         argsJson: String,
         title: String,
+        attachmentsDir: File? = null,
         send: suspend (prompt: String, size: String?) -> NativeOffloadResult,
     ): ToolExecutionResult {
         val args = try { JSONObject(argsJson) } catch (_: Exception) {
@@ -96,6 +105,7 @@ object ImageGenerationTool {
             else -> return ToolExecutionResult("Image size must be WIDTHxHEIGHT, each from 128 to 4096; no image was requested.", false, toolTitle = title)
         }
         val result = send(prompt, size)
-        return ToolExecutionResult(result.output, result.exitCode == 0, toolTitle = title)
+        val toolResult = ToolExecutionResult(result.output, result.exitCode == 0, toolTitle = title)
+        return if (attachmentsDir == null) toolResult else ImageToolPresentation.attachSavedPng(toolResult, attachmentsDir)
     }
 }

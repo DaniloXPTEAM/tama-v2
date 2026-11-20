@@ -4,6 +4,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+- Displayed the saved image from an Android Test image tool call in chat, even when the model does not repeat the attachment link or agent steps are hidden.
+
 - Restored missing free-chat evidence for approved accounts in Android Test without requiring a manual model pick first. Separated Agnes image evidence from chat pricing and showed the exact saved image approval that needs attention.
 
 - Routed standalone image requests, including the spelling “iamgem”, directly to the image tool in Android Test. Kept legacy Agnes image entries out of chat and replaced fake tool transcripts with a notice.

@@ -303,6 +303,8 @@ internal fun ToolDetailSheet(
         val resource = when (summary) {
             ai.tama.media.ImageToolPresentation.Summary.PREPARING -> R.string.nm_image_detail_preparing
             ai.tama.media.ImageToolPresentation.Summary.GENERATED -> R.string.nm_image_detail_generated
+            // nanoMuse: a missing local file is not a successful picture.
+            ai.tama.media.ImageToolPresentation.Summary.ATTACHMENT_MISSING -> R.string.filepreview_image_load_error
             ai.tama.media.ImageToolPresentation.Summary.NO_MODEL -> R.string.nm_image_provider_missing
             ai.tama.media.ImageToolPresentation.Summary.NO_APPROVAL -> R.string.nm_auto_image_missing
             ai.tama.media.ImageToolPresentation.Summary.AGNES_IMAGE_NEEDS_ENTRY -> R.string.nm_agnes_auto_image_needs_entry

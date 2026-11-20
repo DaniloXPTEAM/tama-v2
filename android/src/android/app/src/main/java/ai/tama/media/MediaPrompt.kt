@@ -17,8 +17,11 @@ object MediaPrompt {
             if (testImageGuidance) {
                 append("Use a structured tool call if offered. Never print tool syntax or claim success without a successful image result. ")
                 append("If you cannot call it, suggest `/imagem` followed by the description for a standalone new image. ")
+                append("The app displays a saved `generate_image` result. Do not print its JSON, markdown or path. ")
+                append("For a successful Shell media call, use its returned `markdown` to show the file. ")
+            } else {
+                append("The result has a `markdown` field — put that line in your reply so the file shows inline. ")
             }
-            append("The result has a `markdown` field — put that line in your reply so the file shows inline. ")
             if (reportImageAspect) append("If it includes `aspect_ratio`, tell the user that actual image ratio. ")
             append("`nanomuse-media status` prints what is configured.\n")
             append("- Avatar changes are handled by the app itself when the user writes \"change your avatar to ...\"; you only need to explain when it cannot work.\n")

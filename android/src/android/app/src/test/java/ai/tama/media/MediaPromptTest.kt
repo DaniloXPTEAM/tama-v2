@@ -28,6 +28,8 @@ class MediaPromptTest {
         val text = MediaPrompt.build("Agnes image", null, "minis://settings/media", testImageGuidance = true)
         assertTrue(text.contains("Never print tool syntax or claim success without a successful image result"))
         assertTrue(text.contains("suggest `/imagem`"))
+        assertTrue(text.contains("The app displays a saved `generate_image` result. Do not print its JSON"))
+        assertTrue(text.contains("successful Shell media call, use its returned `markdown`"))
     }
 
     @Test fun `manual image prompt retains its previous edit and missing model guidance`() {
