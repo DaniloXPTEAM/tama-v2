@@ -1,5 +1,5 @@
-name: Tama V2 Test signed APK
-run-name: 'Tama V2 Test assinado · Agnes — criação direta e resposta de ferramenta real · ${{ github.sha }}'
+name: Tama V2 Test private signed APK
+run-name: 'Tama V2 Test assinado · entrega privada do commit 255a8aa'
 
 on:
   push:
@@ -10,26 +10,57 @@ permissions:
   contents: read
 
 env:
+  TAMA_TEST_SOURCE_SHA: '255a8aa171db886707edab1a3bb105b7a56d8afd'
   EXPECTED_CERT_SHA256: 'E5:9C:BA:96:EF:A4:EB:21:9E:D5:A1:90:3F:D6:8F:87:AA:BB:6C:D2:75:07:CD:6F:88:D1:04:E2:5E:0F:93:4F'
   NDK_VERSION: 27.2.12479018
 
 jobs:
   tama-test-apk:
-    # Keep publication on this repository and branch, including manual reruns.
+    # The push runs this delivery workflow, but the APK source is the already
+    # verified commit below. Keep this exception separate from main delivery.
     if: >-
-      ${{ github.repository == 'DaniloXPTEAM/tama-v2'
+      ${{ github.event_name == 'push'
+          && github.repository == 'DaniloXPTEAM/tama-v2'
           && github.ref == 'refs/heads/arena/a4704b56-tama-v2' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 50
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ env.TAMA_TEST_SOURCE_SHA }}
           submodules: recursive
           persist-credentials: false
-      - name: Confirm the source matches this run
+      - name: Confirm the pinned APK source
         shell: bash
-        run: test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+        run: test "$(git rev-parse HEAD)" = "$TAMA_TEST_SOURCE_SHA"
+      - name: Check private Drive credentials before building
+        shell: bash
+        env:
+          TAMA_TEST_DRIVE_OAUTH_JSON: ${{ secrets.TAMA_TEST_DRIVE_OAUTH_JSON }}
+        run: |
+          set +x
+          set -euo pipefail
+          if [[ -z "${TAMA_TEST_DRIVE_OAUTH_JSON:-}" ]]; then
+            echo '::error title=Private Drive::TAMA_TEST_DRIVE_OAUTH_JSON is not available to this workflow. No APK will be published.'
+            exit 1
+          fi
+          python3 - <<'PY'
+          import json
+          import os
+          import runpy
+
+          try:
+              private = runpy.run_path('scripts/android/deliver-private-drive.py')
+              credentials = json.loads(os.environ['TAMA_TEST_DRIVE_OAUTH_JSON'])
+              opener = private['build_opener'](private['NoRedirect']())
+              token = private['login'](opener, credentials)
+              if not isinstance(token, str) or not token:
+                  raise ValueError('Missing access token')
+          except Exception:
+              print('::error title=Private Drive::OAuth check failed. No folder or APK was created.')
+              raise SystemExit(1) from None
+          print('Private Drive OAuth verified. No folder created yet.')
+          PY
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: temurin
@@ -116,35 +147,28 @@ jobs:
               categories = runpy.run_path('../../../scripts/android/summarize-build-failure.py')['categories']
               for category in categories(build.stdout[-8_000_000:].decode('utf-8', 'replace'), build.returncode):
                   print(f'::error title=Tama V2 Test build::{category}. Raw Gradle output was not logged.')
-              lines = build.stdout[-8_000_000:].decode('utf-8', 'replace').splitlines()
-              keep, seen = [], set()
-              for i, line in enumerate(lines):
-                  low = line.lower()
-                  if (line.startswith('e: ') or 'what went wrong' in low or 'execution failed' in low
-                          or 'could not ' in low or 'caused by' in low or 'error:' in low):
-                      for extra in lines[i:i + 4]:
-                          if extra not in seen and 'tama_test' not in extra.lower() and 'keystore' not in extra.lower():
-                              seen.add(extra)
-                              keep.append(extra[:300])
-              print('::group::Trecho do erro do Gradle (filtrado)')
-              for extra in keep[:120]:
-                  print(extra)
-              print('::endgroup::')
               raise SystemExit(max(1, build.returncode))
           PY
-      - name: Verify the APK certificate and stage the two files
+      - name: Verify APK identity, version and stable signature
         id: verified
         shell: bash
         run: |
           set -euo pipefail
-          stage="$RUNNER_TEMP/tama-v2-test-apk"
-          mkdir -m 0700 -- "$stage"
-          apk="$stage/Tama-V2-Test.apk"
-          install -m 0600 -- android/src/android/app/build/outputs/apk/tamaTest/app-tamaTest.apk "$apk"
+          apk=android/src/android/app/build/outputs/apk/tamaTest/app-tamaTest.apk
+          test -s "$apk"
+          chmod 0600 -- "$apk"
           tools="$ANDROID_HOME/build-tools/35.0.0"
-          package=$("$tools/aapt" dump badging "$apk" | sed -n "s/^package: name='\([^']*\)'.*/\1/p")
-          if [[ "$package" != ai.tama.assistant.tamav2test ]]; then
-            echo '::error::Unexpected Android package; nothing will be uploaded.'
+          badging=$("$tools/aapt" dump badging "$apk")
+          package_line=$(sed -n '/^package: /p' <<< "$badging")
+          package=$(sed -n "s/^package: name='\([^']*\)'.*/\1/p" <<< "$package_line")
+          code=$(sed -n "s/.* versionCode='\([0-9][0-9]*\)'.*/\1/p" <<< "$package_line")
+          version=$(sed -n "s/.* versionName='\([^']*\)'.*/\1/p" <<< "$package_line")
+          if [[ "$package" != ai.tama.assistant.tamav2test || "$code" != 530 || "$version" != 1.0.9-tama.1-teste.3 ]]; then
+            echo '::error::Unexpected Android package or version; nothing will be uploaded.'
+            exit 1
+          fi
+          if [[ "$(sed -n '/^native-code: /p' <<< "$badging")" != "native-code: 'arm64-v8a'" ]]; then
+            echo '::error::Unexpected APK ABI; nothing will be uploaded.'
             exit 1
           fi
           if ! signature=$("$tools/apksigner" verify --print-certs "$apk" 2>/dev/null); then
@@ -162,33 +186,32 @@ jobs:
               "$actual" "$EXPECTED_CERT_SHA256"
             exit 1
           fi
-          (
-            cd "$stage"
-            sha256sum Tama-V2-Test.apk > SHA256SUMS.txt
-          )
-          read -r apk_sha256 _ < "$stage/SHA256SUMS.txt"
-          printf 'apk_sha256=%s\ncert_sha256=%s\n' "$apk_sha256" "$actual" >> "$GITHUB_OUTPUT"
-      - name: Upload the verified APK and checksum for one day
-        if: ${{ steps.verified.outputs.cert_sha256 == env.EXPECTED_CERT_SHA256 }}
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: tama-v2-test-apk
-          path: |
-            ${{ runner.temp }}/tama-v2-test-apk/Tama-V2-Test.apk
-            ${{ runner.temp }}/tama-v2-test-apk/SHA256SUMS.txt
-          retention-days: 1
-          compression-level: 0
-          if-no-files-found: error
-      - name: Record the public SHA-256 fingerprints
+          read -r apk_sha256 _ < <(sha256sum -- "$apk")
+          size=$(stat -c '%s' -- "$apk")
+          [[ "$apk_sha256" =~ ^[0-9a-f]{64}$ && "$size" =~ ^[1-9][0-9]*$ ]]
+          printf 'apk_sha256=%s\nsize=%s\n' "$apk_sha256" "$size" >> "$GITHUB_OUTPUT"
+          printf '::notice title=Tama V2 Test verified::source=%s; package=%s; versionCode=%s; versionName=%s; size=%s; APK SHA-256=%s; certificate SHA-256=%s\n' \
+            "$TAMA_TEST_SOURCE_SHA" "$package" "$code" "$version" "$size" "$apk_sha256" "$actual"
+      - name: Deliver the verified APK only to a restricted Drive folder
         shell: bash
         env:
+          TAMA_TEST_DRIVE_OAUTH_JSON: ${{ secrets.TAMA_TEST_DRIVE_OAUTH_JSON }}
           APK_SHA256: ${{ steps.verified.outputs.apk_sha256 }}
-          CERT_SHA256: ${{ steps.verified.outputs.cert_sha256 }}
+          APK_SIZE: ${{ steps.verified.outputs.size }}
         run: |
-          {
-            printf '### Tama V2 Test\n\n'
-            printf 'Artefato: `tama-v2-test-apk` (retenção: 1 dia)\n\n'
-            printf 'SHA-256 do APK: `%s`\n\n' "$APK_SHA256"
-            printf 'SHA-256 do certificado: `%s`\n' "$CERT_SHA256"
-          } >> "$GITHUB_STEP_SUMMARY"
-          printf '::notice title=Tama V2 Test::APK SHA-256=%s; certificate SHA-256=%s\n' "$APK_SHA256" "$CERT_SHA256"
+          set +x
+          set -euo pipefail
+          apk=android/src/android/app/build/outputs/apk/tamaTest/app-tamaTest.apk
+          read -r current_hash _ < <(sha256sum -- "$apk")
+          test "$(git rev-parse HEAD)" = "$TAMA_TEST_SOURCE_SHA"
+          test "$current_hash" = "$APK_SHA256"
+          test "$(stat -c '%s' -- "$apk")" = "$APK_SIZE"
+          # Take the filename's source SHA from the pinned checkout. The outer
+          # Actions run still identifies the workflow-only push separately.
+          GITHUB_SHA="$TAMA_TEST_SOURCE_SHA" python3 scripts/android/deliver-private-drive.py "$apk"
+          printf '::notice title=Tama V2 Test private delivery::Drive upload verified. Source=%s; APK SHA-256=%s; size=%s\n' \
+            "$TAMA_TEST_SOURCE_SHA" "$APK_SHA256" "$APK_SIZE"
+      - name: Remove the runner's APK
+        if: ${{ always() }}
+        shell: bash
+        run: rm -f -- android/src/android/app/build/outputs/apk/tamaTest/app-tamaTest.apk
