@@ -199,6 +199,12 @@ object ImageGen {
             if (instance == null || !instance.isEnabled || !AgnesImages.route(instance) ||
                 (selected != null && AgnesImages.model(selected) == null)) return CustomImageRoute.Problem.AGNES_UNAVAILABLE
             if (repo.tamaOwnApiKey(instance) == null) return CustomImageRoute.Problem.NEEDS_KEY
+            // nanoMuse: distinguish an ambiguous legacy pin from an HTTP or key failure.
+            if (selected != null) {
+                val matching = repo.entriesFor(instance.id).filter { it.baseModel.id == selected }
+                if (matching.isNotEmpty() && AgnesImages.registeredEntry(matching) == null)
+                    return CustomImageRoute.Problem.AGNES_IMAGE_AMBIGUOUS
+            }
             val ids = selected?.let { listOf(it) } ?: AgnesImages.models.map { it.id }
             if (ids.all { repo.tamaPaymentRefused(instance.id, it) }) return CustomImageRoute.Problem.AGNES_PAYMENT
             return if (ids.any { it in availableModels(context, instance) }) null else CustomImageRoute.Problem.AGNES_UNAVAILABLE

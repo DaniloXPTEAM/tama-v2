@@ -1581,4 +1581,12 @@
     <string name="nm_code_wrap">Balut baris</string>
     <string name="nm_code_unwrap">Tatal baris panjang</string>
     <string name="nm_free_image_unavailable">Mod percuma versi ini tidak mempunyai penjana imej yang disahkan percuma.</string>
+    <string name="nm_router_request_profile_chip">Profil perbualan: %1$s</string>
+    <string name="nm_usage_thinking_supported">Menyokong penaakulan</string>
+    <string name="nm_agnes_free_summary">%1$d model sembang percuma yang disahkan, %2$d model imej yang dinyatakan percuma, %3$d belum disahkan.</string>
+    <string name="nm_agnes_free_scope">Dengan penapis ini, hanya sembang percuma yang disahkan boleh menghantar permintaan. Penjanaan imej Agnes menggunakan peraturan lain. Ujian kunci tidak mengesahkan harga akaun.</string>
+    <string name="nm_agnes_api_help">Asas API: %1$s. Agnes menggunakan POST /images/generations, bukan halaman pelayar. Gunakan Uji kunci. Untuk imej, pilih Automatik atau Images API, bukan Chat Completions.</string>
+    <string name="nm_agnes_auto_image_needs_entry">Model Agnes yang dipilih tiada entri untuk penggunaan automatik. Buka Model imej dan video dan semak kebenaran imej automatik untuk memulihkan entri ini.</string>
+    <string name="nm_agnes_auto_image_capability_off">Penjanaan imej dimatikan untuk model ini dalam pemilihan automatik. Buka semakan, hidupkan Jana imej, kemudian simpan.</string>
+    <string name="nm_agnes_auto_image_authorized">Penggunaan imej automatik telah diluluskan untuk pilihan ini. Kebenaran imej masih disemak bagi setiap permintaan.</string>
 </resources>

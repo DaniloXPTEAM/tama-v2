@@ -1630,4 +1630,12 @@
     <string name="nm_agnes_review_image">Review automatic image permission</string>
     <string name="nm_agnes_review_image_help">In Automatic mode, allow automatic image generation for this exact model and tap Save. Choosing a model or changing a group does not grant permission.</string>
     <string name="nm_vision_group_not_image_generation">The Vision Group reads images. Group fallback does not configure image generation; use Settings → Models → Make pictures instead.</string>
+    <string name="nm_router_request_profile_chip">Conversation profile: %1$s</string>
+    <string name="nm_usage_thinking_supported">Supports reasoning</string>
+    <string name="nm_agnes_free_summary">%1$d verified free chat models, %2$d image models with declared free use, %3$d unconfirmed.</string>
+    <string name="nm_agnes_free_scope">Only verified free chat can send messages with this filter. Agnes image generation has a separate rule. Testing the key does not verify the account price.</string>
+    <string name="nm_agnes_api_help">API base: %1$s. Agnes uses POST /images/generations, not a browser page. Use Test key to check the key. For images, select Auto or Images API, not Chat Completions.</string>
+    <string name="nm_agnes_auto_image_needs_entry">The selected Agnes model has no entry for automatic use. Open image and video models and tap Review automatic image approval to restore this entry.</string>
+    <string name="nm_agnes_auto_image_capability_off">Image generation is off for this model in automatic selection. Open its review, turn on Generate images and save.</string>
+    <string name="nm_agnes_auto_image_authorized">Automatic image use was approved for this selection. Each request still goes through the image permission check.</string>
 </resources>

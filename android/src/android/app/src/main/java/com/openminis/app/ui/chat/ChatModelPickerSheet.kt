@@ -384,8 +384,9 @@ internal fun ModelPickerSheet(
     val nmPaymentRefusals by providerRepository.tamaPaymentRefusals.collectAsState()
     val nmActive = config.modelEntries.firstOrNull { it.id == activeEntryId }
     val nmActiveInstance = config.instances.firstOrNull { it.id == nmActive?.providerInstanceId }
-    val nmModeControl = tamaPicker && ownChatModeBusy != null &&
-        nmActiveInstance?.let { providerRepository.tamaOwnApiKey(it) != null } == true
+    // nanoMuse: this is the global model selector. It must be usable even
+    // before a chat has a bound route, not only after a manual key/model pick.
+    val nmModeControl = chatOnly
     @Composable
     fun Badges(entry: ModelEntry, instance: com.openminis.app.data.model.ProviderInstance?) {
         val metadata = remember(config, entry, instance, nmCatalogueStatuses, nmPaymentRefusals, nmFreeEvidence) {
@@ -582,23 +583,22 @@ internal fun ModelPickerSheet(
                     .weight(1f, fill = false),
             ) {
                 // nanoMuse: show the current selection and the mode without changing route consent.
-                if (nmModeControl && nmActive != null && nmActiveInstance != null) item {
+                if (nmModeControl) item {
                     val modeRevision by ai.tama.router.AutoModelStore.modeChanges.collectAsState()
                     val automatic = remember(modeRevision) { ai.tama.router.AutoModelStore.enabled(nmContext) }
+                    val mode = stringResource(if (automatic) R.string.soul_lang_auto else R.string.nm_chat_mode_manual)
+                    val route = if (nmActive != null && nmActiveInstance != null) stringResource(
+                        R.string.nm_chat_current_route,
+                        nmActiveInstance.label.ifBlank { nmActiveInstance.providerType.displayName },
+                        nmActive.model.displayName,
+                    ) else null
                     com.openminis.app.ui.settings.SettingsSwitchRow(
                         title = stringResource(R.string.nm_auto_models_title),
-                        subtitle = stringResource(if (automatic) R.string.soul_lang_auto else R.string.nm_chat_mode_manual) +
-                            " · " + stringResource(
-                            R.string.nm_chat_current_route,
-                            nmActiveInstance.label.ifBlank { nmActiveInstance.providerType.displayName },
-                            nmActive.model.displayName,
-                        ),
+                        subtitle = listOfNotNull(mode, route).joinToString(" · "),
                         checked = automatic,
                         enabled = ownChatModeBusy == false,
                         onCheckedChange = { enabled ->
-                            val live = providerRepository.instance(nmActiveInstance.id)
-                            if (ownChatModeBusy == false && live?.let { providerRepository.tamaOwnApiKey(it) != null } == true)
-                                ai.tama.router.AutoModelStore.setEnabled(nmContext, enabled)
+                            if (ownChatModeBusy == false) ai.tama.router.AutoModelStore.setEnabled(nmContext, enabled)
                         },
                     )
                     Text(

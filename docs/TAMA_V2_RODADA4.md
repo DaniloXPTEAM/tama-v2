@@ -104,3 +104,72 @@ que ela permaneceu. Se for testar outro modo, cada novo pedido explícito é uma
 nova geração. Se bloquear, confira a mensagem e o atalho de configuração; não
 reenvie com base em `ok:true` no texto. A Arena não usa a conta real nem executa
 esse roteiro no aparelho.
+
+
+## Seleção salva, autorização e preço após o relato do Poco
+
+O relato posterior ao roteiro .3 inclui falha de chat no Automático, uso manual
+que respondeu, imagem conseguida via ferramenta e um bloqueio de elegibilidade.
+Não identificamos a versão instalada nem conseguimos observar simultaneamente a
+configuração e o envio que falharam no Poco. O erro amplo `no_approved_image_model`
+era local, no ramo de seleção automática; por si só não indicava que houve um
+`POST`, que a chave estava errada ou que a Agnes recusou a conta.
+
+- No seletor de chat do Test, **Seleção automática de modelos** agora está
+  disponível até sem modelo ativo. **Perfil da conversa** (Leve, Agente completo
+  etc.) não muda aquele controle. Ao reabrir o app, a lista de preços/capacidades
+  do OpenRouter ou a evidência do Groq podem estar ausentes. Se nenhuma rota
+  elegível já estiver pronta, o Automático tenta recuperar evidência somente
+  para contas/entradas que já têm autorização, sem exigir um chat manual prévio.
+  A verificação é de catálogo, não de inferência. As exigências de custo, conta,
+  capacidade, contexto e permissão não são removidas. Para provedores com
+  evidência verificável, a aprovação em lote de **chat** continua disponível.
+- **Criar imagens** continua separado de **Visão** e da conversa. **Manual** usa
+  o par de conta e modelo salvo para a imagem sem exigir aprovação automática.
+  Um pedido direto de imagem nova, sem anexos, usa a ferramenta nativa, sem
+  depender de o modelo de texto procurar um gerador. Em **Automático**, o app
+  aponta se falta a entrada, se ela é ambígua, se **Gerar imagens** está
+  desligado ou se falta a autorização. O link das configurações leva à revisão
+  da seleção exata. Abrir essa revisão não concede permissão, não envia uma
+  imagem e não muda o slot. Se a entrada estiver ausente, o toque explícito
+  repõe apenas a entrada conhecida, sem restaurar um consentimento antigo. A
+  permissão para criar imagens continua sendo verificada antes do envio.
+- `agnes-image-2.1-flash` e `agnes-image-2.0-flash` geram imagens; não são modelos
+  de conversa. Um vínculo antigo do primeiro não vira um endpoint de chat. Em
+  **Modelo e uso → Raciocínio**, **Suporta raciocínio: Não** vale só para esse
+  recurso do modelo de chat; não testa a Agnes nem a criação de imagem.
+- **“0 gratuitos, 4 não confirmados”** era compatível com dois modelos de chat
+  sem prova de gratuidade e dois de imagem contados como não confirmados pelo
+  critério de chat. A nova contagem separa chat gratuito confirmado, geradores
+  com gratuidade informada e entradas sem custo confirmado. O filtro continua
+  impedindo chat de custo desconhecido; imagem não entra na sua lista de chat.
+  Gratuidade informada não é uma garantia de tarifa para a chave, o plano ou a
+  próxima chamada. A referência para cobrança real é a conta da Agnes, não o
+  catálogo, a sonda ou uma imagem concluída.
+- A base esperada no APK é `https://apihub.agnes-ai.com/v1` e o contrato de imagem
+  já usado continua `POST /v1/images/generations` com autenticação. A
+  [referência da Agnes](https://wiki.agnes-ai.com/en/docs/agnes-image-21-flash)
+  publica esse método e caminho. A captura do Studio Local v4 mostra a interface
+  de um HTML local, não o destino da requisição interna. Abrir a base ou o caminho
+  no navegador não reproduz esse POST; **Testar chave** faz uma consulta de
+  catálogo opt-in, sem confirmar acesso a todo modelo nem preço.
+
+**Roteiro de aceite, sem reinstalar nem recadastrar:**
+
+1. No build que contenha esta correção, anote a versão. Com a conta de texto que
+   já respondia, use o controle **Seleção automática de modelos** e teste uma
+   saudação em conversa nova, sem escolher o modelo no chat. Confirme qual rota
+   respondeu ou qual bloqueio local foi mostrado. Repita após reabrir o app.
+2. Mantenha a mesma conta de texto e a Agnes no slot **Criar imagens**. No
+   **Manual**, peça uma imagem nova sem anexos e confira o pedido de permissão,
+   modelo e anexo real; não deve ser necessário instruir um Shell. No
+   **Automático**, abra a revisão se o app pedir, confira o modelo e salve a
+   autorização apenas se desejada. Negar a permissão não pode enviar a imagem.
+3. Se continuar falhando, registre a versão, o modo de seleção, a mensagem
+   exata e, se o erro for de endereço, só host/caminho da URL. Não envie a
+   chave, parâmetros secretos ou capturas da conta de faturamento.
+
+A regressão automatizada usa preferências de teste, resolução real, chaves
+fictícias e transporte simulado; a instrumentação preparada para Room e
+preferências criptografadas não testa a Agnes real. Nenhuma dessas provas é
+aceite no aparelho.

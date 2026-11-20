@@ -1581,4 +1581,12 @@
     <string name="nm_code_wrap">ตัดบรรทัด</string>
     <string name="nm_code_unwrap">เลื่อนบรรทัดยาว</string>
     <string name="nm_free_image_unavailable">โหมดฟรีในรุ่นนี้ไม่มีตัวสร้างรูปภาพที่ยืนยันว่าใช้ฟรี</string>
+    <string name="nm_router_request_profile_chip">โปรไฟล์การสนทนา: %1$s</string>
+    <string name="nm_usage_thinking_supported">รองรับการให้เหตุผล</string>
+    <string name="nm_agnes_free_summary">โมเดลแชตฟรีที่ยืนยันแล้ว %1$d รายการ โมเดลภาพที่แจ้งว่าใช้ฟรี %2$d รายการ ยังไม่ยืนยัน %3$d รายการ</string>
+    <string name="nm_agnes_free_scope">เมื่อใช้ตัวกรองนี้ เฉพาะแชตฟรีที่ยืนยันแล้วเท่านั้นที่ส่งคำขอได้ การสร้างภาพของ Agnes ใช้กฎแยกต่างหาก การทดสอบคีย์ไม่ยืนยันราคาของบัญชี</string>
+    <string name="nm_agnes_api_help">ที่อยู่หลักของ API: %1$s Agnes ใช้ POST /images/generations ไม่ใช่หน้าเว็บ ให้ใช้ทดสอบคีย์ สำหรับภาพให้เลือกอัตโนมัติหรือ Images API ไม่ใช่ Chat Completions</string>
+    <string name="nm_agnes_auto_image_needs_entry">โมเดล Agnes ที่เลือกไม่มีรายการสำหรับการใช้งานอัตโนมัติ เปิดโมเดลภาพและวิดีโอแล้วตรวจสอบการอนุญาตสร้างภาพอัตโนมัติเพื่อกู้คืนรายการนี้</string>
+    <string name="nm_agnes_auto_image_capability_off">โมเดลนี้ปิดการสร้างภาพในการเลือกอัตโนมัติ เปิดการตรวจสอบ เปิดสร้างภาพ แล้วบันทึก</string>
+    <string name="nm_agnes_auto_image_authorized">ได้อนุญาตให้โมเดลที่เลือกสร้างภาพอัตโนมัติแล้ว แต่ยังตรวจสอบสิทธิ์สร้างภาพเมื่อส่งคำขอ</string>
 </resources>

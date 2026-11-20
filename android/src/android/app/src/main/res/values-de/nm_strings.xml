@@ -1585,4 +1585,12 @@
     <string name="nm_code_wrap">Zeilen umbrechen</string>
     <string name="nm_code_unwrap">Lange Zeilen scrollen</string>
     <string name="nm_free_image_unavailable">In dieser Version gibt es im kostenlosen Modus keinen Bildgenerator mit bestätigten Gratisanfragen.</string>
+    <string name="nm_router_request_profile_chip">Gesprächsprofil: %1$s</string>
+    <string name="nm_usage_thinking_supported">Unterstützt Schlussfolgern</string>
+    <string name="nm_agnes_free_summary">%1$d bestätigte kostenlose Chatmodelle, %2$d Bildmodelle mit angegebenem Gratiszugang, %3$d unbestätigt.</string>
+    <string name="nm_agnes_free_scope">Mit diesem Filter können nur bestätigte kostenlose Chatmodelle Anfragen senden. Für Agnes-Bilder gilt eine eigene Regel. Der Schlüsseltest prüft nicht den Kontopreis.</string>
+    <string name="nm_agnes_api_help">API-Basis: %1$s. Agnes nutzt POST /images/generations, keine Browserseite. Prüfe den Schlüssel mit „Schlüssel testen“. Wähle für Bilder Auto oder Images API, nicht Chat Completions.</string>
+    <string name="nm_agnes_auto_image_needs_entry">Das gewählte Agnes-Modell hat keinen Eintrag für die automatische Auswahl. Öffne die Bild- und Videomodelle und überprüfe die Freigabe für automatische Bilder, um den Eintrag wiederherzustellen.</string>
+    <string name="nm_agnes_auto_image_capability_off">Die Bilderstellung ist für dieses Modell in der automatischen Auswahl aus. Öffne die Freigabe, aktiviere die Bilderstellung und speichere.</string>
+    <string name="nm_agnes_auto_image_authorized">Die automatische Bilderstellung ist für diese Auswahl freigegeben. Jede Anfrage prüft weiterhin die Bildberechtigung.</string>
 </resources>

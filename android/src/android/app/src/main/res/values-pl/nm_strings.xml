@@ -1593,4 +1593,12 @@
     <string name="nm_code_wrap">Zawijaj wiersze</string>
     <string name="nm_code_unwrap">Przewijaj długie wiersze</string>
     <string name="nm_free_image_unavailable">Tryb bezpłatny w tej wersji nie ma generatora obrazów o potwierdzonej bezpłatności.</string>
+    <string name="nm_router_request_profile_chip">Profil rozmowy: %1$s</string>
+    <string name="nm_usage_thinking_supported">Obsługuje rozumowanie</string>
+    <string name="nm_agnes_free_summary">%1$d zweryfikowanych darmowych modeli czatu, %2$d modeli obrazu deklarowanych jako darmowe, %3$d niepotwierdzonych.</string>
+    <string name="nm_agnes_free_scope">Z tym filtrem tylko zweryfikowany darmowy czat może wysyłać żądania. Generowanie obrazów Agnes podlega oddzielnej regule. Test klucza nie weryfikuje ceny na koncie.</string>
+    <string name="nm_agnes_api_help">Adres bazowy API: %1$s. Agnes używa POST /images/generations, a nie strony w przeglądarce. Użyj opcji Testuj klucz. Dla obrazów wybierz Auto lub Images API, nie Chat Completions.</string>
+    <string name="nm_agnes_auto_image_needs_entry">Wybrany model Agnes nie ma wpisu do użytku automatycznego. W modelach obrazu i wideo otwórz przegląd zgody na automatyczne obrazy, aby go przywrócić.</string>
+    <string name="nm_agnes_auto_image_capability_off">Generowanie obrazów jest wyłączone dla tego modelu w trybie automatycznym. Otwórz przegląd, włącz generowanie obrazów i zapisz.</string>
+    <string name="nm_agnes_auto_image_authorized">Zatwierdzono automatyczne użycie tego modelu do obrazów. Każde żądanie nadal wymaga sprawdzenia uprawnień do obrazów.</string>
 </resources>

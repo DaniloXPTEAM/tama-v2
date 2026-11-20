@@ -30,10 +30,14 @@ class P01ChatWiring(unittest.TestCase):
     def test_automatic_none_rechecks_only_approved_accounts_and_explains_exhaustion(self):
         chat = (MAIN / "com/openminis/app/ui/chat/ChatViewModel.kt").read_text()
         select = chat.split("suspend fun nmAutoSelect", 1)[1].split("suspend fun nmAutoActivate", 1)[0]
-        for gate in ("it.candidate.automaticApproved", "nmOwnKeyRecipientAllowed(it.instance)",
+        for gate in ("AutoChatEvidenceRecovery.candidates(", "nmOwnKeyRecipientAllowed(it.instance)",
                      "nmAutoRecheckedAccounts.add(it.instance.id)",
                      "tamaEnsureFreeChatEvidence(", "throw nmAutoNoCandidate(choices, selection)"):
             self.assertIn(gate, select)
+        policy = (MAIN / "ai/tama/router/AutoChatEvidenceRecovery.kt").read_text()
+        self.assertIn("candidate.automaticApproved", policy)
+        recovery = select.split("val recheck =", 1)[1].split("throw nmAutoNoCandidate", 1)[0]
+        self.assertNotIn("nmOwnKeyTurn", recovery)
         self.assertIn("actual is LocalAutoNoCandidate -> actual.explanation", chat)
         self.assertIn("context.getString(R.string.nm_auto_no_routes)).joinToString", chat)
 

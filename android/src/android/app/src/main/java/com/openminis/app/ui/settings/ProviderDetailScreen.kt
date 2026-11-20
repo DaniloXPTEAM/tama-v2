@@ -344,6 +344,7 @@ fun ProviderDetailScreen(
                     if (saved && enabled) providerRepository.refreshModelsInBackground(instance)
                 },
                 status = nmImportStatus,
+                agnes = ai.tama.media.AgnesImages.account(instance), // nanoMuse: images have separate evidence.
             )
             // nanoMuse: one tap enables the filter, fetches catalogue metadata if needed,
             // and approves the visible free chat routes. It does not run inference.
@@ -592,7 +593,10 @@ fun ProviderDetailScreen(
             val mode = instance.imageEndpointMode
             SettingsSection(
                 header = "Image Generation",
-                footer = when (mode) {
+                // nanoMuse: Agnes uses its Images API, not generic chat fallback.
+                footer = if (ai.tama.media.AgnesImages.account(instance)) stringResource(
+                    R.string.nm_agnes_api_help, ai.tama.providers.ProviderEndpoints.AGNES_BASE,
+                ) else when (mode) {
                     com.openminis.app.data.model.ImageEndpointMode.auto ->
                         if (instance.imageEndpointResolved != null) {
                             val resolved = if (instance.imageEndpointResolved ==

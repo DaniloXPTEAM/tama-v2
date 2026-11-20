@@ -63,6 +63,7 @@ fun MediaModelsScreen(
     onBack: () -> Unit,
     onOpenModelGroups: () -> Unit,
     onOpenProviders: () -> Unit,
+    onReviewImageModel: (String, String) -> Unit,
 ) {
     val context = LocalContext.current
     val repo = (context.applicationContext as? MinisApp)?.providerRepositoryOrNull
@@ -213,6 +214,12 @@ fun MediaModelsScreen(
             if (imageInstances.isEmpty() && !ImageGen.noFreeImageAvailable(context)) { // nanoMuse
                 SettingsRow(title = stringResource(R.string.nm_media_add_provider), onClick = onOpenProviders, showDivider = false)
             }
+        }
+
+        // nanoMuse: the settings link from an image refusal opens this same review.
+        if (parallelTest) {
+            val choiceRevision = remember(imageInstance, imageModel, config) { ImageGen.imageChoiceRevision() }
+            ai.tama.media.AgnesImageReviewSection(choiceRevision, onReviewImageModel)
         }
 
         // ── video ──

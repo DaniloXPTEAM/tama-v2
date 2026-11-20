@@ -114,24 +114,7 @@ fun SlotPickerScreen(
             modifier = Modifier.padding(horizontal = 16.dp).padding(top = 12.dp),
         )
         if (slot == Slot.IMAGE && parallelTest) {
-            // Use the same registered identity as the automatic selector, not a legacy custom duplicate.
-            val agnes = current?.takeIf { ai.tama.media.AgnesImages.route(it.instance) && ai.tama.media.AgnesImages.model(it.modelId) != null }
-            val registered = agnes?.let { value ->
-                val matching = config?.modelEntries.orEmpty().filter {
-                    it.providerInstanceId == value.instance.id && it.baseModel.id == value.modelId
-                }
-                ai.tama.media.AgnesImages.registeredEntry(matching)?.takeUnless { it.isHidden }
-            }
-            if (registered != null) {
-                SettingsSection(footer = stringResource(R.string.nm_agnes_review_image_help)) {
-                    SettingsRow(
-                        title = stringResource(R.string.nm_agnes_review_image),
-                        subtitle = registered.model.displayName,
-                        onClick = { onReviewImageModel(registered.providerInstanceId, registered.id) },
-                        showDivider = false,
-                    )
-                }
-            }
+            ai.tama.media.AgnesImageReviewSection(io.github.nanomuse.avatar.ImageGen.imageChoiceRevision(), onReviewImageModel)
         }
         // nanoMuse: distinguish an untried video check from a provider failure.
         if (slot == Slot.VIDEO && parallelTest) {

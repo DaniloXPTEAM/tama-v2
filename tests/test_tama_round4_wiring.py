@@ -31,11 +31,14 @@ class Round4WiringTest(unittest.TestCase):
     def test_image_picker_reviews_existing_agnes_entry_without_granting_approval(self):
         picker = (MAIN / 'io/github/nanomuse/ui/models/SlotPickerScreen.kt').read_text()
         review = picker.split('if (slot == Slot.IMAGE && parallelTest)', 1)[1].split('// nanoMuse: distinguish', 1)[0]
-        self.assertIn('it.providerInstanceId == value.instance.id && it.baseModel.id == value.modelId', review)
-        self.assertIn('AgnesImages.registeredEntry(matching)', review)
-        self.assertIn('onReviewImageModel(registered.providerInstanceId, registered.id)', review)
+        self.assertIn('AgnesImageReviewSection(', review)
+        ui = (MAIN / 'ai/tama/media/AgnesImageReviewSection.kt').read_text()
+        self.assertIn('AutoImageSelection.prepareAgnesReview(context, setup)', ui)
+        self.assertIn('onReview(setup.providerId, entryId)', ui)
         for mutator in ('setImageApproved', 'nmSaveAutoReview', 'ImageGen.save', 'addEntry'):
-            self.assertNotIn(mutator, review)
+            self.assertNotIn(mutator, ui)
+        media = (MAIN / 'io/github/nanomuse/ui/media/MediaModelsScreen.kt').read_text()
+        self.assertIn('AgnesImageReviewSection(choiceRevision, onReviewImageModel)', media)
         navigation = (MAIN / 'com/openminis/app/ui/navigation/AppNavigation.kt').read_text()
         self.assertIn('onReviewImageModel = { instanceId, entryId ->\n'
                       '                    navController.safeNavigate(Routes.modelEntryDetail(instanceId, entryId))', navigation)

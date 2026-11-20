@@ -1585,4 +1585,12 @@
     <string name="nm_code_wrap">I-wrap ang mga linya</string>
     <string name="nm_code_unwrap">I-scroll ang mahahabang linya</string>
     <string name="nm_free_image_unavailable">Walang beripikadong libreng generator ng larawan sa libreng mode ng bersyong ito.</string>
+    <string name="nm_router_request_profile_chip">Profile ng usapan: %1$s</string>
+    <string name="nm_usage_thinking_supported">May suporta sa pangangatwiran</string>
+    <string name="nm_agnes_free_summary">%1$d kumpirmadong libreng modelo ng chat, %2$d modelo ng larawan na idineklarang libre, %3$d hindi kumpirmado.</string>
+    <string name="nm_agnes_free_scope">Sa filter na ito, ang kumpirmadong libreng chat lang ang makapagpapadala ng mga request. May sariling patakaran ang larawan ng Agnes. Hindi kinukumpirma ng pagsubok sa key ang presyo ng account.</string>
+    <string name="nm_agnes_api_help">API base: %1$s. POST /images/generations ang gamit ng Agnes, hindi pahina sa browser. Gamitin ang Subukan ang key. Para sa larawan, piliin ang Awtomatiko o Images API, hindi Chat Completions.</string>
+    <string name="nm_agnes_auto_image_needs_entry">Walang entry para sa awtomatikong paggamit ng napiling modelo ng Agnes. Buksan ang Mga modelo ng larawan at video at suriin ang pahintulot para maibalik ang entry.</string>
+    <string name="nm_agnes_auto_image_capability_off">Naka-off ang paggawa ng larawan para sa modelong ito sa awtomatikong pagpili. Buksan ang pagsuri, i-on ang Gumawa ng larawan at i-save.</string>
+    <string name="nm_agnes_auto_image_authorized">Aprubado ang awtomatikong paggawa ng larawan para sa napiling ito. Susuriin pa rin ang pahintulot sa larawan sa bawat request.</string>
 </resources>

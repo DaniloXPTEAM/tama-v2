@@ -222,6 +222,25 @@ object AutoModelStore {
             preferences.getBoolean(prefix(identity) + "image_approved", false))
     }
 
+    /** Inspect the saved grant and override without letting a stale UI snapshot change the route. */
+    @Synchronized
+    internal fun inspectImageReview(context: Context, identity: Identity): Pair<Boolean, Boolean?> {
+        val preferences = prefs(context)
+        if (preferences.getString(currentRouteKey(identity.providerId), null) != identity.route) return false to null
+        val key = capabilityKey(identity, Need.IMAGE_GENERATION)
+        return preferences.getBoolean(prefix(identity) + "image_approved", false) to
+            if (preferences.contains(key)) preferences.getBoolean(key, false) else null
+    }
+
+    /** Caller proved the row is absent while holding the provider config lock. */
+    @Synchronized
+    internal fun forgetMissingImageReview(context: Context, identity: Identity): Boolean {
+        val written = prefs(context).edit().remove(prefix(identity) + "image_approved")
+            .remove(capabilityKey(identity, Need.IMAGE_GENERATION)).commit()
+        advanceReview(identity.providerId)
+        return written
+    }
+
     /** Check an in-flight image selection without restoring an obsolete route or grant. */
     @Synchronized
     internal fun imageReviewCurrent(

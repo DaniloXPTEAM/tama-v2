@@ -17,6 +17,15 @@ internal object FreeModelImport {
         OpenRouterPricing.chatStatus(catalogue, it.id, nowMillis) == OpenRouterPricing.Status.ADVERTISED_FREE
     }
 
+    /** Image evidence is counted separately and can never qualify an ID for free chat. */
+    fun summarize(visibleIds: Set<String>, eligibleChatIds: Set<String>, added: Int,
+                  declaredImageIds: Set<String>? = null): FreeModelImportStatus.Complete {
+        val images = visibleIds.intersect(declaredImageIds.orEmpty())
+        val chat = (visibleIds - images).count { it in eligibleChatIds }
+        return FreeModelImportStatus.Complete(chat, added, visibleIds.size - chat - images.size,
+            images.size.takeIf { declaredImageIds != null })
+    }
+
     /** Existing entries, customizations, groups and pins are deliberately untouched. */
     fun additions(instanceId: String, existing: List<ModelEntry>, eligible: List<LLMModel>): List<ModelEntry> {
         val present = existing.filter { it.providerInstanceId == instanceId }
@@ -34,7 +43,10 @@ sealed interface FreeModelImportStatus {
     data object MissingKey : FreeModelImportStatus
     data object Failed : FreeModelImportStatus
     data object SaveFailed : FreeModelImportStatus
-    data class Complete(val eligible: Int, val added: Int, val unconfirmed: Int = 0) : FreeModelImportStatus
+    data class Complete(
+        val eligible: Int, val added: Int, val unconfirmed: Int = 0,
+        val declaredImages: Int? = null,
+    ) : FreeModelImportStatus
 }
 
 /**

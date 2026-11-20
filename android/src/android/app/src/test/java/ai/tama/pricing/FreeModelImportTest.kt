@@ -59,6 +59,17 @@ class FreeModelImportTest {
         assertTrue(FreeModelImport.eligible(list, catalogue, now + OpenRouterPricing.MAX_AGE_MILLIS + 1).isEmpty())
     }
 
+    @Test fun `Agnes summary never counts declared image evidence as free chat`() {
+        val images = setOf("agnes-image-2.1-flash", "agnes-image-2.0-flash")
+        val visible = images + setOf("agnes-2.5-flash", "agnes-3.0-flash")
+        assertEquals(FreeModelImportStatus.Complete(0, 0, 2, declaredImages = 2),
+            FreeModelImport.summarize(visible, images, added = 0, declaredImageIds = images))
+        assertEquals(FreeModelImportStatus.Complete(0, 0, 2, declaredImages = 1),
+            FreeModelImport.summarize(visible - "agnes-image-2.1-flash", emptySet(), added = 0, declaredImageIds = images))
+        assertEquals(FreeModelImportStatus.Complete(1, 1, 1),
+            FreeModelImport.summarize(setOf("fixture/free", "fixture/unknown"), setOf("fixture/free"), added = 1))
+    }
+
     @Test fun `import is additive idempotent and preserves customized existing entries`() {
         val preserved = ModelEntry("one", model("vendor/a:free"), overrides = ModelOverrides(displayName = "My model"), isHidden = true, uuid = "stable")
         val other = ModelEntry("two", model("vendor/b:free"), uuid = "other")

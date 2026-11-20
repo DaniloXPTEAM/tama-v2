@@ -140,7 +140,9 @@ internal fun TokenUsageSheet(
                 StatSection(title = stringResource(R.string.token_usage_section_thinking)) {
                     StatRow(stringResource(R.string.token_usage_thinking_label), if (t.enabled) onText else offText)
                     if (t.enabled) StatRow(stringResource(R.string.token_usage_thinking_level), t.level)
-                    StatRow(stringResource(R.string.token_usage_thinking_supported), if (t.supported) yesText else noText)
+                    // nanoMuse: only reasoning support, not chat/image route compatibility.
+                    StatRow(stringResource(if (parallelTest) R.string.nm_usage_thinking_supported
+                        else R.string.token_usage_thinking_supported), if (t.supported) yesText else noText)
                 }
             }
 

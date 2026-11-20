@@ -1581,4 +1581,12 @@
     <string name="nm_code_wrap">Lipat baris</string>
     <string name="nm_code_unwrap">Gulir baris panjang</string>
     <string name="nm_free_image_unavailable">Mode gratis di versi ini tidak memiliki generator gambar yang terverifikasi gratis.</string>
+    <string name="nm_router_request_profile_chip">Profil percakapan: %1$s</string>
+    <string name="nm_usage_thinking_supported">Mendukung penalaran</string>
+    <string name="nm_agnes_free_summary">%1$d model chat gratis terverifikasi, %2$d model gambar dengan penggunaan gratis yang dinyatakan, %3$d belum dikonfirmasi.</string>
+    <string name="nm_agnes_free_scope">Dengan filter ini, hanya chat gratis terverifikasi yang dapat mengirim permintaan. Gambar Agnes memakai aturan terpisah. Pengujian kunci tidak memverifikasi tarif akun.</string>
+    <string name="nm_agnes_api_help">Basis API: %1$s. Agnes memakai POST /images/generations, bukan halaman browser. Gunakan Uji kunci. Untuk gambar, pilih Otomatis atau Images API, bukan Chat Completions.</string>
+    <string name="nm_agnes_auto_image_needs_entry">Model Agnes yang dipilih belum memiliki entri untuk penggunaan otomatis. Buka Model gambar dan video, lalu tinjau izin gambar otomatis untuk memulihkan entri ini.</string>
+    <string name="nm_agnes_auto_image_capability_off">Pembuatan gambar dinonaktifkan untuk model ini pada pilihan otomatis. Buka peninjauan, aktifkan Buat gambar, lalu simpan.</string>
+    <string name="nm_agnes_auto_image_authorized">Penggunaan gambar otomatis telah disetujui untuk pilihan ini. Izin gambar tetap diperiksa pada setiap permintaan.</string>
 </resources>

@@ -98,6 +98,55 @@ internal object AutoImageSelection {
         }
     }
 
+    // This is the same exact Agnes identity used by entries(), with no alternative
+    // provider or approval guessed from the name. A direct Manual pick can exist
+    // without a registered row, but only a registered entry can carry Auto consent.
+    data class AgnesSetup(
+        val providerId: String, val modelId: String, val entryId: String?, val problem: CustomImageRoute.Problem?,
+        val slotRevision: Long, val accountVersion: Long,
+    )
+
+    fun agnesSetup(context: Context): AgnesSetup? {
+        if (!parallel) return null
+        val repo = (context.applicationContext as? MinisApp)?.providerRepositoryOrNull ?: return null
+        val revision = ImageGen.imageChoiceRevision()
+        val endpoint = ImageGen.endpoint(context) ?: return null
+        if (!AgnesImages.route(endpoint.instance) || AgnesImages.model(endpoint.model) == null) return null
+        val config = repo.config.value
+        val live = config.instances.singleOrNull { it.id == endpoint.instanceId }?.takeIf { it == endpoint.instance } ?: return null
+        val version = AutoModelRuntime.accountVersion(live.id)
+        val matching = config.modelEntries.filter { it.providerInstanceId == live.id && it.baseModel.id == endpoint.model }
+        val entry = AgnesImages.registeredEntry(matching)
+        val problem = when {
+            matching.isEmpty() -> CustomImageRoute.Problem.AGNES_IMAGE_NEEDS_ENTRY
+            entry == null || entry.model.id != endpoint.model || config.modelEntries.count { it.id == entry.id } != 1 ->
+                CustomImageRoute.Problem.AGNES_IMAGE_AMBIGUOUS
+            entry.isHidden -> return null
+            else -> {
+                val (approved, override) = AutoModelStore.inspectImageReview(context, AutoModelStore.identity(entry, live))
+                when {
+                    override == false -> CustomImageRoute.Problem.AGNES_IMAGE_CAPABILITY_OFF
+                    !approved -> CustomImageRoute.Problem.AGNES_IMAGE_NEEDS_APPROVAL
+                    else -> null
+                }
+            }
+        }
+        if (revision != ImageGen.imageChoiceRevision() || version != AutoModelRuntime.accountVersion(live.id)) return null
+        return AgnesSetup(live.id, endpoint.model, entry?.id, problem, revision, version)
+    }
+
+    /** Only a tap on Review can restore a missing row. Opening it does not grant consent. */
+    fun prepareAgnesReview(context: Context, expected: AgnesSetup): String? {
+        val repo = (context.applicationContext as? MinisApp)?.providerRepositoryOrNull ?: return null
+        if (agnesSetup(context) != expected || expected.problem == CustomImageRoute.Problem.AGNES_IMAGE_AMBIGUOUS) return null
+        expected.entryId?.let { return it }
+        val restored = repo.nmRegisterAgnesImage(expected.providerId, expected.modelId, expected.accountVersion) ?: return null
+        return restored.takeIf {
+            val live = agnesSetup(context)
+            live == expected.copy(entryId = restored, problem = CustomImageRoute.Problem.AGNES_IMAGE_NEEDS_APPROVAL)
+        }
+    }
+
     private fun candidates(
         context: Context, repo: ProviderRepository, freeOnly: Boolean, excluded: Set<Pair<String, String>>,
     ): List<Entry> {

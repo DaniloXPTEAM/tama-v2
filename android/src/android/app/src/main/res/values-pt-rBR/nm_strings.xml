@@ -1651,4 +1651,12 @@
     <string name="nm_agnes_review_image">Revisar autorização de imagem automática</string>
     <string name="nm_agnes_review_image_help">No modo Automático, ative a autorização de geração de imagens para este modelo e toque em Salvar. Escolher um modelo ou mudar o grupo não dá autorização.</string>
     <string name="nm_vision_group_not_image_generation">O Grupo de visão lê imagens. O Fallback do grupo não configura a geração. Para gerar, use Configurações → Modelos → Criar imagens.</string>
+    <string name="nm_router_request_profile_chip">Perfil da conversa: %1$s</string>
+    <string name="nm_usage_thinking_supported">Suporta raciocínio</string>
+    <string name="nm_agnes_free_summary">%1$d modelos de chat gratuitos confirmados, %2$d de imagem com gratuidade informada, %3$d sem custo confirmado.</string>
+    <string name="nm_agnes_free_scope">Com este filtro, só modelos de chat gratuitos confirmados podem enviar pedidos. Imagens da Agnes seguem outra regra. Testar a chave não confirma a tarifa da conta.</string>
+    <string name="nm_agnes_api_help">Base da API: %1$s. A Agnes usa POST /images/generations, não uma página de navegador. Use Testar chave para verificar a chave. Para imagens, selecione Automático ou Images API, não Chat Completions.</string>
+    <string name="nm_agnes_auto_image_needs_entry">O modelo Agnes selecionado não tem uma entrada para uso automático. Em Modelos de imagem e vídeo, toque em Revisar autorização de imagem automática para restaurar essa entrada.</string>
+    <string name="nm_agnes_auto_image_capability_off">Gerar imagens está desligado para este modelo no Automático. Abra a revisão do modelo, ative Gerar imagens e salve.</string>
+    <string name="nm_agnes_auto_image_authorized">O uso automático de imagem está autorizado para esta seleção. O pedido ainda passa pela verificação da permissão de criar imagens.</string>
 </resources>

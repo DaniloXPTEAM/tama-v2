@@ -7,6 +7,10 @@ object R { object string {
     const val nm_image_endpoint_rejected = 105
     const val nm_agnes_image_authentication = 6017
     const val nm_agnes_image_access_denied = 6018
+    const val nm_agnes_auto_image_needs_entry = 6090
+    const val nm_auto_reason_duplicate = 6091
+    const val nm_agnes_auto_image_capability_off = 6092
+    const val nm_agnes_review_image_help = 6093
     const val nm_agnes_image_unavailable = 208
     const val nm_agnes_image_queue = 201
     const val nm_agnes_image_limit = 202

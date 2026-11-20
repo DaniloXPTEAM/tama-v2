@@ -1551,4 +1551,12 @@
     <string name="nm_code_block_label">程式碼</string>
     <string name="nm_code_wrap">自動換行</string>
     <string name="nm_code_unwrap">水平捲動長行</string>
+    <string name="nm_router_request_profile_chip">對話設定：%1$s</string>
+    <string name="nm_usage_thinking_supported">支援推理</string>
+    <string name="nm_agnes_free_summary">%1$d 個已核實的免費對話模型，%2$d 個聲明可免費使用的圖片模型，%3$d 個費用未確認。</string>
+    <string name="nm_agnes_free_scope">啟用此篩選器後，只有已核實免費的對話模型可以送出請求。Agnes 圖片生成有另外的規則。測試金鑰不會確認帳戶費率。</string>
+    <string name="nm_agnes_api_help">API 基礎網址：%1$s。Agnes 使用 POST /images/generations，這不是瀏覽器網頁。請用「測試金鑰」。生成圖片請選「自動」或 Images API，不要選 Chat Completions。</string>
+    <string name="nm_agnes_auto_image_needs_entry">所選的 Agnes 模型沒有自動使用的項目。請開啟圖片和影片模型，檢查自動圖片授權以還原項目。</string>
+    <string name="nm_agnes_auto_image_capability_off">這個模型在自動選擇中已關閉圖片生成。請開啟授權檢查，啟用「生成圖片」後儲存。</string>
+    <string name="nm_agnes_auto_image_authorized">已允許自動使用所選的模型生成圖片。每次請求仍會檢查圖片生成權限。</string>
 </resources>

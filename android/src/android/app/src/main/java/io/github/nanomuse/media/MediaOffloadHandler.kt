@@ -189,7 +189,8 @@ class MediaOffloadHandler internal constructor(
                     val problem = images.selectionProblem()
                     return when (problem) {
                         CustomImageRoute.Problem.AGNES_PAYMENT, CustomImageRoute.Problem.NEEDS_KEY,
-                        CustomImageRoute.Problem.AGNES_UNAVAILABLE -> imageRouteError(problem)
+                        CustomImageRoute.Problem.AGNES_UNAVAILABLE,
+                        CustomImageRoute.Problem.AGNES_IMAGE_AMBIGUOUS -> imageRouteError(problem)
                         else -> noFreeImage()
                     }
                 }
@@ -345,11 +346,19 @@ class MediaOffloadHandler internal constructor(
                 is ImageDispatch.Outcome.Blocked -> return when (outcome.reason) {
                     ImageDispatch.Block.AUTO_EDIT_UNAVAILABLE -> automaticImageError(
                         "automatic_image_edit_unavailable", com.openminis.app.R.string.nm_auto_image_edit_blocked)
-                    ImageDispatch.Block.NO_APPROVED_IMAGE -> if (fallback) imageRouteError(CustomImageRoute.Problem.AGNES_PAYMENT)
-                    else if (!images.automaticCostAllowed() && !images.hasDeclaredFreeImage()) automaticImageError(
-                        "automatic_image_cost_unverified", com.openminis.app.R.string.nm_auto_reason_unverified_cost)
-                    else if (!images.hasConfiguredImage()) missing("image") else automaticImageError(
-                        "no_approved_image_model", com.openminis.app.R.string.nm_auto_image_missing)
+                    ImageDispatch.Block.NO_APPROVED_IMAGE -> {
+                        if (fallback) imageRouteError(CustomImageRoute.Problem.AGNES_PAYMENT)
+                        else if (!images.automaticCostAllowed() && !images.hasDeclaredFreeImage()) automaticImageError(
+                            "automatic_image_cost_unverified", com.openminis.app.R.string.nm_auto_reason_unverified_cost)
+                        else {
+                            // nanoMuse: a saved Manual pick need not be missing altogether.
+                            // Report its specific Auto blocker using only local settings.
+                            val problem = if (parallel) images.automaticSelectionProblem() else null
+                            if (problem != null) imageRouteError(problem)
+                            else if (!images.hasConfiguredImage()) missing("image") else automaticImageError(
+                                "no_approved_image_model", com.openminis.app.R.string.nm_auto_image_missing)
+                        }
+                    }
                     ImageDispatch.Block.AUTHORIZATION_CHANGED -> if (automatic && !images.automaticCostAllowed()) automaticImageError(
                         "automatic_image_cost_unverified", com.openminis.app.R.string.nm_auto_reason_unverified_cost)
                     else automaticImageError("image_authorization_changed", com.openminis.app.R.string.nm_auto_image_changed)

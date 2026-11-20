@@ -41,18 +41,20 @@ class AutoImageSelectionTest {
         val identity: AutoModelStore.Identity,
         val repo: ProviderRepository,
         val config: ProviderConfig,
+        val reopened: () -> Context,
     )
 
     private fun fixture(): Fixture {
         val preferences = PetPrefsContext()
         val app = Mockito.mock(MinisApp::class.java)
         val repo = Mockito.mock(ProviderRepository::class.java)
-        val context = object : ContextWrapper(null) {
+        fun reopen() = object : ContextWrapper(null) {
             override fun getApplicationContext(): Context = app
             override fun getFilesDir() = temp.root
             override fun getSharedPreferences(name: String, mode: Int): SharedPreferences =
                 preferences.getSharedPreferences(name, mode)
         }
+        val context = reopen()
         val instance = ProviderInstance(
             UUID.randomUUID().toString(), "Fixture", ProviderType.openAI, ProviderCredential.apiKey,
             customBaseURL = "https://fixture.invalid/v1",
@@ -69,7 +71,7 @@ class AutoImageSelectionTest {
         AutoModelStore.setAllowUnverifiedAutomaticCost(context, true)
         AutoModelStore.setCapability(context, identity, Need.IMAGE_GENERATION, true)
         AutoModelStore.setImageApproved(context, identity, true)
-        return Fixture(context, identity, repo, config)
+        return Fixture(context, identity, repo, config, ::reopen)
     }
 
     private fun Fixture.addAgnes(): Pair<ProviderInstance, List<ModelEntry>> {
@@ -119,6 +121,7 @@ class AutoImageSelectionTest {
         val sent = mutableListOf<Pair<String, String>>()
         val permits = mutableListOf<Boolean>()
         var permissionGranted = true
+        var freeOnlyForChat = false
         val services = object : MediaImageServices by AndroidMediaImageServices(f.context) {
             override suspend fun observeCliImageScope(sessionId: String?): () -> CliImageScope.State =
                 { CliImageScope.State.UNRESTRICTED }
@@ -153,26 +156,31 @@ class AutoImageSelectionTest {
         val cli = NativeOffloadRequest(pid = 1, argv = listOf("nanomuse-media", "image", "--prompt", prompt),
             env = emptyMap(), cwd = "/", sessionId = sid)
         suspend fun tool(text: String) = ImageGenerationTool.execute(JSONObject().put("prompt", text).toString(), "Image") { p, size ->
-            handler.generateImage(p, size, sid)
+            handler.generateImage(p, size, sid, freeOnly = freeOnlyForChat)
         }
         ModelCostGuard.setAllowedForCurrentProcess(true)
         try {
             assertTrue(services.automaticCostAllowed())
             assertTrue(services.modelCostAllowed())
             // An available but unapproved Agnes default cannot fall through to paid.
-            assertEquals("no_approved_image_model", JSONObject(handler.handle(cli).output).getString("error"))
-            assertEquals("no_approved_image_model", JSONObject(tool(prompt).output).getString("error"))
+            assertEquals("agnes_auto_image_needs_approval", JSONObject(handler.handle(cli).output).getString("error"))
+            assertEquals("agnes_auto_image_needs_approval", JSONObject(tool(prompt).output).getString("error"))
             assertTrue(sent.isEmpty())
             assertTrue(permits.isEmpty())
 
+            // Set a pin and reopen the preferences without enabling any general cost permission.
             ImageGen.save(f.context, agnes.id, AgnesImages.DEFAULT)
-            AutoModelStore.setEnabled(f.context, false)
+            AutoModelStore.setEnabled(f.reopened(), false)
+            AutoModelStore.setAllowUnverifiedAutomaticCost(f.reopened(), false)
+            ModelCostGuard.setAllowedForCurrentProcess(false)
+            freeOnlyForChat = true
             val manual = tool(prompt)
             assertTrue(manual.success)
             assertEquals(AgnesImages.DEFAULT, JSONObject(manual.output).getString("model"))
 
-            AutoModelStore.setEnabled(f.context, true)
-            AutoModelStore.setImageApproved(f.context, AutoModelStore.identity(entries.first(), agnes), true)
+            AutoModelStore.setEnabled(f.reopened(), true)
+            val review = AutoModelStore.review(f.reopened(), AutoModelStore.identity(entries.first(), agnes))
+            assertTrue(AutoModelStore.saveReview(f.reopened(), review, chat = false, image = true, edits = emptyMap()))
             permissionGranted = false
             val denied = ImageShortcutRunner.run(prompt, "could not draw", "Settings",
                 safeFailureMessages = mapOf("permission_denied" to "permission not granted"), execute = ::tool)
@@ -192,6 +200,84 @@ class AutoImageSelectionTest {
             assertEquals(List(3) { agnes.id to AgnesImages.DEFAULT }, sent)
             assertEquals(listOf(false, false, false, true), permits) // CLI must still ask fresh permission.
         } finally { ModelCostGuard.setAllowedForCurrentProcess(false) }
+    }
+
+    @Test fun `restored image pin and review use exact saved identity independently of chat`() {
+        assumeTrue(BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test")
+        val f = fixture()
+        val (agnes, entries) = f.addAgnes()
+        val image = entries.first()
+        val identity = AutoModelStore.identity(image, agnes)
+        AutoModelStore.setAllowUnverifiedAutomaticCost(f.context, false)
+        // The text account can be fully approved on its own. That approval is not image consent.
+        val chat = ProviderInstance(UUID.randomUUID().toString(), "Fixture chat", ProviderType.openAI,
+            ProviderCredential.apiKey, customBaseURL = "https://fixture-chat.invalid/v1", tamaImportFreeOnly = true)
+        val chatEntry = ModelEntry(chat.id, LLMModel("text-model", "Fixture text", "fixture",
+            inputModalities = listOf("text"), outputModalities = listOf("text")))
+        f.config.instances.add(chat)
+        f.config.modelEntries.add(chatEntry)
+        Mockito.`when`(f.repo.tamaOwnApiKey(chat)).thenReturn("fixture-chat-key")
+        Mockito.`when`(f.repo.instance(chat.id)).thenReturn(chat)
+        Mockito.`when`(f.repo.tamaFreeChatOnly(chat)).thenReturn(true)
+        val chatIdentity = AutoModelStore.identity(chatEntry, chat)
+        AutoModelStore.setApproved(f.context, chatIdentity, true)
+        ImageGen.save(f.context, agnes.id, image.model.id)
+        val reopened = f.reopened()
+        assertEquals(image.model.id, ImageGen.savedChoice(reopened)?.model)
+        assertEquals(agnes.id, ImageGen.endpoint(reopened)?.instanceId)
+        val setup = requireNotNull(AutoImageSelection.agnesSetup(reopened))
+        assertEquals(CustomImageRoute.Problem.AGNES_IMAGE_NEEDS_APPROVAL, setup.problem)
+        assertEquals(image.id, AutoImageSelection.prepareAgnesReview(reopened, setup))
+        assertNull(AutoImageSelection.choose(reopened, freeOnly = ImageGen.freeImagesOnly(reopened, chat.id)))
+
+        val review = AutoModelStore.review(reopened, identity)
+        assertTrue(AutoModelStore.saveReview(reopened, review, chat = false, image = true,
+            edits = mapOf(Need.IMAGE_GENERATION to false)))
+        assertEquals(CustomImageRoute.Problem.AGNES_IMAGE_CAPABILITY_OFF, AutoImageSelection.agnesSetup(f.reopened())?.problem)
+        assertNull(AutoImageSelection.choose(reopened))
+        assertTrue(AutoModelStore.saveReview(reopened, AutoModelStore.review(reopened, identity),
+            chat = false, image = true, edits = mapOf(Need.IMAGE_GENERATION to true)))
+        assertNull(requireNotNull(AutoImageSelection.agnesSetup(f.reopened())).problem)
+        for (freeOnly in listOf(true, false)) {
+            val chosen = requireNotNull(AutoImageSelection.choose(f.reopened(), freeOnly))
+            assertEquals(identity, chosen.identity)
+            assertEquals(image.model.id, AutoImageSelection.endpointIfStillAllowed(f.reopened(), chosen)?.model)
+        }
+        assertTrue(AutoModelStore.approved(reopened, chatIdentity))
+        assertFalse(AutoModelStore.approved(reopened, identity))
+
+        AutoModelStore.setEnabled(reopened, false)
+        assertNull(AutoImageSelection.choose(f.reopened(), freeOnly = true))
+        assertEquals(agnes.id, ImageGen.endpoint(f.reopened())?.instanceId)
+        assertEquals(image.model.id, ImageGen.endpoint(f.reopened())?.model)
+        AutoModelStore.setEnabled(reopened, true)
+        val selected = requireNotNull(AutoImageSelection.choose(f.reopened(), freeOnly = true))
+        AutoModelStore.accountChanged(reopened, agnes.id)
+        assertNull(AutoImageSelection.endpointIfStillAllowed(f.reopened(), selected))
+        assertEquals(CustomImageRoute.Problem.AGNES_IMAGE_NEEDS_APPROVAL, AutoImageSelection.agnesSetup(f.reopened())?.problem)
+    }
+
+    @Test fun `missing and ambiguous legacy rows do not substitute a different model`() {
+        assumeTrue(BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test")
+        val f = fixture()
+        val (agnes, entries) = f.addAgnes()
+        val image = entries.first()
+        ImageGen.save(f.context, agnes.id, image.model.id)
+        f.config.modelEntries.remove(image)
+        assertEquals(image.model.id, ImageGen.endpoint(f.context)?.model)
+        assertNull(AutoImageSelection.choose(f.context))
+        val missing = requireNotNull(AutoImageSelection.agnesSetup(f.context))
+        assertEquals(CustomImageRoute.Problem.AGNES_IMAGE_NEEDS_ENTRY, missing.problem)
+        assertNull(missing.entryId)
+
+        val alternate = entries.last()
+        AutoModelStore.setImageApproved(f.context, AutoModelStore.identity(alternate, agnes), true)
+        assertNull(AutoImageSelection.choose(f.context))
+        f.config.modelEntries.addAll(List(2) { ModelEntry(agnes.id, image.model, isCustom = true) })
+        assertNull(ImageGen.endpoint(f.context))
+        assertEquals(CustomImageRoute.Problem.AGNES_IMAGE_AMBIGUOUS, ImageGen.selectionProblem(f.context))
+        assertNull(AutoImageSelection.choose(f.context))
+        assertNull(AutoImageSelection.prepareAgnesReview(f.context, missing))
     }
 
     @Test fun `an exact Agnes selection blocks on missing approval or key and permits only a free payment alternate`() {

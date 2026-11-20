@@ -154,12 +154,15 @@ fun ModelEntryDetailScreen(
                     val baseInputs = baseModel.inputModalities ?: emptyList()
                     val baseOutputs = baseModel.outputModalities ?: emptyList()
                     val newInputs = buildList {
+                        // nanoMuse: an approval-only save must not strip text or other unshown modalities.
+                        if (nmParallel) addAll(effectiveInput.filterNot { it in setOf("image", "pdf", "audio", "video") })
                         if (imageInput) add("image")
                         if (pdfInput) add("pdf")
                         if (audioInput) add("audio")
                         if (videoInput) add("video")
                     }
                     val newOutputs = buildList {
+                        if (nmParallel) addAll(effectiveOutput.filterNot { it in setOf("image", "audio") })
                         if (imageOutput) add("image")
                         if (audioOutput) add("audio")
                     }
@@ -180,7 +183,8 @@ fun ModelEntryDetailScreen(
                     } else {
                         entry.copy(overrides = newOverrides, isHidden = isHidden)
                     }
-                    providerRepository.updateEntry(updated)
+                    // nanoMuse: saving only a route review need not rewrite the provider configuration.
+                    if (!nmParallel || updated != entry) providerRepository.updateEntry(updated)
                     // nanoMuse: editing the model id or route cannot transfer consent to a
                     // different endpoint/model. The new identity must be reviewed separately.
                     if (instance != null && autoIdentity != null &&

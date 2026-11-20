@@ -305,6 +305,10 @@ internal fun ToolDetailSheet(
             ai.tama.media.ImageToolPresentation.Summary.GENERATED -> R.string.nm_image_detail_generated
             ai.tama.media.ImageToolPresentation.Summary.NO_MODEL -> R.string.nm_image_provider_missing
             ai.tama.media.ImageToolPresentation.Summary.NO_APPROVAL -> R.string.nm_auto_image_missing
+            ai.tama.media.ImageToolPresentation.Summary.AGNES_IMAGE_NEEDS_ENTRY -> R.string.nm_agnes_auto_image_needs_entry
+            ai.tama.media.ImageToolPresentation.Summary.AGNES_IMAGE_AMBIGUOUS -> R.string.nm_auto_reason_duplicate
+            ai.tama.media.ImageToolPresentation.Summary.AGNES_IMAGE_CAPABILITY_OFF -> R.string.nm_agnes_auto_image_capability_off
+            ai.tama.media.ImageToolPresentation.Summary.AGNES_IMAGE_NEEDS_APPROVAL -> R.string.nm_agnes_review_image_help
             ai.tama.media.ImageToolPresentation.Summary.UNVERIFIED_COST -> R.string.nm_auto_reason_unverified_cost
             ai.tama.media.ImageToolPresentation.Summary.MODEL_COST_UNVERIFIED -> R.string.nm_model_cost_blocked
             ai.tama.media.ImageToolPresentation.Summary.AUTHORIZATION_CHANGED -> R.string.nm_auto_image_changed

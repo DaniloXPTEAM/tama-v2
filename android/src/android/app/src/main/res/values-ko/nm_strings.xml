@@ -1581,4 +1581,12 @@
     <string name="nm_code_wrap">줄 바꿈</string>
     <string name="nm_code_unwrap">긴 줄 가로 스크롤</string>
     <string name="nm_free_image_unavailable">이 버전의 무료 모드에는 무료로 확인된 이미지 생성 모델이 없습니다.</string>
+    <string name="nm_router_request_profile_chip">대화 프로필: %1$s</string>
+    <string name="nm_usage_thinking_supported">추론 지원</string>
+    <string name="nm_agnes_free_summary">무료로 확인된 채팅 모델 %1$d개, 무료 사용을 명시한 이미지 모델 %2$d개, 미확인 %3$d개.</string>
+    <string name="nm_agnes_free_scope">이 필터에서는 무료로 확인된 채팅만 요청을 보낼 수 있습니다. Agnes 이미지 생성에는 별도 규칙이 적용됩니다. 키 테스트로 계정 요금을 확인할 수 없습니다.</string>
+    <string name="nm_agnes_api_help">API 기본 주소: %1$s. Agnes는 브라우저 페이지가 아닌 POST /images/generations를 사용합니다. 키 테스트로 키를 확인하세요. 이미지에는 자동 또는 Images API를 선택하고 Chat Completions는 선택하지 마세요.</string>
+    <string name="nm_agnes_auto_image_needs_entry">선택한 Agnes 모델에 자동 사용 항목이 없습니다. 이미지 및 동영상 모델에서 자동 이미지 승인 검토를 열어 항목을 복원하세요.</string>
+    <string name="nm_agnes_auto_image_capability_off">이 모델의 자동 선택에서 이미지 생성이 꺼져 있습니다. 승인 검토를 열고 이미지 생성을 켠 다음 저장하세요.</string>
+    <string name="nm_agnes_auto_image_authorized">이 선택의 자동 이미지 사용이 승인되었습니다. 요청 시 이미지 생성 권한은 계속 확인합니다.</string>
 </resources>

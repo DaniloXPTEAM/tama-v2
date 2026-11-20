@@ -5080,7 +5080,7 @@ class ChatViewModel(
     /** Restore a previously successful automatic route without losing the preferred group. */
     private fun restoreAutomaticOutsideGroup(groupId: String, entryId: String): Boolean {
         if (com.openminis.app.BuildConfig.APPLICATION_ID != "ai.tama.assistant.tamav2test" ||
-            !AutoModelStore.enabled(context) || !ai.tama.router.AutomaticCostGuard.permits(context)) return false
+            !AutoModelStore.enabled(context)) return false
         val config = providerRepository.config.value
         val group = config.modelGroups.find { it.id == groupId } ?: return false
         if (entryId in group.memberEntryIds) return false
@@ -5088,6 +5088,10 @@ class ChatViewModel(
         // nanoMuse: an old automatic chat binding cannot restore an image generator.
         if (ai.tama.media.AgnesImages.imageOnlyInTest(entry.model.id)) return false
         val instance = config.instances.find { it.id == entry.providerInstanceId } ?: return false
+        // nanoMuse: the main chat dispatch can re-use an already proven exact text route
+        // without the blanket cost opt-in. If proof expired, leave it to the turn router.
+        if (!ai.tama.router.AutomaticCostGuard.permits(context) &&
+            !providerRepository.tamaDocumentedChatAllowed(instance, entry.model.id)) return false
         if (!ai.tama.router.GroupFallback.eligible(entry.isHidden, instance.isEnabled,
                 instance.providerType.isUsable, providerRepository.hasAnyCredential(instance),
                 AutoModelStore.approved(context, AutoModelStore.identity(entry, instance)))) return false
@@ -9784,15 +9788,17 @@ class ChatViewModel(
                         if (largerThanWindow != null) throw NoLargerContext()
                         // nanoMuse: other approved accounts may lack ephemeral proof after reopen.
                         // Recover only if no approved route is ready. No imports or chat calls here.
-                        val costRejected = selection.rejected.filter {
-                            it.reason == ModelRouter.Reason.UNVERIFIED_COST || it.reason == ModelRouter.Reason.NO_CREDENTIAL
-                        }.mapTo(hashSetOf()) { it.entryId }
-                        val recheck = if (tamaV2Test && nmOwnKeyTurn) choices.firstOrNull {
-                            it.entry.id in costRejected && it.candidate.automaticApproved && it.instance.isEnabled &&
-                                !it.entry.isHidden && it.candidate.capabilities.containsAll(needs) &&
-                                providerRepository.tamaOwnApiKey(it.instance) != null &&
-                                nmOwnKeyRecipientAllowed(it.instance) && providerRepository.tamaNeedsFreeChatEvidence(it.instance, it.model.id) &&
-                                nmAutoRecheckedAccounts.add(it.instance.id)
+                        val recheck = if (tamaV2Test) {
+                            // The candidate owns its proof, not the initial chat client. After
+                            // restart the bound/default model can be Cloud, OAuth or keyless.
+                            val recoverable = ai.tama.router.AutoChatEvidenceRecovery.candidates(
+                                selection, choices.map { it.candidate }, needs,
+                            )
+                            choices.firstOrNull {
+                                it.entry.id in recoverable && providerRepository.tamaOwnApiKey(it.instance) != null &&
+                                    nmOwnKeyRecipientAllowed(it.instance) && providerRepository.tamaNeedsFreeChatEvidence(it.instance, it.model.id) &&
+                                    nmAutoRecheckedAccounts.add(it.instance.id)
+                            }
                         } else null
                         if (recheck != null) {
                             providerRepository.tamaEnsureFreeChatEvidence(recheck.instance.id, recheck.model.id,

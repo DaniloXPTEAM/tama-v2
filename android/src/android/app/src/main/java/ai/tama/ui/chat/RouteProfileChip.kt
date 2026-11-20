@@ -39,7 +39,11 @@ fun RouteProfileChip(
     Box(modifier) {
         AssistChip(
             onClick = { open = true },
-            label = { Text(stringResource(R.string.nm_router_profile_chip, label)) },
+            label = {
+                val template = if (com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test")
+                    R.string.nm_router_request_profile_chip else R.string.nm_router_profile_chip
+                Text(stringResource(template, label))
+            },
             modifier = Modifier.defaultMinSize(minHeight = 48.dp),
         )
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {

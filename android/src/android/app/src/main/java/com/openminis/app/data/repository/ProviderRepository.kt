@@ -823,6 +823,30 @@ class ProviderRepository(private val context: Context) {
         return changed
     }
 
+    // nanoMuse: a known manual slot can predate, or outlive, its catalogue row. Restore only
+    // that missing row on an explicit review, never another entry, grant, group, or chosen model.
+    internal fun nmRegisterAgnesImage(instanceId: String, modelId: String, accountVersion: Long): String? =
+        synchronized(configLock) {
+            ensureConfigLoaded()
+            val config = workingCopy()
+            val instance = config.instances.singleOrNull { it.id == instanceId } ?: return@synchronized null
+            val spec = AgnesImages.model(modelId) ?: return@synchronized null
+            if (!instance.isEnabled || !AgnesImages.route(instance) || tamaOwnApiKey(instance) == null ||
+                AutoModelRuntime.accountVersion(instanceId) != accountVersion ||
+                config.modelEntries.any { it.providerInstanceId == instanceId && it.baseModel.id == modelId }) return@synchronized null
+            val entry = ModelEntry(instanceId, spec.metadata(), uuid = compositeEntryKey(instanceId, spec.id))
+            if (config.modelEntries.any { it.id == entry.id || compositeEntryKey(it.providerInstanceId, it.baseModel.id) == entry.id })
+                return@synchronized null
+            AutoModelStore.credentialTransaction {
+                if (AutoModelRuntime.accountVersion(instanceId) != accountVersion ||
+                    !AutoModelStore.forgetMissingImageReview(context, AutoModelStore.identity(entry, instance))) null
+                else {
+                    config.modelEntries.add(entry)
+                    if (saveConfigChecked(config)) entry.id else null
+                }
+            }
+        }
+
     private fun ensureAgnesImageModels() = synchronized(configLock) {
         if (_config.value.instances.none(AgnesImages::account)) return@synchronized
         val config = workingCopy()
@@ -2863,8 +2887,10 @@ class ProviderRepository(private val context: Context) {
             _nmFreeImportStatus.value = _nmFreeImportStatus.value + (instance.id to
                 if (additions.isEmpty() || saveConfigChecked(config)) {
                     markInstanceFetched(instance.id)
-                    val verified = visible.count { it.id in currentIds }
-                    FreeModelImportStatus.Complete(verified, additions.size, visible.size - verified)
+                    val declaredImages = AgnesImages.models.filter {
+                        tamaAgnesImageStatus(instance, it.id) == DocumentedFreeChat.Status.FREE
+                    }.mapTo(mutableSetOf()) { it.id }.takeIf { AgnesImages.account(instance) }
+                    FreeModelImport.summarize(visible.mapTo(mutableSetOf()) { it.id }, currentIds, additions.size, declaredImages)
                 } else FreeModelImportStatus.SaveFailed)
         }
     }

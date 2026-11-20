@@ -68,6 +68,10 @@ class ImageToolPresentationTest {
         val reasons = mapOf(
             "no_image_model" to ImageToolPresentation.Summary.NO_MODEL,
             "no_approved_image_model" to ImageToolPresentation.Summary.NO_APPROVAL,
+            "agnes_auto_image_needs_entry" to ImageToolPresentation.Summary.AGNES_IMAGE_NEEDS_ENTRY,
+            "agnes_auto_image_ambiguous" to ImageToolPresentation.Summary.AGNES_IMAGE_AMBIGUOUS,
+            "agnes_auto_image_capability_off" to ImageToolPresentation.Summary.AGNES_IMAGE_CAPABILITY_OFF,
+            "agnes_auto_image_needs_approval" to ImageToolPresentation.Summary.AGNES_IMAGE_NEEDS_APPROVAL,
             "automatic_image_cost_unverified" to ImageToolPresentation.Summary.UNVERIFIED_COST,
             "image_cost_unverified" to ImageToolPresentation.Summary.MODEL_COST_UNVERIFIED,
             "image_authorization_changed" to ImageToolPresentation.Summary.AUTHORIZATION_CHANGED,

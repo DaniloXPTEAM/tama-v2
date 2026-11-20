@@ -1586,4 +1586,12 @@
     <string name="nm_code_wrap">Renvoyer à la ligne</string>
     <string name="nm_code_unwrap">Faire défiler les lignes longues</string>
     <string name="nm_free_image_unavailable">Dans cette version, le mode gratuit ne comprend aucun générateur d’images dont la gratuité est confirmée.</string>
+    <string name="nm_router_request_profile_chip">Profil de conversation : %1$s</string>
+    <string name="nm_usage_thinking_supported">Prend en charge le raisonnement</string>
+    <string name="nm_agnes_free_summary">%1$d modèles de chat gratuits vérifiés, %2$d modèles d’image déclarés gratuits, %3$d non confirmés.</string>
+    <string name="nm_agnes_free_scope">Avec ce filtre, seuls les modèles de chat gratuits vérifiés peuvent envoyer des requêtes. Les images Agnes suivent une autre règle. Tester la clé ne vérifie pas le tarif du compte.</string>
+    <string name="nm_agnes_api_help">Base de l’API : %1$s. Agnes utilise POST /images/generations, pas une page web. Utilisez Tester la clé. Pour les images, choisissez Auto ou Images API, pas Chat Completions.</string>
+    <string name="nm_agnes_auto_image_needs_entry">Le modèle Agnes choisi n’a pas d’entrée pour la sélection automatique. Ouvrez Modèles d’image et de vidéo et examinez l’autorisation automatique pour restaurer cette entrée.</string>
+    <string name="nm_agnes_auto_image_capability_off">La génération d’images est désactivée pour ce modèle en mode automatique. Ouvrez sa révision, activez Générer des images et enregistrez.</string>
+    <string name="nm_agnes_auto_image_authorized">La génération automatique d’images est autorisée pour ce choix. Chaque requête passe encore par la vérification de l’autorisation d’image.</string>
 </resources>

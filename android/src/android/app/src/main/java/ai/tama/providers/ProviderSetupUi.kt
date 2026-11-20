@@ -206,6 +206,8 @@ internal fun freeModelImportStatusText(status: FreeModelImportStatus?): String? 
     FreeModelImportStatus.Failed -> stringResource(R.string.nm_free_import_failed)
     FreeModelImportStatus.SaveFailed -> stringResource(R.string.nm_provider_save_failed)
     is FreeModelImportStatus.Complete -> when {
+        status.declaredImages != null -> stringResource(R.string.nm_agnes_free_summary,
+            status.eligible, status.declaredImages, status.unconfirmed)
         status.unconfirmed > 0 -> stringResource(R.string.nm_free_import_classified, status.eligible, status.unconfirmed)
         status.eligible == 0 -> stringResource(R.string.nm_free_import_empty)
         else -> stringResource(R.string.nm_free_import_found, status.eligible, status.added)
@@ -223,6 +225,7 @@ internal fun FreeModelImportSection(
     lockedByZeroLimit: Boolean = false,
     hasCatalogue: Boolean = true,
     hasKey: Boolean = true,
+    agnes: Boolean = false,
 ) {
     // A legacy filter must remain removable after the endpoint changes or
     // loses its supported catalogue. Only enabling requires a catalogue.
@@ -232,6 +235,7 @@ internal fun FreeModelImportSection(
         lockedByZeroLimit -> R.string.nm_reach_key_zero_body
         !hasCatalogue -> R.string.nm_free_no_plan
         !hasKey -> R.string.nm_free_import_missing_key
+        agnes -> R.string.nm_agnes_free_scope
         FreeModelImport.supports(type) -> R.string.nm_free_import_help
         else -> R.string.nm_free_direct_help
     })

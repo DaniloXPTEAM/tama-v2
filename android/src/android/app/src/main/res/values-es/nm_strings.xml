@@ -1585,4 +1585,12 @@
     <string name="nm_code_wrap">Ajustar líneas</string>
     <string name="nm_code_unwrap">Desplazar líneas largas</string>
     <string name="nm_free_image_unavailable">El modo gratuito de esta versión no tiene un generador de imágenes con gratuidad confirmada.</string>
+    <string name="nm_router_request_profile_chip">Perfil de la conversación: %1$s</string>
+    <string name="nm_usage_thinking_supported">Admite razonamiento</string>
+    <string name="nm_agnes_free_summary">%1$d modelos de chat gratuitos verificados, %2$d modelos de imagen con gratuidad declarada y %3$d sin confirmar.</string>
+    <string name="nm_agnes_free_scope">Con este filtro, solo el chat gratuito verificado puede enviar solicitudes. Las imágenes de Agnes tienen su propia regla. Probar la clave no verifica el precio de la cuenta.</string>
+    <string name="nm_agnes_api_help">Base de la API: %1$s. Agnes usa POST /images/generations, no una página web. Usa Probar clave. Para imágenes, elige Automático o Images API, no Chat Completions.</string>
+    <string name="nm_agnes_auto_image_needs_entry">El modelo Agnes elegido no tiene una entrada para uso automático. Abre Modelos de imagen y vídeo y toca Revisar autorización de imágenes automáticas para restaurarla.</string>
+    <string name="nm_agnes_auto_image_capability_off">La generación de imágenes está desactivada para este modelo en la selección automática. Abre su revisión, activa Generar imágenes y guarda.</string>
+    <string name="nm_agnes_auto_image_authorized">El uso automático de imágenes está autorizado para esta selección. Las solicitudes aún deben pasar la comprobación del permiso de imagen.</string>
 </resources>

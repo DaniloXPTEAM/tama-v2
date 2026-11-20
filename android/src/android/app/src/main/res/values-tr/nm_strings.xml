@@ -1585,4 +1585,12 @@
     <string name="nm_code_wrap">Satırları kaydır</string>
     <string name="nm_code_unwrap">Uzun satırları yatay kaydır</string>
     <string name="nm_free_image_unavailable">Bu sürümün ücretsiz modunda, ücretsiz olduğu doğrulanmış bir görüntü üretici yok.</string>
+    <string name="nm_router_request_profile_chip">Sohbet profili: %1$s</string>
+    <string name="nm_usage_thinking_supported">Akıl yürütmeyi destekler</string>
+    <string name="nm_agnes_free_summary">%1$d doğrulanmış ücretsiz sohbet modeli, %2$d ücretsiz olduğu belirtilen görsel modeli, %3$d doğrulanmamış.</string>
+    <string name="nm_agnes_free_scope">Bu filtreyle yalnızca doğrulanmış ücretsiz sohbet istek gönderebilir. Agnes görselleri için ayrı kural geçerlidir. Anahtarı test etmek hesap ücretini doğrulamaz.</string>
+    <string name="nm_agnes_api_help">API tabanı: %1$s. Agnes bir tarayıcı sayfası değil, POST /images/generations kullanır. Anahtarı test edin. Görseller için Chat Completions yerine Otomatik veya Images API seçin.</string>
+    <string name="nm_agnes_auto_image_needs_entry">Seçili Agnes modelinin otomatik kullanım kaydı yok. Görsel ve video modellerini açın, bu kaydı geri yüklemek için otomatik görsel iznini inceleyin.</string>
+    <string name="nm_agnes_auto_image_capability_off">Otomatik seçimde bu model için görsel oluşturma kapalı. İncelemeyi açın, görsel oluşturmayı etkinleştirin ve kaydedin.</string>
+    <string name="nm_agnes_auto_image_authorized">Bu seçim için otomatik görsel kullanımı onaylandı. İsteklerde görsel oluşturma izni yine denetlenir.</string>
 </resources>

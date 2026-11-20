@@ -722,7 +722,8 @@ private fun ColumnScope.ApiKeyConfigSection(
     var importFreeOnly by remember(nmDestination, useResponsesAPI) { mutableStateOf(false) }
     if (nmParallel) {
         ai.tama.providers.FreeModelImportSection(type = providerType, checked = importFreeOnly,
-            onCheckedChange = { importFreeOnly = it }, hasCatalogue = nmHasFreeCatalogue, hasKey = apiKey.isNotBlank())
+            onCheckedChange = { importFreeOnly = it }, hasCatalogue = nmHasFreeCatalogue, hasKey = apiKey.isNotBlank(),
+            agnes = ai.tama.providers.ProviderEndpoints.isAgnesBase(nmDestination)) // nanoMuse: show separate image evidence.
     }
     val nmDestinationAllowed = if (nmCustomAddressMissing) false
         else if (nmParallel) ai.tama.providers.KeyDestinationReview(apiKey, nmDestination) else true

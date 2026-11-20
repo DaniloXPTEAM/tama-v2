@@ -1589,4 +1589,12 @@
     <string name="nm_code_wrap">Încadrează liniile</string>
     <string name="nm_code_unwrap">Derulează liniile lungi</string>
     <string name="nm_free_image_unavailable">Modul gratuit din această versiune nu are niciun generator de imagini confirmat ca gratuit.</string>
+    <string name="nm_router_request_profile_chip">Profilul conversației: %1$s</string>
+    <string name="nm_usage_thinking_supported">Acceptă raționament</string>
+    <string name="nm_agnes_free_summary">%1$d modele de chat gratuite verificate, %2$d modele de imagine declarate gratuite, %3$d neconfirmate.</string>
+    <string name="nm_agnes_free_scope">Cu acest filtru, doar chatul gratuit verificat poate trimite cereri. Imaginile Agnes au o regulă separată. Testarea cheii nu verifică tariful contului.</string>
+    <string name="nm_agnes_api_help">Baza API: %1$s. Agnes folosește POST /images/generations, nu o pagină web. Folosește Testează cheia. Pentru imagini, alege Automat sau Images API, nu Chat Completions.</string>
+    <string name="nm_agnes_auto_image_needs_entry">Modelul Agnes ales nu are o intrare pentru folosire automată. În Modele de imagine și video, verifică autorizarea automată a imaginilor pentru a restabili intrarea.</string>
+    <string name="nm_agnes_auto_image_capability_off">Generarea imaginilor este dezactivată pentru acest model în selecția automată. Deschide revizuirea, activează Generare imagini și salvează.</string>
+    <string name="nm_agnes_auto_image_authorized">Utilizarea automată pentru imagini este autorizată pentru alegerea curentă. Permisiunea pentru imagini este verificată în continuare la fiecare cerere.</string>
 </resources>

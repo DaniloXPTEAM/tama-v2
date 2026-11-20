@@ -9,6 +9,7 @@ internal object ImageToolPresentation {
         AUTHORIZATION_CHANGED, PERMISSION_DENIED, EDIT_UNAVAILABLE, MODEL_CHANGE_BLOCKED, AMBIGUOUS, ALREADY_HANDLED, INVALID, FAILED,
         NO_CONFIRMED_GENERATOR, NO_VERIFIED_FREE_GENERATOR, CHAT_ONLY, ROUTE_UNCONFIRMED,
         KEY_MISSING, NVIDIA_NATIVE, ENDPOINT_REJECTED, AGNES_AUTHENTICATION, AGNES_ACCESS_DENIED,
+        AGNES_IMAGE_NEEDS_ENTRY, AGNES_IMAGE_AMBIGUOUS, AGNES_IMAGE_CAPABILITY_OFF, AGNES_IMAGE_NEEDS_APPROVAL,
     }
 
     fun summary(
@@ -38,6 +39,10 @@ internal object ImageToolPresentation {
             "image_nvidia_native" -> Summary.NVIDIA_NATIVE
             "image_endpoint_rejected" -> Summary.ENDPOINT_REJECTED
             "no_approved_image_model" -> Summary.NO_APPROVAL
+            CustomImageRoute.Problem.AGNES_IMAGE_NEEDS_ENTRY.code -> Summary.AGNES_IMAGE_NEEDS_ENTRY
+            CustomImageRoute.Problem.AGNES_IMAGE_AMBIGUOUS.code -> Summary.AGNES_IMAGE_AMBIGUOUS
+            CustomImageRoute.Problem.AGNES_IMAGE_CAPABILITY_OFF.code -> Summary.AGNES_IMAGE_CAPABILITY_OFF
+            CustomImageRoute.Problem.AGNES_IMAGE_NEEDS_APPROVAL.code -> Summary.AGNES_IMAGE_NEEDS_APPROVAL
             "automatic_image_cost_unverified" -> Summary.UNVERIFIED_COST
             "image_cost_unverified" -> Summary.MODEL_COST_UNVERIFIED
             "image_authorization_changed" -> Summary.AUTHORIZATION_CHANGED
