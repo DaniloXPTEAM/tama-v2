@@ -1567,7 +1567,10 @@
     <string name="nm_free_bulk_retry">Nie zezwolono na żaden aktualnie dostępny model. Odśwież katalog i spróbuj ponownie.</string>
     <string name="nm_image_retry_question">Czy chcesz ponowić próbę tej ilustracji? Odpowiedz tak lub poproś o ponowną próbę.</string>
     <string name="nm_context_near_limit">Kontekst zbliża się do limitu modelu (%1$d / %2$d tokenów). Rozpocznij nowy czat lub użyj /compact, aby kontynuować niezawodnie.</string>
-    <string name="nm_image_raw_tool_text">Dostawca zwrócił wywołanie narzędzia jako tekst. Ten fragment nie został wykonany jako narzędzie.</string>
+    <string name="nm_image_raw_tool_text">Dostawca zwrócił wywołanie narzędzia jako tekst. Ten fragment nie został wykonany jako narzędzie. Aby bezpośrednio utworzyć obraz, wyślij /imagem, a po nim opis.</string>
+    <string name="nm_image_command_hint">Gdy czat nie jest zajęty, wyślij /imagem i opis obrazu w jednym wierszu, bez załączników.</string>
+    <string name="nm_agnes_image_not_chat">Ten model Agnes tworzy obrazy, ale nie odpowiada na czacie. Wybierz model tekstowy do rozmowy lub wyślij /imagem z opisem obrazu.</string>
+    <string name="nm_media_image_selected">Wybrano. Obrazy wymagają osobnego zezwolenia.</string>
     <string name="nm_free_list_filter">Pokaż tylko modele oznaczone jako darmowe</string>
     <string name="nm_free_list_help">Filtruje tylko tę listę. Nie usuwa modeli ani nie gwarantuje kosztu. Wyłącz filtr, aby zobaczyć wszystkie zapisane modele.</string>
     <string name="nm_free_list_refresh">Brak aktualnych danych katalogu. Odśwież listę modeli lub wyłącz filtr.</string>

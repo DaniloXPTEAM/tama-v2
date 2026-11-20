@@ -59,8 +59,9 @@ fun AddModelsToGroupScreen(
         config.visionGroupId -> PickerModalityFilter.IMAGE_INPUT
         else -> null
     }
+    // nanoMuse: Agnes image models belong in the image slot, not a model group.
     val availableEntries = config.modelEntries.filter {
-        !it.isHidden && it.id !in existingIds
+        !it.isHidden && it.id !in existingIds && !ai.tama.media.AgnesImages.imageOnlyInTest(it.model.id)
     }
 
     val searchQuery = remember { mutableStateOf("") }

@@ -1,5 +1,5 @@
 name: Tama V2 Test signed APK
-run-name: 'Tama V2 Test assinado · Agnes — teste de chave e diagnóstico de imagem · ${{ github.sha }}'
+run-name: 'Tama V2 Test assinado · Agnes — criação direta e resposta de ferramenta real · ${{ github.sha }}'
 
 on:
   push:

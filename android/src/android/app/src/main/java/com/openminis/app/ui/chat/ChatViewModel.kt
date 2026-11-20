@@ -1345,9 +1345,9 @@ class ChatViewModel(
     // nanoMuse: a failed standalone image can offer one short-lived, session-bound retry.
     private val nmImageRetryOffer = ai.tama.router.ImageRetryOffer()
 
-    // nanoMuse: recognize the common PT-BR "faz uma imagem" form only in the parallel app.
+    // nanoMuse: keep colloquial Portuguese and the observed typo local to the Test app.
     private fun nmExplicitImageRequest(text: String): Boolean = ai.tama.router.ImageRequestIntent.explicit(
-        text, portugueseMake = com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test",
+        text, parallelTest = com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test",
     )
 
     /** Reclassify a new user turn, including queued messages and attachments. */
@@ -1405,6 +1405,8 @@ class ChatViewModel(
         if (groupId != null) return resolveProviderFromGroup(groupId, preferredId)
         val config = providerRepository.config.value
         val entry = config.modelEntries.find { it.id == preferredId } ?: return false
+        // nanoMuse: an old preference must not restore the image entry as a chat client.
+        if (ai.tama.media.AgnesImages.imageOnlyInTest(entry.model.id)) return true
         val instance = config.instances.find { it.id == entry.providerInstanceId } ?: return false
         if (entry.isHidden || !instance.isEnabled || !instance.providerType.isUsable ||
             !providerRepository.hasAnyCredential(instance)) return false
@@ -5083,6 +5085,8 @@ class ChatViewModel(
         val group = config.modelGroups.find { it.id == groupId } ?: return false
         if (entryId in group.memberEntryIds) return false
         val entry = config.modelEntries.find { it.id == entryId } ?: return false
+        // nanoMuse: an old automatic chat binding cannot restore an image generator.
+        if (ai.tama.media.AgnesImages.imageOnlyInTest(entry.model.id)) return false
         val instance = config.instances.find { it.id == entry.providerInstanceId } ?: return false
         if (!ai.tama.router.GroupFallback.eligible(entry.isHidden, instance.isEnabled,
                 instance.providerType.isUsable, providerRepository.hasAnyCredential(instance),
@@ -5116,10 +5120,13 @@ class ChatViewModel(
                         _selectedGroupId.value = groupId
                         if (parallel) {
                             val group = providerRepository.group(groupId)
-                            nmPreferredAutoEntryId = obj.optString("preferredEntryId").takeIf {
-                                it.isNotBlank() && it in group?.memberEntryIds.orEmpty()
-                            } ?: _activeEntryId.value?.takeIf { it in group?.memberEntryIds.orEmpty() }
-                                ?: group?.memberEntryIds?.firstOrNull()
+                            val chatMembers = group?.memberEntryIds.orEmpty().filter { id ->
+                                providerRepository.config.value.modelEntries.any {
+                                    it.id == id && !ai.tama.media.AgnesImages.imageOnlyInTest(it.model.id)
+                                }
+                            }
+                            nmPreferredAutoEntryId = obj.optString("preferredEntryId").takeIf { it in chatMembers }
+                                ?: _activeEntryId.value?.takeIf { it in chatMembers } ?: chatMembers.firstOrNull()
                         }
                     }
                     resolved
@@ -5127,6 +5134,8 @@ class ChatViewModel(
                 "entry" -> {
                     val entryId = obj.optString("entryId").takeIf { it.isNotEmpty() } ?: return false
                     val entry = providerRepository.config.value.modelEntries.find { it.id == entryId } ?: return false
+                    // nanoMuse: fall through to the normal chat defaults without rewriting the saved pin.
+                    if (ai.tama.media.AgnesImages.imageOnlyInTest(entry.model.id)) return false
                     val instance = providerRepository.instance(entry.providerInstanceId) ?: return false
                     // [T-android-group-resolve-skip-uncredentialed] An explicit
                     // entry pin on an OAuth provider must restore too.
@@ -5178,7 +5187,9 @@ class ChatViewModel(
         // enabledMemberEntries (still used by the settings UI) deliberately
         // does not — "switched on" is the right question there, "usable right
         // now" is the right question here.
+        // nanoMuse: older mixed groups can keep their settings, but chat only uses chat entries.
         val available = providerRepository.availableMemberEntries(group)
+            .filterNot { ai.tama.media.AgnesImages.imageOnlyInTest(it.model.id) }
         if (available.isEmpty()) return false
 
         // preferredEntryId comes from a prior session binding ("user picked
@@ -5231,6 +5242,8 @@ class ChatViewModel(
 
     /** Select a specific entry within a group (keeps group selected). */
     fun selectGroupEntry(groupId: String, entryId: String) {
+        // nanoMuse: do not swap a tap on an old image entry for a different chat route.
+        if (nmBlockAgnesImageAsChat(providerRepository.config.value.modelEntries.find { it.id == entryId }?.model)) return
         _selectedGroupId.value = groupId
         _selectedGroupName.value = providerRepository.group(groupId)?.name ?: ""
         val resolved = resolveProviderFromGroup(groupId, entryId)
@@ -5287,7 +5300,7 @@ class ChatViewModel(
      * which ignored both last-used and add-order — replaced by this chain.
      */
     private fun applyNewChatDefaultModel(): Boolean {
-        val entry = providerRepository.lastUsedVisibleEntry()
+        val entry = providerRepository.lastUsedVisibleEntry()?.takeUnless { ai.tama.media.AgnesImages.imageOnlyInTest(it.model.id) }
             ?: providerRepository.newestProviderNewestTextEntry()
             ?: return false
         val instance = providerRepository.instance(entry.providerInstanceId) ?: return false
@@ -5305,10 +5318,17 @@ class ChatViewModel(
         return true
     }
 
+    private fun nmBlockAgnesImageAsChat(model: LLMModel?): Boolean {
+        if (!ai.tama.media.AgnesImages.imageOnlyInTest(model?.id)) return false
+        _error.value = context.getString(R.string.nm_agnes_image_not_chat)
+        return true
+    }
+
     /** Select a specific model entry (bypasses group selection). */
     fun selectEntry(entryId: String) {
         val config = providerRepository.config.value
         val entry = config.modelEntries.find { it.id == entryId } ?: return
+        if (nmBlockAgnesImageAsChat(entry.model)) return
         val instance = providerRepository.instance(entry.providerInstanceId) ?: return
         // [T-android-group-resolve-skip-uncredentialed] The user explicitly
         // tapped this model; refusing it because the API-key slot is empty
@@ -5346,7 +5366,8 @@ class ChatViewModel(
     }
 
     private fun findModelEntry(modelId: String) =
-        providerRepository.allVisibleEntries().find { it.model.id == modelId }
+        // nanoMuse: the legacy model_id column can still refer to a generator.
+        providerRepository.allVisibleEntries().find { it.model.id == modelId && !ai.tama.media.AgnesImages.imageOnlyInTest(modelId) }
 
     /**
      * Build the ordered list of fallback providers for the current group,
@@ -5403,6 +5424,7 @@ class ChatViewModel(
         } else legacyOrder
         for (entryId in orderedIds) {
             val entry = config.modelEntries.find { it.id == entryId } ?: continue
+            if (ai.tama.media.AgnesImages.imageOnlyInTest(entry.model.id)) continue
             val instance = config.instances.find { it.id == entry.providerInstanceId } ?: continue
             // Credential test via hasAnyCredential also preserves OAuth members.
             val credentialed = providerRepository.hasAnyCredential(instance)
@@ -6565,6 +6587,11 @@ class ChatViewModel(
         val trimmed = text.trim()
         val pendingAttachments = _attachments.value
         if ((trimmed.isBlank() && pendingAttachments.isEmpty()) || !_isStreaming.value) return
+        // nanoMuse: the explicit local command must not become part of a queued chat batch.
+        if (nmLocalImageCommand(trimmed, petGeneration)) {
+            nmShowImageCommandHint(text)
+            return
+        }
 
         val prompt = QueuedPrompt(
             id = "queued_${System.currentTimeMillis()}_${(Math.random() * 1_000_000).toInt()}",
@@ -6814,7 +6841,7 @@ class ChatViewModel(
                     person = it.petGeneration != null, batchSize = queued.size,
                     hasAttachments = it.attachments.isNotEmpty(), hasPastedContent = queuedPaste != null,
                     editing = _editingMessageId.value != null, sharedContent = _hasInjectedShareContent.value,
-                    portugueseMake = com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test",
+                    parallelTest = com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test",
                 ),
             )
         }
@@ -6917,7 +6944,7 @@ class ChatViewModel(
                             person = it.petGeneration != null, batchSize = queued.size,
                             hasAttachments = it.attachments.isNotEmpty(), hasPastedContent = drainPaste != null,
                             editing = _editingMessageId.value != null, sharedContent = _hasInjectedShareContent.value,
-                            portugueseMake = com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test",
+                            parallelTest = com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test",
                         ),
                     )
                 }
@@ -7010,6 +7037,15 @@ class ChatViewModel(
 
     internal fun nmSendAutomatedMessage(text: String) = nmSendMessage(text, null) // nanoMuse: routines and RPCs are not typed on this phone.
 
+    private fun nmLocalImageCommand(text: String, petGeneration: Long?): Boolean =
+        petGeneration != null && com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test" &&
+            ai.tama.router.ShortcutParser.isImageCommand(text)
+
+    private fun nmShowImageCommandHint(text: String) {
+        appendSystemInfo(context.getString(R.string.nm_image_command_hint), "info")
+        if (_inputText.value.isEmpty()) _inputText.value = text
+    }
+
     private fun nmSendMessage(text: String, petGeneration: Long?) { // nanoMuse: null is an automated prompt.
         // nanoMuse: explicit device work is routed before any local model or avatar action.
         if (nmRemoteBridge.send(text, io.github.nanomuse.hub.Hub.others(context),
@@ -7031,7 +7067,8 @@ class ChatViewModel(
             if (retry != null && petGeneration != null) { nmStartImageShortcut(text, petGeneration, retry); return }
         }
         // nanoMuse: an automated prompt must not trigger a paid avatar request on its own.
-        if (petGeneration != null && nmInterceptAvatar(text, petGeneration)) { nmCountableTurn = false; return }
+        val imageCommand = nmLocalImageCommand(text, petGeneration)
+        if (!imageCommand && petGeneration != null && nmInterceptAvatar(text, petGeneration)) { nmCountableTurn = false; return }
         // Both branches are explicit so the same decision can be tested with a
         // fake chat client; automated, busy or media-bearing turns fall through.
         ai.tama.router.ImageShortcutEligibility.dispatch(
@@ -7039,10 +7076,13 @@ class ChatViewModel(
                 person = petGeneration != null, hasAttachments = _attachments.value.isNotEmpty(),
                 hasPastedContent = _pastedTexts.value.isNotEmpty(), editing = _editingMessageId.value != null,
                 sharedContent = _hasInjectedShareContent.value, busy = _isStreaming.value || _isCompacting.value,
-                portugueseMake = com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test",
+                parallelTest = com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test",
             ),
             image = { image -> nmStartImageShortcut(text, requireNotNull(petGeneration), image) },
-            chat = { sendMessage(text, skipContextCheck = false, petGeneration = petGeneration) },
+            chat = {
+                if (imageCommand) nmShowImageCommandHint(text)
+                else sendMessage(text, skipContextCheck = false, petGeneration = petGeneration)
+            },
         )
     }
 
@@ -7206,7 +7246,7 @@ class ChatViewModel(
                 person = next.petGeneration != null, hasAttachments = next.attachments.isNotEmpty(),
                 hasPastedContent = _pastedTexts.value.isNotEmpty(), editing = _editingMessageId.value != null,
                 sharedContent = _hasInjectedShareContent.value,
-                portugueseMake = com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test",
+                parallelTest = com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test",
             ),
         ) != null
         // nanoMuse: a queued answer to our own retry question also works without a chat model.
@@ -7770,6 +7810,12 @@ class ChatViewModel(
             _error.value = context.getString(R.string.nm_chat_no_model)
             return
         }
+        // nanoMuse: the local image shortcut already ran its own lane. A legacy chat pin
+        // to a dedicated generator cannot go to chat/completions or a paid fallback.
+        if (nmBlockAgnesImageAsChat(currentProvider?.model ?: currentModel)) {
+            if (petGeneration != null && _inputText.value.isEmpty()) _inputText.value = text
+            return
+        }
         // Context pressure check. Unlike before, needsCompact now HOLDS the
         // send: either compact silently (auto-compact on) or ask first. The
         // whole point is that the request which tripped the threshold must not
@@ -7815,8 +7861,8 @@ class ChatViewModel(
             val config = providerRepository.config.value
             config.modelEntries.firstNotNullOfOrNull { entry ->
                 val instance = config.instances.find { it.id == entry.providerInstanceId } ?: return@firstNotNullOfOrNull null
-                if (entry.isHidden || !instance.isEnabled || !instance.providerType.isUsable ||
-                    !providerRepository.hasAnyCredential(instance) ||
+                if (entry.isHidden || ai.tama.media.AgnesImages.imageOnlyInTest(entry.model.id) ||
+                    !instance.isEnabled || !instance.providerType.isUsable || !providerRepository.hasAnyCredential(instance) ||
                     !AutoModelStore.approved(context, AutoModelStore.identity(entry, instance))) return@firstNotNullOfOrNull null
                 runCatching {
                     nmCreateProvider(instance, providerRepository.usableApiKey(instance).orEmpty(), entry.model).also { client ->
@@ -9213,6 +9259,11 @@ class ChatViewModel(
         onTerminalFailure: () -> Unit,
         onTerminalAssistantSaved: (String?, String?) -> Unit = { _, _ -> }, // nanoMuse: final row and finish reason for verified receipts.
     ): Boolean {
+        // nanoMuse: Resume/regenerate can reach the loop without a new composer send.
+        if (nmBlockAgnesImageAsChat(provider.model)) {
+            onTerminalFailure()
+            return false
+        }
         // The caller skips model-specific completion hooks when a queued shortcut
         // itself produced the final answer.
         var completedImageShortcut = false
@@ -9415,7 +9466,6 @@ class ChatViewModel(
         // At most one native image call per explicit person turn. A failure can
         // still have been charged, so a model's retry must not dispatch again.
         val nmImageGuard = ai.tama.router.ImageTurnGuard(explicitImageRequest)
-        var nmIsImagePersonTurn = explicitImageRequest // nanoMuse: limit literal tool-text filtering to image requests.
         var nmWarnedWithoutTools = false
         var nmAttempt: TurnRequestPlanner.Attempt? = null
         // Captured at dispatch, not looked up later after a settings change.
@@ -9546,6 +9596,7 @@ class ChatViewModel(
                 }
             }
             return config.modelEntries.toList().mapNotNull { entry ->
+                if (ai.tama.media.AgnesImages.imageOnlyInTest(entry.model.id)) return@mapNotNull null
                 val instance = config.instances.find { it.id == entry.providerInstanceId } ?: return@mapNotNull null
                 val identity = AutoModelStore.identity(entry, instance)
                 val caps = nmAutoCapabilities(entry, instance)
@@ -10611,11 +10662,9 @@ class ChatViewModel(
                             thinkingLevel = if (currentModelSupportsReasoning) _thinkingLevel.value else ThinkingLevel.OFF,
                         )
                         val sourceStream = if (freeChat == null) providerStream else providerStream.flowOn(freeChat)
-                        // nanoMuse: text that merely looks like an image tool call is
-                        // never executed or shown raw. Real tool events pass unchanged.
-                        // nanoMuse: an escaped/compound image prompt may not have matched the shortcut.
-                        // Hide raw tool syntax in the personal-key stream without rewriting its opaque history.
-                        val visibleStream = if (tamaV2Test && (nmIsImagePersonTurn || nmOwnKeyTurn))
+                        // nanoMuse: fake tool transcripts can occur even on follow-ups or after
+                        // a chat model switch. Only alter visible text, not native tool events or opaque reasoning.
+                        val visibleStream = if (tamaV2Test)
                             ai.tama.media.ImageToolStream.filter(sourceStream, context.getString(R.string.nm_image_raw_tool_text))
                         else sourceStream
                         visibleStream.collect { chunk ->
@@ -11998,7 +12047,6 @@ class ChatViewModel(
                     nmCurrentInput = nmCapturePromptInput()
                     nmUsedTools = false
                     nmImageGuard.newTurn(handled.explicitImageRequest)
-                    nmIsImagePersonTurn = handled.explicitImageRequest // nanoMuse: queued message has its own intent.
                     nmWarnedWithoutTools = false
                     nmAutoTurn?.reset()
                     nmAutoLocalBlocks.clear()

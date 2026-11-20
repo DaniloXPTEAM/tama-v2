@@ -112,7 +112,7 @@ android {
         create("tamaTest") {
             initWith(getByName("debug"))
             applicationIdSuffix = ".tamav2test"
-            versionNameSuffix = "-teste.2" // distinguish this signed update without changing the normal app
+            versionNameSuffix = "-teste.3" // distinguish this signed update without changing the normal app
             signingConfig = signingConfigs.findByName("tamaPrivateTest") ?: signingConfigs.getByName("debug")
             matchingFallbacks += listOf("debug")
         }

@@ -118,6 +118,7 @@ class AutoImageSelectionTest {
         val (agnes, entries) = f.addAgnes()
         val sent = mutableListOf<Pair<String, String>>()
         val permits = mutableListOf<Boolean>()
+        var permissionGranted = true
         val services = object : MediaImageServices by AndroidMediaImageServices(f.context) {
             override suspend fun observeCliImageScope(sessionId: String?): () -> CliImageScope.State =
                 { CliImageScope.State.UNRESTRICTED }
@@ -133,8 +134,11 @@ class AutoImageSelectionTest {
         val gate = object : MediaImageGate {
             override suspend fun allow(endpoint: ImageGen.Endpoint, prompt: String, size: String,
                 sessionId: String?, freshApproval: Boolean): Boolean {
+                assertEquals(agnes.id, endpoint.instanceId)
+                assertEquals(AgnesImages.DEFAULT, endpoint.model)
+                assertEquals("um gato astronauta", prompt)
                 permits.add(freshApproval)
-                return true
+                return permissionGranted
             }
             override fun observe(endpoint: ImageGen.Endpoint, sessionId: String?) = object : MediaPermissionObservation {
                 override fun isCurrent() = true
@@ -142,7 +146,9 @@ class AutoImageSelectionTest {
             }
         }
         val handler = MediaOffloadHandler(f.context, services, gate)
-        val prompt = "crie uma imagem de um gato astronauta"
+        val prompt = requireNotNull(ai.tama.router.ImageShortcutEligibility.select(
+            "crie uma iamgem de um gato astronauta", ai.tama.router.ImageShortcutContext(person = true, parallelTest = true),
+        )).prompt
         val sid = UUID.randomUUID().toString()
         val cli = NativeOffloadRequest(pid = 1, argv = listOf("nanomuse-media", "image", "--prompt", prompt),
             env = emptyMap(), cwd = "/", sessionId = sid)
@@ -155,6 +161,7 @@ class AutoImageSelectionTest {
             assertTrue(services.modelCostAllowed())
             // An available but unapproved Agnes default cannot fall through to paid.
             assertEquals("no_approved_image_model", JSONObject(handler.handle(cli).output).getString("error"))
+            assertEquals("no_approved_image_model", JSONObject(tool(prompt).output).getString("error"))
             assertTrue(sent.isEmpty())
             assertTrue(permits.isEmpty())
 
@@ -166,14 +173,24 @@ class AutoImageSelectionTest {
 
             AutoModelStore.setEnabled(f.context, true)
             AutoModelStore.setImageApproved(f.context, AutoModelStore.identity(entries.first(), agnes), true)
+            permissionGranted = false
+            val denied = ImageShortcutRunner.run(prompt, "could not draw", "Settings",
+                safeFailureMessages = mapOf("permission_denied" to "permission not granted"), execute = ::tool)
+            assertFalse(denied.success)
+            assertTrue(denied.text.contains("[Settings](minis://settings/permissions)"))
+            assertEquals(listOf(agnes.id to AgnesImages.DEFAULT), sent)
+
+            permissionGranted = true
             val shortcut = ImageShortcutRunner.run(prompt, "could not draw", "Settings", execute = ::tool)
             assertTrue(shortcut.success)
             assertTrue(shortcut.text.contains("](minis://attachments/"))
+            val name = shortcut.text.substringAfter("minis://attachments/").substringBefore(')')
+            assertArrayEquals(byteArrayOf(1, 2, 3), f.context.filesDir.resolve("minis-sessions/$sid/attachments/$name").readBytes())
             val fromCli = handler.handle(cli)
             assertEquals(0, fromCli.exitCode)
             assertEquals(AgnesImages.DEFAULT, JSONObject(fromCli.output).getString("model"))
             assertEquals(List(3) { agnes.id to AgnesImages.DEFAULT }, sent)
-            assertEquals(listOf(false, false, true), permits) // CLI must still ask fresh permission.
+            assertEquals(listOf(false, false, false, true), permits) // CLI must still ask fresh permission.
         } finally { ModelCostGuard.setAllowedForCurrentProcess(false) }
     }
 

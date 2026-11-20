@@ -142,6 +142,9 @@ jobs:
             --tests 'ai.tama.router.AutoModelFailureTest' \
             --tests 'ai.tama.router.ModelRouterTest' \
             --tests 'ai.tama.router.TurnRouterTest' \
+            --tests 'ai.tama.router.ShortcutParserTest' \
+            --tests 'ai.tama.router.ImageShortcutEligibilityTest' \
+            --tests 'ai.tama.router.ImageTurnGuardTest' \
             --tests 'ai.tama.router.ImageRetryOfferTest' \
             --tests 'ai.tama.router.LargerContextTest' \
             --tests 'ai.tama.router.AutomaticCostGuardTest' \
@@ -162,6 +165,7 @@ jobs:
             --tests 'ai.tama.media.CliImageScopeTest' \
             --tests 'ai.tama.chat.SessionBindingWritesTest' \
             --tests 'ai.tama.media.ImageRawToolFilterTest' \
+            --tests 'ai.tama.media.MediaPromptTest' \
             --tests 'ai.tama.providers.ProviderEndpointsTest' \
             --max-workers=1 --console=plain --no-daemon \
             '-Dorg.gradle.jvmargs=-Xmx4608m -XX:MaxMetaspaceSize=768m -Dfile.encoding=UTF-8' \
@@ -181,6 +185,7 @@ jobs:
           ./gradlew :app:testDebugUnitTest \
             --tests 'ai.tama.net.GroqHistoryPolicyTest' \
             --tests 'ai.tama.net.GroqNormalHistoryWireTest' \
+            --tests 'ai.tama.router.ShortcutParserTest' \
             --tests 'io.github.nanomuse.avatar.ImageModelRequestsTest' \
             --tests 'ai.tama.media.AutoImageSelectionTest' \
             --tests 'ai.tama.router.ModelRouteHistoryTest' \

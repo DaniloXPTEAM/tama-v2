@@ -68,7 +68,9 @@ fun MediaModelsScreen(
     val repo = (context.applicationContext as? MinisApp)?.providerRepositoryOrNull
     val config = repo?.config?.collectAsState()?.value
     val defaultGroup = config?.let { cfg -> cfg.modelGroups.firstOrNull { it.id == cfg.defaultPrimaryGroupId } ?: cfg.modelGroups.firstOrNull() }
-    val chatEntry = config?.let { cfg -> defaultGroup?.memberEntryIds?.firstNotNullOfOrNull { id -> cfg.modelEntries.firstOrNull { it.id == id } } }
+    val chatEntry = config?.let { cfg -> defaultGroup?.memberEntryIds?.firstNotNullOfOrNull { id ->
+        cfg.modelEntries.firstOrNull { it.id == id && !ai.tama.media.AgnesImages.imageOnlyInTest(it.model.id) }
+    } }
     val chatInstance = config?.instances?.firstOrNull { it.id == chatEntry?.providerInstanceId }
 
     val scope = rememberCoroutineScope()
@@ -178,6 +180,7 @@ fun MediaModelsScreen(
                     else -> stringResource(R.string.nm_media_not_set)
                 },
                 offLine = stringResource(R.string.nm_media_image_off),
+                readyLine = if (parallelTest) stringResource(R.string.nm_media_image_selected) else null,
             )
             imageInstances.forEach { inst ->
                 SettingsChoiceRow(
@@ -343,10 +346,12 @@ fun MediaModelsScreen(
 
 /** Ready / not set, with the one line of consequence when it is not. */
 @Composable
-private fun StatusRow(icon: androidx.compose.ui.graphics.vector.ImageVector, ready: Boolean, line: String, offLine: String) {
+private fun StatusRow(
+    icon: androidx.compose.ui.graphics.vector.ImageVector, ready: Boolean, line: String, offLine: String, readyLine: String? = null,
+) {
     SettingsRow(
         title = line,
-        subtitle = if (ready) stringResource(R.string.nm_media_ready) else offLine,
+        subtitle = if (ready) readyLine ?: stringResource(R.string.nm_media_ready) else offLine,
         icon = icon,
         iconColor = if (ready) MuseTones.accent else MaterialTheme.colorScheme.onSurfaceVariant,
         minHeight = 72.dp,

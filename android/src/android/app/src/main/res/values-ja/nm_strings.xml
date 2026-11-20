@@ -1555,7 +1555,10 @@
     <string name="nm_free_bulk_retry">現在利用条件を満たすモデルは許可されませんでした。カタログを更新して再試行してください。</string>
     <string name="nm_image_retry_question">この画像をもう一度試しますか？ はい、またはもう一度と返信してください。</string>
     <string name="nm_context_near_limit">コンテキストがモデルの上限に近づいています（%1$d / %2$d トークン）。安定して続けるには新しいチャットを始めるか、/compact を使用してください。</string>
-    <string name="nm_image_raw_tool_text">プロバイダーがツール呼び出しをテキストで返しました。この部分はツールとして実行されていません。</string>
+    <string name="nm_image_raw_tool_text">プロバイダーがツール呼び出しをテキストで返しました。この部分はツールとして実行されていません。 画像を直接作るには、/imagem に続けて内容を入力してください。</string>
+    <string name="nm_image_command_hint">チャットの処理が終わったら、添付ファイルなしで /imagem と画像の説明を1行で送信してください。</string>
+    <string name="nm_agnes_image_not_chat">この Agnes モデルは画像を生成するもので、チャットには返信しません。会話にはテキストモデルを選び、画像を作るには /imagem と説明を送ってください。</string>
+    <string name="nm_media_image_selected">選択済み。画像の生成には別途許可が必要です。</string>
     <string name="nm_free_list_filter">無料と掲載されたモデルのみ表示</string>
     <string name="nm_free_list_help">この一覧だけを絞り込みます。モデルは削除されず、費用は保証されません。すべての保存済みモデルを見るにはフィルターをオフにしてください。</string>
     <string name="nm_free_list_refresh">現在のカタログ情報がありません。モデル一覧を更新するか、フィルターをオフにしてください。</string>

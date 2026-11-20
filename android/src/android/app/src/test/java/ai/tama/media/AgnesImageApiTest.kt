@@ -77,6 +77,16 @@ class AgnesImageApiTest {
     private fun image(bytes: ByteArray = png()) = MockResponse().setBody("""{"data":[{"b64_json":"${b64(bytes)}"}]}""")
     private fun next(s: MockWebServer) = requireNotNull(s.takeRequest(4, TimeUnit.SECONDS))
 
+    @Test fun `dedicated IDs are not chat models in Test even in a legacy entry without metadata`() {
+        val testApp = com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test"
+        for (id in listOf("agnes-image-2.1-flash", "agnes-image-2.0-flash")) {
+            assertEquals(testApp, AgnesImages.imageOnlyInTest(id))
+        }
+        assertFalse(AgnesImages.imageOnlyInTest("agnes-2.5-flash"))
+        assertFalse(AgnesImages.imageOnlyInTest("nvidia/laguna-xs-2.1"))
+        assertFalse(AgnesImages.imageOnlyInTest(null))
+    }
+
     @Test fun `sizes use nearest supported ratios while the first returned image is untouched`() = runBlocking {
         val samples = listOf("1024x1024" to "1024x1024", "768x1024" to "768x1024", "1024x768" to "1024x768",
             "576x1024" to "576x1024", "1024x576" to "1024x576", "1344x576" to "1024x576")

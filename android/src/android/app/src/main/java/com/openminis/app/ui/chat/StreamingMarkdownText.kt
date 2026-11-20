@@ -1930,6 +1930,13 @@ private fun RenderBlock(block: MdBlock) {
             // null) and the image quietly renders as a 0-height placeholder.
             // The video/audio renderers already follow this pattern.
             val file = remember(block.url, sessionId) { resolveMdMediaFile(context, block.url, sessionId) }
+            // nanoMuse: a model can print an attachment link with no file behind it.
+            // Do not create a clickable picture card for a missing local attachment.
+            if (com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test" &&
+                block.url.startsWith("minis://attachments/") && file == null) {
+                Text(stringResource(R.string.filepreview_image_load_error), style = MaterialTheme.typography.bodySmall)
+                return
+            }
             // T146: 1dp hairline + 2dp soft shadow so a white-bg PNG (matplotlib
             // chart, screenshot…) reads as a discrete card against the chat
             // surface. Same ChatColors.thumbnailBorder / inputShadow recipe as

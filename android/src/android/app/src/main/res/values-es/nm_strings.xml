@@ -1559,7 +1559,10 @@
     <string name="nm_free_bulk_retry">No se autorizó ningún modelo elegible actual. Actualiza el catálogo y vuelve a intentarlo.</string>
     <string name="nm_image_retry_question">¿Quieres intentar esta imagen de nuevo? Responde sí o pide reintentar.</string>
     <string name="nm_context_near_limit">El contexto está cerca del límite del modelo (%1$d / %2$d tokens). Inicia una conversación nueva o usa /compact para continuar de forma fiable.</string>
-    <string name="nm_image_raw_tool_text">El proveedor devolvió una llamada a herramienta como texto. Ese texto no se ejecutó como herramienta.</string>
+    <string name="nm_image_raw_tool_text">El proveedor devolvió una llamada a herramienta como texto. Ese texto no se ejecutó como herramienta. Para crear una imagen directamente, envía /imagem seguido de la descripción.</string>
+    <string name="nm_image_command_hint">Cuando el chat esté libre, envía /imagem y una descripción en una sola línea, sin archivos adjuntos.</string>
+    <string name="nm_agnes_image_not_chat">Este modelo de Agnes crea imágenes, pero no responde en el chat. Elige un modelo de texto para conversar o envía /imagem y una descripción.</string>
+    <string name="nm_media_image_selected">Seleccionado. El permiso de imágenes es independiente.</string>
     <string name="nm_free_list_filter">Mostrar solo modelos anunciados gratis</string>
     <string name="nm_free_list_help">Filtra solo esta lista. No elimina modelos ni garantiza su coste. Desactiva el filtro para ver todos los modelos guardados.</string>
     <string name="nm_free_list_refresh">No hay datos actuales del catálogo. Actualiza la lista o desactiva el filtro.</string>

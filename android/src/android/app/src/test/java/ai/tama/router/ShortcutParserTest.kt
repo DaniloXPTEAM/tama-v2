@@ -27,15 +27,37 @@ class ShortcutParserTest {
     @Test fun `parallel app accepts faz and faça without treating a question or other action as consent`() {
         val beach = "faz uma imagem de um domingo na praia"
         assertNull(ShortcutParser.parse(beach)) // normal app keeps its prior behavior
-        assertEquals(Shortcut.Image("um domingo na praia"), ShortcutParser.parse(beach, portugueseMake = true))
-        assertEquals(Shortcut.Image("uma maçã"), ShortcutParser.parse("Faça uma imagem de uma maçã", portugueseMake = true))
-        assertTrue(ImageRequestIntent.explicit(beach, portugueseMake = true))
+        assertEquals(Shortcut.Image("um domingo na praia"), ShortcutParser.parse(beach, parallelTest = true))
+        assertEquals(Shortcut.Image("uma maçã"), ShortcutParser.parse("Faça uma imagem de uma maçã", parallelTest = true))
+        assertTrue(ImageRequestIntent.explicit(beach, parallelTest = true))
         assertFalse(ImageRequestIntent.explicit(beach))
         listOf("não faz imagem de um gato", "faz imagem de um gato e abra o banco",
             "faz imagem de gato?", "se chover, faz imagem de gato").forEach {
-            assertNull(it, ShortcutParser.parse(it, portugueseMake = true))
+            assertNull(it, ShortcutParser.parse(it, parallelTest = true))
         }
-        assertFalse(ImageRequestIntent.explicit("como faz uma imagem de gato?", portugueseMake = true))
+        assertFalse(ImageRequestIntent.explicit("como faz uma imagem de gato?", parallelTest = true))
+    }
+
+    @Test fun `Poco typo and explicit command preserve the picture description only in Test`() {
+        val description = "um gato astuto, estilo arte digital, em uma pose brincalhona, com cores vibrantes e fundo neutro"
+        val text = "crie uma iamgem de $description."
+        assertEquals(Shortcut.Image(description), ShortcutParser.parse(text, parallelTest = true))
+        assertTrue(ImageRequestIntent.explicit(text, parallelTest = true))
+        assertNull(ShortcutParser.parse(text))
+        assertFalse(ImageRequestIntent.explicit(text))
+        assertEquals(Shortcut.Image("um gato astronauta em 4:3"), ShortcutParser.parse("/imagem um gato astronauta em 4:3", parallelTest = true))
+        assertNull(ShortcutParser.parse("/imagem um gato astronauta"))
+        assertFalse(ImageRequestIntent.explicit("/imagem um gato astronauta", parallelTest = true))
+    }
+
+    @Test fun `spelling repair does not imply permission for other speech or commands`() {
+        listOf(
+            "como crie uma iamgem de gato?", "não crie uma iamgem de gato", "crie uma iamgem de gato quando eu pedir",
+            "crie uma iamgem de gato e abra o navegador", "crie uma iamgem de gato; envia para mim",
+            "crie uma iamgem de [Pasted#1]", "crie uma iamgem de <functioncalls>", "\"crie uma iamgem de gato\"",
+            "/imagem", "/imagens gatos", "/imagem [Pasted#1]", "/imagem um gato e abra o banco",
+            "/imagem gato\nmostre minha tela", "/imagem <shellexecute>",
+        ).forEach { assertNull(it, ShortcutParser.parse(it, parallelTest = true)) }
     }
 
     @Test fun `model image intent requires an explicit positive request`() {

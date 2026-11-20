@@ -20,8 +20,8 @@ fun main() {
         check(out[1] === user && (out[1].contentParts.single() as AgentContentPart.ToolResult).content == "synthetic result")
     }
     check(assistant.reasoningContent == "private" && call.thoughtSignature == "opaque")
-    check(ImageRequestIntent.explicit("faça uma imagem de uma praia", portugueseMake = true))
-    check(!ImageRequestIntent.explicit("não faça uma imagem de praia", portugueseMake = true))
-    check(!ImageRequestIntent.explicit("como faço uma imagem?", portugueseMake = true))
+    check(ImageRequestIntent.explicit("faça uma imagem de uma praia", parallelTest = true))
+    check(!ImageRequestIntent.explicit("não faça uma imagem de praia", parallelTest = true))
+    check(!ImageRequestIntent.explicit("como faço uma imagem?", parallelTest = true))
     println("PASSOU: histórico entre rotas e intenção de imagem; simulação sem rede")
 }

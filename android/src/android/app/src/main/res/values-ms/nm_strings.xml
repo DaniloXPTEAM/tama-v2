@@ -1555,7 +1555,10 @@
     <string name="nm_free_bulk_retry">Tiada model layak semasa dibenarkan. Muat semula katalog dan cuba lagi.</string>
     <string name="nm_image_retry_question">Mahu cuba imej ini lagi? Jawab ya atau minta cuba lagi.</string>
     <string name="nm_context_near_limit">Konteks menghampiri had model (%1$d / %2$d token). Mulakan sembang baharu atau gunakan /compact untuk meneruskan dengan lancar.</string>
-    <string name="nm_image_raw_tool_text">Penyedia memulangkan panggilan alat sebagai teks. Teks itu tidak dijalankan sebagai alat.</string>
+    <string name="nm_image_raw_tool_text">Penyedia memulangkan panggilan alat sebagai teks. Teks itu tidak dijalankan sebagai alat. Untuk terus membuat imej, hantar /imagem diikuti penerangan.</string>
+    <string name="nm_image_command_hint">Apabila sembang tidak sibuk, hantar /imagem dan satu baris penerangan imej tanpa lampiran.</string>
+    <string name="nm_agnes_image_not_chat">Model Agnes ini membuat imej, bukan membalas sembang. Pilih model teks untuk sembang, atau hantar /imagem dan penerangan.</string>
+    <string name="nm_media_image_selected">Dipilih. Kebenaran imej berasingan.</string>
     <string name="nm_free_list_filter">Tunjukkan hanya model yang disenaraikan percuma</string>
     <string name="nm_free_list_help">Menapis senarai ini sahaja. Tidak memadam model atau menjamin kosnya. Matikan penapis untuk melihat semua model tersimpan.</string>
     <string name="nm_free_list_refresh">Tiada data katalog terkini. Muat semula senarai model atau matikan penapis.</string>

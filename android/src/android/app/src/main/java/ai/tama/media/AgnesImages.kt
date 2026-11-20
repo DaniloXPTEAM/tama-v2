@@ -36,6 +36,11 @@ internal object AgnesImages {
 
     fun model(id: String): Model? = models.firstOrNull { it.id == id }
 
+    // An old custom entry may have no modalities, or end up pinned in a chat.
+    // These two exact image IDs still cannot serve a chat request in the Test app.
+    fun imageOnlyInTest(id: String?): Boolean = BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test" &&
+        id != null && model(id) != null
+
     // Old builds let Add custom model duplicate the bundled row. Resolve the
     // exact same provider/model to its one bundled entry without deleting rows
     // or moving a custom entry's visibility, capabilities, or approval.

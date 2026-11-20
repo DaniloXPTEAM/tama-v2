@@ -1174,8 +1174,10 @@ class ProviderRepository(private val context: Context) {
             .filter { it.isEnabled }
             .sortedByDescending { it.createdAt }
         for (instance in enabledProviders) {
+            // nanoMuse: legacy generator entries can still claim text output in Test.
             val textEntry = config.modelEntries
-                .filter { it.providerInstanceId == instance.id && !it.isHidden && it.model.isTextOutput }
+                .filter { it.providerInstanceId == instance.id && !it.isHidden && it.model.isTextOutput &&
+                    !AgnesImages.imageOnlyInTest(it.model.id) }
                 .lastOrNull()
             if (textEntry != null) return textEntry
         }
@@ -2553,7 +2555,7 @@ class ProviderRepository(private val context: Context) {
 
     /** This check excludes unknown/paid routes. It cannot grant either cost permission. */
     internal fun tamaAllowsChatModel(instance: ProviderInstance, modelId: String, requireFree: Boolean = false): Boolean {
-        if (AgnesImages.account(instance) && AgnesImages.model(modelId) != null) return false
+        if (AgnesImages.imageOnlyInTest(modelId)) return false
         val restricted = requireFree || tamaFreeChatOnly(instance)
         if (!restricted) return !tamaPaymentRefused(instance.id, modelId)
         return ai.tama.pricing.FreeModelList.canDispatch(tamaFreeChatStatus(instance, modelId),
@@ -2637,7 +2639,7 @@ class ProviderRepository(private val context: Context) {
     /** Applies only to the conversational picker, not the provider catalogue or other slot types. */
     internal fun tamaIsChatModel(entry: ModelEntry, instance: ProviderInstance): Boolean {
         val id = entry.model.id
-        if (AgnesImages.account(instance) && AgnesImages.model(id) != null) return false
+        if (AgnesImages.imageOnlyInTest(id)) return false
         val exact = ModelsDevApi.bundledProvider(tamaModelBase(instance))?.models?.get(id)
         return ai.tama.providers.ChatModelKind.accepts(id,
             exact?.inputModalities ?: entry.model.inputModalities,

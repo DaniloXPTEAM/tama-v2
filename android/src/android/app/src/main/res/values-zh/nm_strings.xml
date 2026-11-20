@@ -1532,7 +1532,10 @@
     <string name="nm_free_bulk_retry">没有允许当前符合条件的模型。请刷新目录后重试。</string>
     <string name="nm_image_retry_question">要再次尝试这张图片吗？请回复“是”或“重试”。</string>
     <string name="nm_context_near_limit">上下文接近模型上限（%1$d / %2$d 个词元）。请开始新对话或使用 /compact，以便可靠地继续。</string>
-    <string name="nm_image_raw_tool_text">服务商将工具调用作为文本返回。该文本没有作为工具执行。</string>
+    <string name="nm_image_raw_tool_text">服务商将工具调用作为文本返回。该文本没有作为工具执行。 要直接生成图片，请发送 /imagem，后面加上图片描述。</string>
+    <string name="nm_image_command_hint">等聊天空闲后，发送 /imagem 和一行图片描述，不要附加文件。</string>
+    <string name="nm_agnes_image_not_chat">此 Agnes 模型只生成图片，不能聊天。聊天请选择文本模型；生成图片请发送 /imagem 和图片描述。</string>
+    <string name="nm_media_image_selected">已选定。图片权限需单独授权。</string>
     <string name="nm_free_list_filter">仅显示标为免费的模型</string>
     <string name="nm_free_list_help">仅筛选此列表，不删除模型，也不保证费用。关闭筛选可查看所有已保存的模型。</string>
     <string name="nm_free_list_refresh">没有当前目录数据。请刷新模型列表或关闭筛选。</string>

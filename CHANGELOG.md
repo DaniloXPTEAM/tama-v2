@@ -4,6 +4,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+- Routed standalone image requests, including the spelling “iamgem”, directly to the image tool in Android Test. Kept legacy Agnes image entries out of chat and replaced fake tool transcripts with a notice.
+
 - Kept image calls from managed shells on their own chat's free-only policy in Android Test.
 
 - Showed chat mode, the active personal-key route and separate input/output capabilities in the Android Test picker. Added code wrapping without changing copied text.

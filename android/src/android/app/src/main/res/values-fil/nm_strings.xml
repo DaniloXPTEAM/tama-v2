@@ -1559,7 +1559,10 @@
     <string name="nm_free_bulk_retry">Walang kasalukuyang angkop na modelo ang pinahintulutan. I-refresh ang katalogo at subukan muli.</string>
     <string name="nm_image_retry_question">Gusto mo bang subukang muli ang larawang ito? Sumagot ng oo o hilinging subukan muli.</string>
     <string name="nm_context_near_limit">Malapit na ang konteksto sa limitasyon ng modelo (%1$d / %2$d token). Magsimula ng bagong chat o gamitin ang /compact para makapagpatuloy nang maayos.</string>
-    <string name="nm_image_raw_tool_text">Nagbalik ang provider ng tool call bilang text. Hindi isinagawa ang text na iyon bilang tool.</string>
+    <string name="nm_image_raw_tool_text">Nagbalik ang provider ng tool call bilang text. Hindi isinagawa ang text na iyon bilang tool. Para direktang gumawa ng larawan, ipadala ang /imagem kasunod ang paglalarawan.</string>
+    <string name="nm_image_command_hint">Kapag walang ginagawa ang chat, ipadala ang /imagem at isang linyang paglalarawan, nang walang kalakip.</string>
+    <string name="nm_agnes_image_not_chat">Gumagawa ng larawan ang Agnes model na ito at hindi sumasagot sa chat. Pumili ng text model para sa chat o ipadala ang /imagem at ang paglalarawan.</string>
+    <string name="nm_media_image_selected">Napili na. Hiwalay ang pahintulot para sa larawan.</string>
     <string name="nm_free_list_filter">Ipakita lamang ang mga modelong nakalistang libre</string>
     <string name="nm_free_list_help">Ang listahang ito lang ang sinasala. Hindi nito binubura ang mga modelo o ginagarantiya ang gastos. Patayin ang filter para makita ang lahat ng naka-save na modelo.</string>
     <string name="nm_free_list_refresh">Walang kasalukuyang datos ng katalogo. I-refresh ang listahan o patayin ang filter.</string>

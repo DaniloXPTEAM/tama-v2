@@ -13,7 +13,14 @@ internal object ImageToolStream {
             if (chunk is LLMStreamChunk.Text) {
                 val text = filter.push(chunk.text)
                 if (text.isNotEmpty()) emit(LLMStreamChunk.Text(text))
-            } else emit(chunk)
+            } else {
+                // Flush a held suffix before the terminal event, not after it.
+                if (chunk is LLMStreamChunk.Finished) {
+                    val rest = filter.finish()
+                    if (rest.isNotEmpty()) emit(LLMStreamChunk.Text(rest))
+                }
+                emit(chunk)
+            }
         }
         val rest = filter.finish()
         if (rest.isNotEmpty()) emit(LLMStreamChunk.Text(rest))

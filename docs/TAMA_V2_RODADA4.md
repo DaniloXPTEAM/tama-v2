@@ -61,3 +61,46 @@ uma nem outra abre fallback de imagem.
    Se não sair imagem, anote o modo e o texto do balão de geração separadamente
    do resultado do teste de chave. Uma consulta aceita não prova que a imagem
    pode ser gerada nem comprova gratuidade.
+
+## Geração direta e retorno verdadeiro no Poco (Test .3)
+
+Em uma captura, o cabeçalho trazia Agnes Image 2.1 Flash como modelo da conversa
+quando o pedido continha `iamgem`. No código anterior, esse erro de digitação
+não seguia o atalho local. Em outra tentativa, o gato apareceu após execução
+real pelo Shell. Já no Modo agente completo, o Laguna escreveu `<functioncalls>`,
+`<functionresult>` e `<shellexecute>` no balão. O `ok:true` e os caminhos que
+apareceram nesse texto não eram recibos de execução. As capturas não mostram
+código HTTP para o erro inicial nem comprovam a tarifa da conta.
+
+- Um pedido direto de uma imagem nova, sem anexos, agora reconhece `iamgem`
+  na posição de `imagem` no Test. Também é possível enviar **`/imagem um gato
+  astronauta`** em uma só linha, sem anexos ou outras ações. O app chama a
+  ferramenta de imagem nativa, sem consultar o modelo de conversa e sem abrir
+  o Shell. O atalho não envia arquivos colados nem roda em turnos automáticos.
+- O JSON de um resultado falso e os links que vêm depois dos marcadores
+  observados não entram no novo balão. O app avisa que aquele trecho não foi
+  executado e não usa o texto para tentar gerar outra imagem. Eventos reais de
+  ferramenta mantêm seus controles. Se um link para anexo local não resolver
+  um arquivo, o Test mostra falha de carregamento em vez de cartão vazio.
+- Entradas antigas dos dois geradores Agnes ficam de fora das rotas de chat.
+  Um vínculo antigo usa a resolução de chat existente (por exemplo, o próximo
+  modelo de texto elegível do grupo), sem alteração automática na escolha
+  global ou no slot de imagem. **Visão** usa outro modelo para ler capturas.
+- **Modo: Automático / Modo agente / Modo agente completo** altera o perfil
+  de conversa. **Seleção automática de modelos** é um controle separado;
+  se estiver ligado, a aprovação exata do modelo de imagem continua necessária.
+  “Selecionado” na tela de mídia indica a escolha, não que a chave, a permissão
+  ou a cobrança tenham sido confirmadas. **Testar chave** continua só uma
+  consulta de catálogo, sem gerar imagem.
+
+**Teste no Poco:** instale o Test assinado por cima, sem limpar dados e sem
+recadastrar a chave. Deixe o Laguna ou outro modelo de texto na conversa e
+confirme **Criar imagens → Agnes Image 2.1 Flash**. Envie, sem anexar a captura,
+**“crie uma iamgem de um gato astronauta”**. Se o app pedir permissão para
+**Criar imagens**, confira o modelo e decida antes de enviar à Agnes. Não é
+necessário aparecer um cartão de Shell. Com resultado real, confirme a imagem
+inline, toque para abrir e compartilhar, e feche/reabra o chat para conferir
+que ela permaneceu. Se for testar outro modo, cada novo pedido explícito é uma
+nova geração. Se bloquear, confira a mensagem e o atalho de configuração; não
+reenvie com base em `ok:true` no texto. A Arena não usa a conta real nem executa
+esse roteiro no aparelho.

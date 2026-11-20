@@ -31,6 +31,22 @@ class ImageShortcutEligibilityTest {
         assertEquals(0, chatCalls)
     }
 
+    @Test fun `Poco request never needs a chat client or dispatches from a batch`() {
+        val context = ImageShortcutContext(person = true, parallelTest = true)
+        val descriptions = mutableListOf<String>()
+        for (text in listOf("crie uma iamgem de um gato astuto", "/imagem um gato astuto")) {
+            ImageShortcutEligibility.dispatch(text, context, image = { descriptions += it.prompt },
+                chat = { error("an eligible standalone image must not contact the chat model") })
+            assertNull(ImageShortcutEligibility.select(text, context.copy(batchSize = 2)))
+            assertNull(ImageShortcutEligibility.select(text, context.copy(person = false)))
+            assertNull(ImageShortcutEligibility.select(text, context.copy(hasAttachments = true)))
+            assertNull(ImageShortcutEligibility.select(text, context.copy(hasPastedContent = true)))
+            assertNull(ImageShortcutEligibility.select(text, context.copy(editing = true)))
+            assertNull(ImageShortcutEligibility.select(text, context.copy(sharedContent = true)))
+        }
+        assertEquals(listOf("um gato astuto", "um gato astuto"), descriptions)
+    }
+
     @Test fun `ambiguous automated and media sends fall through to the fake chat client`() {
         val cases = listOf(
             "gere uma imagem de um gato e abra o banco" to ImageShortcutContext(person = true),

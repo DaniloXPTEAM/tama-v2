@@ -1555,7 +1555,10 @@
     <string name="nm_free_bulk_retry">Tidak ada model yang memenuhi syarat saat ini. Perbarui katalog dan coba lagi.</string>
     <string name="nm_image_retry_question">Ingin mencoba gambar ini lagi? Jawab ya atau minta coba lagi.</string>
     <string name="nm_context_near_limit">Konteks mendekati batas model (%1$d / %2$d token). Mulai chat baru atau gunakan /compact agar dapat melanjutkan dengan andal.</string>
-    <string name="nm_image_raw_tool_text">Penyedia mengembalikan panggilan alat sebagai teks. Teks itu tidak dijalankan sebagai alat.</string>
+    <string name="nm_image_raw_tool_text">Penyedia mengembalikan panggilan alat sebagai teks. Teks itu tidak dijalankan sebagai alat. Untuk langsung membuat gambar, kirim /imagem diikuti deskripsi.</string>
+    <string name="nm_image_command_hint">Saat chat tidak sibuk, kirim /imagem dan satu baris deskripsi gambar, tanpa lampiran.</string>
+    <string name="nm_agnes_image_not_chat">Model Agnes ini membuat gambar dan tidak membalas chat. Pilih model teks untuk chat, atau kirim /imagem dan deskripsi untuk membuat gambar.</string>
+    <string name="nm_media_image_selected">Dipilih. Izin gambar diberikan secara terpisah.</string>
     <string name="nm_free_list_filter">Tampilkan hanya model yang tercantum gratis</string>
     <string name="nm_free_list_help">Hanya memfilter daftar ini. Tidak menghapus model atau menjamin biaya. Matikan filter untuk melihat semua model tersimpan.</string>
     <string name="nm_free_list_refresh">Tidak ada data katalog terbaru. Perbarui daftar model atau matikan filter.</string>

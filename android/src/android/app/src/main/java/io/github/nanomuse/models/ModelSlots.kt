@@ -102,7 +102,9 @@ object ModelSlots {
     fun chatEntry(context: Context): ModelEntry? {
         val cfg = repo(context)?.config?.value ?: return null
         val group = cfg.modelGroups.firstOrNull { it.id == cfg.defaultPrimaryGroupId } ?: return null
-        return group.memberEntryIds.firstNotNullOfOrNull { id -> cfg.modelEntries.firstOrNull { it.id == id && !it.isHidden } }
+        return group.memberEntryIds.firstNotNullOfOrNull { id -> cfg.modelEntries.firstOrNull {
+            it.id == id && !it.isHidden && !ai.tama.media.AgnesImages.imageOnlyInTest(it.model.id)
+        } }
     }
 
     /** The provider new chats talk to; the other slots lean on it when nothing was chosen. */

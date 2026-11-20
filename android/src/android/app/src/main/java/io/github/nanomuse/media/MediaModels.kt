@@ -293,7 +293,8 @@ object MediaModels {
             }
         }
         return MediaPrompt.build(imageStatus, video?.let { "${it.model} via ${it.label}" }, DEEP_LINK, automatic,
-            reportImageAspect = image?.let { ai.tama.media.AgnesImages.route(it.instance) } == true)
+            reportImageAspect = image?.let { ai.tama.media.AgnesImages.route(it.instance) } == true,
+            testImageGuidance = com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test")
     }
 
     /** The one-turn addendum when an avatar change was asked for but cannot be drawn. */
