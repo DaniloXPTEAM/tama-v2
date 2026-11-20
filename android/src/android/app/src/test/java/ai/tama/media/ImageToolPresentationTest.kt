@@ -10,10 +10,10 @@ import com.openminis.app.ui.chat.ChatMessage
 import com.openminis.app.ui.chat.FlatChatItem
 import com.openminis.app.ui.chat.ToolBlockStatus
 import com.openminis.app.ui.chat.buildFlatChatItems
-import java.awt.image.BufferedImage
-import javax.imageio.ImageIO
+import java.util.Base64
 import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -26,6 +26,10 @@ import org.junit.rules.TemporaryFolder
 class ImageToolPresentationTest {
     @get:Rule val temp = TemporaryFolder()
 
+    // A real, fixed 3x2 RGB PNG. Android unit tests do not compile against java.desktop.
+    private val png = Base64.getDecoder().decode(
+        "iVBORw0KGgoAAAANSUhEUgAAAAMAAAACCAIAAAASFvFNAAAAFUlEQVR4nGP4DwTlDECCAQhDjUBcAI2BDfI1QGQaAAAAAElFTkSuQmCC",
+    )
     private val filename = "nanomuse-20260101-010203-00000000-0000-0000-0000-000000000001.png"
     private val ambiguous = "Não consegui confirmar o pedido."
     private val repeated = "Não vou repetir automaticamente."
@@ -57,7 +61,7 @@ class ImageToolPresentationTest {
             assertEquals(prompt, received)
             assertNull(size)
             submissions++
-            assertTrue(ImageIO.write(BufferedImage(3, 2, BufferedImage.TYPE_INT_RGB), "png", file))
+            file.writeBytes(png)
             NativeOffloadResult(0, JSONObject().put("ok", true)
                 .put("path", "/var/minis/attachments/$filename").put("bytes", file.length()).toString())
         }
@@ -65,7 +69,7 @@ class ImageToolPresentationTest {
         assertEquals(1, submissions)
         assertEquals(ImageTurnGuard.Decision.ALREADY_ATTEMPTED, guard.consume())
         assertEquals(file.canonicalPath, result.imageFilePath)
-        assertEquals(3, ImageIO.read(file).width)
+        assertArrayEquals(png, file.readBytes())
         val block = AssistantBlock(id = "image-call", kind = "tool_use", toolStatus = ToolBlockStatus.SUCCESS,
             toolName = ImageGenerationTool.NAME, content = result.output, imageFilePath = result.imageFilePath)
         fun imageRows(tool: AssistantBlock, showSteps: Boolean) = buildFlatChatItems(
@@ -84,7 +88,7 @@ class ImageToolPresentationTest {
     @Test fun `a missing or different session attachment is not a successful picture`() {
         val here = temp.newFolder("here")
         val other = temp.newFolder("other").resolve(filename)
-        assertTrue(ImageIO.write(BufferedImage(1, 1, BufferedImage.TYPE_INT_RGB), "png", other))
+        other.writeBytes(png)
         val body = JSONObject().put("ok", true).put("bytes", other.length())
         for (path in listOf("/var/minis/attachments/$filename", other.path, "/var/minis/attachments/../other/$filename")) {
             val result = ImageToolPresentation.attachSavedPng(ToolExecutionResult(body.put("path", path).toString(), true), here)
