@@ -1,5 +1,5 @@
-name: Tama V2 Test private signed APK
-run-name: 'Tama V2 Test assinado · entrega privada do commit 255a8aa'
+name: Tama V2 Test public signed APK
+run-name: 'Tama V2 Test assinado · download público do commit 255a8aa'
 
 on:
   push:
@@ -11,6 +11,7 @@ permissions:
 
 env:
   TAMA_TEST_SOURCE_SHA: '255a8aa171db886707edab1a3bb105b7a56d8afd'
+  TAMA_TEST_APK_NAME: Tama-V2-Test-255a8aa171db.apk
   EXPECTED_CERT_SHA256: 'E5:9C:BA:96:EF:A4:EB:21:9E:D5:A1:90:3F:D6:8F:87:AA:BB:6C:D2:75:07:CD:6F:88:D1:04:E2:5E:0F:93:4F'
   NDK_VERSION: 27.2.12479018
 
@@ -33,57 +34,6 @@ jobs:
       - name: Confirm the pinned APK source
         shell: bash
         run: test "$(git rev-parse HEAD)" = "$TAMA_TEST_SOURCE_SHA"
-      - name: Check private Drive credentials before building
-        shell: bash
-        env:
-          TAMA_TEST_DRIVE_OAUTH_JSON: ${{ secrets.TAMA_TEST_DRIVE_OAUTH_JSON }}
-        run: |
-          set +x
-          set -euo pipefail
-          if [[ -z "${TAMA_TEST_DRIVE_OAUTH_JSON:-}" ]]; then
-            echo '::error title=Private Drive::TAMA_TEST_DRIVE_OAUTH_JSON did not reach this job. Check Actions Repository secrets in DaniloXPTEAM/tama-v2, not Variables or Environment secrets. No APK will be published.'
-            exit 1
-          fi
-          python3 - <<'PY'
-          import json
-          import os
-          import runpy
-          from urllib.error import HTTPError
-
-          def fail(message):
-              print(f'::error title=Private Drive::{message} No folder or APK was created.')
-              raise SystemExit(1) from None
-
-          try:
-              credentials = json.loads(os.environ['TAMA_TEST_DRIVE_OAUTH_JSON'])
-          except json.JSONDecodeError:
-              fail('The secret was received but is not JSON. Save the OAuth JSON, not a link.')
-          fields = ('client_id', 'client_secret', 'refresh_token')
-          if not isinstance(credentials, dict) or any(
-              not isinstance(credentials.get(field), str) or not credentials[field].strip() for field in fields
-          ):
-              fail('The secret JSON must contain nonempty client_id, client_secret and refresh_token fields.')
-
-          try:
-              private = runpy.run_path('scripts/android/deliver-private-drive.py')
-              opener = private['build_opener'](private['NoRedirect']())
-              token = private['login'](opener, credentials)
-              if not isinstance(token, str) or not token:
-                  raise ValueError('Missing access token')
-          except HTTPError as error:
-              try:
-                  code = json.loads(error.read(4096)).get('error')
-              except Exception:
-                  code = None
-              if code == 'invalid_grant':
-                  fail('Google rejected the refresh token (invalid_grant). Renew it for this OAuth client.')
-              if code in ('invalid_client', 'unauthorized_client'):
-                  fail('Google rejected the OAuth client. Check the client ID and secret in GitHub.')
-              fail('Google rejected the OAuth token exchange. Check the credential and drive.file scope.')
-          except Exception:
-              fail('Could not verify private Drive OAuth. Check that the consent uses only the drive.file scope.')
-          print('Private Drive OAuth verified. No folder created yet.')
-          PY
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: temurin
@@ -177,9 +127,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          apk=android/src/android/app/build/outputs/apk/tamaTest/app-tamaTest.apk
-          test -s "$apk"
-          chmod 0600 -- "$apk"
+          test "$(git rev-parse HEAD)" = "$TAMA_TEST_SOURCE_SHA"
+          original=android/src/android/app/build/outputs/apk/tamaTest/app-tamaTest.apk
+          test -s "$original"
+          stage="$RUNNER_TEMP/tama-v2-test-public"
+          mkdir -m 0700 -- "$stage"
+          apk="$stage/$TAMA_TEST_APK_NAME"
+          install -m 0600 -- "$original" "$apk"
+          cmp -s -- "$original" "$apk"
           tools="$ANDROID_HOME/build-tools/35.0.0"
           badging=$("$tools/aapt" dump badging "$apk")
           package_line=$(sed -n '/^package: /p' <<< "$badging")
@@ -215,26 +170,54 @@ jobs:
           printf 'apk_sha256=%s\nsize=%s\n' "$apk_sha256" "$size" >> "$GITHUB_OUTPUT"
           printf '::notice title=Tama V2 Test verified::source=%s; package=%s; versionCode=%s; versionName=%s; size=%s; APK SHA-256=%s; certificate SHA-256=%s\n' \
             "$TAMA_TEST_SOURCE_SHA" "$package" "$code" "$version" "$size" "$apk_sha256" "$actual"
-      - name: Deliver the verified APK only to a restricted Drive folder
+      - name: Publish only the verified APK as a public Actions artifact for one day
+        id: published
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          path: ${{ runner.temp }}/tama-v2-test-public/${{ env.TAMA_TEST_APK_NAME }}
+          archive: false
+          retention-days: 1
+          if-no-files-found: error
+      - name: Download the published artifact by ID without extracting the APK
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          artifact-ids: ${{ steps.published.outputs.artifact-id }}
+          path: ${{ runner.temp }}/tama-v2-test-download
+          skip-decompress: true
+      - name: Verify the downloaded bytes and record the public download link
         shell: bash
         env:
-          TAMA_TEST_DRIVE_OAUTH_JSON: ${{ secrets.TAMA_TEST_DRIVE_OAUTH_JSON }}
           APK_SHA256: ${{ steps.verified.outputs.apk_sha256 }}
           APK_SIZE: ${{ steps.verified.outputs.size }}
+          ARTIFACT_ID: ${{ steps.published.outputs.artifact-id }}
+          ARTIFACT_URL: ${{ steps.published.outputs.artifact-url }}
+          ARTIFACT_DIGEST: ${{ steps.published.outputs.artifact-digest }}
         run: |
-          set +x
           set -euo pipefail
-          apk=android/src/android/app/build/outputs/apk/tamaTest/app-tamaTest.apk
-          read -r current_hash _ < <(sha256sum -- "$apk")
-          test "$(git rev-parse HEAD)" = "$TAMA_TEST_SOURCE_SHA"
-          test "$current_hash" = "$APK_SHA256"
-          test "$(stat -c '%s' -- "$apk")" = "$APK_SIZE"
-          # Take the filename's source SHA from the pinned checkout. The outer
-          # Actions run still identifies the workflow-only push separately.
-          GITHUB_SHA="$TAMA_TEST_SOURCE_SHA" python3 scripts/android/deliver-private-drive.py "$apk"
-          printf '::notice title=Tama V2 Test private delivery::Drive upload verified. Source=%s; APK SHA-256=%s; size=%s\n' \
-            "$TAMA_TEST_SOURCE_SHA" "$APK_SHA256" "$APK_SIZE"
-      - name: Remove the runner's APK
+          apk="$RUNNER_TEMP/tama-v2-test-download/$TAMA_TEST_APK_NAME"
+          test -s "$apk"
+          read -r downloaded_hash _ < <(sha256sum -- "$apk")
+          if [[ "$downloaded_hash" != "$APK_SHA256" || "${ARTIFACT_DIGEST#sha256:}" != "$APK_SHA256" ||
+                "$(stat -c '%s' -- "$apk")" != "$APK_SIZE" ]]; then
+            echo '::error::The published artifact does not match the verified APK.'
+            exit 1
+          fi
+          [[ "$ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]]
+          repo_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY"
+          test "$ARTIFACT_URL" = "$repo_url/actions/runs/$GITHUB_RUN_ID/artifacts/$ARTIFACT_ID"
+          {
+            printf '### TAMA V2 Test, download público\n\n'
+            printf '[Baixar `%s`](%s) (login no GitHub, retenção de 1 dia)\n\n' "$TAMA_TEST_APK_NAME" "$ARTIFACT_URL"
+            printf 'SHA-256: `%s` · %s bytes\n\n' "$downloaded_hash" "$APK_SIZE"
+            printf '[Código-fonte correspondente](%s/tree/%s) · [Licenças e avisos](%s/blob/%s/LICENCIAMENTO_TAMA.md)\n' \
+              "$repo_url" "$TAMA_TEST_SOURCE_SHA" "$repo_url" "$TAMA_TEST_SOURCE_SHA"
+          } >> "$GITHUB_STEP_SUMMARY"
+          printf '::notice title=Tama V2 Test public download::artifact=%s; source=%s; APK SHA-256=%s; size=%s\n' \
+            "$ARTIFACT_ID" "$TAMA_TEST_SOURCE_SHA" "$downloaded_hash" "$APK_SIZE"
+      - name: Remove the runner's APK copies
         if: ${{ always() }}
         shell: bash
-        run: rm -f -- android/src/android/app/build/outputs/apk/tamaTest/app-tamaTest.apk
+        run: |
+          rm -f -- android/src/android/app/build/outputs/apk/tamaTest/app-tamaTest.apk \
+            "$RUNNER_TEMP/tama-v2-test-public/$TAMA_TEST_APK_NAME" \
+            "$RUNNER_TEMP/tama-v2-test-download/$TAMA_TEST_APK_NAME"
