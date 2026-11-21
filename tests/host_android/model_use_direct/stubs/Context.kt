@@ -2,6 +2,12 @@ package android.content
 import java.util.concurrent.ConcurrentHashMap
 open class Context {
     companion object { const val MODE_PRIVATE = 0 }
+    val applicationContext get() = this
+    val cacheDir = java.io.File(System.getProperty("java.io.tmpdir"), "tama-catalogue-host")
+    val assets = AssetFixture()
+    class AssetFixture {
+        fun open(name: String) = java.io.File("android/src/android/app/src/main/assets", name).inputStream()
+    }
     val filesDir = java.io.File(System.getProperty("java.io.tmpdir"), "tama-handler-host")
     fun getString(id: Int): String = when (id) { 1 -> "automatic mode blocked"; 2 -> "model cost unverified"; else -> "unknown" }
     private val stores = ConcurrentHashMap<String, SharedPreferences>()
@@ -25,5 +31,9 @@ class SharedPreferences {
         fun putBoolean(key: String, value: Boolean) = apply { changes[key] = value }
         fun remove(key: String) = apply { changes[key] = null }
         fun apply() = synchronized(values) { for ((key, value) in changes) if (value == null) values.remove(key) else values[key] = value }
+        fun commit(): Boolean {
+            apply()
+            return true // In-memory fixture; does not simulate disk writes or failure.
+        }
     }
 }

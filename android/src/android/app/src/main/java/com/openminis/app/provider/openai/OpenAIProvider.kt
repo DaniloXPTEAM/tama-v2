@@ -19,6 +19,9 @@ import com.openminis.app.provider.applyUserAgentOverride
 import com.openminis.app.provider.safeOptString
 import ai.tama.net.singleUseImageBody
 import ai.tama.net.singleUseImageClient
+import ai.tama.pricing.DocumentedChatDispatch
+import ai.tama.pricing.DocumentedOpenAIChatBody
+import ai.tama.pricing.ModelCostGuard
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
@@ -93,6 +96,7 @@ class OpenAIProvider private constructor(
      * which is wrong for Azure's deployments-path routing.
      */
     private val azureBase: String? = null,
+    private val clientOverride: OkHttpClient? = null,
 ) : LLMProvider {
     override val name = "OpenAI"
 
@@ -178,6 +182,11 @@ class OpenAIProvider private constructor(
         model: LLMModel = LLMModel.codexMini,
         codexAccountId: String? = null,
     ) : this(apiKey = null, oauthTokenProvider = oauthTokenProvider, model = model, codexAccountId = codexAccountId)
+
+    // Real provider serializer and parser with a credential-free local HTTP fixture.
+    internal constructor(apiKey: String, model: LLMModel, basePath: String, httpClient: OkHttpClient) : this(
+        apiKey = apiKey, oauthTokenProvider = null, model = model, basePath = basePath, clientOverride = httpClient,
+    )
 
     companion object {
         /**
@@ -449,7 +458,7 @@ class OpenAIProvider private constructor(
     // or the server itself stopped emitting bytes. Each milestone goes
     // through AppLogger.info at the OkHttpEvents tag with the call's
     // identity hash so concurrent streams can be disambiguated.
-    private val client = OkHttpClient.Builder()
+    private val client = clientOverride ?: OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(600, TimeUnit.SECONDS)
         .writeTimeout(30, TimeUnit.SECONDS)
@@ -613,6 +622,9 @@ class OpenAIProvider private constructor(
         tools: List<AgentToolDefinition>,
         thinkingLevel: ThinkingLevel,
     ): LLMResponse = withContext(Dispatchers.IO) {
+        // This entry point consumes a stream internally, but cannot borrow the
+        // main chat's exception for auxiliary/offload sendMessage calls.
+        if (DocumentedChatDispatch.ticket(kotlin.coroutines.coroutineContext) != null) throw ModelCostGuard.Blocked()
         val textBuf = StringBuilder()
         var stopReason: String? = null
         var usage: LLMUsage? = null
@@ -666,8 +678,13 @@ class OpenAIProvider private constructor(
         if (com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test") {
             ai.tama.providers.KeyDestinationGuard.requireAllowed(true, apiKey, if (isAzure) azureBase else basePath)
         }
-        // nanoMuse: neither a selected model nor user-supplied request fields prove zero cost.
-        ai.tama.pricing.ModelCostGuard.requireAllowed()
+        val ticket = DocumentedChatDispatch.ticket(coroutineContext)
+        val freeRoute = ticket?.checkOpenAI(basePath, apiKey, model.id,
+            usesChatCompletionsAPI && !isAzure && !isOAuth && !isCodexImageModel && !singleUseDirectRequest &&
+                absoluteEndpointOverride == null && chatExtraBody.isEmpty() && chatExtraHeaders.isEmpty() &&
+                model.outputModalities.orEmpty().all { it == "text" } &&
+                extraHeaders.keys.all { it in setOf("HTTP-Referer", "X-Title") })
+        if (ticket == null) ai.tama.pricing.ModelCostGuard.requireAllowed()
         val body = if (isCodexImageModel) {
             // [T-gpt-image2-codex-backend-route-android] gpt-image-2 on an
             // OpenAI OAuth (Codex) instance is driven through the Codex backend
@@ -693,10 +710,12 @@ class OpenAIProvider private constructor(
             )
             buildCodexImageBody(messages)
         } else if (usesChatCompletionsAPI) {
-            buildRequestBody(messages, systemPrompt, maxTokens, stream = true, temperature = temperature, imageParts = imageParts, tools = tools, thinkingLevel = thinkingLevel)
+            buildRequestBody(messages, systemPrompt, maxTokens, stream = true, temperature = temperature,
+                imageParts = imageParts, tools = tools, thinkingLevel = thinkingLevel, documentedChat = ticket != null)
         } else {
             buildResponsesAPIBody(messages, systemPrompt, maxTokens, stream = true, imageParts = imageParts, tools = tools, thinkingLevel = thinkingLevel)
         }
+        if (freeRoute != null) DocumentedOpenAIChatBody.restrict(body, freeRoute)
         // T302: serialize the request body exactly once. Pre-T302 we called
         // body.toString() three times per request (debug log + OAuth byte
         // build + non-OAuth RequestBody), each materialising a fresh 30+ MB
@@ -729,7 +748,8 @@ class OpenAIProvider private constructor(
         // nanoMuse: OpenCode Go wants one stable id per conversation (io.github.nanomuse.net.OpenCodeSession); the relay's record takes the same id and, with it, where the call sits (io.github.nanomuse.cloud.CloudHeaders)
         val builtRequest = buildRequest(bodyStr, if (io.github.nanomuse.net.OpenCodeSession.wants(basePath) || io.github.nanomuse.cloud.CloudHeaders.isCloud(extraHeaders)) derivePromptCacheKey(messages) else null, messages)
         // nanoMuse: a direct request can produce images even if metadata says text.
-        val request = if (singleUseDirectRequest && builtRequest.body != null)
+        val oneShot = singleUseDirectRequest || ticket != null
+        val request = if (oneShot && builtRequest.body != null)
             builtRequest.newBuilder().method(builtRequest.method, builtRequest.body!!.singleUseImageBody()).build()
         else builtRequest
         // nanoMuse: a provider may echo any request credential, even JSON-escaped.
@@ -775,7 +795,7 @@ class OpenAIProvider private constructor(
         // (b) evict THIS ONE connection on timeout.
         val watchState = CallWatchState()
         // nanoMuse: disable client-level retries and redirects for direct test calls.
-        val streamClient = if (singleUseDirectRequest) client.singleUseImageClient() else client
+        val streamClient = if (oneShot) client.singleUseImageClient() else client
         val call = streamClient.newCall(request.newBuilder().tag(CallWatchState::class.java, watchState).build())
         // [T-android-stale-conn-retry-hang] Time-to-first-byte watchdog. A
         // request written into a dead pooled h2 tunnel (local proxy socket
@@ -835,7 +855,10 @@ class OpenAIProvider private constructor(
         val response = try {
             // nanoMuse: recheck after preparing the request and before the network call.
             beforeDirectRequest?.invoke()
-            ai.tama.pricing.ModelCostGuard.requireAllowed()
+            if (ticket == null) ai.tama.pricing.ModelCostGuard.requireAllowed()
+            else ticket.checkOpenAI(basePath, apiKey, model.id,
+                request.url.toString() == "${freeRoute?.base}/chat/completions" && request.method == "POST" &&
+                    request.headers("Authorization") == listOf("Bearer $apiKey") && requestModelId == model.id)
             call.execute()
         } catch (e: IOException) {
             if (ttfbTimedOut.get()) {
@@ -1679,7 +1702,10 @@ class OpenAIProvider private constructor(
     ): LLMResponse = withContext(Dispatchers.IO) {
         // nanoMuse: image capability and approval do not verify image pricing.
         ai.tama.pricing.ModelCostGuard.requireAllowed()
-        val retryAllowed = allowFormatRetry && !singleUseDirectRequest
+        val agnes = com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test" &&
+            ai.tama.media.CustomImageRoute.agnes(basePath) && model.id == ai.tama.media.AgnesImages.DEFAULT &&
+            !isAzure && imagePathOverride == null && absoluteEndpointOverride == null && imageExtraBody.isEmpty()
+        val retryAllowed = allowFormatRetry && !singleUseDirectRequest && !agnes
         val token = getToken()
         // [T-android-model-use-image-passthrough GH#62] Honor an explicit
         // endpoint-path override (non-standard providers); default otherwise.
@@ -1707,7 +1733,12 @@ class OpenAIProvider private constructor(
                 .put("n", n)
             if (size != null) body.put("size", size)
             if (quality != null) body.put("quality", quality)
-            if (!triedWithoutFormat) body.put("response_format", "b64_json")
+            // Agnes documents return_base64 for text-to-image, not a top-level response_format.
+            if (agnes) {
+                body.remove("n")
+                body.put("size", size ?: "1024x1024")
+                body.put("return_base64", true)
+            } else if (!triedWithoutFormat) body.put("response_format", "b64_json")
             // [T-android-model-use-image-passthrough GH#62] Merge user-supplied
             // passthrough fields. User keys WIN over our defaults (they can
             // override prompt/size or add Seedream's `image`/`watermark`), but
@@ -1753,6 +1784,9 @@ class OpenAIProvider private constructor(
             val imageClient = if (retryAllowed) client else client.singleUseImageClient()
             // nanoMuse: revalidate before every image POST, including a format retry.
             beforeDirectRequest?.invoke()
+            if (com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test") {
+                ai.tama.providers.KeyDestinationGuard.requireAllowed(true, apiKey, if (isAzure) azureBase else basePath)
+            }
             ai.tama.pricing.ModelCostGuard.requireAllowed()
             val response = imageClient.newCall(request).execute()
             val statusCode = response.code
@@ -2032,6 +2066,7 @@ class OpenAIProvider private constructor(
         imageParts: List<LLMMessage.ImagePart>,
         tools: List<AgentToolDefinition> = emptyList(),
         thinkingLevel: ThinkingLevel = ThinkingLevel.OFF,
+        documentedChat: Boolean = false,
     ): JSONObject {
         // T264: cross-provider image sanitization, mirrors iOS
         // OpenAIAgentProvider.swift:744-768 / 900-918. When the target model
@@ -2098,7 +2133,7 @@ class OpenAIProvider private constructor(
         // 4-breakpoint budget across a mutating history.
         //
         // Gated on host + `anthropic/` prefix, so no other model's body changes.
-        if (needsOpenRouterAnthropicCacheControl) {
+        if (!documentedChat && needsOpenRouterAnthropicCacheControl) {
             body.put("cache_control", JSONObject().put("type", "ephemeral"))
         }
 

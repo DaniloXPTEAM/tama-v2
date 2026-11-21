@@ -1,5 +1,7 @@
 package com.openminis.app.ui.settings
 
+import ai.tama.media.AgnesImages
+import android.widget.Toast
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -13,6 +15,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
@@ -23,6 +26,8 @@ import com.openminis.app.ui.components.RowLabel
 import com.openminis.app.ui.components.SectionTextField
 import com.openminis.app.R
 import com.openminis.app.ui.components.MinisButton
+import io.github.nanomuse.avatar.ImageGen
+import io.github.nanomuse.models.ModelSlots
 
 /**
  * Add Custom Model — adopts the SettingsScaffold/SettingsSection toolkit
@@ -43,8 +48,10 @@ fun AddCustomModelScreen(
         return
     }
 
+    val context = LocalContext.current
     var modelId by remember { mutableStateOf("") }
     var displayName by remember { mutableStateOf("") }
+    val agnesImage = if (AgnesImages.account(instance)) AgnesImages.model(modelId.trim()) else null
 
     SettingsScaffold(
         title = stringResource(R.string.provider_detail_add_custom_model),
@@ -52,7 +59,8 @@ fun AddCustomModelScreen(
     ) {
         SettingsSection(
             header = stringResource(R.string.add_provider_identity),
-            footer = stringResource(R.string.add_custom_model_id_footer, instance.providerType.displayName),
+            footer = if (agnesImage != null) stringResource(R.string.nm_agnes_use_image_help)
+                else stringResource(R.string.add_custom_model_id_footer, instance.providerType.displayName),
         ) {
             SettingsCardBlock {
                 RowLabel(text = stringResource(R.string.add_custom_model_model_id))
@@ -63,19 +71,31 @@ fun AddCustomModelScreen(
                     singleLine = true,
                     textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
                 )
-                Spacer(Modifier.height(12.dp))
-                RowLabel(text = stringResource(R.string.add_custom_model_display_name_optional))
-                SectionTextField(
-                    value = displayName,
-                    onValueChange = { displayName = it },
-                    singleLine = true,
-                )
+                if (agnesImage == null) {
+                    Spacer(Modifier.height(12.dp))
+                    RowLabel(text = stringResource(R.string.add_custom_model_display_name_optional))
+                    SectionTextField(
+                        value = displayName,
+                        onValueChange = { displayName = it },
+                        singleLine = true,
+                    )
+                }
             }
         }
 
         Spacer(Modifier.height(20.dp))
         MinisButton(
             onClick = {
+                if (agnesImage != null) {
+                    val live = providerRepository.instance(instanceId)
+                    if (live != null && AgnesImages.route(live) && agnesImage.id in ImageGen.availableModels(context, live)) {
+                        ModelSlots.choose(context, ModelSlots.Slot.IMAGE, ModelSlots.Option(live, agnesImage.id))
+                        onBack()
+                    } else {
+                        Toast.makeText(context, R.string.nm_agnes_image_unavailable, Toast.LENGTH_LONG).show()
+                    }
+                    return@MinisButton
+                }
                 val name = displayName.ifBlank { modelId }
                 val model = LLMModel(
                     id = modelId.trim(),
@@ -95,7 +115,7 @@ fun AddCustomModelScreen(
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp),
         ) {
-            Text(stringResource(R.string.common_save))
+            Text(stringResource(if (agnesImage != null) R.string.nm_agnes_use_image else R.string.common_save))
         }
         Spacer(Modifier.height(20.dp))
     }

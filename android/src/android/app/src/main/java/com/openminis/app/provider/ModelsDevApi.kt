@@ -138,6 +138,13 @@ object ModelsDevApi {
         }
     }
 
+    // nanoMuse: for own-key catalogues, an identical ID on a different host
+    // is not a substitute for the configured provider's modalities.
+    internal fun enrichModelsForBase(models: List<LLMModel>, base: String?): List<LLMModel> {
+        val exact = bundledProvider(base)?.models ?: return models
+        return models.map { model -> exact[model.id]?.let { applyDevData(model, it) } ?: model }
+    }
+
     // MARK: - Apply models.dev data
 
     private fun applyDevData(model: LLMModel, devModel: ModelDevEntry): LLMModel {
@@ -260,8 +267,8 @@ object ModelsDevApi {
         }
 
         // 4. Bundled fallback
-        val bundled = loadBundledRegistry()
-        if (bundled != null) {
+        val bundled = bundledRegistrySnapshot()
+        if (bundled.isNotEmpty()) {
             cachedRegistry = bundled
             cacheTimestamp = System.currentTimeMillis()
             scheduleBackgroundRefresh()
@@ -335,19 +342,21 @@ object ModelsDevApi {
     private fun parseProviderEntry(id: String, obj: JSONObject): ProviderEntry? {
         val name = obj.optString("name", "").ifEmpty { null }
         val api = obj.optString("api", "").ifEmpty { null }
-        val modelsObj = obj.optJSONObject("models") ?: return ProviderEntry(id, name, api, emptyMap())
+        val sdk = obj.optString("npm", "").ifBlank { null }
+        val docs = obj.optString("doc", "").ifBlank { null }
+        val modelsObj = obj.optJSONObject("models") ?: return ProviderEntry(id, name, api, emptyMap(), sdk, docs)
 
         val models = mutableMapOf<String, ModelDevEntry>()
         val modelKeys = modelsObj.keys()
         while (modelKeys.hasNext()) {
             val modelKey = modelKeys.next()
             val modelObj = modelsObj.optJSONObject(modelKey) ?: continue
-            models[modelKey] = parseModelDevEntry(modelKey, modelObj)
+            models[modelKey] = parseModelDevEntry(modelKey, modelObj, nvidia = id == "nvidia")
         }
-        return ProviderEntry(id, name, api, models)
+        return ProviderEntry(id, name, api, models, sdk, docs)
     }
 
-    private fun parseModelDevEntry(id: String, obj: JSONObject): ModelDevEntry {
+    private fun parseModelDevEntry(id: String, obj: JSONObject, nvidia: Boolean): ModelDevEntry {
         val name = obj.optString("name", "").ifEmpty { null }
         val family = obj.optString("family", "").ifEmpty { null }
 
@@ -429,6 +438,9 @@ object ModelsDevApi {
             reasoningEffortValues = reasoningEffortValues,
             declaresNoEffortTiers = declaresNoEffortTiers,
             releaseDate = obj.optString("release_date", "").ifEmpty { null },
+            toolCalls = (obj.opt("tool_call") as? Boolean),
+            zeroTokenPrice = nvidia && ai.tama.pricing.NvidiaChatPricing.isZero(obj.optJSONObject("cost")),
+            inputCost = obj.optJSONObject("cost")?.optDouble("input", Double.NaN)?.takeIf { it.isFinite() && it >= 0 },
             outputCost = obj.optJSONObject("cost")
                 ?.optDouble("output", Double.NaN)
                 ?.takeIf { !it.isNaN() },
@@ -436,6 +448,31 @@ object ModelsDevApi {
     }
 
     // MARK: - Bundled Fallback
+
+    private var bundled: Map<String, ProviderEntry>? = null
+
+    // nanoMuse: never use another provider's price or a newer live catalog as
+    // the bundled reference. This lookup isn't a billing or availability check.
+    @Synchronized
+    internal fun bundledRegistrySnapshot(): Map<String, ProviderEntry> =
+        bundled ?: loadBundledRegistry()?.also { bundled = it }.orEmpty()
+
+    internal fun bundledProvider(base: String?): ProviderEntry? {
+        val url = base?.trimEnd('/') ?: return null
+        val providers = bundledRegistrySnapshot()
+        val matches = providers.values.filter { it.api?.trimEnd('/') == url }
+        if (matches.isNotEmpty()) return matches.singleOrNull()
+        return when (url) {
+            "https://api.groq.com/openai/v1" -> providers["groq"]
+            "https://generativelanguage.googleapis.com/v1beta", "https://generativelanguage.googleapis.com/v1beta/openai" -> providers["google"]
+            "https://api.cerebras.ai/v1" -> providers["cerebras"]
+            "https://api.openai.com/v1" -> providers["openai"]
+            "https://api.mistral.ai/v1" -> providers["mistral"]
+            else -> null
+        }
+    }
+
+    internal fun bundledModels(base: String?): List<LLMModel> = bundledProvider(base)?.let(::buildModels).orEmpty()
 
     private fun loadBundledRegistry(): Map<String, ProviderEntry>? {
         val ctx = appContext ?: return null
@@ -487,6 +524,8 @@ object ModelsDevApi {
         val name: String?,
         val api: String?,
         val models: Map<String, ModelDevEntry>,
+        val sdk: String? = null, // nanoMuse: only create presets for known compatible transports
+        val docs: String? = null,
     )
 
     data class ModelDevEntry(
@@ -518,5 +557,8 @@ object ModelsDevApi {
         // for same-day releases: sol/terra/luna all shipped 2026-07-09 and only
         // price (30 / 12 / 1.2) separates their tiers.
         val outputCost: Double?,
+        val inputCost: Double? = null, // nanoMuse: bundled list-price hint, not account evidence
+        val toolCalls: Boolean? = null,
+        val zeroTokenPrice: Boolean = false, // nanoMuse: never round a small positive price to zero
     )
 }

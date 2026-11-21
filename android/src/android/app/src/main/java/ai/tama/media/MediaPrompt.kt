@@ -1,10 +1,11 @@
 package ai.tama.media
 
-import io.github.nanomuse.media.*
-
 /** The app's media-model paragraph with endpoint display strings supplied by the caller. */
 object MediaPrompt {
-    fun build(image: String?, video: String?, deepLink: String, automaticImages: Boolean = false): String {
+    fun build(
+        image: String?, video: String?, deepLink: String, automaticImages: Boolean = false, reportImageAspect: Boolean = false,
+        testImageGuidance: Boolean = false,
+    ): String {
         return buildString {
             append("Media models. Unlike Muse, whose image and video models are built in, TAMA AI runs on three models the user configures: ")
             append("the chat model (you), an image model (avatar changes, pictures the user asks for) and a video model (the animated avatar, short clips). ")
@@ -13,7 +14,16 @@ object MediaPrompt {
             append("- To make one new picture the user asks for, call `generate_image` with a prompt and optional size; do not retry after a failed image request. ")
             if (!automaticImages) append("For a manual edit of a reference use `nanomuse-media image --prompt \"...\" [--from <image path>]`; ")
             append("for a short clip use `nanomuse-media video --prompt \"...\" [--from <image path>] [--seconds 4-15]` (takes 1-5 minutes; say so first). ")
-            append("The result has a `markdown` field — put that line in your reply so the file shows inline. `nanomuse-media status` prints what is configured.\n")
+            if (testImageGuidance) {
+                append("Use a structured tool call if offered. Never print tool syntax or claim success without a successful image result. ")
+                append("If you cannot call it, suggest `/imagem` followed by the description for a standalone new image. ")
+                append("The app displays a saved `generate_image` result. Do not print its JSON, markdown or path. ")
+                append("For a successful Shell media call, use its returned `markdown` to show the file. ")
+            } else {
+                append("The result has a `markdown` field — put that line in your reply so the file shows inline. ")
+            }
+            if (reportImageAspect) append("If it includes `aspect_ratio`, tell the user that actual image ratio. ")
+            append("`nanomuse-media status` prints what is configured.\n")
             append("- Avatar changes are handled by the app itself when the user writes \"change your avatar to ...\"; you only need to explain when it cannot work.\n")
             if (image == null) {
                 if (automaticImages) {

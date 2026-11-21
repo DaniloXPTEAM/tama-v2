@@ -168,7 +168,18 @@ fun ModelsScreen(
                 showDivider = false,
             )
         }
+        var showCost by remember { mutableStateOf(false) } // nanoMuse: cost controls are separate from Auto.
         if (parallelTest) {
+            SettingsSection {
+                SettingsRow(
+                    title = stringResource(R.string.nm_models_cost_advanced),
+                    subtitle = stringResource(R.string.nm_models_cost_advanced_sub),
+                    onClick = { showCost = !showCost },
+                    showDivider = false,
+                )
+            }
+        }
+        if (parallelTest && showCost) {
             SettingsSection(footer = stringResource(R.string.nm_model_cost_guard_help)) {
                 SettingsSwitchRow(
                     title = stringResource(R.string.nm_model_allow_unverified_cost),
@@ -236,6 +247,7 @@ fun ModelsScreen(
             val value = remember(config, tick, changed) { ModelSlots.current(context, slot) }
             val hasOptions = remember(config, tick) { ModelSlots.groups(context, slot).isNotEmpty() }
             val videoOff = remember(tick, changed) { slot == Slot.VIDEO && ModelSlots.videoOff(context) }
+            val noFreeImage = slot == Slot.IMAGE && io.github.nanomuse.avatar.ImageGen.noFreeImageAvailable(context)
             val footer = buildString {
                 append(stringResource(slotSubtitle(slot)))
                 if (slot == Slot.CHAT && changed == Slot.CHAT) append(" ").append(stringResource(R.string.nm_models_chat_applies))
@@ -244,6 +256,7 @@ fun ModelsScreen(
                 SettingsRow(
                     title = stringResource(slotTitle(slot)),
                     subtitle = when {
+                        noFreeImage -> stringResource(R.string.nm_free_image_unavailable)
                         value != null -> value.label(context)
                         videoOff -> stringResource(R.string.nm_media_video_off_option)
                         hasOptions -> stringResource(R.string.nm_media_not_set)
@@ -251,11 +264,11 @@ fun ModelsScreen(
                     },
                     icon = slotIcon(slot),
                     iconColor = if (value != null) MuseTones.accent else MaterialTheme.colorScheme.onSurfaceVariant,
-                    onClick = if (hasOptions || videoOff) ({ onPick(slot) }) else null,
-                    showDivider = !hasOptions,
+                    onClick = if (!noFreeImage && (hasOptions || videoOff)) ({ onPick(slot) }) else null,
+                    showDivider = !hasOptions && !noFreeImage,
                     minHeight = 72.dp,
                 )
-                if (!hasOptions) {
+                if (!hasOptions && !noFreeImage) {
                     SettingsRow(
                         title = stringResource(R.string.nm_media_add_provider),
                         titleColor = MuseTones.accent,

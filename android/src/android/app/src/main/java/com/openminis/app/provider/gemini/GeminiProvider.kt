@@ -15,10 +15,17 @@ import com.openminis.app.data.model.LLMUsage
 import com.openminis.app.data.model.ThinkingLevel
 import com.openminis.app.provider.LLMProvider
 import com.openminis.app.provider.safeOptString
+import ai.tama.net.GeminiStreamTiming
 import ai.tama.net.singleUseImageBody
 import ai.tama.net.singleUseImageClient
-import kotlinx.coroutines.Dispatchers
+import ai.tama.pricing.DocumentedChatDispatch // nanoMuse: scoped main-chat cost evidence
+import ai.tama.pricing.DocumentedGeminiBody
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -31,22 +38,24 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.BufferedReader
 import java.io.InputStreamReader
+import java.nio.charset.StandardCharsets
 import java.util.concurrent.TimeUnit
 import com.openminis.app.provider.failOnSilentEmptyCompletion
 import com.openminis.app.provider.thinking.ThinkingRuleResolver
 
-class GeminiProvider(
+// nanoMuse: an internal client and clock seam lets tests intercept the exact logical route.
+class GeminiProvider internal constructor(
     private val apiKey: String,
-    override var model: LLMModel = LLMModel.gemini25Flash,
-    private val basePath: String = "https://generativelanguage.googleapis.com/v1beta",
+    override var model: LLMModel,
+    private val basePath: String,
+    private val client: OkHttpClient,
+    private val costTimeMillis: () -> Long,
 ) : LLMProvider {
-    override val name = "Google"
-
-    // nanoMuse: set on fresh providers for protected images or direct ModelUse.
-    internal var singleUseImageRequest: Boolean = false
-    internal var beforeDirectRequest: (() -> Unit)? = null
-
-    private val client = OkHttpClient.Builder()
+    constructor(
+        apiKey: String,
+        model: LLMModel = LLMModel.gemini25Flash,
+        basePath: String = "https://generativelanguage.googleapis.com/v1beta",
+    ) : this(apiKey, model, basePath, OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(10, TimeUnit.MINUTES)
         .writeTimeout(30, TimeUnit.SECONDS)
@@ -54,7 +63,13 @@ class GeminiProvider(
         // Network-transition eviction must reach provider connections.
         .connectionPool(com.openminis.app.network.NetworkMonitor.sharedLLMConnectionPool)
         .proxyAuthenticator(io.github.nanomuse.net.OwnProviderProxy.authenticator) // nanoMuse: Settings → Network, a proxy with a password
-        .build()
+        .build(), System::currentTimeMillis)
+
+    override val name = "Google"
+
+    // nanoMuse: set on fresh providers for protected images or direct ModelUse.
+    internal var singleUseImageRequest: Boolean = false
+    internal var beforeDirectRequest: (() -> Unit)? = null
 
     override suspend fun sendMessageClamped(
         messages: List<LLMMessage>,
@@ -127,21 +142,25 @@ class GeminiProvider(
         tools: List<AgentToolDefinition>,
         thinkingLevel: ThinkingLevel,
     ): Flow<LLMStreamChunk> = callbackFlow {
+        val parallel = com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test"
+        val timing = if (parallel) GeminiStreamTiming() else null
         // nanoMuse: check the destination before exposing a recognized key.
-        if (com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test") {
+        if (parallel) {
             ai.tama.providers.KeyDestinationGuard.requireAllowed(true, apiKey, basePath)
         }
-        // nanoMuse: block unknown-cost streams before building the outbound request.
-        ai.tama.pricing.ModelCostGuard.requireAllowed()
-        val body = buildRequestBody(messages, systemPrompt, maxTokens, temperature, imageParts, tools, thinkingLevel)
-        // nanoMuse: snapshot the model in the URL before the request starts.
+        // nanoMuse: a documented free-only Gemini model has a chat-scoped ticket.
+        // No other caller (image, tool/offload, probe) inherits this permission.
+        val costTicket = DocumentedChatDispatch.ticket(coroutineContext)
         val requestModel = model.id
+        DocumentedChatDispatch.checkGemini(coroutineContext, basePath, apiKey, requestModel,
+            supportedBody = true, nowMillis = costTimeMillis())
+        val body = buildRequestBody(messages, systemPrompt, maxTokens, temperature, imageParts, tools, thinkingLevel)
         val url = "$basePath/models/$requestModel:streamGenerateContent?alt=sse&key=$apiKey"
         // nanoMuse: a protected image/direct stream must not replay the POST.
         val requestBody = body.toString().toRequestBody("application/json".toMediaType())
         val request = Request.Builder()
             .url(url)
-            .post(if (singleUseImageRequest) requestBody.singleUseImageBody() else requestBody)
+            .post(if (singleUseImageRequest || costTicket != null) requestBody.singleUseImageBody() else requestBody)
             // [T-android-default-ua] same intent as the non-streaming
             // branch above — brand outbound requests with Minis/<version>.
             .applyUserAgentOverride(null)
@@ -149,87 +168,121 @@ class GeminiProvider(
 
         // nanoMuse: capture credentials from this call, not a later provider selection.
         val credentials = requestCredentials(request)
-        // nanoMuse: the guards may have changed while the request was prepared.
-        beforeDirectRequest?.invoke()
-        ai.tama.pricing.ModelCostGuard.requireAllowed()
-        val requestClient = if (singleUseImageRequest) client.singleUseImageClient() else client
-        val response = requestClient.newCall(request).execute()
-        if (!response.isSuccessful) {
-            val errorBody = response.body?.string() ?: ""
-            response.close()
-            throw mapHttpError(response.code, errorBody, response.header("Retry-After"), requestModel, credentials)
-        }
+        val requestClient = if (singleUseImageRequest || costTicket != null) client.singleUseImageClient() else client
+        val call = requestClient.newCall(request)
+        suspend fun readResponse(): Unit = call.run {
+            // nanoMuse: revalidate in the worker, immediately before I/O.
+            beforeDirectRequest?.invoke()
+            DocumentedChatDispatch.checkGemini(
+                currentCoroutineContext(), basePath, apiKey, requestModel,
+                supportedBody = costTicket == null || (model.id == requestModel && DocumentedGeminiBody.permits(body)),
+                nowMillis = costTimeMillis(),
+            )
+            if (parallel || costTicket != null) currentCoroutineContext().ensureActive()
+            timing?.dispatch()
+            execute().use { response ->
+                timing?.headers()
+                if (!response.isSuccessful) throw mapHttpError(response.code, response.body?.string().orEmpty(),
+                    response.header("Retry-After"), requestModel, credentials)
+                val input = response.body?.byteStream() ?: throw java.io.IOException("Gemini stream has no body")
+                try {
+                    BufferedReader(InputStreamReader(input, StandardCharsets.UTF_8)).use { reader ->
+                        var started = false
+                        var lastFinishReason: String? = null
+                        var line: String?
+                        while (reader.readLine().also { line = it } != null) {
+                            val l = line ?: continue
+                            if (!l.startsWith("data: ")) continue
+                            val payload = l.removePrefix("data: ")
 
-        val reader = BufferedReader(InputStreamReader(response.body!!.byteStream()))
-        try {
-            var started = false
-            var lastFinishReason: String? = null
-            var line: String?
-            while (reader.readLine().also { line = it } != null) {
-                val l = line ?: continue
-                if (!l.startsWith("data: ")) continue
-                val payload = l.removePrefix("data: ")
+                            val json = try { JSONObject(payload) } catch (_: Exception) { continue }
+                            // nanoMuse: do not mistake an in-band error for a successful empty completion.
+                            if (json.has("error") && !json.isNull("error")) {
+                                val streamError = json.optJSONObject("error")
+                                val code = streamError?.optInt("code", 0) ?: 0
+                                val status = streamError?.opt("status") as? String
+                                throw mapHttpError(
+                                    code, json.toString(), null, requestModel, credentials,
+                                    hasHttpStatus = false,
+                                    transientStream = status in setOf("INTERNAL", "UNAVAILABLE", "DEADLINE_EXCEEDED"),
+                                )
+                            }
 
-                val json = try { JSONObject(payload) } catch (_: Exception) { continue }
-                // nanoMuse: do not mistake an in-band error for a successful empty completion.
-                if (json.has("error") && !json.isNull("error")) {
-                    val streamError = json.optJSONObject("error")
-                    val code = streamError?.optInt("code", 0) ?: 0
-                    val status = streamError?.opt("status") as? String
-                    throw mapHttpError(
-                        code, json.toString(), null, requestModel, credentials,
-                        hasHttpStatus = false,
-                        transientStream = status in setOf("INTERNAL", "UNAVAILABLE", "DEADLINE_EXCEEDED"),
-                    )
-                }
+                            if (!started) {
+                                send(LLMStreamChunk.Started)
+                                started = true
+                            }
 
-                if (!started) {
-                    send(LLMStreamChunk.Started)
-                    started = true
-                }
+                            // Separate thought parts from text parts
+                            val (text, thinking) = extractTextAndThinking(json)
+                            if (thinking.isNotEmpty()) {
+                                send(LLMStreamChunk.ThinkingDelta(thinking))
+                            }
+                            if (text.isNotEmpty()) {
+                                timing?.firstText()
+                                send(LLMStreamChunk.Text(text))
+                            }
 
-                // Separate thought parts from text parts
-                val (text, thinking) = extractTextAndThinking(json)
-                if (thinking.isNotEmpty()) {
-                    send(LLMStreamChunk.ThinkingDelta(thinking))
-                }
-                if (text.isNotEmpty()) {
-                    send(LLMStreamChunk.Text(text))
-                }
+                            // Extract function calls from streaming response
+                            val functionCalls = extractFunctionCalls(json)
+                            for ((fcName, fcArgs, fcSig) in functionCalls) {
+                                val toolId = "gemini_${System.nanoTime()}"
+                                send(LLMStreamChunk.ToolUseStart(toolId, fcName))
+                                // [T-android-gemini3-thoughtsig / #179] Carry the part's
+                                // thoughtSignature through so it can be persisted and replayed
+                                // on the historical functionCall (gemini-3.x requires it).
+                                send(LLMStreamChunk.ToolCallComplete(toolId, fcName, fcArgs, thoughtSignature = fcSig))
+                            }
 
-                // Extract function calls from streaming response
-                val functionCalls = extractFunctionCalls(json)
-                for ((fcName, fcArgs, fcSig) in functionCalls) {
-                    val toolId = "gemini_${System.nanoTime()}"
-                    send(LLMStreamChunk.ToolUseStart(toolId, fcName))
-                    // [T-android-gemini3-thoughtsig / #179] Carry the part's
-                    // thoughtSignature through so it can be persisted and replayed
-                    // on the historical functionCall (gemini-3.x requires it).
-                    send(LLMStreamChunk.ToolCallComplete(toolId, fcName, fcArgs, thoughtSignature = fcSig))
-                }
+                            extractUsage(json)?.let { usage ->
+                                send(LLMStreamChunk.Usage(usage))
+                            }
 
-                extractUsage(json)?.let { usage ->
-                    send(LLMStreamChunk.Usage(usage))
-                }
-
-                extractFinishReason(json)?.let { reason ->
-                    lastFinishReason = reason
+                            extractFinishReason(json)?.let { reason ->
+                                lastFinishReason = reason
+                            }
+                        }
+                        // nanoMuse: never synthesize success for the isolated test app when
+                        // Gemini's stream ended without an actual terminal reason.
+                        send(LLMStreamChunk.Finished(ai.tama.net.GeminiStreamTermination.reason(
+                            lastFinishReason,
+                            parallelTest = parallel,
+                        )))
+                    }
+                } catch (e: Exception) {
+                    if (parallel) throw e
+                    cancel("Stream error", mapError(e))
                 }
             }
-            // nanoMuse: never synthesize success for the isolated test app when
-            // Gemini's stream ended without an actual terminal reason.
-            send(LLMStreamChunk.Finished(ai.tama.net.GeminiStreamTermination.reason(
-                lastFinishReason,
-                parallelTest = com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test",
-            )))
-        } catch (e: Exception) {
-            cancel("Stream error", mapError(e))
-        } finally {
-            reader.close()
-            response.close()
         }
-        channel.close()
-        awaitClose()
+        if (!parallel) {
+            readResponse()
+            channel.close()
+            awaitClose()
+        } else {
+            // A blocking read on this producer used to prevent awaitClose from
+            // running until the server or a read timeout finished. Keep the
+            // producer free to cancel the actual HTTP call, including headers.
+            val reader = launch(Dispatchers.IO) {
+                var failure: Exception? = null
+                try {
+                    readResponse()
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (e: Exception) {
+                    failure = mapError(e)
+                } finally {
+                    timing?.line(requestBody.contentLength())?.let {
+                        com.openminis.app.logging.AppLogger.info("GeminiStream", it)
+                    }
+                }
+                channel.close(failure)
+            }
+            awaitClose {
+                reader.cancel()
+                call.cancel()
+            }
+        }
     }
 
     private fun buildRequestBody(
@@ -558,6 +611,17 @@ class GeminiProvider(
 
     private fun extractUsage(json: JSONObject): LLMUsage? {
         val usage = json.optJSONObject("usageMetadata") ?: return null
+        if (com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test") {
+            fun count(name: String): Int? {
+                val n = usage.opt(name) as? Number ?: return null
+                val value = n.toLong()
+                return value.toInt().takeIf { value in 0..Int.MAX_VALUE.toLong() && n.toDouble() == value.toDouble() }
+            }
+            val context = count("promptTokenCount") ?: return null
+            val output = count("candidatesTokenCount") ?: return null
+            val cached = count("cachedContentTokenCount")?.takeIf { it <= context }
+            return LLMUsage(context - (cached ?: 0), output, cacheReadInputTokens = cached, latestContextTokens = context)
+        }
         return LLMUsage(
             inputTokens = usage.optInt("promptTokenCount", 0),
             outputTokens = usage.optInt("candidatesTokenCount", 0),

@@ -723,12 +723,26 @@ internal fun buildFlatChatItems(
                 "nm_avatar_share" -> out.add(dedupe(FlatChatItem.NanoMuseAvatarShare(message.id, block.content))) // nanoMuse
                 "nm_avatar_confirm" -> out.add(dedupe(FlatChatItem.NanoMuseAvatarConfirm(message.id, block.content))) // nanoMuse
                 "nm_allowance" -> out.add(dedupe(FlatChatItem.NanoMuseAllowance(message.id))) // nanoMuse
-                else -> if (showSteps) out.add(dedupe(FlatChatItem.AssistantToolUse( // nanoMuse: a step
-                    messageId = message.id,
-                    block = block,
-                    allToolBlocks = toolPillBlocks,
-                    isLastCancelled = block.id == lastCancelledToolId,
-                )))
+                else -> {
+                    if (showSteps) out.add(dedupe(FlatChatItem.AssistantToolUse( // nanoMuse: a step
+                        messageId = message.id,
+                        block = block,
+                        allToolBlocks = toolPillBlocks,
+                        isLastCancelled = block.id == lastCancelledToolId,
+                    )))
+                    // nanoMuse: a saved image is part of the reply, not an agent step.
+                    generatedImageMarkdown(block)?.let { image ->
+                        out.add(dedupe(FlatChatItem.AssistantMarkdownBlock(
+                            messageId = message.id,
+                            parentBlockId = "${block.id}:generated-image",
+                            rawText = image,
+                            blockIndex = 0,
+                            isLastBlockOfMessage = false,
+                            messageIsStreaming = false,
+                            messageMarkdown = joinedMarkdown.ifEmpty { image },
+                        )))
+                    }
+                }
             }
         }
 
@@ -754,7 +768,7 @@ internal fun buildFlatChatItems(
                 "info" -> false
                 "thinking" -> showSteps && (message.thinkingLevel?.isEnabled ?: true) // nanoMuse: hidden steps do not count
                 "text" -> it.content.isNotEmpty()
-                "tool_use" -> showSteps // pills render immediately — when the steps are shown (nanoMuse)
+                "tool_use" -> showSteps || generatedImageMarkdown(it) != null // nanoMuse: generated images are always visible
                 else -> true // the app's own cards
             }
         }
@@ -788,5 +802,12 @@ internal fun buildFlatChatItems(
 private fun stepsOnlyTurn(m: ChatMessage): Boolean =
     m.role == "assistant" && !m.isStreaming && m.error == null && m.content.isEmpty() &&
         m.toolBlocks.isNotEmpty() && m.toolBlocks.all {
-            it.kind == "tool_use" || it.kind == "thinking" || (it.kind == "text" && it.content.isEmpty())
+            (it.kind == "tool_use" && generatedImageMarkdown(it) == null) || // nanoMuse: keep tool-only replies with a saved image.
+                it.kind == "thinking" || (it.kind == "text" && it.content.isEmpty())
         }
+
+// nanoMuse: consume only typed metadata from a completed native image call, not response text.
+private fun generatedImageMarkdown(block: AssistantBlock): String? =
+    if (BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test" && block.kind == "tool_use" &&
+        block.toolName == ai.tama.tools.ImageGenerationTool.NAME && block.toolStatus == ToolBlockStatus.SUCCESS)
+        ai.tama.media.ImageToolPresentation.generatedMarkdown(block.imageFilePath) else null

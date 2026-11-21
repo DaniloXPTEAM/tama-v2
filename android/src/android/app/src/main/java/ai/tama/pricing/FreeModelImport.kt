@@ -17,6 +17,15 @@ internal object FreeModelImport {
         OpenRouterPricing.chatStatus(catalogue, it.id, nowMillis) == OpenRouterPricing.Status.ADVERTISED_FREE
     }
 
+    /** Image evidence is counted separately and can never qualify an ID for free chat. */
+    fun summarize(visibleIds: Set<String>, eligibleChatIds: Set<String>, added: Int,
+                  declaredImageIds: Set<String>? = null): FreeModelImportStatus.Complete {
+        val images = visibleIds.intersect(declaredImageIds.orEmpty())
+        val chat = (visibleIds - images).count { it in eligibleChatIds }
+        return FreeModelImportStatus.Complete(chat, added, visibleIds.size - chat - images.size,
+            images.size.takeIf { declaredImageIds != null })
+    }
+
     /** Existing entries, customizations, groups and pins are deliberately untouched. */
     fun additions(instanceId: String, existing: List<ModelEntry>, eligible: List<LLMModel>): List<ModelEntry> {
         val present = existing.filter { it.providerInstanceId == instanceId }
@@ -34,7 +43,10 @@ sealed interface FreeModelImportStatus {
     data object MissingKey : FreeModelImportStatus
     data object Failed : FreeModelImportStatus
     data object SaveFailed : FreeModelImportStatus
-    data class Complete(val eligible: Int, val added: Int) : FreeModelImportStatus
+    data class Complete(
+        val eligible: Int, val added: Int, val unconfirmed: Int = 0,
+        val declaredImages: Int? = null,
+    ) : FreeModelImportStatus
 }
 
 /**
@@ -76,46 +88,44 @@ internal class ModelRefreshGate {
         latest[ticket.providerId] == ticket.sequence && ticket.freeOnly == freeOnly && ticket.route == route
 }
 
-/**
- * Ephemeral evidence for a post-import choice. Never persisted and never holds
- * a key. Call under the same route/configuration and credential locks used by
- * their writers; this check alone cannot make a later network send atomic.
- */
-internal class FreeModelImportEvidence(
-    private val ticket: ModelRefreshGate.Ticket,
-    private val accountVersion: Long,
-    private val prices: OpenRouterPricing.Catalogue,
-    private val modelIds: Set<String>,
-) {
-    /** Null is unusable evidence; an empty set is a valid check with no candidates. */
-    fun current(
-        gate: ModelRefreshGate,
-        freeOnly: Boolean,
-        route: String,
-        currentAccountVersion: Long,
-        nowMillis: Long,
-    ): Set<String>? {
-        val fetched = prices.fetchedAtMillis
-        if (!freeOnly || !gate.isCurrent(ticket, freeOnly, route) || currentAccountVersion != accountVersion ||
-            fetched < 0 || nowMillis < fetched || nowMillis - fetched > OpenRouterPricing.MAX_AGE_MILLIS) return null
-        return modelIds.filterTo(mutableSetOf()) {
-            OpenRouterPricing.chatStatus(prices, it, nowMillis) == OpenRouterPricing.Status.ADVERTISED_FREE
+/** Account-bound live evidence, independent of the import filter and entry list. */
+internal sealed class FreeChatCatalogue(val fetchedAtMillis: Long) {
+    fun fresh(now: Long): Boolean = fetchedAtMillis >= 0 && now >= fetchedAtMillis &&
+        now - fetchedAtMillis <= OpenRouterPricing.MAX_AGE_MILLIS
+
+    class OpenRouter(val prices: OpenRouterPricing.Catalogue) : FreeChatCatalogue(prices.fetchedAtMillis) {
+        fun status(id: String, now: Long): DocumentedFreeChat.Status = when (OpenRouterPricing.chatStatus(prices, id, now)) {
+            OpenRouterPricing.Status.ADVERTISED_FREE -> DocumentedFreeChat.Status.FREE
+            OpenRouterPricing.Status.PAID -> DocumentedFreeChat.Status.PAID
+            OpenRouterPricing.Status.UNKNOWN -> DocumentedFreeChat.Status.UNKNOWN
+        }
+
+        fun capabilities(id: String, now: Long): Set<String> {
+            if (status(id, now) != DocumentedFreeChat.Status.FREE) return emptySet()
+            val quote = prices.quotes[id] ?: return emptySet()
+            return buildSet {
+                add("chat")
+                if (quote.tools) add("tools")
+                if (quote.inputModalities?.contains("image") == true) add("vision")
+            }
         }
     }
 
-    /** Exact fresh catalogue capabilities only; never an approval or a cost permission. */
-    fun currentCapabilities(
-        gate: ModelRefreshGate,
-        freeOnly: Boolean,
-        route: String,
-        currentAccountVersion: Long,
-        nowMillis: Long,
-        modelId: String,
-    ): Set<String> {
-        if (current(gate, freeOnly, route, currentAccountVersion, nowMillis)?.contains(modelId) != true) return emptySet()
-        return buildSet {
-            add("chat")
-            if (prices.quotes[modelId]?.tools == true) add("tools")
+    class Groq(fetchedAtMillis: Long, val models: Set<String>, val paymentRequired: Boolean = false) :
+        FreeChatCatalogue(fetchedAtMillis) {
+        fun status(id: String, now: Long): DocumentedFreeChat.Status = when {
+            fresh(now) && paymentRequired -> DocumentedFreeChat.Status.PAYMENT_REQUIRED
+            else -> DocumentedFreeChat.status(DocumentedFreeChat.GROQ_BASE, id, now, false, models.takeIf { fresh(now) })
         }
     }
+}
+
+/** Bind the snapshot to the exact saved route and key generation, not the API-key prefix. */
+internal class FreeChatCatalogueEvidence(
+    private val route: String,
+    private val accountVersion: Long,
+    private val catalogue: FreeChatCatalogue,
+) {
+    fun current(route: String, accountVersion: Long, now: Long): FreeChatCatalogue? =
+        catalogue.takeIf { this.route == route && this.accountVersion == accountVersion && it.fresh(now) }
 }

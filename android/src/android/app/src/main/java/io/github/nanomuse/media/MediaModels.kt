@@ -73,7 +73,7 @@ object MediaModels {
     /** Agent image requests in automatic mode need their own exact-model consent. */
     internal fun agentImageEndpoint(context: Context): ImageGen.Endpoint? {
         if (!ai.tama.router.AutoModelStore.enabled(context)) return imageEndpoint(context)
-        val selected = AutoImageSelection.choose(context) ?: return null
+        val selected = AutoImageSelection.choose(context, freeOnly = !ai.tama.pricing.ModelCostGuard.permits()) ?: return null
         return AutoImageSelection.endpointIfStillAllowed(context, selected)
     }
 
@@ -292,7 +292,9 @@ object MediaModels {
                 "$model via $provider"
             }
         }
-        return MediaPrompt.build(imageStatus, video?.let { "${it.model} via ${it.label}" }, DEEP_LINK, automatic)
+        return MediaPrompt.build(imageStatus, video?.let { "${it.model} via ${it.label}" }, DEEP_LINK, automatic,
+            reportImageAspect = image?.let { ai.tama.media.AgnesImages.route(it.instance) } == true,
+            testImageGuidance = com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test")
     }
 
     /** The one-turn addendum when an avatar change was asked for but cannot be drawn. */

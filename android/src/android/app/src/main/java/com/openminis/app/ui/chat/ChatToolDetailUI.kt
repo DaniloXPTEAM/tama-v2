@@ -303,8 +303,14 @@ internal fun ToolDetailSheet(
         val resource = when (summary) {
             ai.tama.media.ImageToolPresentation.Summary.PREPARING -> R.string.nm_image_detail_preparing
             ai.tama.media.ImageToolPresentation.Summary.GENERATED -> R.string.nm_image_detail_generated
+            // nanoMuse: a missing local file is not a successful picture.
+            ai.tama.media.ImageToolPresentation.Summary.ATTACHMENT_MISSING -> R.string.filepreview_image_load_error
             ai.tama.media.ImageToolPresentation.Summary.NO_MODEL -> R.string.nm_image_provider_missing
             ai.tama.media.ImageToolPresentation.Summary.NO_APPROVAL -> R.string.nm_auto_image_missing
+            ai.tama.media.ImageToolPresentation.Summary.AGNES_IMAGE_NEEDS_ENTRY -> R.string.nm_agnes_auto_image_needs_entry
+            ai.tama.media.ImageToolPresentation.Summary.AGNES_IMAGE_AMBIGUOUS -> R.string.nm_auto_reason_duplicate
+            ai.tama.media.ImageToolPresentation.Summary.AGNES_IMAGE_CAPABILITY_OFF -> R.string.nm_agnes_auto_image_capability_off
+            ai.tama.media.ImageToolPresentation.Summary.AGNES_IMAGE_NEEDS_APPROVAL -> R.string.nm_agnes_review_image_help
             ai.tama.media.ImageToolPresentation.Summary.UNVERIFIED_COST -> R.string.nm_auto_reason_unverified_cost
             ai.tama.media.ImageToolPresentation.Summary.MODEL_COST_UNVERIFIED -> R.string.nm_model_cost_blocked
             ai.tama.media.ImageToolPresentation.Summary.AUTHORIZATION_CHANGED -> R.string.nm_auto_image_changed
@@ -316,6 +322,15 @@ internal fun ToolDetailSheet(
             ai.tama.media.ImageToolPresentation.Summary.ALREADY_HANDLED -> R.string.nm_image_guard_repeat
             ai.tama.media.ImageToolPresentation.Summary.INVALID -> R.string.nm_image_guard_invalid
             ai.tama.media.ImageToolPresentation.Summary.FAILED -> R.string.nm_image_detail_failed
+            ai.tama.media.ImageToolPresentation.Summary.NO_CONFIRMED_GENERATOR -> R.string.nm_own_image_no_generator
+            ai.tama.media.ImageToolPresentation.Summary.CHAT_ONLY -> R.string.nm_image_chat_only
+            ai.tama.media.ImageToolPresentation.Summary.ROUTE_UNCONFIRMED -> R.string.nm_image_route_unconfirmed
+            ai.tama.media.ImageToolPresentation.Summary.KEY_MISSING -> R.string.nm_image_key_missing
+            ai.tama.media.ImageToolPresentation.Summary.AGNES_AUTHENTICATION -> R.string.nm_agnes_image_authentication
+            ai.tama.media.ImageToolPresentation.Summary.AGNES_ACCESS_DENIED -> R.string.nm_agnes_image_access_denied
+            ai.tama.media.ImageToolPresentation.Summary.NVIDIA_NATIVE -> R.string.nm_image_nvidia_native
+            ai.tama.media.ImageToolPresentation.Summary.ENDPOINT_REJECTED -> R.string.nm_image_endpoint_rejected
+            ai.tama.media.ImageToolPresentation.Summary.NO_VERIFIED_FREE_GENERATOR -> R.string.nm_own_image_no_verified_free
         }
         imageContext.getString(resource)
     } else block.content

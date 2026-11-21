@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="skill_minis_skills_modal">Habilidades do TAMA AI</string>
+    <string name="skills_browser_title">Habilidades do TAMA AI</string>
+    <string name="nm_connectors_client_redirect">Endereço de retorno do app. Toque para copiar:</string>
+    <string name="nm_connectors_client_id">Identificador do app OAuth</string>
+    <string name="nm_connectors_client_secret">Segredo do app OAuth (se houver)</string>
+    <string name="nm_connectors_how_client">%1$s exige que você cadastre um app OAuth. Nas configurações de desenvolvedor do serviço, cadastre o endereço de retorno abaixo. Depois cole aqui o identificador do app e o segredo, se houver. Ambos ficam neste celular.</string>
+</resources>

@@ -59,8 +59,9 @@ fun AddModelsToGroupScreen(
         config.visionGroupId -> PickerModalityFilter.IMAGE_INPUT
         else -> null
     }
+    // nanoMuse: Agnes image models belong in the image slot, not a model group.
     val availableEntries = config.modelEntries.filter {
-        !it.isHidden && it.id !in existingIds
+        !it.isHidden && it.id !in existingIds && !ai.tama.media.AgnesImages.imageOnlyInTest(it.model.id)
     }
 
     val searchQuery = remember { mutableStateOf("") }
@@ -79,17 +80,23 @@ fun AddModelsToGroupScreen(
         )
     }
 
+    val parallel = com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test"
     Scaffold(
         topBar = {
             io.github.nanomuse.ui.muse.MuseTopAppBar( // nanoMuse: Muse's bar (drop-in for TopAppBar)
-                title = { Text(stringResource(R.string.model_group_detail_add_models), fontWeight = FontWeight.SemiBold) },
+                title = { Text(stringResource(R.string.model_group_detail_add_models), fontWeight = FontWeight.SemiBold,
+                    maxLines = if (parallel) 1 else Int.MAX_VALUE,
+                    overflow = if (parallel) androidx.compose.ui.text.style.TextOverflow.Ellipsis else androidx.compose.ui.text.style.TextOverflow.Clip) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.model_group_detail_back))
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(
+                            if (parallel) R.string.common_cancel else R.string.model_group_detail_back,
+                        ))
                     }
                 },
                 actions = {
-                    MinisTextButton(onClick = onBack) { Text(stringResource(R.string.common_cancel)) }
+                    // nanoMuse: there is already a cancel action at the start of the bar.
+                    if (!parallel) MinisTextButton(onClick = onBack) { Text(stringResource(R.string.common_cancel)) }
                     MinisButton(
                         onClick = {
                             val updated = group.copy(

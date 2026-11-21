@@ -15,6 +15,7 @@ import io.github.nanomuse.net.ProviderReach
 import kotlinx.coroutines.runBlocking
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
+import okhttp3.mockwebserver.QueueDispatcher
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
@@ -117,6 +118,36 @@ class AutomaticFailureWireTest {
             assertEquals("continue", secondBody.getJSONArray("messages").getJSONObject(2).getString("content"))
             assertEquals(3, history.size) // transport did not mutate the caller's history
         } finally { server.shutdown() }
+    }
+
+    @Test fun explicitPersonalKeyRefusalsCarryTheirOwnFallbackDecision() = runBlocking {
+        MockWebServer().use { server ->
+            server.dispatcher = QueueDispatcher().apply { setFailFast(true) }
+            server.start()
+            val fixtures = listOf(
+                Triple(403, "key_limit_exceeded", ModelHealth.Failure.SPEND_LIMIT),
+                Triple(404, "model_decommissioned", ModelHealth.Failure.MODEL_UNAVAILABLE),
+                Triple(408, "request_timeout", ModelHealth.Failure.NETWORK),
+                Triple(507, "server_error", ModelHealth.Failure.SERVER),
+            )
+            for ((status, code, reason) in fixtures) {
+                server.enqueue(MockResponse().setResponseCode(status).apply {
+                    // A bare 408 can cause OkHttp to replay the request. Test classification
+                    // of the actual HTTP response, not the legacy client's replay policy.
+                    if (status == 408) setHeader("Retry-After", "1")
+                    setBody("""{"error":{"code":"$code","message":"fixture refusal"}}""")
+                })
+                val error = failure(server)
+                assertEquals(status, error.nmProviderReach?.httpStatus)
+                val decision = AutoModelFailure.classify(error, false, switchOnAmbiguousAccessDenied = false,
+                    ownKeyTurn = true) as AutoModelFailure.Decision.Cooldown
+                assertEquals(reason, decision.reason)
+                if (status in setOf(403, 404, 408)) {
+                    assertNull(AutoModelFailure.classify(error, false, switchOnAmbiguousAccessDenied = false))
+                }
+            }
+            assertEquals(fixtures.size, server.requestCount)
+        }
     }
 
     @Test fun inlineErrorDoesNotPretendToBeAnHttpStatus() = runBlocking {

@@ -36,6 +36,39 @@ class ProviderEndpointsTest {
         assertNull(ProviderEndpoints.storageBase(ProviderType.openRouter, "https://service.example", false))
     }
 
+    @Test fun `custom HTTPS scheme is case insensitive without accepting URLs with credentials`() {
+        val base = "HTTPS://APIHUB.AGNES-AI.COM/v1"
+        assertTrue(ProviderDirectory.validCustomAddress(base))
+        assertTrue(ProviderEndpoints.isAgnesBase(base))
+        for (bad in listOf("http://apihub.agnes-ai.com/v1", "$base?k=synthetic", "$base#fragment", "$base/gateway",
+            "https://apihub.agnes-ai.com.example/v1", "https://apihub.agnes-ai.com:567/v1", "https://user@apihub.agnes-ai.com/v1")) {
+            assertFalse(bad, ProviderEndpoints.isAgnesBase(bad))
+        }
+        assertFalse(ProviderDirectory.validCustomAddress("HTTPS://user@apihub.agnes-ai.com/v1"))
+    }
+
+    @Test fun `Agnes key probe only targets its official HTTPS model list`() {
+        val host = "https://apihub.agnes-ai.com"
+        val good = listOf("$host/v1", " HTTPS://APIHUB.AGNES-AI.COM:443/v1/ ",
+            ProviderEndpoints.factoryBase(ProviderType.openAI, host, true))
+        for (type in listOf(ProviderType.openAI, ProviderType.openAIResponses)) {
+            for (base in good) {
+                val plan = checkNotNull(KeyProbePlan.create(type, base))
+                assertEquals("$host/v1/models", plan.url)
+                assertEquals("Authorization", plan.header)
+                assertTrue(plan.agnesModelList)
+                assertFalse(plan.groqModelList || plan.openRouterKeyInfo)
+            }
+        }
+        for (bad in listOf(null, host, "$host/v1/v1", "$host/v1/chat/completions", "$host/%76%31",
+            "$host/v1?query=test", "$host/v1#fragment", "https://apihub.agnes-ai.com:444/v1", "http://apihub.agnes-ai.com/v1",
+            "https://apihub.agnes-ai.com.example/v1", "https://apihub.agnes-ai.com@other.example/v1",
+            "https://person:password@apihub.agnes-ai.com/v1")) {
+            assertNull(bad, KeyProbePlan.create(ProviderType.openAI, bad))
+        }
+        assertNull(KeyProbePlan.create(ProviderType.anthropic, "$host/v1"))
+    }
+
     @Test fun `official OpenAI fallback requires the exact HTTPS base`() {
         assertTrue(ProviderEndpoints.isOfficialOpenAIBase("https://api.openai.com/v1/"))
         assertTrue(ProviderEndpoints.isOfficialOpenAIBase("https://CHATGPT.COM"))
@@ -104,9 +137,8 @@ class ProviderEndpointsTest {
         assertNull(ProviderKeySuggestion.match("eyJsynthetic", hints))
         assertNull(ProviderKeySuggestion.match("anything", hints))
         assertNull(ProviderKeySuggestion.match("gsk_synthetic", hints + ("other" to "gsk_…")))
-        assertTrue(ProviderKeySuggestion.mayFill(endpointEdited = false, hasSelectedVendor = false, autoSuggested = false))
-        assertTrue(ProviderKeySuggestion.mayFill(endpointEdited = false, hasSelectedVendor = true, autoSuggested = true))
-        assertFalse(ProviderKeySuggestion.mayFill(endpointEdited = true, hasSelectedVendor = false, autoSuggested = false))
-        assertFalse(ProviderKeySuggestion.mayFill(endpointEdited = false, hasSelectedVendor = true, autoSuggested = false))
+        assertTrue(ProviderKeySuggestion.mayOfferPreset(endpointEdited = false, hasSelectedVendor = false))
+        assertFalse(ProviderKeySuggestion.mayOfferPreset(endpointEdited = true, hasSelectedVendor = false))
+        assertFalse(ProviderKeySuggestion.mayOfferPreset(endpointEdited = false, hasSelectedVendor = true))
     }
 }

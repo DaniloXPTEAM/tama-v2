@@ -310,6 +310,8 @@ internal fun ModelPickerSheet(
      *  section header — dismisses the sheet and navigates to the Model Groups
      *  management screen. Null hides the button (callers without a route). */
     onEditGroups: (() -> Unit)? = null,
+    // nanoMuse: the chat can display and change the saved mode; other pickers cannot.
+    ownChatModeBusy: Boolean? = null,
 ) {
     val openTime = remember { System.nanoTime() }
 
@@ -347,20 +349,60 @@ internal fun ModelPickerSheet(
      */
     var quickTestEntry by remember { mutableStateOf<ModelEntry?>(null) }
 
+    val tamaPicker = com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test"
+    val chatOnly = tamaPicker && ownChatModeBusy != null
+    val chatEntryIds = remember(config, chatOnly) {
+        if (!chatOnly) emptySet() else {
+            val providers = config.instances.filter { it.isEnabled }.associateBy { it.id }
+            config.modelEntries.filter { entry ->
+                !entry.isHidden && providers[entry.providerInstanceId]?.let { providerRepository.tamaIsChatModel(entry, it) } == true
+            }.mapTo(mutableSetOf()) { it.id }
+        }
+    }
+    val pickerGroups = remember(groups, chatOnly, chatEntryIds) {
+        if (!chatOnly) groups else groups.mapNotNull { group ->
+            val chatMembers = group.memberEntryIds.filter { it in chatEntryIds }
+            if (chatMembers.isEmpty()) null else group.copy(memberEntryIds = chatMembers.toMutableList())
+        }
+    }
     // Filtered groups
-    val filteredGroups = remember(groups, searchText) {
-        if (searchText.isEmpty()) groups
+    val filteredGroups = remember(pickerGroups, searchText) {
+        if (searchText.isEmpty()) pickerGroups
         else {
             val t0 = System.nanoTime()
-            val result = groups.filter { fuzzyMatch(it.name, searchText) }
+            val result = pickerGroups.filter { fuzzyMatch(it.name, searchText) }
             val ms = (System.nanoTime() - t0) / 1_000_000.0
             AppLogger.info("ModelPicker", "[ModelPicker] filter groups: ${result.size}/${groups.size}, ${"%.1f".format(ms)}ms")
             result
         }
     }
 
-    // Filtered entries by instance
-    val allInstancesWithEntries = remember(config, searchText) {
+    // nanoMuse: the chat list follows the per-key filter and live account metadata.
+    val nmCatalogueStatuses by providerRepository.nmFreeImportStatus.collectAsState()
+    val nmFreeEvidence by providerRepository.tamaFreeEvidence.collectAsState()
+    val nmSpendLimits by providerRepository.tamaZeroSpendLimits.collectAsState()
+    val nmPaymentRefusals by providerRepository.tamaPaymentRefusals.collectAsState()
+    val nmActive = config.modelEntries.firstOrNull { it.id == activeEntryId }
+    val nmActiveInstance = config.instances.firstOrNull { it.id == nmActive?.providerInstanceId }
+    // nanoMuse: this is the global model selector. It must be usable even
+    // before a chat has a bound route, not only after a manual key/model pick.
+    val nmModeControl = chatOnly
+    @Composable
+    fun Badges(entry: ModelEntry, instance: com.openminis.app.data.model.ProviderInstance?) {
+        val metadata = remember(config, entry, instance, nmCatalogueStatuses, nmPaymentRefusals, nmFreeEvidence) {
+            if (tamaPicker && instance != null) providerRepository.tamaModelMetadata(entry, instance) else null
+        }
+        ai.tama.providers.ModelBadges(entry, metadata)
+        val price = remember(config, entry, instance, nmSpendLimits, nmFreeEvidence, nmPaymentRefusals) {
+            if (!tamaPicker || instance == null) null
+            else providerRepository.tamaFreeChatStatus(instance, entry.model.id).takeIf {
+                it == ai.tama.pricing.DocumentedFreeChat.Status.FREE || providerRepository.tamaFreeChatOnly(instance)
+            }
+        }
+        if (price != null) Text(stringResource(ai.tama.pricing.freeStatusLabel(price)), style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+    val allInstancesWithEntries = remember(config, searchText, nmCatalogueStatuses, nmSpendLimits, nmPaymentRefusals, nmFreeEvidence, chatEntryIds, chatOnly) {
         val t0 = System.nanoTime()
         var totalCount = 0
         val result = config.instances
@@ -368,7 +410,12 @@ internal fun ModelPickerSheet(
             .map { instance ->
                 val pt = System.nanoTime()
                 var entries = config.modelEntries.filter {
-                    it.providerInstanceId == instance.id && !it.isHidden
+                    it.providerInstanceId == instance.id && !it.isHidden && (!chatOnly || it.id in chatEntryIds)
+                }
+                if (providerRepository.tamaFreeChatOnly(instance)) {
+                    entries = ai.tama.pricing.FreeModelList.filterForDisplay(entries, true) {
+                        providerRepository.tamaFreeChatStatus(instance, it.model.id)
+                    }
                 }
                 // nanoMuse: the Cloud's menu first, in the menu's order; the catalog beyond
                 // it (models a member may name) after, so the recommended ones are on top.
@@ -535,6 +582,32 @@ internal fun ModelPickerSheet(
                     .fillMaxWidth()
                     .weight(1f, fill = false),
             ) {
+                // nanoMuse: show the current selection and the mode without changing route consent.
+                if (nmModeControl) item {
+                    val modeRevision by ai.tama.router.AutoModelStore.modeChanges.collectAsState()
+                    val automatic = remember(modeRevision) { ai.tama.router.AutoModelStore.enabled(nmContext) }
+                    val mode = stringResource(if (automatic) R.string.soul_lang_auto else R.string.nm_chat_mode_manual)
+                    val route = if (nmActive != null && nmActiveInstance != null) stringResource(
+                        R.string.nm_chat_current_route,
+                        nmActiveInstance.label.ifBlank { nmActiveInstance.providerType.displayName },
+                        nmActive.model.displayName,
+                    ) else null
+                    com.openminis.app.ui.settings.SettingsSwitchRow(
+                        title = stringResource(R.string.nm_auto_models_title),
+                        subtitle = listOfNotNull(mode, route).joinToString(" · "),
+                        checked = automatic,
+                        enabled = ownChatModeBusy == false,
+                        onCheckedChange = { enabled ->
+                            if (ownChatModeBusy == false) ai.tama.router.AutoModelStore.setEnabled(nmContext, enabled)
+                        },
+                    )
+                    Text(
+                        stringResource(R.string.nm_chat_mode_global),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp),
+                    )
+                }
                 // ── Model Groups (grouped section card with embedded header) ──
                 if (filteredGroups.isNotEmpty()) {
                     // Section card: header + rows live in the same surface so
@@ -623,7 +696,13 @@ internal fun ModelPickerSheet(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .clip(groupShape)
-                                        .clickable { onSelectGroup(group.id) }
+                                        .clickable {
+                                            // A mixed group remains editable elsewhere. Never let its
+                                            // non-chat members win the default search in this picker.
+                                            if (chatOnly && groups.firstOrNull { it.id == group.id }?.memberEntryIds != group.memberEntryIds)
+                                                onSelectGroupEntry(group.id, group.memberEntryIds.first())
+                                            else onSelectGroup(group.id)
+                                        }
                                         .padding(horizontal = 16.dp, vertical = 12.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
@@ -870,6 +949,10 @@ internal fun ModelPickerSheet(
                                                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
                                                         )
                                                     }
+                                                    // nanoMuse: group members need the same modality distinctions.
+                                                    if (tamaPicker && instance?.let { providerRepository.tamaOwnApiKey(it) != null } == true) {
+                                                        FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) { Badges(entry, instance) }
+                                                    }
                                                 }
                                                 if (isActive) {
                                                     Text(
@@ -1046,9 +1129,8 @@ internal fun ModelPickerSheet(
                                                     displayEntry.model.displayName,
                                                     style = MaterialTheme.typography.bodyMedium,
                                                 )
-                                                com.openminis.app.ui.components.modalityBadges(displayEntry.model).forEach { badge ->
-                                                    com.openminis.app.ui.components.ModalityBadge(badge)
-                                                }
+                                                // nanoMuse: exact input and output labels for own-key models.
+                                                Badges(displayEntry, instance)
                                             }
                                             // [T-android-model-picker-polish]
                                             // Quick Test, not a model count. The
@@ -1203,9 +1285,8 @@ internal fun ModelPickerSheet(
                                                         style = MaterialTheme.typography.labelSmall,
                                                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
                                                     )
-                                                    com.openminis.app.ui.components.modalityBadges(entry.model).forEach { badge ->
-                                                        com.openminis.app.ui.components.ModalityBadge(badge)
-                                                    }
+                                                    // nanoMuse: use the same metadata as automatic selection.
+                                                    Badges(entry, instance)
                                                 }
                                             }
                                             if (selectedGroupId != null && activeEntryId == entry.id) {

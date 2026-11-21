@@ -331,8 +331,8 @@ traço quando não há valor positivo salvo. Os registros existentes podem conte
 zeros usados como padrão para campos não informados: não é possível distinguir
 todos esses casos retroativamente. Um aviso diz que os registros podem estar
 incompletos e não são fatura. O contexto vem do último valor positivo salvo na
-ordem da conversa; empates usam data e ID para estabilidade. A contagem de
-loops continua sendo uma aproximação, não uma contagem de chamadas ou cobranças.
+ordem da conversa; empates usam data e ID para estabilidade. A contagem antiga de
+loops era uma aproximação, não uma contagem de chamadas ou cobranças.
 A consulta foi exercitada em SQLite local com linhas fictícias e isolamento
 entre sessões; Compose, Room e aparelho ainda precisam de verificação.
 
@@ -343,9 +343,100 @@ categorias fixas sem reproduzir texto do log na anotação. Isso não substitui 
 análise do log completo nem transforma uma hipótese de recurso ou rede em causa.
 O arquivo temporário do runner é removido; não há upload de APK ou log.
 
+### F1/F4/F10: uma lista por chave própria
+
+No Tama V2 Test, abra o provedor com uma chave própria cadastrada. **Usar somente
+modelos gratuitos** filtra a lista e as rotas do chat dessa conta. Desligar a opção
+restaura a lista salva; nenhum modelo é apagado. **Usar todos os gratuitos** no
+OpenRouter liga esse filtro, atualiza o catálogo se necessário e autoriza as rotas
+visíveis de chat da lista em um toque. Não muda o modo automático, não autoriza
+imagem e não liga nenhuma permissão de custo. O catálogo não comprova a cobrança
+final. Sem evidência atual, o filtro não inclui modelos de custo desconhecido.
+
 A aprovação explícita em lote agora ignora identificadores de entrada duplicados
 em qualquer conta e modelos duplicados na conta, inclusive duplicatas ocultas;
 também recusa IDs duplicados de conta. Isso evita aprovar uma identidade ambígua
 após importações ou configurações inconsistentes. Não remove nem altera entradas;
 o usuário pode resolvê-las antes de aprovar. Os testes são sintéticos e não
 comprovam comportamento das preferências Android em um aparelho.
+
+Se uma recusa oficial indicar limite de gastos zero, o app restringe o chat aos
+gratuitos para aquela chave enquanto a observação estiver ativa. Se não houver
+rota elegível, mostra a explicação em português em vez do código HTTP. Catálogos
+sem evidência compatível não são tratados como gratuitos. Esta opção não altera
+a nuvem TAMA, o app normal, a voz nem os seletores de mídia.
+
+### Retorno para pedido de imagem com chave própria (T4)
+
+O atalho de imagem já reconhece “faz/cria/gera/desenha uma imagem de …”. No
+paralelo com chave própria, uma recusa de custo agora distingue a falta de um
+modelo com geração confirmada da falta de uma rota com preço zero comprovado.
+Visão (ler uma foto) e `:free` no chat não comprovam geração de imagens de graça.
+Nenhuma rota de imagem deste build comprova gratuidade no despacho; com cobrança
+bloqueada, não enviamos a geração. Não foi criado um veto novo para mídia nem
+alterados a seleção, a permissão por imagem, a nuvem ou o app normal. Falha sem
+sinal de cobrança não exibe uma suposição de cobrança. “Sim” e “tenta de novo” só
+repetem o pedido após o convite do app na mesma conversa e revalidam os controles.
+
+### Contexto e etapas de resposta com chave própria
+
+Com Auto ligado, uma recusa explícita por excesso de tokens, mesmo depois da
+redução local possível, pode usar outro modelo aprovado, que caiba na janela e
+cujo limite conhecido seja maior. Uma recusa genérica ou um limite em bytes não
+serve de sinal. Não muda custo nem autorizações, nem força a troca de um modelo
+fixado. O aviso da troca é exibido inteiro no chat.
+
+“11 loops” na versão anterior era o maior valor entre a quantidade de mensagens
+do assistente e os blocos que não eram texto nem aviso (inclusive raciocínio).
+Não eram 11 cobranças nem 11 respostas confirmadas. Agora **Etapas concluídas**
+conta etapas de resposta salvas por esta versão com término confirmado. Uma etapa
+pode devolver ferramentas ou o texto final. Tentativa de envio que falhou, texto
+parcial, imagem local e histórico antigo sem confirmação não contam.
+
+### Ajustes de telas do paralelo
+
+O título de Habilidades e os campos de OAuth dos Conectores usam PT-BR no
+paralelo. Descrições de terceiros não foram traduzidas. Atualizar modelos usa o
+texto local em um provedor com chave própria, mesmo sem conta Cloud cadastrada.
+O rodapé do Avatar respeita a área dos botões/gestos do Android. Em **Adicionar
+modelos**, a seta tem a ação de cancelar, sem um segundo botão apertando o título.
+A conversa rola abaixo do cabeçalho no paralelo. Mãos reavalia a escolha de modelo
+quando ela muda; se já há modelos compatíveis, o atalho vai ao seletor. As
+permissões de acessibilidade e sobreposição continuam sob controle do Android.
+
+O seletor de modelo padrão não lista nem grava um modelo fora da lista
+confirmada de gratuitos da conta própria quando o filtro está ativo. Nenhum
+modelo pago virou padrão por conta própria. Não há alteração no padrão Cloud.
+
+### Verificação Android da PR #7
+
+A [execução 44372229478](https://github.com/DaniloXPTEAM/tama-v2/actions/runs/44372229478)
+montou os dois APKs de `3413403` com sucesso, mas falhou na etapa de unitários do
+paralelo antes da conferência das identidades. O runner informou assinatura de
+verificação temporária. O log remoto não pôde ser lido neste ambiente; o código de
+saída por si só não identifica o teste que falhou.
+
+O teste HTTP 408 foi ajustado: sem `Retry-After` positivo, o OkHttp pode repetir
+a chamada e esperar uma resposta que o mock não enfileirou. O teste agora exige
+receber o 408 original e o mock responde de imediato a uma chamada inesperada.
+Isso não altera a política de retries do cliente de chat. Separadamente, o teste
+de chave não envia um segundo GET se o serviço responder 503 com `Retry-After: 0`.
+A conferência de identidades agora ocorre assim que os dois builds terminam;
+os unitários continuam obrigatórios antes de qualquer entrega. A falha da etapa
+de unitários do paralelo também recebe diagnóstico por categoria fixa, sem
+anexar APK ou copiar o log para a anotação.
+
+Em loopback, duas contraprovas confirmaram a diferença: retirando o
+`Retry-After` do 408, o teste recebeu a resposta 404 de chamada inesperada;
+com o teste de chave anterior, o 503 com `Retry-After: 0` provocou um segundo
+GET. Com os ajustes, os cinco testes das duas classes passaram. Ao todo,
+62 testes JUnit do paralelo e 14 do normal passaram na montagem local,
+incluindo histórico, catálogo e apresentação de imagem. Os JARs OkHttp/Okio
+foram compilados a partir de tags, com adaptações de compilação e plataforma
+para JVM. Os servidores, chaves e identidades eram fictícios, com Android
+substituído por dublês; não é validação de APK, Gradle ou aparelho.
+
+Os harnesses `model_use_direct` e `media_handlers` voltaram a compilar com o
+sinal de falha novo e o `commit()` das preferências em memória. Passaram sem
+falhas nas duas identidades simuladas, incluindo os skips por `Assume`. Os
+dublês não simulam gravação em disco nem recusa da gravação no Android.

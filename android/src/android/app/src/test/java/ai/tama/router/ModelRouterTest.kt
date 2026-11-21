@@ -119,4 +119,30 @@ class ModelRouterTest {
         assertFalse(CapabilityEvidence.explicitlyUnsupportedTools(429, yes.first()))
         assertEquals(setOf(Need.CHAT), CapabilityEvidence.effective(setOf(Need.CHAT, Need.TOOLS), setOf(Need.TOOLS)))
     }
+
+    @Test fun `approved chat can recover after reopen without a personal key bound to the chat`() {
+        val unapprovedInitial = ModelRouter.Candidate("initial", "keyless", setOf(Need.CHAT), Profile.LEAN, 80, 64)
+        // The saved route has consent, but its in-memory catalogue was lost, including CHAT evidence.
+        val saved = unapprovedInitial.copy(entryId = "saved", providerId = "owned", capabilities = emptySet(),
+            credentialed = false, automaticApproved = true, automaticCostAllowed = false)
+        val choices = listOf(unapprovedInitial, saved)
+        val needs = setOf(Need.CHAT)
+        val none = ModelRouter.pick(choices, needs, currentEntryId = unapprovedInitial.entryId) as ModelRouter.Choice.None
+        assertEquals(setOf(saved.entryId), AutoChatEvidenceRecovery.candidates(none, choices, needs))
+        // Read-only metadata may establish this exact route; fetching it is not enough on its own.
+        val documented = saved.copy(capabilities = needs, credentialed = true, automaticCostAllowed = true)
+        val selected = ModelRouter.pick(listOf(unapprovedInitial, documented), needs, unapprovedInitial.entryId) as ModelRouter.Choice.Selected
+        assertEquals(saved.entryId, selected.candidate.entryId)
+        // Unknown price even after catalogue refresh, or no saved consent: no dispatch.
+        assertTrue(ModelRouter.pick(listOf(documented.copy(automaticCostAllowed = false)), needs) is ModelRouter.Choice.None)
+        assertTrue(ModelRouter.pick(listOf(documented.copy(automaticApproved = false)), needs) is ModelRouter.Choice.None)
+
+        val missingVision = needs + Need.VISION
+        val noVision = ModelRouter.pick(choices, missingVision) as ModelRouter.Choice.None
+        assertTrue(AutoChatEvidenceRecovery.candidates(noVision, choices, missingVision).isEmpty())
+        val noConsent = choices.map { it.copy(automaticApproved = false) }
+        val blocked = ModelRouter.pick(noConsent, needs) as ModelRouter.Choice.None
+        assertTrue(AutoChatEvidenceRecovery.candidates(blocked, noConsent, needs).isEmpty())
+    }
+
 }

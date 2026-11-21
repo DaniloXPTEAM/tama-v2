@@ -2398,18 +2398,16 @@ fun ChatScreen(
                     refs.add(Ref(msg.id, src, title))
                 }
             }
-            if (refs.isEmpty()) {
-                // Defensive: tap arrived for a URL that isn't in the visible
-                // window (compacted away, just deleted, etc.). Fall back to
-                // the single-item URL handler so the user still sees the
-                // tapped image rather than swallowing the tap silently.
-                urlClickHandler(tappedUrl)
-                return@handler
-            }
             val startIndex = refs.indexOfFirst { it.messageId == tappedMessageId && it.source == tappedUrl }
                 .takeIf { it >= 0 }
                 ?: refs.indexOfFirst { it.source == tappedUrl }.takeIf { it >= 0 }
-                ?: 0
+                ?: run {
+                    if (refs.isNotEmpty() && BuildConfig.APPLICATION_ID != "ai.tama.assistant.tamav2test") return@run 0
+                    // nanoMuse: native image receipts are not in the model's text gallery.
+                    // Open the tapped attachment itself, even if other replies have images.
+                    urlClickHandler(tappedUrl)
+                    return@handler
+                }
             val items = refs.map { ref ->
                 // Resolve minis://... / file:// / /abs → host File so Coil
                 // doesn't have to re-walk PRootKernel for every page swipe.
@@ -2444,6 +2442,8 @@ fun ChatScreen(
         onOpenProviderSettings = { ChatLinkResolver.dispatchDeepLink(context, "minis://settings/providers") },
     ) { openProviderErrorDetail ->
     ai.tama.ui.chat.PromptSizeDetailHost(sessionId) { openPromptSizeDetail ->
+    val nmReserveHeader = com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test"
+    val nmHeaderExtra = if (nmReserveHeader) (44 * (LocalDensity.current.fontScale - 1f).coerceAtLeast(0f)).dp else 0.dp
     Scaffold(
         containerColor = nmChatBackground, // nanoMuse: chat-only canvas
         contentWindowInsets = WindowInsets(0),
@@ -2495,7 +2495,7 @@ fun ChatScreen(
                                 // behind. Horizontal 32dp keeps the fallback
                                 // pulse highlight comfortably padded around
                                 // the longest title.
-                                .padding(horizontal = 32.dp, vertical = 2.dp),
+                                .padding(horizontal = if (nmReserveHeader) 8.dp else 32.dp, vertical = 2.dp),
                         ) {
                             // nanoMuse: the face above the name, as in Muse's
                             // header. Its mood follows this session's streaming
@@ -2768,9 +2768,13 @@ fun ChatScreen(
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis,
                                             style = noFontPad,
-                                            // Yield first when space is tight; the
-                                            // badge to the right stays intrinsic.
-                                            modifier = Modifier.weight(1f, fill = false),
+                                            // In Test the model text opens its info and usage;
+                                            // the group row above still opens the model picker.
+                                            modifier = Modifier.weight(1f, fill = false).then(
+                                                if (nmReserveHeader) Modifier.clickable(
+                                                    onClickLabel = stringResource(R.string.nm_chat_model_info_title),
+                                                ) { showTokenUsageSheet = true } else Modifier,
+                                            ),
                                         )
                                         // Show the badge whenever thinking is on,
                                         // and ALSO when it's Off but the active
@@ -3220,13 +3224,13 @@ fun ChatScreen(
                 // capsule padding sit on top of that. In the home shell the
                 // main chat's disc (76dp) needs more, a side chat's one-line
                 // title less.
-                expandedHeight = when {
+                expandedHeight = (when {
                     nmHome == null -> 108.dp
                     // nanoMuse: disc (per the Avatar size setting; 10dp spacer when hidden)
                     // + the two-line name tag area, + the model rows when on.
                     nmHome.isMainChat -> (nmAvatarSize.disc ?: 10.dp) + 55.dp + (if (nmHideModelRows) 0.dp else 20.dp)
                     else -> 72.dp
-                },
+                }) + nmHeaderExtra,
             )
             } // nanoMuse: close the header-fade wrapper
         },
@@ -3241,7 +3245,9 @@ fun ChatScreen(
                 // nanoMuse: the message list slides under the header, which is an
                 // overlay, so only the bottom bar insets the content. The
                 // header itself is a scrim over the scrolling list.
-                .padding(bottom = padding.calculateBottomPadding())
+                // nanoMuse: in the test app a reply scrolls below, not underneath, the header.
+                .padding(top = if (nmReserveHeader) padding.calculateTopPadding() else 0.dp,
+                    bottom = padding.calculateBottomPadding())
                 .imePadding()
                 .onGloballyPositioned { chatPaneWidthPx = it.size.width },
         ) {
@@ -3834,7 +3840,7 @@ fun ChatScreen(
                     // measured height (status bar included), plus breathing room.
                     // The bottom clears the floating pill bar the same way.
                     contentPadding = PaddingValues(
-                        top = padding.calculateTopPadding() + 8.dp,
+                        top = (if (nmReserveHeader) 0.dp else padding.calculateTopPadding()) + 8.dp,
                         // nanoMuse: use this layout pass's full footer height.
                         bottom = bottomChromeHeight + bottomReserve,
                     ),
@@ -7115,9 +7121,29 @@ fun ChatScreen(
 
     // Session Token Usage bottom sheet
     if (showTokenUsageSheet) {
+        val parallelTest = com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test"
+        val info = if (parallelTest) {
+            val config by providerRepository.config.collectAsState()
+            val activeEntryId by viewModel.activeEntryId.collectAsState()
+            val evidence by providerRepository.tamaFreeEvidence.collectAsState()
+            val refusals by providerRepository.tamaPaymentRefusals.collectAsState()
+            val entry = config.modelEntries.singleOrNull { it.id == activeEntryId }
+            val instance = config.instances.singleOrNull { it.id == entry?.providerInstanceId }
+            val metadata = remember(entry, instance, evidence, refusals) {
+                if (entry != null && instance != null) providerRepository.tamaModelMetadata(entry, instance) else null
+            }
+            ActiveChatModelInfo(modelName, providerName, entry, metadata)
+        } else null
         TokenUsageSheet(
             viewModel = viewModel,
             onDismiss = { showTokenUsageSheet = false },
+            activeModel = info,
+            displayedSessionId = nmDisplayedSessionId,
+            streaming = isStreaming,
+            onChangeModel = {
+                showTokenUsageSheet = false
+                showModelPicker = true
+            },
         )
     }
 
@@ -7201,6 +7227,7 @@ fun ChatScreen(
             defaultPrimaryGroupId = config.defaultPrimaryGroupId,
             config = config,
             providerRepository = providerRepository,
+            ownChatModeBusy = isStreaming, // nanoMuse: do not interrupt an in-flight turn from the picker
             onSelectGroup = { groupId ->
                 val group = availableGroups.firstOrNull { it.id == groupId }
                 val firstEntry = group?.memberEntryIds?.firstNotNullOfOrNull(::entryById)
@@ -7255,6 +7282,13 @@ fun ChatScreen(
             },
             onSelectEntry = { entryId ->
                 val entry = entryById(entryId)
+                val instance = entry?.let { providerRepository.instance(it.providerInstanceId) }
+                if (entry != null && instance != null && providerRepository.tamaFreeChatOnly(instance) &&
+                    !providerRepository.tamaAllowsChatModel(instance, entry.model.id)) {
+                    android.widget.Toast.makeText(context, context.getString(ai.tama.pricing.freeStatusAction(
+                        providerRepository.tamaFreeChatStatus(instance, entry.model.id))), android.widget.Toast.LENGTH_LONG).show()
+                    return@ModelPickerSheet
+                }
                 val label = entry?.model?.let(::nonTextLabelFor)
                 if (entry != null && label != null) {
                     pendingNonTextSelection = PendingNonTextSelection.Entry(

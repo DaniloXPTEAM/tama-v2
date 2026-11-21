@@ -56,6 +56,8 @@ class ChatRepository(internal val dao: ChatDao) {
     // nanoMuse: keep the ordinary app's query unchanged.
     suspend fun sessionTokenUsagesInChatOrder(sessionId: String): List<String> = dao.tokenUsagesInChatOrder(sessionId)
 
+    internal suspend fun confirmedReplySteps(sessionId: String): Int = dao.confirmedReplySteps(sessionId)
+
     /**
      * [T-android-session-paused-badge-hardkill] Session ids whose agent loop was
      * left interrupted, derived purely from the persisted message tail — so the
@@ -138,6 +140,15 @@ class ChatRepository(internal val dao: ChatDao) {
         nmBindingWrites.read(sessionId) {
             dao.getSession(sessionId)?.let { ai.tama.chat.SessionBindingSnapshot(it.modelBinding, it.modelId) }
         }.await()
+
+    // nanoMuse: bind a CLI image attempt to the persisted chat, not the default chat slot.
+    internal suspend fun nmObserveBinding(sessionId: String): Pair<ai.tama.chat.SessionBindingSnapshot, () -> Boolean>? {
+        val read = nmBindingWrites.readVersioned(sessionId) {
+            dao.getSession(sessionId)?.let { ai.tama.chat.SessionBindingSnapshot(it.modelBinding, it.modelId) }
+        }
+        val snapshot = read.result.await() ?: return null
+        return snapshot to { nmBindingWrites.isCurrent(sessionId, read.version) }
+    }
 
     // nanoMuse: compare in SQLite, including null, so a different row value is not overwritten.
     internal suspend fun nmCompareAndSetBinding(

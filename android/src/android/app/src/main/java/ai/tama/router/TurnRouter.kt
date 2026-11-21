@@ -22,6 +22,7 @@ sealed interface Route {
         /** The original intent is retained even if a provider budget lowers the profile. */
         val requestedProfile: Profile = profile,
         val budgetLimited: Boolean = false,
+        val codeRequested: Boolean = false,
     ) : Route
 }
 
@@ -37,10 +38,25 @@ object TurnRouter {
         return words.any { " $it " in padded }
     }
 
+    // An explicit request to return code can be answered in chat. Keep every
+    // other intent and all file/shell work, including the follow-up below.
+    private val codeTerms = listOf("codigo", "script", "programacao", "funcao python", "funcao javascript",
+        "write code", "code", "coding", "python function", "javascript function")
+    private val textCode = Regex(
+        "^(?:(?:por favor|please|me) )?" +
+            "(?:escrev[ae]|mostr[ae]|ger[ae]|cri[ae]|faz|faca|write|show me|give me|generate|create) " +
+            "(?:(?:um|uma|o|a|an|the|some|example|exemplo de|python|javascript) )*" +
+            "(?:codigo|script|code|funcao|function)\\b",
+    )
+    private val codeAction = listOf("rode", "roda", "rodar", "execute", "executa", "executar", "run",
+        "salve", "grave", "grava", "gravar", "no projeto", "in the project", "patch", "apply", "aplique", "repositorio", "repo")
+    private val fileTerms = listOf("arquivo", "arquivos", "pasta", "pastas", "salva", "salvar", "edita", "editar", "instala", "instalar",
+        "file", "files", "folder", "directory", "save", "edit", "install")
+
     private val groups = linkedMapOf(
         ToolGroup.WEB to listOf("pesquisa", "pesquise", "pesquisar", "busca", "busque", "buscar", "site", "sites", "noticia", "noticias", "navegador", "web", "website", "browse", "search", "look up", "news", "internet"),
         ToolGroup.WEB_ADVANCED to listOf("baixar", "download", "cookie", "cookies", "rolar pagina", "scroll", "login", "log in", "tela cheia", "full screen"),
-        ToolGroup.FILES to listOf("arquivo", "arquivos", "pasta", "pastas", "salva", "salvar", "edita", "editar", "codigo", "script", "instala", "instalar", "file", "files", "folder", "directory", "save", "edit", "code", "install"),
+        ToolGroup.FILES to (fileTerms + listOf("codigo", "script", "code")),
         ToolGroup.MEMORY to listOf("lembra", "lembrar", "memoria", "anota", "anotar", "remember", "memory", "note down"),
         ToolGroup.ANDROID to listOf("wifi", "bluetooth", "bateria", "volume", "brilho", "camera", "localizacao", "alarme", "clima", "tempo em", "abrir app", "abre o app", "abre o", "abre a", "abrir o", "abra o", "battery", "brightness", "location", "alarm", "weather", "open app", "open the app"),
         ToolGroup.SCREEN to listOf("clica", "clicar", "toca na tela", "toque na tela", "opera o app", "preenche", "click", "tap the screen", "fill in", "operate the app"),
@@ -63,9 +79,15 @@ object TurnRouter {
         override: Profile? = null,
         hasImageAttachment: Boolean = false,
         hasFileAttachment: Boolean = false,
+        preferTextCode: Boolean = false,
     ): Route.Chat {
         val normalized = normalize(text)
+        val textRequested = textCode.containsMatchIn(normalized)
         val hints = groups.filterValues { containsAny(normalized, it) }.keys.toMutableSet()
+        if (preferTextCode && textRequested) {
+            if (containsAny(normalized, codeAction) || containsAny(normalized, fileTerms)) hints += ToolGroup.FILES
+            else if (!hasFileAttachment) hints.remove(ToolGroup.FILES)
+        }
         if (ToolGroup.FILES in hints || hasFileAttachment) {
             hints += ToolGroup.FILES
             hints += ToolGroup.SHELL
@@ -91,7 +113,8 @@ object TurnRouter {
                 add(Need.IMAGE_GENERATION)
             }
         }
-        return Route.Chat(profile = profile, hints = hints, needs = needs)
+        val code = textRequested || containsAny(normalized, codeTerms)
+        return Route.Chat(profile = profile, hints = hints, needs = needs, codeRequested = code)
     }
 
     /**

@@ -1,7 +1,5 @@
 package ai.tama.media
 
-import io.github.nanomuse.media.*
-
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -26,10 +24,19 @@ class MediaPromptTest {
         assertTrue(text.contains("Image model: image model via provider"))
     }
 
+    @Test fun `Test guidance never presents a made-up result as a picture`() {
+        val text = MediaPrompt.build("Agnes image", null, "minis://settings/media", testImageGuidance = true)
+        assertTrue(text.contains("Never print tool syntax or claim success without a successful image result"))
+        assertTrue(text.contains("suggest `/imagem`"))
+        assertTrue(text.contains("The app displays a saved `generate_image` result. Do not print its JSON"))
+        assertTrue(text.contains("successful Shell media call, use its returned `markdown`"))
+    }
+
     @Test fun `manual image prompt retains its previous edit and missing model guidance`() {
         val text = MediaPrompt.build(null, null, "minis://settings/media")
         assertTrue(text.contains("`nanomuse-media image --prompt \"...\" [--from <image path>]`"))
         assertTrue(text.contains("No image model is set"))
         assertFalse(text.contains("minis-model-use run` is unavailable"))
+        assertFalse(text.contains("/imagem"))
     }
 }

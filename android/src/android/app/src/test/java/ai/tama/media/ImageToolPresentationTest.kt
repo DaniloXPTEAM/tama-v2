@@ -1,9 +1,36 @@
 package ai.tama.media
 
+import ai.tama.router.ImageTurnGuard
+import ai.tama.tools.ImageGenerationTool
+import com.openminis.app.BuildConfig
+import com.openminis.app.sandbox.NativeOffloadResult
+import com.openminis.app.tools.ToolExecutionResult
+import com.openminis.app.ui.chat.AssistantBlock
+import com.openminis.app.ui.chat.ChatMessage
+import com.openminis.app.ui.chat.FlatChatItem
+import com.openminis.app.ui.chat.ToolBlockStatus
+import com.openminis.app.ui.chat.buildFlatChatItems
+import java.util.Base64
+import kotlinx.coroutines.runBlocking
+import org.json.JSONObject
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Assume.assumeTrue
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TemporaryFolder
 
 class ImageToolPresentationTest {
+    @get:Rule val temp = TemporaryFolder()
+
+    // A real, fixed 3x2 RGB PNG. Android unit tests do not compile against java.desktop.
+    private val png = Base64.getDecoder().decode(
+        "iVBORw0KGgoAAAANSUhEUgAAAAMAAAACCAIAAAASFvFNAAAAFUlEQVR4nGP4DwTlDECCAQhDjUBcAI2BDfI1QGQaAAAAAElFTkSuQmCC",
+    )
+    private val filename = "nanomuse-20260101-010203-00000000-0000-0000-0000-000000000001.png"
     private val ambiguous = "Não consegui confirmar o pedido."
     private val repeated = "Não vou repetir automaticamente."
     private val invalid = "Esta tentativa não foi enviada."
@@ -19,6 +46,60 @@ class ImageToolPresentationTest {
         assertEquals(ImageToolPresentation.Summary.GENERATED, summarize("{\"ok\":true,\"markdown\":\"secret\"}", success = true))
         assertEquals(ImageToolPresentation.Summary.FAILED, summarize("{\"ok\":false}", success = true))
         assertEquals(ImageToolPresentation.Summary.FAILED, summarize("{\"ok\":true}", success = false))
+    }
+
+    @Test fun `one structured request shows its saved PNG even with no model text or steps`() = runBlocking {
+        assumeTrue(BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test")
+        val dir = temp.newFolder("session-attachments")
+        val file = dir.resolve(filename)
+        val prompt = "Crie uma imagem de um gato colorido, em fundo branco."
+        val args = JSONObject().put("prompt", prompt).toString()
+        val guard = ImageTurnGuard(explicitPersonRequest = true)
+        var submissions = 0
+        assertEquals(ImageTurnGuard.Decision.ALLOW, guard.consume())
+        val result = ImageGenerationTool.execute(args, "Image", dir) { received, size ->
+            assertEquals(prompt, received)
+            assertNull(size)
+            submissions++
+            file.writeBytes(png)
+            NativeOffloadResult(0, JSONObject().put("ok", true)
+                .put("path", "/var/minis/attachments/$filename").put("bytes", file.length()).toString())
+        }
+        assertTrue(result.success)
+        assertEquals(1, submissions)
+        assertEquals(ImageTurnGuard.Decision.ALREADY_ATTEMPTED, guard.consume())
+        assertEquals(file.canonicalPath, result.imageFilePath)
+        assertArrayEquals(png, file.readBytes())
+        val block = AssistantBlock(id = "image-call", kind = "tool_use", toolStatus = ToolBlockStatus.SUCCESS,
+            toolName = ImageGenerationTool.NAME, content = result.output, imageFilePath = result.imageFilePath)
+        fun imageRows(tool: AssistantBlock, showSteps: Boolean) = buildFlatChatItems(
+            listOf(ChatMessage("reply", "assistant", "", toolBlocks = listOf(tool))), showSteps = showSteps,
+        ).filterIsInstance<FlatChatItem.AssistantMarkdownBlock>()
+        for (showSteps in listOf(false, true)) {
+            val row = imageRows(block, showSteps).single()
+            assertEquals("image-call:generated-image", row.parentBlockId)
+            assertEquals("![](minis://attachments/$filename)", row.rawText)
+        }
+        // A text-only transcript or a failed call doesn't get the app's image row.
+        assertTrue(imageRows(block.copy(imageFilePath = null), false).isEmpty())
+        assertTrue(imageRows(block.copy(toolStatus = ToolBlockStatus.FAILED), false).isEmpty())
+    }
+
+    @Test fun `a missing or different session attachment is not a successful picture`() {
+        val here = temp.newFolder("here")
+        val other = temp.newFolder("other").resolve(filename)
+        other.writeBytes(png)
+        val body = JSONObject().put("ok", true).put("bytes", other.length())
+        for (path in listOf("/var/minis/attachments/$filename", other.path, "/var/minis/attachments/../other/$filename")) {
+            val result = ImageToolPresentation.attachSavedPng(ToolExecutionResult(body.put("path", path).toString(), true), here)
+            assertFalse(result.success)
+            assertNull(result.imageFilePath)
+            assertEquals(ImageToolPresentation.Summary.ATTACHMENT_MISSING, summarize(result.output))
+            val failure = JSONObject(ImageToolPresentation.sanitizedFailure(result.output, emptyMap(), "Failed to load image"))
+            assertTrue(failure.getString("tell_user").contains("may have been charged. Do not retry"))
+        }
+        val denied = ToolExecutionResult("""{"ok":false,"error":"permission_denied"}""", false)
+        assertEquals(denied, ImageToolPresentation.attachSavedPng(denied, here))
     }
 
     @Test fun `guard outcomes use only the exact local messages`() {
@@ -68,12 +149,18 @@ class ImageToolPresentationTest {
         val reasons = mapOf(
             "no_image_model" to ImageToolPresentation.Summary.NO_MODEL,
             "no_approved_image_model" to ImageToolPresentation.Summary.NO_APPROVAL,
+            "agnes_auto_image_needs_entry" to ImageToolPresentation.Summary.AGNES_IMAGE_NEEDS_ENTRY,
+            "agnes_auto_image_ambiguous" to ImageToolPresentation.Summary.AGNES_IMAGE_AMBIGUOUS,
+            "agnes_auto_image_capability_off" to ImageToolPresentation.Summary.AGNES_IMAGE_CAPABILITY_OFF,
+            "agnes_auto_image_needs_approval" to ImageToolPresentation.Summary.AGNES_IMAGE_NEEDS_APPROVAL,
             "automatic_image_cost_unverified" to ImageToolPresentation.Summary.UNVERIFIED_COST,
             "image_cost_unverified" to ImageToolPresentation.Summary.MODEL_COST_UNVERIFIED,
             "image_authorization_changed" to ImageToolPresentation.Summary.AUTHORIZATION_CHANGED,
             "permission_denied" to ImageToolPresentation.Summary.PERMISSION_DENIED,
             "automatic_image_edit_unavailable" to ImageToolPresentation.Summary.EDIT_UNAVAILABLE,
             "media_model_change_blocked" to ImageToolPresentation.Summary.MODEL_CHANGE_BLOCKED,
+            "agnes_image_authentication" to ImageToolPresentation.Summary.AGNES_AUTHENTICATION,
+            "agnes_image_access_denied" to ImageToolPresentation.Summary.AGNES_ACCESS_DENIED,
             "image_failed" to ImageToolPresentation.Summary.FAILED,
         )
         reasons.forEach { (code, expected) ->

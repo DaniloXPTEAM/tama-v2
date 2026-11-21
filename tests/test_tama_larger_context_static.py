@@ -14,7 +14,7 @@ class LargerContextWiring(unittest.TestCase):
         guard = text.split('when (inLoopContextCheck(contextMaintenance, requestBudget,', 1)[1]
         guard = guard.split('// The loop cannot present a modal mid-flight', 1)[0]
         for item in ('tamaV2Test && nmAutoTurn != null', 'largerThanWindow = requestBudget.window',
-                     'nmAutoTurn.exclude(prior)', 'nmAutoActivate(larger)', 'continue@agentTurns'):
+                     'nmAutoTurn.exclude(prior)', 'nmAutoActivate(larger, largerWindow = true)', 'continue@agentTurns'):
             self.assertIn(item, guard)
         self.assertNotIn('setAllowUnverifiedAutomaticCost', guard)
 
@@ -24,9 +24,17 @@ class LargerContextWiring(unittest.TestCase):
         rebuild = rebuild.split('val requestMessages = checkNotNull(preparedMessages)', 1)[0]
         for item in ('ContextMaintenance.Action.STOP', 'tamaV2Test && nmAutoTurn != null',
                      'largerThanWindow = requestBudget.window', 'nmAutoTurn.exclude(prior)',
-                     'nmAutoActivate(larger)', 'return@streamBlock true', 'nm_context_limit_reached'):
+                     'nmAutoActivate(larger, largerWindow = true)', 'return@streamBlock true', 'nm_context_limit_reached'):
             self.assertIn(item, rebuild)
         self.assertNotIn('setAllowUnverifiedAutomaticCost', rebuild)
+
+    def test_own_key_server_overflow_only_uses_revalidated_larger_route(self):
+        text = VM.read_text().split('val ownInputOverflow =', 1)[1].split('// nanoMuse: never forward', 1)[0]
+        for item in ('nmOwnKeyTurn', 'LargerContext.serverRejected', 'largerThanWindow = requestBudget.window',
+                     'nmAutoActivate(larger ?: nmAutoSelect(null), largerWindow = larger != null)',
+                     'nm_own_context_limit'):
+            self.assertIn(item, text)
+        self.assertNotIn('setAllowUnverifiedAutomaticCost', text)
 
 if __name__ == '__main__':
     unittest.main()

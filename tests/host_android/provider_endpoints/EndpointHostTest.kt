@@ -11,6 +11,16 @@ private fun equal(expected: Any?, actual: Any?) = check(expected == actual) {
 }
 
 fun main() {
+    val agnes = OwnKeyPresets.agnesPreset()
+    val agnesInstance = ProviderInstance("fixture-agnes", agnes.name, agnes.providerType, ProviderCredential.apiKey,
+        customBaseURL = agnes.baseURL, appendV1Suffix = agnes.appendV1)
+    equal("Agnes", agnes.name)
+    equal(ProviderEndpoints.AGNES_BASE, agnesInstance.effectiveBaseURL)
+    equal(false, agnesInstance.allowsEmptyAPIKey)
+    equal(true, agnesInstance.copy(customBaseURL = "https://local.example/v1").allowsEmptyAPIKey)
+    equal(true, ProviderDirectory.validCustomAddress("HTTPS://APIHUB.AGNES-AI.COM/v1"))
+    equal(true, ProviderEndpoints.isAgnesBase("HTTPS://APIHUB.AGNES-AI.COM/v1"))
+    equal(false, ProviderEndpoints.isAgnesBase("https://apihub.agnes-ai.com.example/v1"))
     val groq = OwnKeyPresets.template(
         CatalogueProvider("groq", "openai", "https://api.groq.com/openai/v1"), false, false,
     )
@@ -47,9 +57,9 @@ fun main() {
     equal("groq", ProviderKeySuggestion.match("gsk_synthetic", hints))
     equal("router", ProviderKeySuggestion.match("sk-or-v1-synthetic", hints))
     equal(null, ProviderKeySuggestion.match("sk-synthetic", hints))
-    equal(false, ProviderKeySuggestion.mayFill(true, false, false))
-    equal(false, ProviderKeySuggestion.mayFill(false, true, false))
-    equal(true, ProviderKeySuggestion.mayFill(false, false, false))
+    equal(false, ProviderKeySuggestion.mayOfferPreset(true, false))
+    equal(false, ProviderKeySuggestion.mayOfferPreset(false, true))
+    equal(true, ProviderKeySuggestion.mayOfferPreset(false, false))
 
     // This is only the key-review policy, not the Cloud initialization or chat path.
     for (base in listOf(null, "", "https://cloud.example.invalid/v1")) {
@@ -97,7 +107,7 @@ fun main() {
     val probe = KeyProbePlan.create(ProviderType.openAI, "https://api.groq.com/openai/v1")
     equal("https://api.groq.com/openai/v1/models", probe?.url)
     equal("Authorization", probe?.header)
-    equal("https://openrouter.ai/api/v1/models", KeyProbePlan.create(ProviderType.openRouter, "https://openrouter.ai/api/v1")?.url)
+    equal("https://openrouter.ai/api/v1/key", KeyProbePlan.create(ProviderType.openRouter, "https://openrouter.ai/api/v1")?.url)
     equal("x-api-key", KeyProbePlan.create(ProviderType.anthropic, "https://api.anthropic.com")?.header)
     equal("x-goog-api-key", KeyProbePlan.create(ProviderType.gemini, "https://generativelanguage.googleapis.com/v1beta")?.header)
     equal(null, KeyProbePlan.create(ProviderType.openAI, "https://api.groq.com.example/openai/v1"))
@@ -112,5 +122,16 @@ fun main() {
     equal(KeyProbePlan.Outcome.UNAVAILABLE, KeyProbePlan.classify(429))
     equal("https://api.anthropic.com", ProviderEndpoints.factoryBase(ProviderType.anthropic, null, true))
     equal("/v1", ProviderEndpoints.factoryBase(ProviderType.openAI, "", true))
+    equal("https://openrouter.ai/api", ProviderEndpoints.editableDefault(ProviderType.openRouter))
+    equal("https://openrouter.ai/api/v1/key", KeyProbePlan.create(ProviderType.openRouter, "https://openrouter.ai/api/v1")?.url)
+    equal(true, KeyProbePlan.zeroSpendingLimit(0.0))
+    equal(false, KeyProbePlan.zeroSpendingLimit(2.0))
+    equal(null, KeyProbePlan.zeroSpendingLimit("0"))
+    equal(null, KeyProbePlan.zeroSpendingLimit(-1))
+    equal(KeyProbePlan.Outcome.ZERO_SPEND, KeyProbePlan.classify(200, zeroSpendLimit = true))
+    equal(KeyProbePlan.Outcome.NO_CREDIT, KeyProbePlan.classify(402, noCredit = true))
+    equal(KeyProbePlan.Outcome.DENIED, KeyProbePlan.classify(402))
+    equal(false, KeyProbePlan.reportsNoCredit("insufficient_credits", "", "openrouter_in_flight_budget"))
+    equal(true, KeyProbePlan.reportsNoCredit("insufficient_credits", "", null))
     println("PASSOU: presets e confirmação de destinatário em lógica JVM; sem rede")
 }

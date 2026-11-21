@@ -21,5 +21,26 @@ class ImageRetryIntegration(unittest.TestCase):
         self.assertNotIn('setAllowUnverifiedAutomaticCost', execute)
 
 
+    def test_explicit_image_command_does_not_entangle_chat_or_queue(self):
+        text = VM.read_text()
+        entry = text.split("private fun nmSendMessage(text:", 1)[1].split("private suspend fun nmRunImageShortcut", 1)[0]
+        self.assertIn('image = { image -> nmStartImageShortcut', entry)
+        self.assertIn('if (imageCommand) nmShowImageCommandHint(text)', entry)
+        self.assertNotIn('AutoModelStore.enabled(', entry)
+        self.assertNotIn('_nmProfileOverride', entry)
+        queue = text.split('private fun nmEnqueuePrompt(', 1)[1].split('val prompt = QueuedPrompt', 1)[0]
+        self.assertIn('if (nmLocalImageCommand(trimmed, petGeneration))', queue)
+        self.assertIn('nmShowImageCommandHint(text)', queue)
+
+    def test_legacy_agnes_bindings_are_rejected_before_chat_client_creation(self):
+        text = VM.read_text()
+        restore = text.split('private fun restoreFromBinding(', 1)[1].split('private fun resolveProviderFromGroup', 1)[0]
+        self.assertLess(restore.index('AgnesImages.imageOnlyInTest(entry.model.id)) return false'),
+                        restore.index('currentProvider = nmCreateProvider'))
+        group = text.split('private fun resolveProviderFromGroup(', 1)[1].split('fun selectGroup', 1)[0]
+        self.assertIn('.filterNot { ai.tama.media.AgnesImages.imageOnlyInTest(it.model.id) }', group)
+        self.assertIn('!ai.tama.media.AgnesImages.imageOnlyInTest(modelId)', text)
+
+
 if __name__ == "__main__":
     unittest.main()

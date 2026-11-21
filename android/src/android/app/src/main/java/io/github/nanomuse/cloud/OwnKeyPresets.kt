@@ -24,6 +24,14 @@ object OwnKeyPresets {
     /** Alibaba Cloud Bailian (阿里云百炼): OpenAI-compatible, one key for chat, the screen, pictures and clips. */
     const val BAILIAN = ProviderCatalogue.BAILIAN
 
+    internal const val AGNES = "agnes"
+
+    internal fun agnesPreset() = VoiceProviderTemplate(
+        id = AGNES, name = "Agnes", providerType = ProviderType.openAI,
+        baseURL = ai.tama.providers.ProviderEndpoints.AGNES_BASE, appendV1 = false,
+        capability = VoiceProviderTemplate.Capability.BOTH, baseURLMarkers = emptyList(), mockModels = emptyList(),
+    )
+
     /** OpenRouter: one account, one key, most models, pay as you go; signs up anywhere. */
     const val OPENROUTER = ProviderCatalogue.OPENROUTER
 
@@ -53,6 +61,9 @@ object OwnKeyPresets {
 
     /** The form's pre-fill for a `preset` value, or null when it names no vendor of the catalogue. */
     fun template(context: Context, preset: String?): VoiceProviderTemplate? {
+        if (com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test" && id(preset) == AGNES) {
+            return agnesPreset()
+        }
         val provider = ProviderCatalogue.byId(context, id(preset)) ?: return null
         return template(provider, Region.mainland(context), ProviderCatalogue.chinese(context), signIn(context, preset))
     }

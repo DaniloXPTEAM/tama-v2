@@ -145,6 +145,13 @@ fun ProviderDetailScreen(
     var customUserAgent by remember { mutableStateOf(instance.customUserAgent ?: "") }
 
     val entries = providerRepository.entriesFor(instanceId)
+    val nmHasOwnKey = storedKey.isNotBlank() && providerRepository.tamaOwnApiKey(instance) != null
+    val nmLimits by providerRepository.tamaZeroSpendLimits.collectAsState()
+    val nmZeroLimit = nmHasOwnKey && nmLimits.containsKey(instanceId) && providerRepository.tamaZeroSpendLimit(instance)
+    val nmOnlyFree = nmHasOwnKey && (instance.tamaImportFreeOnly || nmZeroLimit)
+    val nmImportStatuses by providerRepository.nmFreeImportStatus.collectAsState()
+    val nmFreeEvidence by providerRepository.tamaFreeEvidence.collectAsState()
+    val nmImportStatus = nmImportStatuses[instanceId]
     var isRefreshing by remember { mutableStateOf(false) }
 
     val exportContext = androidx.compose.ui.platform.LocalContext.current
@@ -231,9 +238,8 @@ fun ProviderDetailScreen(
         val isOAuthProvider =
             instance.credentialType == com.openminis.app.data.model.ProviderCredential.oauth
         // nanoMuse: review the saved route; editing the field does not change the live route yet.
-        val nmLiveDestination = if (nmParallel && !isOAuthProvider) ai.tama.providers.ProviderEndpoints.factoryBase(
-            instance.providerType, instance.customBaseURL, instance.appendV1Suffix,
-        ) else null
+        val nmLiveDestination = if (!nmParallel || isOAuthProvider) null else if (instance.azureMode) instance.customBaseURL
+            else ai.tama.providers.ProviderEndpoints.factoryBase(instance.providerType, instance.customBaseURL, instance.appendV1Suffix)
         val nmReviewedKey = if (isEditingKey) editKeyValue else storedKey
         val nmDestinationAllowed = if (nmParallel && !isOAuthProvider)
             ai.tama.providers.KeyDestinationReview(nmReviewedKey, nmLiveDestination) else true
@@ -273,13 +279,14 @@ fun ProviderDetailScreen(
                             if (nmParallel && (!nmDestinationAllowed ||
                                     !ai.tama.providers.KeyDestinationGuard.permits(editKeyValue, nmLiveDestination))) return@ApiKeyCredentialBlock
                             val nmFirstKey = storedKey.isBlank() && editKeyValue.isNotBlank() // nanoMuse
-                            val saved = if (nmParallel) providerRepository.saveApiKeyChecked(instanceId, editKeyValue)
+                            val savedValue = if (nmParallel) editKeyValue.trim() else editKeyValue
+                            val saved = if (nmParallel) providerRepository.saveApiKeyChecked(instanceId, savedValue)
                                 else { providerRepository.saveApiKey(instanceId, editKeyValue); true }
                             keySaveFailed = !saved
                             if (saved) {
                                 // [T-android-provider-apikey-save-stale] Reflect the
                                 // just-saved value without re-reading async prefs.
-                                storedKey = editKeyValue
+                                storedKey = savedValue
                                 AppLogger.info(TAG, "Saved API key for ${instance.id}")
                                 isEditingKey = false
                                 editKeyValue = ""
@@ -295,40 +302,71 @@ fun ProviderDetailScreen(
             }
         }
 
-        // nanoMuse: changing this preference is additive and never deletes
-        // existing entries or group members. Cloud has its own account menu.
-        if (nmParallel && io.github.nanomuse.cloud.NanoMuseCloud.instance(exportContext)?.id != instanceId) {
-            val statuses by providerRepository.nmFreeImportStatus.collectAsState()
+        // nanoMuse: the saved route can be checked here as well as on the add form.
+        // An Azure route is not the Agnes bearer-key integration, even if its URL was pasted here.
+        val nmAzureAgnes = instance.azureMode && ai.tama.providers.ProviderEndpoints.isAgnesBase(nmLiveDestination)
+        if (nmHasOwnKey && !isEditingKey && !nmAzureAgnes) {
+            val snapshot = providerRepository.nmOAuthKeySnapshot(instanceId)
+            val version = snapshot.version
+            val route = ai.tama.router.AutoModelStore.routeFingerprint(instance)
+            ai.tama.providers.KeyProbeSection(
+                instance.providerType, storedKey, nmLiveDestination,
+                nmDestinationAllowed && snapshot.key == storedKey, version,
+                current = {
+                    providerRepository.instance(instanceId)?.let { live ->
+                        ai.tama.router.AutoModelStore.routeFingerprint(live) == route
+                    } == true && providerRepository.nmOAuthKeyStillCurrent(snapshot)
+                },
+                check = { plan, key ->
+                    if (plan.groqModelList) providerRepository.tamaCheckSavedGroqKey(instance, snapshot)
+                    else ai.tama.providers.KeyProbe.check(plan, key)
+                },
+            ) { result ->
+                val isZero = result?.zeroSpendLimit
+                if (isZero != null && providerRepository.tamaRecordZeroSpendLimit(instanceId, version, isZero) &&
+                    isZero && providerRepository.tamaEligibleFreeModelIds(instanceId) == null) {
+                    providerRepository.refreshModelsInBackground(instance)
+                }
+            }
+        }
+
+        // nanoMuse: one per-key choice, no deletion and no changes to spending permissions.
+        val nmHasFreeCatalogue = providerRepository.tamaHasFreeCatalogue(instance)
+        if (nmParallel && !isOAuthProvider && instance.id != io.github.nanomuse.cloud.NanoMuseCloud.instance(exportContext)?.id) {
             ai.tama.providers.FreeModelImportSection(
                 type = instance.providerType,
-                checked = instance.tamaImportFreeOnly,
+                checked = nmOnlyFree,
+                lockedByZeroLimit = nmZeroLimit,
+                hasCatalogue = nmHasFreeCatalogue,
+                hasKey = nmHasOwnKey,
                 onCheckedChange = { enabled ->
                     val saved = providerRepository.setTamaImportFreeOnly(instanceId, enabled)
                     if (saved && enabled) providerRepository.refreshModelsInBackground(instance)
                 },
-                status = statuses[instanceId],
+                status = nmImportStatus,
+                agnes = ai.tama.media.AgnesImages.account(instance), // nanoMuse: images have separate evidence.
             )
-            // nanoMuse: chat-route approval is not cost or image consent, and does not send a request.
-            if (instance.providerType == ProviderType.openRouter &&
-                instance.credentialType == com.openminis.app.data.model.ProviderCredential.apiKey &&
-                instance.tamaImportFreeOnly) {
+            // nanoMuse: one tap enables the filter, fetches catalogue metadata if needed,
+            // and approves the visible free chat routes. It does not run inference.
+            if (providerRepository.tamaHasFreeChatRoute(instance) && nmHasOwnKey && instance.isEnabled) {
                 var nmBulkBusy by remember(instanceId) { mutableStateOf(false) }
-                var nmBulkResult by remember(instanceId, statuses[instanceId], storedKey, instance.customBaseURL) { mutableStateOf<Int?>(null) }
+                var nmBulkResult by remember(instanceId, storedKey, instance.customBaseURL) { mutableStateOf<Int?>(null) }
                 SettingsSection(footer = stringResource(R.string.nm_free_bulk_help)) {
                     MinisButton(
                         onClick = {
+                            val key = providerRepository.nmOAuthKeySnapshot(instanceId)
                             nmBulkBusy = true
                             scope.launch {
                                 nmBulkResult = try {
                                     kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                                        providerRepository.tamaApproveFreeChatModels(instanceId)
+                                        providerRepository.tamaUseAllFreeChatModels(instanceId, key)
                                     }
                                 } catch (e: kotlinx.coroutines.CancellationException) { throw e }
                                 catch (_: Exception) { 0 }
                                 nmBulkBusy = false
                             }
                         },
-                        enabled = !nmBulkBusy && statuses[instanceId] is ai.tama.pricing.FreeModelImportStatus.Complete,
+                        enabled = !nmBulkBusy && !isRefreshing,
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                     ) { Text(stringResource(R.string.nm_free_bulk_button)) }
                     nmBulkResult?.let { count ->
@@ -378,6 +416,15 @@ fun ProviderDetailScreen(
                         placeholder = stringResource(R.string.provider_detail_https_api_example_placeholder),
                         fieldModifier = Modifier.bringIntoViewOnFocus(),
                     )
+                }
+                // nanoMuse: fix the common old OpenAI + blank-address Groq setup with two explicit taps.
+                if (nmHasOwnKey && instance.providerType == ProviderType.openAI && !instance.useResponsesAPI &&
+                    storedKey.trim().startsWith("gsk_") && (customBaseURL.isBlank() ||
+                        ai.tama.providers.ProviderEndpoints.isOfficialOpenAIBase(customBaseURL))) {
+                    ai.tama.providers.KeyProviderHint("Groq") {
+                        customBaseURL = "https://api.groq.com/openai"
+                        appendV1Suffix = true
+                    }
                 }
                 HorizontalDivider(
                     modifier = Modifier.padding(horizontal = 16.dp),
@@ -474,7 +521,7 @@ fun ProviderDetailScreen(
             }
         } else if (nmParallel) {
             // nanoMuse: OpenRouter's transport uses this fixed endpoint.
-            ai.tama.providers.FixedEndpointSection("https://openrouter.ai/api/v1")
+            ai.tama.providers.OpenRouterEndpointSection()
         }
 
         // ─── API Format (OpenAI API-key only) ───────────────────────
@@ -546,7 +593,10 @@ fun ProviderDetailScreen(
             val mode = instance.imageEndpointMode
             SettingsSection(
                 header = "Image Generation",
-                footer = when (mode) {
+                // nanoMuse: Agnes uses its Images API, not generic chat fallback.
+                footer = if (ai.tama.media.AgnesImages.account(instance)) stringResource(
+                    R.string.nm_agnes_api_help, ai.tama.providers.ProviderEndpoints.AGNES_BASE,
+                ) else when (mode) {
                     com.openminis.app.data.model.ImageEndpointMode.auto ->
                         if (instance.imageEndpointResolved != null) {
                             val resolved = if (instance.imageEndpointResolved ==
@@ -676,37 +726,27 @@ fun ProviderDetailScreen(
         ThinkingRulesSection(instance = instance, providerRepository = providerRepository)
 
         // ─── Models ─────────────────────────────────────────────────
-        // nanoMuse: this is a reversible view filter, not a change to saved entries,
-        // model selection or spending authorization.
-        val nmShowFreeFilter = nmParallel && instance.providerType == ProviderType.openRouter &&
-            instance.credentialType == com.openminis.app.data.model.ProviderCredential.apiKey && instance.tamaImportFreeOnly &&
-            io.github.nanomuse.cloud.NanoMuseCloud.instance(exportContext)?.id != instanceId
-        var nmFilterFree by remember(instanceId, instance.tamaImportFreeOnly) { mutableStateOf(instance.tamaImportFreeOnly) }
-        val nmImportStatuses by providerRepository.nmFreeImportStatus.collectAsState()
-        // Reading the status makes the view re-evaluate after a background refresh.
-        val nmImportStatus = nmImportStatuses[instanceId]
-        val nmFreeIds = if (nmShowFreeFilter && nmFilterFree && nmImportStatus !is ai.tama.pricing.FreeModelImportStatus.Checking)
-            providerRepository.tamaEligibleFreeModelIds(instanceId) else null
-        val nmDisplayedEntries = ai.tama.pricing.FreeModelList.filter(entries, nmShowFreeFilter && nmFilterFree, nmFreeIds) { it.model.id }
-        if (nmShowFreeFilter) {
-            SettingsSection(footer = stringResource(R.string.nm_free_list_help)) {
-                SettingsSwitchRow(title = stringResource(R.string.nm_free_list_filter), checked = nmFilterFree,
-                    onCheckedChange = { nmFilterFree = it }, showDivider = false)
-            }
+        // nanoMuse: the same switch filters this list and own-key chat. Saved entries stay intact.
+        val nmPaymentRefusals by providerRepository.tamaPaymentRefusals.collectAsState()
+        val nmFreeIds = if (nmOnlyFree && nmImportStatus !is ai.tama.pricing.FreeModelImportStatus.Checking)
+            remember(instance, entries, nmFreeEvidence, nmImportStatus, nmPaymentRefusals, storedKey) { providerRepository.tamaEligibleFreeModelIds(instanceId) } else null
+        val nmDisplayedEntries = ai.tama.pricing.FreeModelList.filterForDisplay(entries, nmOnlyFree) {
+            providerRepository.tamaProviderModelStatus(instance, it.model.id)
         }
         SettingsSection(
             header = stringResource(R.string.provider_detail_models_count_header, nmDisplayedEntries.size),
-            footer = if (nmShowFreeFilter && nmFilterFree && nmFreeIds == null)
-                stringResource(R.string.nm_free_list_refresh) else null,
+            footer = when {
+                nmOnlyFree && nmFreeIds == null -> stringResource(R.string.nm_free_list_refresh)
+                nmOnlyFree && nmFreeIds?.isEmpty() == true -> stringResource(R.string.nm_free_no_confirmed)
+                else -> null
+            },
         ) {
             // Refresh action sits as the first row, mirroring the iOS
             // tap-to-refresh affordance in the section header area.
             SettingsRow(
                 // nanoMuse: localize only an own-key provider in the isolated build;
                 // keep the normal app and Cloud row unchanged.
-                title = if (nmParallel && storedKey.isNotBlank() &&
-                    instance.credentialType == com.openminis.app.data.model.ProviderCredential.apiKey &&
-                    io.github.nanomuse.cloud.NanoMuseCloud.instance(exportContext)?.id?.let { it != instanceId } == true) {
+                title = if (nmHasOwnKey) {
                     if (isRefreshing) stringResource(R.string.nm_cloud_refreshing)
                     else stringResource(R.string.provider_detail_refresh_models)
                 } else if (isRefreshing) "Refreshing…" else "Refresh model list",
@@ -785,14 +825,27 @@ fun ProviderDetailScreen(
                     // Surface both directions — input badges are muted, output
                     // badges use a tinted "generate"-style glyph so they read
                     // distinctly. Mirrors iOS #669.
-                    val inputModalities = entry.model.inputModalities.orEmpty()
-                    val outputModalities = entry.model.outputModalities.orEmpty()
+                    val metadata = remember(entry, instance, nmHasOwnKey, nmFreeEvidence, nmPaymentRefusals) {
+                        if (nmHasOwnKey) providerRepository.tamaModelMetadata(entry, instance) else null
+                    }
+                    val inputModalities = if (metadata == null) entry.model.inputModalities.orEmpty() else metadata.inputs.orEmpty().toList()
+                    val outputModalities = if (metadata == null) entry.model.outputModalities.orEmpty() else metadata.outputs.orEmpty().toList()
                     val hasBadge = inputModalities.any { it in modalityIconKeys } ||
                         outputModalities.any { it in modalityOutputIconKeys }
+                    // nanoMuse: plan availability and list prices are separate.
+                    val priceStatus = remember(entry.model.id, instance, nmPaymentRefusals, nmFreeIds, nmHasOwnKey, nmFreeEvidence) {
+                        if (nmHasOwnKey) providerRepository.tamaProviderModelStatus(instance, entry.model.id) else null
+                    }
+                    val agnesFree = providerRepository.tamaAgnesImageStatus(instance, entry.model.id) == ai.tama.pricing.DocumentedFreeChat.Status.FREE
+                    val priceHint = if (agnesFree) stringResource(R.string.nm_agnes_free_source, ai.tama.media.AgnesImages.REVIEW_DATE)
+                        else priceStatus?.let { stringResource(ai.tama.pricing.freeStatusLabel(it)) }
+                    val codingHint = if (metadata?.coding == true) stringResource(R.string.nm_model_badge_coding) else null
                     SettingsRow(
                         title = entry.model.displayName,
                         subtitle = buildString {
                             append(entry.model.id)
+                            if (priceHint != null) append("\n").append(priceHint)
+                            if (codingHint != null) append("\n").append(codingHint)
                             if (entry.isHidden) append(" • Hidden")
                         },
                         // onClick = null so SettingsRow doesn't add a second

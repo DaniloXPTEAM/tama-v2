@@ -83,7 +83,8 @@ fun UseItForScreen(instanceId: String, onDone: () -> Unit) {
     val config = repo?.config?.collectAsState()
     val inst = config?.value?.instances?.firstOrNull { it.id == instanceId }
     val nmParallel = com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test" // nanoMuse
-    val freeOnly = nmParallel && inst?.tamaImportFreeOnly == true
+    val limits = repo?.tamaZeroSpendLimits?.collectAsState()?.value
+    val freeOnly = remember(inst, limits) { nmParallel && inst?.let { repo?.tamaFreeChatOnly(it) } == true }
     // nanoMuse: a free-chat catalogue is not evidence for image, video or screen use.
     val offered = remember(inst, freeOnly) {
         inst?.let { ModelSlots.offeredSlots(context, it) }.orEmpty().filter { !freeOnly || it == Slot.CHAT }
@@ -120,7 +121,8 @@ fun UseItForScreen(instanceId: String, onDone: () -> Unit) {
         }
         if (freeOnly) { // nanoMuse: keep the limits visible beside the choice
             Text(
-                text = stringResource(R.string.nm_free_import_help),
+                text = stringResource(if (ai.tama.pricing.FreeModelImport.supports(inst.providerType))
+                    R.string.nm_free_import_help else R.string.nm_free_direct_help),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 16.dp).padding(top = 12.dp),

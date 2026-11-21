@@ -10,7 +10,7 @@ import java.time.ZoneOffset
 /**
  * A conservative, short-lived view of the public OpenRouter catalogue. A zero top-provider
  * price alone does not prove that an arbitrary model, image endpoint, plugin or account is free.
- * Only an exact documented free chat variant with fresh zero price metadata can qualify here.
+ * Only the exact catalogue row with fresh, unconditional zero chat prices can qualify here.
  * This is evidence about catalogue pricing, not a guarantee against later provider changes or
  * charges from tools and services outside the chat request.
  */
@@ -31,6 +31,8 @@ internal object OpenRouterPricing {
         val tools: Boolean,
         val expiresAtMillis: Long?,
         val expiryMalformed: Boolean,
+        val inputModalities: Set<String>? = null,
+        val outputModalities: Set<String>? = null,
     )
 
     data class Catalogue(val fetchedAtMillis: Long, val quotes: Map<String, Quote>)
@@ -70,8 +72,12 @@ internal object OpenRouterPricing {
             }
             if ("prompt" !in values || "completion" !in values) malformed = true
             val arch = obj.optJSONObject("architecture")
-            val inputs = strings(arch?.optJSONArray("input_modalities"))
-            val outputs = strings(arch?.optJSONArray("output_modalities"))
+            val inputs = strings(arch?.optJSONArray("input_modalities"))?.mapTo(linkedSetOf()) {
+                it.lowercase().removeSuffix("_input")
+            }
+            val outputs = strings(arch?.optJSONArray("output_modalities"))?.mapTo(linkedSetOf()) {
+                it.lowercase().removeSuffix("_output")
+            }
             val endpoints = strings(obj.optJSONArray("endpoints"))
             val params = strings(obj.optJSONArray("supported_parameters"))
             val rawExpiry = obj.opt("expiration_date")
@@ -88,6 +94,7 @@ internal object OpenRouterPricing {
                 tools = params?.contains("tools") == true,
                 expiresAtMillis = expiry,
                 expiryMalformed = rawExpiry != null && rawExpiry != JSONObject.NULL && expiry == null,
+                inputModalities = inputs, outputModalities = outputs,
             )
         }
         return Catalogue(fetchedAtMillis, quotes.toMap())
@@ -102,9 +109,8 @@ internal object OpenRouterPricing {
         if (quote.malformed || quote.conditional) return Status.UNKNOWN
         if (quote.prices.values.any { number(it)?.signum() == 1 }) return Status.PAID
         if (hasMedia || !quote.textInput || !quote.textOnlyOutput || !quote.chatEndpoint) return Status.UNKNOWN
-        val documentedFreeVariant = modelId.endsWith(":free") && modelId.count { it == ':' } == 1 ||
-            modelId == "openrouter/free"
-        if (!documentedFreeVariant || '/' !in modelId) return Status.UNKNOWN
+        // :online is a hosted web-search shortcut, not the quoted text-only request.
+        if (modelId.split(':').drop(1).any { it.equals("online", ignoreCase = true) } || '/' !in modelId) return Status.UNKNOWN
         return if (quote.prices.values.all { number(it)?.signum() == 0 }) Status.ADVERTISED_FREE else Status.UNKNOWN
     }
 
@@ -120,7 +126,7 @@ internal object OpenRouterPricing {
         }
     }
 
-    private fun number(raw: String): BigDecimal? {
+    internal fun number(raw: String): BigDecimal? {
         if (raw.isBlank() || raw.length > 64 || raw.startsWith('-')) return null
         return runCatching { BigDecimal(raw).takeIf { it.signum() >= 0 } }.getOrNull()
     }

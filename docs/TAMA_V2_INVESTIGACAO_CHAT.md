@@ -166,3 +166,27 @@ de grupo nem escolha atual elegível. Isso não muda a rota Cloud, não sobrepõ
 uma escolha fixa elegível e não concede permissão de custo. A preferência de
 catálogo não garante ausência de cobranças. A política foi testada com
 candidatos fictícios, sem chat real nem rede.
+
+## Continuação: F11, troca após falha
+
+A configuração antiga (chave `gsk_`, tipo OpenAI, base vazia) aponta para a
+OpenAI, não para a Groq. A PR 6 passou a barrar localmente essa combinação sem
+confirmação. A seleção automática ainda podia escolher a rota; a recusa local
+então encerrava o turno antes de procurar outra. No Tama V2 Test, um turno com
+chave própria agora pula rotas sem destinatário confirmado na seleção automática
+e no fallback de grupo. A chave nunca é reencaminhada para corrigir a URL. Na
+seleção manual fixa, corrija o endereço no provedor.
+
+O mesmo fallback reconhece recusa explícita de limite, modelo indisponível e
+timeout. Um 403 genérico ou recusa de política não é tratado como falta de crédito.
+A troca só usa candidatas elegíveis e autorizadas. As guardas de custo continuam
+independentes: o catálogo não é autorização de cobrança. Testes com dados
+fictícios não identificam qual resposta de fato ocorreu no Poco.
+
+O cliente de chat com chave própria carrega também a geração da credencial usada
+na sua criação. Se a rota ou a conta mudou, não reutiliza o cliente antigo, nem
+em A → B → A. O filtro por conta vale na seleção e no reenvio, inclusive quando
+um turno começou por outra rota e passou a usar uma chave própria. “Usar todos
+os gratuitos” não inicia uma nova consulta com uma chave que substituiu a chave
+da ação. A tela do teste de chave salva confirma conta e destinatário antes do
+GET e novamente antes de aceitar seu retorno.

@@ -75,19 +75,21 @@ class MediaOffloadHandler internal constructor(
     private suspend fun image(
         args: Args, sessionId: String?, peer: ai.tama.sandbox.OffloadPeerLease?,
     ): NativeOffloadResult = image(
-        promptValue = args.get("prompt"), referencePath = args.get("from"), requestedSize = args.get("size"),
+        promptValue = args.get("prompt"), referencePaths = args.all("from"), requestedSize = args.get("size"),
         requestedName = args.get("name"), sessionId = sessionId, origin = ImageOrigin.CLI, peer = peer,
     )
 
     /** Shared by the native tool and direct shortcut; neither enters a shell or blocks the UI. */
-    internal suspend fun generateImage(prompt: String, size: String?, sessionId: String?): NativeOffloadResult = image(
-        promptValue = prompt, referencePath = null, requestedSize = size,
-        requestedName = null, sessionId = sessionId, origin = ImageOrigin.NATIVE, peer = null,
+    internal suspend fun generateImage(
+        prompt: String, size: String?, sessionId: String?, freeOnly: Boolean = false,
+    ): NativeOffloadResult = image(
+        promptValue = prompt, referencePaths = emptyList(), requestedSize = size,
+        requestedName = null, sessionId = sessionId, origin = ImageOrigin.NATIVE, peer = null, freeOnly = freeOnly,
     )
 
     private suspend fun image(
-        promptValue: String?, referencePath: String?, requestedSize: String?, requestedName: String?,
-        sessionId: String?, origin: ImageOrigin, peer: ai.tama.sandbox.OffloadPeerLease?,
+        promptValue: String?, referencePaths: List<String>, requestedSize: String?, requestedName: String?,
+        sessionId: String?, origin: ImageOrigin, peer: ai.tama.sandbox.OffloadPeerLease?, freeOnly: Boolean = false,
     ): NativeOffloadResult {
         // nanoMuse: a CLI worker can outlive its shell; a native tool can start
         // after its own coroutine was cancelled. Check both lifetimes, even when
@@ -98,7 +100,7 @@ class MediaOffloadHandler internal constructor(
         } else null
         try {
             attempt?.requireActive()
-            return imageAttempt(promptValue, referencePath, requestedSize, requestedName, sessionId, origin, attempt)
+            return imageAttempt(promptValue, referencePaths, requestedSize, requestedName, sessionId, origin, attempt, freeOnly)
         } catch (_: ImageAttemptTracker.Stopped) {
             return if (attempt?.mayHaveSubmitted() == true) failed(
                 "image", context.getString(com.openminis.app.R.string.nm_image_request_failed), noRetry = true,
@@ -109,8 +111,8 @@ class MediaOffloadHandler internal constructor(
     }
 
     private suspend fun imageAttempt(
-        promptValue: String?, referencePath: String?, requestedSize: String?, requestedName: String?,
-        sessionId: String?, origin: ImageOrigin, attempt: ImageAttemptTracker.Attempt?,
+        promptValue: String?, referencePaths: List<String>, requestedSize: String?, requestedName: String?,
+        sessionId: String?, origin: ImageOrigin, attempt: ImageAttemptTracker.Attempt?, freeOnly: Boolean,
     ): NativeOffloadResult {
         val prompt = promptValue?.trim().orEmpty()
         if (prompt.isEmpty() || prompt.length > 4_000) {
@@ -133,13 +135,25 @@ class MediaOffloadHandler internal constructor(
             false
         }
         val automatic = images.automatic()
-        // nanoMuse: manual image approval does not prove a free request either.
-        if (!costStillCurrent()) return modelCostError("image")
-        if (automatic && !images.automaticCostAllowed()) return automaticImageError(
-            "automatic_image_cost_unverified", com.openminis.app.R.string.nm_auto_reason_unverified_cost)
+        // nanoMuse: the host socket has already bound a CLI request to its managed chat.
+        val freeAtStart = freeOnly || (parallel && CliImageScope.freeDuringTurn(sessionId))
+        val sessionScope = if (parallel && !freeAtStart && origin == ImageOrigin.CLI) try {
+            images.observeCliImageScope(sessionId)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            { CliImageScope.State.CHANGED }
+        } else null
+        fun requiresFreeImage(endpoint: ImageGen.Endpoint? = null): Boolean {
+            if (!parallel) return false
+            val scope = sessionScope?.invoke()
+            val free = freeAtStart || CliImageScope.freeDuringTurn(sessionId) || images.freeImagesOnly(endpoint) ||
+                scope == CliImageScope.State.FREE_ONLY
+            if (scope == CliImageScope.State.CHANGED && !free) throw ImageDispatch.AuthorizationChanged()
+            return free
+        }
         val size = requestedSize ?: "1024x1024"
-        var sentEndpoint: ImageGen.Endpoint? = null
-        var selection: AutoImageSelection.Selection? = null
+        val paymentRefused = mutableSetOf<Pair<String, String>>()
         // Once a preflight has passed, conservatively assume submission might have
         // happened. The same callback can later be invoked for a result download.
         val possiblySubmitted = java.util.concurrent.atomic.AtomicBoolean(false)
@@ -154,170 +168,251 @@ class MediaOffloadHandler internal constructor(
         } catch (_: Exception) {
             false
         }
-        val outcome = try {
-            ImageDispatch.run(
-                automatic = automatic,
-                hasReference = referencePath != null,
-                automaticNow = images::automatic,
-                select = { images.choose().also { selection = it } },
-                revalidate = images::revalidate,
-                manualEndpoint = images::manualEndpoint,
-                // The legacy CLI can be invoked by scripts or automated turns, so
-                // a remembered native-tool grant is not sufficient for this call.
-                authorize = { endpoint ->
-                    attempt?.requireActive()
-                    if (parallel) {
-                        permissionObservation = try {
-                            imageGate.observe(endpoint, sessionId)
-                        } catch (e: CancellationException) {
-                            throw e
-                        } catch (_: Exception) {
-                            throw ImageDispatch.AuthorizationChanged()
-                        }
-                        if (!permissionStillCurrent()) throw ImageDispatch.AuthorizationChanged()
-                        if (!costStillCurrent()) throw ai.tama.pricing.ModelCostGuard.Blocked()
+        while (true) {
+            var sentEndpoint: ImageGen.Endpoint? = null
+            var selection: AutoImageSelection.Selection? = null
+            val fallback = paymentRefused.isNotEmpty()
+            fun costStillAllowed(endpoint: ImageGen.Endpoint) = images.declaredFree(endpoint) || costStillCurrent()
+            fun automaticCostStillAllowed(endpoint: ImageGen.Endpoint) = images.declaredFree(endpoint) || images.automaticCostAllowed()
+            fun requireImageScope(endpoint: ImageGen.Endpoint) {
+                if (!OwnKeyImagePolicy.mayRequest(fallback || requiresFreeImage(endpoint), images.declaredFree(endpoint)))
+                    throw OwnKeyImagePolicy.NoVerifiedFreeGenerator()
+                if (sessionScope?.invoke() == CliImageScope.State.CHANGED) throw ImageDispatch.AuthorizationChanged()
+            }
+            val outcome = try {
+                // nanoMuse: no endpoint selection or permission prompt before the scope checks.
+                attempt?.requireActive()
+                val restricted = requiresFreeImage() || fallback
+                val hasDeclaredFree = parallel && images.hasDeclaredFreeImage()
+                if (restricted && !hasDeclaredFree) {
+                    if (fallback) return imageRouteError(CustomImageRoute.Problem.AGNES_PAYMENT)
+                    val problem = images.selectionProblem()
+                    return when (problem) {
+                        CustomImageRoute.Problem.AGNES_PAYMENT, CustomImageRoute.Problem.NEEDS_KEY,
+                        CustomImageRoute.Problem.AGNES_UNAVAILABLE,
+                        CustomImageRoute.Problem.AGNES_IMAGE_AMBIGUOUS -> imageRouteError(problem)
+                        else -> noFreeImage()
                     }
-                    imageGate.allow(endpoint, prompt, size, sessionId, freshApproval = origin == ImageOrigin.CLI)
-                },
-                send = { endpoint ->
-                    // nanoMuse: do not even read the reference after a session or
-                    // settings revocation which happened as the dialog closed.
-                    attempt?.requireActive()
-                    if (!permissionStillCurrent()) throw ImageDispatch.AuthorizationChanged()
-                    if (!costStillCurrent()) throw ai.tama.pricing.ModelCostGuard.Blocked()
-                    // Only manual editing may read a private reference. DashScope can
-                    // substitute an edit model, so it is blocked for automatic use.
-                    val reference = referencePath?.let { path ->
-                        loadPicture(path, sessionId) ?: throw ImageReferenceUnavailable(path)
-                    }
-                    if (!costStillCurrent()) throw ai.tama.pricing.ModelCostGuard.Blocked()
-                    if (automatic != images.automatic() || (automatic && !images.automaticCostAllowed()))
-                        throw ImageDispatch.AuthorizationChanged()
-                    sentEndpoint = endpoint
-                    // nanoMuse: re-read mode, approval, route and credential at the
-                    // actual transport edge, not just before request preparation.
-                    val requireCurrentImage = {
-                        attempt?.requireActive()
-                        if (!costStillCurrent()) throw ai.tama.pricing.ModelCostGuard.Blocked()
-                        val unchanged = try {
-                            if (automatic != images.automatic() || (automatic && !images.automaticCostAllowed())) false
-                            else {
-                                val current = if (automatic) selection?.let(images::revalidate) else images.manualEndpoint()
-                                current == endpoint && automatic == images.automatic()
-                            }
-                        } catch (e: CancellationException) {
-                            throw e
-                        } catch (_: Exception) {
-                            false
-                        }
-                        if (!unchanged || !permissionStillCurrent()) throw ImageDispatch.AuthorizationChanged()
-                        if (!costStillCurrent()) throw ai.tama.pricing.ModelCostGuard.Blocked()
-                        attempt?.requireActive()
-                    }
-                    val beforeRequest: (() -> Unit)? = if (parallel) ({
-                        requireCurrentImage()
-                        attempt?.markPossibleSubmission()
-                        possiblySubmitted.set(true)
-                    }) else null
-                    val picture = if (reference != null) images.edit(endpoint, reference, prompt, beforeRequest)
-                    else images.generate(endpoint, prompt, size, allowFormatRetry = false, beforeRequest = beforeRequest)
-                    // nanoMuse: a base64 result may finish without another download preflight.
-                    if (parallel) requireCurrentImage()
-                    picture
-                },
-            )
-        } catch (_: ImageAttemptTracker.Stopped) {
-            return if (attempt?.mayHaveSubmitted() == true) failed(
-                "image", context.getString(com.openminis.app.R.string.nm_image_request_failed), noRetry = true,
-            ) else automaticImageError("image_authorization_changed", com.openminis.app.R.string.nm_auto_image_changed)
-        } catch (e: ImageReferenceUnavailable) {
-            // nanoMuse: a tool argument can contain private text, even when it is not a credential.
-            return NativeOffloadResult(2, if (com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test")
-                "nanomuse-media: cannot read the picture\n" else "nanomuse-media: cannot read picture '${e.path}'\n")
-        } catch (_: ai.tama.pricing.ModelCostGuard.Blocked) {
-            // nanoMuse: a cost revocation at a later download cannot undo a POST.
-            if (possiblySubmitted.get()) return failed(
-                "image", context.getString(com.openminis.app.R.string.nm_image_request_failed), noRetry = true,
-            )
-            return modelCostError("image")
-        } catch (_: MediaModelChangeGuard.Blocked) {
-            return if (possiblySubmitted.get()) failed(
-                "image", context.getString(com.openminis.app.R.string.nm_image_request_failed), noRetry = true,
-            ) else mediaModelChangeError()
-        } catch (_: ImageDispatch.AuthorizationChanged) {
-            // A follow-up download can be refused after the image POST. Do not
-            // claim that no image was sent when a submission may have happened.
-            if (possiblySubmitted.get()) return failed(
-                "image", context.getString(com.openminis.app.R.string.nm_image_request_failed), noRetry = true,
-            )
-            return if (automatic && !images.automaticCostAllowed()) automaticImageError(
-                "automatic_image_cost_unverified", com.openminis.app.R.string.nm_auto_reason_unverified_cost)
-            else automaticImageError("image_authorization_changed", com.openminis.app.R.string.nm_auto_image_changed)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            // A failed image request may still have been charged. Do not automatically try another.
-            val secrets = listOfNotNull(sentEndpoint?.apiKey)
-            // nanoMuse: CLI output also becomes a tool result. Key redaction alone
-            // cannot remove an arbitrary prompt echoed by a provider.
-            val safe = if (com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test")
-                context.getString(com.openminis.app.R.string.nm_image_detail_failed)
-            else io.github.nanomuse.net.ProviderReach.redactedText(e.message ?: "failed", secrets, 500)
-            AppLogger.warning(TAG, "image request failed")
-            return failed("image", safe, noRetry = true)
-        } finally {
-            // nanoMuse: no per-session observation survives success, refusal or cancellation.
-            permissionObservation?.close()
-        }
-        val sent = when (outcome) {
-            is ImageDispatch.Outcome.Sent -> outcome
-            is ImageDispatch.Outcome.Blocked -> return when (outcome.reason) {
-                ImageDispatch.Block.AUTO_EDIT_UNAVAILABLE -> automaticImageError(
-                    "automatic_image_edit_unavailable", com.openminis.app.R.string.nm_auto_image_edit_blocked)
-                ImageDispatch.Block.NO_APPROVED_IMAGE -> if (!images.automaticCostAllowed()) automaticImageError(
+                }
+                if (parallel && !fallback) images.selectionProblem()?.let { return imageRouteError(it) }
+                if (!costStillCurrent() && !hasDeclaredFree) return modelCostError("image")
+                if (automatic && !images.automaticCostAllowed() && !hasDeclaredFree) return automaticImageError(
                     "automatic_image_cost_unverified", com.openminis.app.R.string.nm_auto_reason_unverified_cost)
-                else if (!images.hasConfiguredImage()) missing("image") else automaticImageError(
-                    "no_approved_image_model", com.openminis.app.R.string.nm_auto_image_missing)
-                ImageDispatch.Block.AUTHORIZATION_CHANGED -> if (automatic && !images.automaticCostAllowed()) automaticImageError(
+                ImageDispatch.run(
+                    automatic = automatic,
+                    hasReference = referencePaths.isNotEmpty(),
+                    automaticNow = images::automatic,
+                    select = {
+                        (if (restricted || !costStillCurrent()) images.chooseDeclaredFree(paymentRefused) else images.choose())
+                            .also { selection = it }
+                    },
+                    revalidate = images::revalidate,
+                    manualEndpoint = images::manualEndpoint,
+                    // The legacy CLI can be invoked by scripts or automated turns, so
+                    // a remembered native-tool grant is not sufficient for this call.
+                    authorize = { endpoint ->
+                        requireImageScope(endpoint)
+                        attempt?.requireActive()
+                        if (parallel) {
+                            permissionObservation = try {
+                                imageGate.observe(endpoint, sessionId)
+                            } catch (e: CancellationException) {
+                                throw e
+                            } catch (_: Exception) {
+                                throw ImageDispatch.AuthorizationChanged()
+                            }
+                            if (!permissionStillCurrent()) throw ImageDispatch.AuthorizationChanged()
+                            if (!costStillAllowed(endpoint)) throw ai.tama.pricing.ModelCostGuard.Blocked()
+                        }
+                        if (automatic && !automaticCostStillAllowed(endpoint)) throw ImageDispatch.AuthorizationChanged()
+                        imageGate.allow(endpoint, prompt, size, sessionId, freshApproval = origin == ImageOrigin.CLI || fallback)
+                    },
+                    send = { endpoint ->
+                        // nanoMuse: do not even read the reference after a session or
+                        // settings revocation which happened as the dialog closed.
+                        attempt?.requireActive()
+                        requireImageScope(endpoint)
+                        if (!permissionStillCurrent()) throw ImageDispatch.AuthorizationChanged()
+                        if (!costStillAllowed(endpoint)) throw ai.tama.pricing.ModelCostGuard.Blocked()
+                        // Only manual editing may read a private reference. DashScope can
+                        // substitute an edit model, so it is blocked for automatic use.
+                        val agnes = parallel && AgnesImages.route(endpoint.instance)
+                        val sendSize = if (agnes && requestedSize == null) AgnesImages.sizeFromPrompt(prompt) ?: size else size
+                        val references = if (agnes) referencePaths.map { path -> loadAgnesReference(path, sessionId) } else emptyList()
+                        val reference = if (agnes) null else referencePaths.lastOrNull()?.let { path ->
+                            loadPicture(path, sessionId) ?: throw ImageReferenceUnavailable(path)
+                        }
+                        if (!costStillAllowed(endpoint)) throw ai.tama.pricing.ModelCostGuard.Blocked()
+                        if (automatic != images.automatic() || (automatic && !automaticCostStillAllowed(endpoint)))
+                            throw ImageDispatch.AuthorizationChanged()
+                        sentEndpoint = endpoint
+                        // nanoMuse: re-read mode, approval, route and credential at the
+                        // actual transport edge, not just before request preparation.
+                        val requireCurrentImage = {
+                            requireImageScope(endpoint)
+                            attempt?.requireActive()
+                            if (!costStillAllowed(endpoint)) throw ai.tama.pricing.ModelCostGuard.Blocked()
+                            val unchanged = try {
+                                if (automatic != images.automatic() || (automatic && !automaticCostStillAllowed(endpoint))) false
+                                else {
+                                    val current = if (automatic) selection?.let(images::revalidate) else images.manualEndpoint()
+                                    current == endpoint && automatic == images.automatic()
+                                }
+                            } catch (e: CancellationException) {
+                                throw e
+                            } catch (_: Exception) {
+                                false
+                            }
+                            if (!unchanged || !permissionStillCurrent()) throw ImageDispatch.AuthorizationChanged()
+                            if (!costStillAllowed(endpoint)) throw ai.tama.pricing.ModelCostGuard.Blocked()
+                            attempt?.requireActive()
+                        }
+                        val beforeRequest: (() -> Unit)? = if (parallel) ({
+                            requireCurrentImage()
+                            attempt?.markPossibleSubmission()
+                            possiblySubmitted.set(true)
+                        }) else null
+                        val picture = when {
+                            references.isNotEmpty() -> images.editAgnes(endpoint, references, prompt, sendSize, beforeRequest)
+                            reference != null -> images.edit(endpoint, reference, prompt, beforeRequest)
+                            else -> images.generate(endpoint, prompt, sendSize, allowFormatRetry = false, beforeRequest = beforeRequest)
+                        }
+                        // nanoMuse: a base64 result may finish without another download preflight.
+                        if (parallel) requireCurrentImage()
+                        picture
+                    },
+                )
+            } catch (_: ImageAttemptTracker.Stopped) {
+                return if (attempt?.mayHaveSubmitted() == true) failed(
+                    "image", context.getString(com.openminis.app.R.string.nm_image_request_failed), noRetry = true,
+                ) else automaticImageError("image_authorization_changed", com.openminis.app.R.string.nm_auto_image_changed)
+            } catch (e: ImageReferenceUnavailable) {
+                // nanoMuse: a tool argument can contain private text, even when it is not a credential.
+                return NativeOffloadResult(2, if (com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test")
+                    "nanomuse-media: cannot read the picture\n" else "nanomuse-media: cannot read picture '${e.path}'\n")
+            } catch (_: OwnKeyImagePolicy.NoVerifiedFreeGenerator) {
+                if (possiblySubmitted.get()) return failed(
+                    "image", context.getString(com.openminis.app.R.string.nm_image_request_failed), noRetry = true,
+                )
+                return noFreeImage()
+            } catch (_: ai.tama.pricing.ModelCostGuard.Blocked) {
+                // nanoMuse: a cost revocation at a later download cannot undo a POST.
+                if (possiblySubmitted.get()) return failed(
+                    "image", context.getString(com.openminis.app.R.string.nm_image_request_failed), noRetry = true,
+                )
+                return modelCostError("image")
+            } catch (_: MediaModelChangeGuard.Blocked) {
+                return if (possiblySubmitted.get()) failed(
+                    "image", context.getString(com.openminis.app.R.string.nm_image_request_failed), noRetry = true,
+                ) else mediaModelChangeError()
+            } catch (_: ImageDispatch.AuthorizationChanged) {
+                // A follow-up download can be refused after the image POST. Do not
+                // claim that no image was sent when a submission may have happened.
+                if (possiblySubmitted.get()) return failed(
+                    "image", context.getString(com.openminis.app.R.string.nm_image_request_failed), noRetry = true,
+                )
+                return if (automatic && !images.automaticCostAllowed()) automaticImageError(
                     "automatic_image_cost_unverified", com.openminis.app.R.string.nm_auto_reason_unverified_cost)
                 else automaticImageError("image_authorization_changed", com.openminis.app.R.string.nm_auto_image_changed)
-                ImageDispatch.Block.NO_MANUAL_IMAGE -> missing("image")
-                ImageDispatch.Block.PERMISSION_DENIED -> NativeOffloadResult(
-                    126, JSONObject().put("ok", false).put("error", "permission_denied")
-                        .put("message", context.getString(com.openminis.app.R.string.nm_image_permission_denied))
-                        .put("settings", "minis://settings/permissions")
-                        .put("tell_user", "Permission was denied or expired. Explain this and do not retry.")
-                        .toString(2) + "\n",
-                )
+            } catch (e: AgnesImageApi.Failure) {
+                val endpoint = sentEndpoint
+                // Only an explicit payment refusal advances automatic selection.
+                // Never repeat the pair, use a paid alternate or reuse its approval.
+                if (e.problem == AgnesImageApi.Problem.PAYMENT && automatic && images.automatic() &&
+                    endpoint != null && AgnesImages.route(endpoint.instance) && permissionStillCurrent() &&
+                    paymentRefused.add(endpoint.instanceId to endpoint.model)) continue
+                return imageRouteError(CustomImageRoute.problem(e))
+            } catch (_: CustomImageRoute.Rejected) {
+                return imageRouteError(CustomImageRoute.Problem.ENDPOINT_REJECTED)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // A failed image request may still have been charged. Do not automatically try another.
+                val secrets = listOfNotNull(sentEndpoint?.apiKey)
+                // nanoMuse: CLI output also becomes a tool result. Key redaction alone
+                // cannot remove an arbitrary prompt echoed by a provider.
+                val safe = if (com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test")
+                    context.getString(com.openminis.app.R.string.nm_image_detail_failed)
+                else io.github.nanomuse.net.ProviderReach.redactedText(e.message ?: "failed", secrets, 500)
+                AppLogger.warning(TAG, "image request failed")
+                return failed("image", safe, noRetry = true)
+            } finally {
+                // nanoMuse: no per-session observation survives success, refusal or cancellation.
+                permissionObservation?.close()
+                permissionObservation = null
             }
+            val sent = when (outcome) {
+                is ImageDispatch.Outcome.Sent -> outcome
+                is ImageDispatch.Outcome.Blocked -> return when (outcome.reason) {
+                    ImageDispatch.Block.AUTO_EDIT_UNAVAILABLE -> automaticImageError(
+                        "automatic_image_edit_unavailable", com.openminis.app.R.string.nm_auto_image_edit_blocked)
+                    ImageDispatch.Block.NO_APPROVED_IMAGE -> {
+                        if (fallback) imageRouteError(CustomImageRoute.Problem.AGNES_PAYMENT)
+                        else if (!images.automaticCostAllowed() && !images.hasDeclaredFreeImage()) automaticImageError(
+                            "automatic_image_cost_unverified", com.openminis.app.R.string.nm_auto_reason_unverified_cost)
+                        else {
+                            // nanoMuse: a saved Manual pick need not be missing altogether.
+                            // Report its specific Auto blocker using only local settings.
+                            val problem = if (parallel) images.automaticSelectionProblem() else null
+                            if (problem != null) imageRouteError(problem)
+                            else if (!images.hasConfiguredImage()) missing("image") else automaticImageError(
+                                "no_approved_image_model", com.openminis.app.R.string.nm_auto_image_missing)
+                        }
+                    }
+                    ImageDispatch.Block.AUTHORIZATION_CHANGED -> if (automatic && !images.automaticCostAllowed()) automaticImageError(
+                        "automatic_image_cost_unverified", com.openminis.app.R.string.nm_auto_reason_unverified_cost)
+                    else automaticImageError("image_authorization_changed", com.openminis.app.R.string.nm_auto_image_changed)
+                    ImageDispatch.Block.NO_MANUAL_IMAGE -> missing("image")
+                    ImageDispatch.Block.PERMISSION_DENIED -> NativeOffloadResult(
+                        126, JSONObject().put("ok", false).put("error", "permission_denied")
+                            .put("message", context.getString(com.openminis.app.R.string.nm_image_permission_denied))
+                            .put("settings", "minis://settings/permissions")
+                            .put("tell_user", "Permission was denied or expired. Explain this and do not retry.")
+                            .toString(2) + "\n",
+                    )
+                }
+            }
+            val ep = sent.endpoint
+            val picture = sent.picture
+            // nanoMuse: a registered Stop after the response also prevents the local save
+            // when observed here; this check is not atomic with the file write.
+            try {
+                attempt?.requireActive()
+            } catch (_: ImageAttemptTracker.Stopped) {
+                return failed("image", context.getString(com.openminis.app.R.string.nm_image_request_failed), noRetry = true)
+            }
+            val name = fileName(requestedName, "png")
+            val file = save(sessionId, name) { out -> check(picture.writeTo(out)) }
+                ?: return failed("image", "cannot write to /var/minis/attachments without replacing an existing file", noRetry = true)
+            val model = if (automatic) safeAttribution(ep.model, ep.apiKey) else ep.model
+            val provider = if (automatic) safeAttribution(ep.label, ep.apiKey) else ep.label
+            if (automatic) AutoImageNotices.published(sessionId, model, provider)
+            val result = JSONObject()
+                .put("ok", true)
+                .put("path", "/var/minis/attachments/$name")
+                .put("markdown", "![${prompt.take(60).replace("]", "")}](minis://attachments/$name)")
+                .put("model", model).put("provider", provider)
+                .put("bytes", file.length())
+            if (automatic) result.put("tell_user", context.getString(com.openminis.app.R.string.nm_auto_image_used, model, provider))
+            picture.aspectRatio?.let { ratio -> result.put("aspect_ratio", ratio) }
+            return ok(result)
         }
-        val ep = sent.endpoint
-        val picture = sent.picture
-        // nanoMuse: a registered Stop after the response also prevents the local save
-        // when observed here; this check is not atomic with the file write.
-        try {
-            attempt?.requireActive()
-        } catch (_: ImageAttemptTracker.Stopped) {
-            return failed("image", context.getString(com.openminis.app.R.string.nm_image_request_failed), noRetry = true)
-        }
-        val name = fileName(requestedName, "png")
-        val file = save(sessionId, name) { out -> check(picture.writeTo(out)) }
-            ?: return failed("image", "cannot write to /var/minis/attachments without replacing an existing file", noRetry = true)
-        val model = if (automatic) safeAttribution(ep.model, ep.apiKey) else ep.model
-        val provider = if (automatic) safeAttribution(ep.label, ep.apiKey) else ep.label
-        if (automatic) AutoImageNotices.published(sessionId, model, provider)
-        val result = JSONObject()
-            .put("ok", true)
-            .put("path", "/var/minis/attachments/$name")
-            .put("markdown", "![${prompt.take(60).replace("]", "")}](minis://attachments/$name)")
-            .put("model", model).put("provider", provider)
-            .put("bytes", file.length())
-        if (automatic) result.put("tell_user", context.getString(com.openminis.app.R.string.nm_auto_image_used, model, provider))
-        return ok(result)
     }
 
     private fun safeAttribution(value: String, apiKey: String): String =
         io.github.nanomuse.net.ProviderReach.redactedText(value, listOf(apiKey), 128)
+
+    private fun imageRouteError(problem: CustomImageRoute.Problem): NativeOffloadResult = NativeOffloadResult(
+        if (problem == CustomImageRoute.Problem.ENDPOINT_REJECTED ||
+            (problem.code.startsWith("agnes_image_") && problem != CustomImageRoute.Problem.AGNES_UNAVAILABLE)) 1 else 3,
+        JSONObject().put("ok", false).put("error", problem.code).put("message", context.getString(problem.message))
+            .put("settings", MediaModels.DEEP_LINK)
+            .put("tell_user", ImageFailureInstruction.forCode(problem.code)).toString(2) + "\n",
+    )
+
+    private fun noFreeImage(): NativeOffloadResult = automaticImageError(
+        "no_verified_free_image_generator", com.openminis.app.R.string.nm_free_image_unavailable,
+    )
 
     private fun automaticImageError(code: String, message: Int): NativeOffloadResult = NativeOffloadResult(
         3, JSONObject().put("ok", false).put("error", code).put("message", context.getString(message))
@@ -526,6 +621,28 @@ class MediaOffloadHandler internal constructor(
      * only (a host path such as the app's own private files is not the agent's to read).
      */
     private fun loadPicture(path: String, sessionId: String?): Bitmap? {
+        val file = pictureFile(path, sessionId) ?: return null
+        return runCatching { BitmapFactory.decodeFile(file.path) }.getOrNull()
+    }
+
+    private fun loadAgnesReference(path: String, sessionId: String?): ByteArray {
+        val file = pictureFile(path, sessionId) ?: throw ImageReferenceUnavailable(path)
+        if (file.length() > AgnesImages.MAX_REFERENCE_BYTES) throw AgnesImageApi.Failure(AgnesImageApi.Problem.REFERENCE_SIZE)
+        val bytes = file.inputStream().use { input ->
+            val out = java.io.ByteArrayOutputStream()
+            val buffer = ByteArray(8192)
+            while (true) {
+                val n = input.read(buffer)
+                if (n < 0) break
+                if (out.size() + n > AgnesImages.MAX_REFERENCE_BYTES) throw AgnesImageApi.Failure(AgnesImageApi.Problem.REFERENCE_SIZE)
+                out.write(buffer, 0, n)
+            }
+            out.toByteArray()
+        }
+        return bytes
+    }
+
+    private fun pictureFile(path: String, sessionId: String?): File? {
         val linux = when {
             path.startsWith("minis://attachments/") -> "/var/minis/attachments/" + path.removePrefix("minis://attachments/")
             path.startsWith("minis://") -> path.removePrefix("minis://")
@@ -537,30 +654,31 @@ class MediaOffloadHandler internal constructor(
                     .takeIf { SandboxPaths.inside(context, it) }
             else -> SandboxPaths.host(context, linux, sessionId)
         } ?: return null
-        val f = file.takeIf { it.isFile } ?: return null
-        return runCatching { BitmapFactory.decodeFile(f.path) }.getOrNull()
+        return file.takeIf { it.isFile }
     }
 
     /** `--flag value` and `--flag=value`; the first bare word is the subcommand. */
     internal class Args(argv: List<String>) {
         val positional = mutableListOf<String>()
-        private val values = mutableMapOf<String, String>()
+        private val values = mutableMapOf<String, MutableList<String>>()
+        private fun put(name: String, value: String) { values.getOrPut(name) { mutableListOf() }.add(value) }
         init {
             var i = 0
             while (i < argv.size) {
                 val a = argv[i]
                 when {
-                    a.startsWith("--") && a.contains('=') -> values[a.substring(2, a.indexOf('='))] = a.substringAfter('=')
+                    a.startsWith("--") && a.contains('=') -> put(a.substring(2, a.indexOf('=')), a.substringAfter('='))
                     a.startsWith("--") -> {
                         val next = argv.getOrNull(i + 1)
-                        if (next != null && !next.startsWith("--")) { values[a.substring(2)] = next; i++ } else values[a.substring(2)] = "true"
+                        if (next != null && !next.startsWith("--")) { put(a.substring(2), next); i++ } else put(a.substring(2), "true")
                     }
                     else -> positional += a
                 }
                 i++
             }
         }
-        fun get(name: String): String? = values[name]
+        fun get(name: String): String? = values[name]?.lastOrNull()
+        fun all(name: String): List<String> = values[name].orEmpty()
     }
 
     companion object {
@@ -576,6 +694,7 @@ Usage:
 Files are written to /var/minis/attachments/ and the JSON reply carries a `markdown`
 line to put in the answer so the file shows inline. `--from` takes a sandbox path or a
 minis://attachments/... link (image: edit that picture; video: start from it).
+For a manual Agnes edit, repeat --from for multiple PNG, JPEG or WebP references.
 Video takes 1-5 minutes and is billed per second; keep --seconds low.
 Exit 3 means the needed model is not configured — tell the user and link minis://settings/media.
 """

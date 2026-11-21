@@ -27,6 +27,8 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.*
 import org.junit.Rule
+import org.junit.Assume.assumeTrue
+import com.openminis.app.BuildConfig
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import org.mockito.Mockito
@@ -64,8 +66,10 @@ class MediaOffloadImageTest {
         Mockito.`when`(context.getString(R.string.nm_auto_image_changed)).thenReturn("Image authorization changed")
         Mockito.`when`(context.getString(R.string.nm_auto_reason_unverified_cost)).thenReturn("Automatic cost is not verified")
         Mockito.`when`(context.getString(R.string.nm_model_cost_blocked)).thenReturn("Model cost is not verified")
+        Mockito.`when`(context.getString(R.string.nm_free_image_unavailable)).thenReturn("No verified free generator")
         Mockito.`when`(context.getString(R.string.nm_auto_image_edit_blocked)).thenReturn("Automatic edit unavailable")
         Mockito.`when`(context.getString(R.string.nm_image_permission_denied)).thenReturn("Permission denied")
+        Mockito.`when`(context.getString(R.string.nm_agnes_image_queue)).thenReturn("A fila da Agnes está cheia")
         Mockito.`when`(context.getString(R.string.nm_image_detail_failed)).thenReturn("Image could not be completed")
         Mockito.`when`(context.getString(R.string.nm_image_request_failed)).thenReturn("Image may have been charged; do not retry")
         Mockito.`when`(context.getString(R.string.nm_models_image_title)).thenReturn("Image")
@@ -81,9 +85,16 @@ class MediaOffloadImageTest {
     )
 
     private inner class FakeImages : MediaImageServices {
+        var problem: CustomImageRoute.Problem? = null
+        override fun selectionProblem() = problem
         var autoRevision = 0L
         var choiceRevision = 0L
         var costRevision = 0L
+        var freeOnly = false
+        override fun freeImagesOnly(endpoint: ImageGen.Endpoint?) = freeOnly
+        val cliScopes = mutableMapOf<String, CliImageScope.State>()
+        override suspend fun observeCliImageScope(sessionId: String?): () -> CliImageScope.State =
+            { sessionId?.let(cliScopes::get) ?: CliImageScope.State.UNRESTRICTED }
         var mode = true
             set(value) { if (field != value) autoRevision++; field = value }
         var costAllowed = true
@@ -175,6 +186,63 @@ class MediaOffloadImageTest {
         assertEquals(3, revoked.exitCode)
         assertEquals("image_cost_unverified", JSONObject(revoked.output).getString("error"))
         assertEquals(0, fake.generateCalls)
+    }
+
+    @Test fun `free-only refuses paid defaults before permission and at the transport edge`() {
+        var permissions = 0
+        val fake = FakeImages().apply { mode = false; freeOnly = true }
+        val sid = UUID.randomUUID().toString()
+        val gate = testGate { _, _, _, _, _ -> permissions++; true }
+        val handler = MediaOffloadHandler(context(), fake, gate)
+        val blocked = handler.handle(request(sid, "--prompt", "Draw a bird"))
+        if (com.openminis.app.BuildConfig.APPLICATION_ID != "ai.tama.assistant.tamav2test") {
+            assertEquals(0, blocked.exitCode)
+            assertEquals(1, fake.submissions)
+            return
+        }
+        assertEquals("no_verified_free_image_generator", JSONObject(blocked.output).getString("error"))
+        assertEquals(0, permissions)
+        assertEquals(0, fake.manualCalls)
+        assertEquals(0, fake.submissions)
+        fake.freeOnly = false
+        fake.beforeStage = { if (it == 0) fake.freeOnly = true }
+        val refused = handler.handle(request(sid, "--prompt", "Draw a bird"))
+        assertEquals("no_verified_free_image_generator", JSONObject(refused.output).getString("error"))
+        assertEquals(1, permissions)
+        assertEquals(0, fake.submissions)
+
+        fake.freeOnly = false
+        fake.simulateDownload = true
+        fake.beforeStage = { if (it == 1) fake.freeOnly = true }
+        val afterPost = handler.handle(request(sid, "--prompt", "Draw a bird"))
+        val failure = JSONObject(afterPost.output)
+        assertEquals("image_failed", failure.getString("error"))
+        assertTrue("Do not retry" in failure.getString("tell_user"))
+        assertEquals(1, fake.submissions)
+        assertEquals(0, fake.downloads)
+    }
+
+    @Test fun `a side chat CLI cannot inherit a paid default or stale authorization`() {
+        org.junit.Assume.assumeTrue(com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test")
+        val sideChat = UUID.randomUUID().toString()
+        val defaultChat = UUID.randomUUID().toString()
+        val fake = FakeImages().apply {
+            mode = false
+            cliScopes[sideChat] = CliImageScope.State.FREE_ONLY
+        }
+        var permissions = 0
+        val gate = testGate { _, _, _, _, _ -> permissions++; true }
+        val handler = MediaOffloadHandler(context(), fake, gate)
+        val blocked = handler.handle(request(sideChat, "--prompt", "Draw a bird"))
+        assertEquals("no_verified_free_image_generator", JSONObject(blocked.output).getString("error"))
+        assertEquals(0, fake.manualCalls)
+        assertEquals(0, permissions)
+        assertEquals(0, fake.submissions)
+        assertEquals(0, handler.handle(request(defaultChat, "--prompt", "Draw a bird")).exitCode)
+        fake.beforeStage = { fake.cliScopes[defaultChat] = CliImageScope.State.CHANGED }
+        val changed = handler.handle(request(defaultChat, "--prompt", "Draw a bird"))
+        assertEquals("image_authorization_changed", JSONObject(changed.output).getString("error"))
+        assertEquals(1, fake.submissions)
     }
 
     @Test fun `unverified automatic cost blocks before selection and before send`() {
@@ -577,6 +645,23 @@ class MediaOffloadImageTest {
         assertTrue(AutoImageNotices.takeFor(sid).isEmpty())
     }
 
+    @Test fun `custom catalogue with only chat output returns its specific reason without asking or sending`() = runBlocking {
+        assumeTrue(BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test")
+        val reason = CustomImageRoute.missingModel("fixture/chat", mapOf("fixture/chat" to setOf("text")))
+        assertEquals(CustomImageRoute.Problem.CHAT_ONLY, reason)
+        assertEquals(CustomImageRoute.Problem.UNCONFIRMED, CustomImageRoute.missingModel("fixture/unknown", emptyMap()))
+        val fake = FakeImages().apply { problem = reason }
+        var prompted = false
+        val handler = MediaOffloadHandler(context(), fake, testGate { _, _, _, _, _ -> prompted = true; true })
+        val result = handler.generateImage("a fixture", null, "fixture-session")
+        assertEquals("image_chat_only", JSONObject(result.output).getString("error"))
+        assertFalse(prompted)
+        assertEquals(0, fake.submissions)
+        val free = handler.generateImage("a fixture", null, "fixture-session", freeOnly = true)
+        assertEquals("no_verified_free_image_generator", JSONObject(free.output).getString("error"))
+        assertFalse(prompted)
+    }
+
     @Test fun `missing image provider has the required message without asking or sending`() = runBlocking {
         val fake = FakeImages().apply { mode = false; manual = null }
         var gateCalls = 0
@@ -648,4 +733,113 @@ class MediaOffloadImageTest {
         assertTrue(JSONObject(result.output).getString("tell_user").contains("may have been charged"))
         assertTrue(AutoImageNotices.takeFor(sid).isEmpty())
     }
+
+    @Test fun `Agnes passes free-only and both cost gates without skipping image permission`() = runBlocking {
+        assumeTrue(BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test")
+        val base = FakeImages().apply { modelCostAllowed = false; costAllowed = false; mode = false; freeOnly = true }
+        val agnes = endpoint.copy(instance = endpoint.instance.copy(customBaseURL = "https://apihub.agnes-ai.com/v1"),
+            model = AgnesImages.DEFAULT)
+        var permits = 0
+        val service = object : MediaImageServices by base {
+            override fun hasDeclaredFreeImage() = true
+            override fun declaredFree(endpoint: ImageGen.Endpoint) = endpoint == agnes
+            override fun manualEndpoint() = agnes
+            override suspend fun generate(endpoint: ImageGen.Endpoint, prompt: String, size: String, allowFormatRetry: Boolean,
+                beforeRequest: (() -> Unit)?): MediaPicture {
+                assertEquals(agnes, endpoint)
+                assertEquals("1024x576", size)
+                beforeRequest?.invoke()
+                return object : MediaPicture {
+                    override val aspectRatio = "4:3" // Actual result, not requested 21:9 or sent 16:9.
+                    override fun writeTo(output: java.io.OutputStream): Boolean {
+                        output.write(byteArrayOf(1, 2, 3)); return true
+                    }
+                }
+            }
+        }
+        val gate = testGate { ep, _, _, _, _ -> assertEquals(agnes, ep); permits++; true }
+        val handler = MediaOffloadHandler(context(), service, gate)
+        val result = handler.generateImage("crie uma imagem de um gato astronauta em 21:9", null, "agnes-fixture", freeOnly = true)
+        assertEquals(result.output, 0, result.exitCode)
+        assertEquals(1, permits)
+        val json = JSONObject(result.output)
+        assertEquals("4:3", json.getString("aspect_ratio"))
+        assertTrue(json.getString("markdown").contains("](minis://attachments/"))
+        val paragraph = MediaPrompt.build("${agnes.model} via ${agnes.label}", null, "minis://settings/media")
+        assertTrue(paragraph.contains(AgnesImages.DEFAULT))
+        assertFalse(paragraph.contains("No image model is set"))
+    }
+
+    @Test fun `an unavailable image pick blocks before permission even with a free and paid alternate`() = runBlocking {
+        assumeTrue(BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test")
+        val base = FakeImages().apply { problem = CustomImageRoute.Problem.AGNES_UNAVAILABLE }
+        val images = object : MediaImageServices by base {
+            override fun hasDeclaredFreeImage() = true
+        }
+        var permits = 0
+        val gate = testGate { _, _, _, _, _ -> permits++; true }
+        val result = MediaOffloadHandler(context(), images, gate).generateImage("crie uma imagem de um gato", null, "agnes-blocked")
+        assertEquals("agnes_image_unavailable", JSONObject(result.output).getString("error"))
+        assertEquals(0, base.selects)
+        assertEquals(0, permits)
+        assertEquals(0, base.submissions)
+    }
+
+    @Test fun `automatic Agnes fallback is payment-only and requests new permission for the other free model`() = runBlocking {
+        assumeTrue(BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test")
+        val failures = mapOf(
+            AgnesImageApi.Problem.PAYMENT to "agnes_image_payment",
+            AgnesImageApi.Problem.QUEUE to "agnes_image_queue",
+            AgnesImageApi.Problem.TIMEOUT to "agnes_image_timeout",
+            AgnesImageApi.Problem.AUTHENTICATION to "agnes_image_authentication",
+            AgnesImageApi.Problem.ACCESS_DENIED to "agnes_image_access_denied",
+        )
+        for ((failure, expectedError) in failures) {
+            val base = FakeImages().apply { modelCostAllowed = false; costAllowed = false; freeOnly = true }
+            val provider = endpoint.instance.copy(customBaseURL = "https://apihub.agnes-ai.com/v1")
+            val endpoints = AgnesImages.models.map { ImageGen.Endpoint(provider, endpoint.apiKey, it.id) }
+            val approved = mutableListOf<Pair<String, Boolean>>()
+            val sent = mutableListOf<String>()
+            val excludedChecks = mutableListOf<Set<Pair<String, String>>>()
+            val learned = mutableSetOf<String>()
+            val service = object : MediaImageServices by base {
+                override fun hasDeclaredFreeImage() = endpoints.any(::declaredFree)
+                override fun declaredFree(endpoint: ImageGen.Endpoint) = endpoint in endpoints && endpoint.model !in learned
+                override fun chooseDeclaredFree(excluded: Set<Pair<String, String>>): AutoImageSelection.Selection? {
+                    excludedChecks.add(excluded.toSet())
+                    val next = endpoints.firstOrNull { declaredFree(it) && (it.instanceId to it.model) !in excluded } ?: return null
+                    return selection.copy(modelId = next.model)
+                }
+                override fun revalidate(selection: AutoImageSelection.Selection) = endpoints.firstOrNull {
+                    it.model == selection.modelId && declaredFree(it)
+                }
+                override suspend fun generate(endpoint: ImageGen.Endpoint, prompt: String, size: String, allowFormatRetry: Boolean,
+                    beforeRequest: (() -> Unit)?): MediaPicture {
+                    beforeRequest?.invoke()
+                    sent.add(endpoint.model)
+                    if (endpoint.model == AgnesImages.DEFAULT) {
+                        if (failure == AgnesImageApi.Problem.PAYMENT) learned.add(endpoint.model)
+                        throw AgnesImageApi.Failure(failure)
+                    }
+                    return MediaPicture { true }
+                }
+            }
+            val gate = testGate { ep, _, _, _, fresh -> approved += ep.model to fresh; true }
+            val result = MediaOffloadHandler(context(), service, gate).generateImage("Draw", null, "agnes-fallback-$failure")
+            val first = AgnesImages.DEFAULT
+            if (failure == AgnesImageApi.Problem.PAYMENT) {
+                assertEquals(result.output, 0, result.exitCode)
+                assertEquals(endpoints.map { it.model }, sent)
+                assertEquals(listOf(first to false, endpoints[1].model to true), approved)
+                assertEquals(listOf(emptySet(), setOf(provider.id to first)), excludedChecks)
+            } else {
+                assertEquals(expectedError, JSONObject(result.output).getString("error"))
+                assertEquals(listOf(emptySet<Pair<String, String>>()), excludedChecks)
+                assertEquals(listOf(first), sent)
+                assertEquals(listOf(first to false), approved)
+            }
+            assertEquals(0, base.selects) // No unverified-cost selector on either path.
+        }
+    }
+
 }

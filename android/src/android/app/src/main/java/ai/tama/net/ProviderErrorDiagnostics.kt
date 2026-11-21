@@ -16,10 +16,12 @@ internal object ProviderErrorDiagnostics {
         val reach: ProviderReach.Reach?,
         val relay: AllowanceSignal.HttpError?,
         val message: String,
+        val ownKeyHint: OwnKeyFailureSignals.Hint?,
     ) {
         fun attach(error: LLMError): LLMError = error.apply {
             nmProviderReach = reach
             nmRelayError = relay
+            tamaOwnKeyHint = ownKeyHint
         }
 
         /** Map native-client failures without treating an SSE code as an HTTP status. */
@@ -76,7 +78,7 @@ internal object ProviderErrorDiagnostics {
         // A stream's provider code can guide classification; it is never an HTTP status.
         // Codes outside the status-like range still get a generic diagnostic.
         val diagnosticCode = if (!hasHttpStatus && code !in 300..599) 0 else code
-        val reach = if (relay != null) null else ProviderReach.fromHttp(
+        val observedReach = if (relay != null) null else ProviderReach.fromHttp(
             diagnosticCode, body, host, oauth,
             retryAfterS = ProviderReach.retryAfterSeconds(retryAfter),
             retryAfterPresent = retryAfter != null,
@@ -84,6 +86,26 @@ internal object ProviderErrorDiagnostics {
             includeOtherFailures = true,
             hasHttpStatus = hasHttpStatus,
         )?.let { ProviderReach.withRequestModel(it, requestModel, credentials = credentials) }
-        return Captured(reach, relay, ProviderReach.diagnosticMessage(body, credentials = credentials))
+        val reach = if (com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test" &&
+            !oauth && host in setOf("api.groq.com", "integrate.api.nvidia.com") &&
+            observedReach != null && observedReach.kind in setOf(ProviderReach.Kind.PROVIDER_ERROR,
+                ProviderReach.Kind.ACCESS_DENIED) && diagnosticCode in setOf(402, 403)) {
+            val error = runCatching { JSONObject(body).let { it.optJSONObject("error") ?: it } }.getOrNull()
+            if (OwnKeyFailureSignals.reportsPaymentRequired(diagnosticCode,
+                    listOfNotNull(error?.opt("code") as? String, error?.opt("type") as? String),
+                    (error?.opt("message") as? String).orEmpty())) observedReach.copy(kind = ProviderReach.Kind.NO_CREDIT)
+            else observedReach
+        } else observedReach
+        val message = ProviderReach.diagnosticMessage(body, credentials = credentials)
+        val hint = if (reach != null && reach.kind != ProviderReach.Kind.REGION_BLOCKED &&
+            diagnosticCode in setOf(400, 403, 404, 410, 422, 503)) {
+            val codes = runCatching {
+                val json = JSONObject(body)
+                val error = json.optJSONObject("error") ?: json
+                listOfNotNull(error.opt("code") as? String, error.opt("type") as? String)
+            }.getOrDefault(emptyList())
+            OwnKeyFailureSignals.detect(diagnosticCode, codes, message)
+        } else null
+        return Captured(reach, relay, message, hint)
     }
 }

@@ -102,7 +102,9 @@ object ModelSlots {
     fun chatEntry(context: Context): ModelEntry? {
         val cfg = repo(context)?.config?.value ?: return null
         val group = cfg.modelGroups.firstOrNull { it.id == cfg.defaultPrimaryGroupId } ?: return null
-        return group.memberEntryIds.firstNotNullOfOrNull { id -> cfg.modelEntries.firstOrNull { it.id == id && !it.isHidden } }
+        return group.memberEntryIds.firstNotNullOfOrNull { id -> cfg.modelEntries.firstOrNull {
+            it.id == id && !it.isHidden && !ai.tama.media.AgnesImages.imageOnlyInTest(it.model.id)
+        } }
     }
 
     /** The provider new chats talk to; the other slots lean on it when nothing was chosen. */
@@ -189,12 +191,16 @@ object ModelSlots {
 
     /** Models of [inst] that answer in text: the chat lane. For the relay, its menu's chat lane. */
     fun chatEntriesOf(context: Context, inst: ProviderInstance): List<ModelEntry> {
-        val cfg = repo(context)?.config?.value ?: return emptyList()
+        val providers = repo(context) ?: return emptyList()
+        val cfg = providers.config.value
+        val test = com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test"
         val all = cfg.modelEntries.filter {
-            it.providerInstanceId == inst.id && !it.isHidden && it.model.isTextOutput &&
-                !ImageGen.looksLikeImageModel(it.model.id) && !VideoGen.looksLikeVideoModel(it.model.id)
+            it.providerInstanceId == inst.id && !it.isHidden && if (test) providers.tamaIsChatModel(it, inst)
+            else it.model.isTextOutput && !ImageGen.looksLikeImageModel(it.model.id) && !VideoGen.looksLikeVideoModel(it.model.id)
         }
-        if (!isCloud(context, inst)) return all
+        if (!isCloud(context, inst)) return if (providers.tamaFreeChatOnly(inst))
+            ai.tama.pricing.FreeModelList.filter(all, true, providers.tamaEligibleFreeModelIds(inst.id)) { it.model.id }
+        else all
         val lane = NanoMuseCloud.chatLaneIds(context)
         return if (lane.isEmpty()) all.filter { !NanoMuseCloud.isCatalogModel(context, it.model.id) }
         else lane.mapNotNull { id -> all.firstOrNull { it.model.id == id } }
@@ -341,6 +347,8 @@ object ModelSlots {
         val entry = config.modelEntries.firstOrNull { it.id == entryId } ?: return false
         val inst = config.instances.firstOrNull { it.id == entry.providerInstanceId } ?: return false
         if (NanoMuseCloud.drawsOrFilms(entry.model) || ImageGen.looksLikeImageModel(entry.model.id)) return false
+        // nanoMuse: setting a default cannot bypass a personal key's free-only filter.
+        if (!repo.tamaAllowsChatModel(inst, entry.model.id)) return false
         val name = providerLabel(context, inst)
         val picked = groupId?.let { id -> config.modelGroups.firstOrNull { it.id == id && entryId in it.memberEntryIds } }
         if (picked != null && MainChatFollow.keepAsIs(picked.name, name, picked.memberEntryIds.map { id -> config.modelEntries.firstOrNull { it.id == id }?.providerInstanceId })) {
@@ -401,7 +409,10 @@ object ModelSlots {
      */
     fun offeredSlots(context: Context, inst: ProviderInstance): List<Slot> {
         val known = Capabilities.of(context, inst)
-        if (known != null) return Slot.values().filter { it.capability in known }
+        if (known != null) return Slot.values().filter {
+            it.capability in known && (it != Slot.IMAGE || !(ImageGen.freeImagesOnly(context) ||
+                ImageGen.freeImagesOnly(context, inst.id)))
+        }
         return buildList {
             add(Slot.CHAT)
             if (handsEntriesOf(context, inst).isNotEmpty()) add(Slot.HANDS)
@@ -422,7 +433,18 @@ object ModelSlots {
         // nanoMuse: a free-only setup must not quietly select a paid seed or
         // an unimported image/video default. Wait for the form's in-flight
         // catalogue check and select chat only from its fresh exact-id evidence.
-        val freeOnly = com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test" && inst.tamaImportFreeOnly
+        val nmParallel = com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test"
+        val freeOnly = nmParallel && repo.tamaFreeChatOnly(inst)
+        val ownKey = if (nmParallel && repo.tamaOwnApiKey(inst) != null) repo.nmOAuthKeySnapshot(inst.id) else null
+        val route = if (nmParallel) ai.tama.router.AutoModelStore.routeFingerprint(inst) else null
+        fun stillCurrent(): Boolean {
+            if (!nmParallel) return true
+            val live = repo.instance(inst.id) ?: return false
+            return live.isEnabled && ai.tama.router.AutoModelStore.routeFingerprint(live) == route &&
+                (ownKey != null) == (repo.tamaOwnApiKey(live) != null) &&
+                (ownKey == null || repo.nmOAuthKeyStillCurrent(ownKey)) && repo.tamaFreeChatOnly(live) == freeOnly
+        }
+        if (!stillCurrent()) return emptySet()
         val eligible = if (freeOnly) {
             if (repo.nmFreeImportStatus.value[inst.id] == ai.tama.pricing.FreeModelImportStatus.Checking) {
                 val completed = withTimeoutOrNull(30_000) {
@@ -430,24 +452,28 @@ object ModelSlots {
                 }
                 if (completed == null) return emptySet()
             }
-            if (repo.tamaEligibleFreeModelIds(inst.id) == null) repo.refreshModels(inst)
-            repo.tamaEligibleFreeModelIds(inst.id) ?: return emptySet()
+            if (!stillCurrent()) return emptySet()
+            val known = repo.tamaEligibleFreeModelIds(inst.id)
+            if (known == null || (known.isEmpty() && repo.nmFreeImportStatus.value[inst.id] == null)) repo.refreshModels(inst)
+            if (!stillCurrent()) return emptySet()
+            repo.tamaEligibleFreeModelIds(inst.id) ?: if (ai.tama.media.AgnesImages.route(inst)) emptySet() else return emptySet()
         } else {
-            if (repo.entriesFor(inst.id).none { !it.isHidden }) {
+            val agnes = ai.tama.media.AgnesImages.account(inst)
+            val needsCatalogue = !agnes || slots.any { it == Slot.CHAT || it == Slot.HANDS }
+            if (needsCatalogue && repo.entriesFor(inst.id).none {
+                    !it.isHidden && (!agnes || ai.tama.media.AgnesImages.model(it.model.id) == null)
+                }) {
                 try { repo.refreshModels(inst) }
                 catch (e: kotlinx.coroutines.CancellationException) { throw e }
                 catch (_: Exception) { /* Keep the current choices. */ }
             }
             null
         }
-        if (freeOnly) {
-            val live = repo.instance(inst.id) ?: return emptySet()
-            if (!live.isEnabled || !live.tamaImportFreeOnly ||
-                ai.tama.router.AutoModelStore.routeFingerprint(live) != ai.tama.router.AutoModelStore.routeFingerprint(inst)) return emptySet()
-        }
         val done = mutableSetOf<Slot>()
         for (slot in Slot.values()) {
-            if (slot !in slots || (freeOnly && slot != Slot.CHAT)) continue
+            if (slot !in slots || (freeOnly && slot != Slot.CHAT &&
+                    !(slot == Slot.IMAGE && ai.tama.media.AgnesImages.route(inst)))) continue
+            if (!stillCurrent()) break
             val option = when (slot) {
                 Slot.CHAT -> pickEntry(
                     chatEntriesOf(context, inst).filter { eligible == null || it.model.id in eligible },
@@ -463,9 +489,11 @@ object ModelSlots {
                         ?.let { Option(inst, it) }
                 }
             } ?: continue
-            if (freeOnly && (repo.tamaEligibleFreeModelIds(inst.id)?.contains(option.modelId) != true ||
-                    option.entryId == null || !followPick(context, option.entryId))) continue
-            if (freeOnly) lastChanged.value = slot else choose(context, slot, option)
+            if (nmParallel && slot == Slot.CHAT) {
+                if (!stillCurrent() || (freeOnly && repo.tamaEligibleFreeModelIds(inst.id)?.contains(option.modelId) != true) ||
+                    option.entryId == null || !followPick(context, option.entryId)) continue
+                lastChanged.value = slot
+            } else choose(context, slot, option)
             done += slot
         }
         return done

@@ -669,6 +669,9 @@ fun AppNavigation(
                 slot = slot,
                 onBack = { navController.safePopBackStack() },
                 onAddProvider = { navController.safeNavigate(Routes.ADD_PROVIDER) },
+                onReviewImageModel = { instanceId, entryId ->
+                    navController.safeNavigate(Routes.modelEntryDetail(instanceId, entryId))
+                },
             )
         }
         composable(
@@ -687,6 +690,9 @@ fun AppNavigation(
                 onBack = { navController.safePopBackStack() },
                 onOpenModelGroups = { navController.safeNavigate(Routes.MODEL_GROUPS) },
                 onOpenProviders = { navController.safeNavigate(Routes.PROVIDER_LIST) },
+                onReviewImageModel = { instanceId, entryId -> // nanoMuse: review the same saved image as the slot picker.
+                    navController.safeNavigate(Routes.modelEntryDetail(instanceId, entryId))
+                },
             )
         }
         // nanoMuse: nanoMuse Cloud — sign in with a phone/e-mail code for a starter allowance,

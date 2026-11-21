@@ -8,7 +8,7 @@ package ai.tama.router
  * The supplied clock must be monotonic; rollback is clamped for additional safety.
  */
 class ModelHealth(private val clockMillis: () -> Long) {
-    enum class Failure { RATE_LIMIT, QUOTA, NO_CREDIT, KEY_SPEND_LIMIT, AUTH, SERVER, NETWORK, REQUEST_TOO_LARGE }
+    enum class Failure { RATE_LIMIT, QUOTA, NO_CREDIT, KEY_SPEND_LIMIT, AUTH, SERVER, NETWORK, REQUEST_TOO_LARGE, MODEL_UNAVAILABLE, SPEND_LIMIT, FORBIDDEN }
     enum class DeadlineSource { RETRY_AFTER, HEURISTIC, UNKNOWN }
 
     data class Cooldown(val reason: Failure, val untilMillis: Long?, val source: DeadlineSource)
@@ -191,18 +191,20 @@ class ModelHealth(private val clockMillis: () -> Long) {
         prune(at)
         val validRetry = retryAfterSeconds?.takeIf { it >= 0 }
         val accountBlocked = reason == Failure.AUTH || reason == Failure.QUOTA ||
-            reason == Failure.NO_CREDIT || (reason == Failure.RATE_LIMIT && !modelScopedRateLimit)
+            reason == Failure.NO_CREDIT || reason == Failure.SPEND_LIMIT ||
+            (reason == Failure.RATE_LIMIT && !modelScopedRateLimit)
         val wait = when {
             // Authentication failures need a credential change or an explicit retry, not a timer.
             reason == Failure.AUTH -> Cooldown(reason, null, DeadlineSource.UNKNOWN)
             validRetry != null -> Cooldown(reason, plus(at, validRetry.toLong() * 1000), DeadlineSource.RETRY_AFTER)
-            retryAfterPresent || reason == Failure.QUOTA || reason == Failure.NO_CREDIT || reason == Failure.KEY_SPEND_LIMIT ->
+            retryAfterPresent || reason in setOf(Failure.QUOTA, Failure.NO_CREDIT, Failure.KEY_SPEND_LIMIT, Failure.SPEND_LIMIT) ->
                 Cooldown(reason, null, DeadlineSource.UNKNOWN)
             else -> Cooldown(reason, plus(at, when (reason) {
                 Failure.RATE_LIMIT -> 60_000L
                 Failure.SERVER -> 30_000L
                 Failure.NETWORK -> 15_000L
                 Failure.REQUEST_TOO_LARGE -> 30_000L
+                Failure.MODEL_UNAVAILABLE, Failure.FORBIDDEN -> 60_000L
                 else -> error("account blocks do not have a guessed deadline")
             }), DeadlineSource.HEURISTIC)
         }

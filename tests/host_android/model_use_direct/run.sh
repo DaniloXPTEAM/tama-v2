@@ -5,6 +5,8 @@ ROOT=$(cd "$(dirname "$0")/../../.." && pwd)
 HERE="$ROOT/tests/host_android/model_use_direct"
 MAIN="$ROOT/android/src/android/app/src/main/java"
 TEST="$ROOT/android/src/android/app/src/test/java"
+TEST_TAMA="$ROOT/android/src/android/app/src/testTamaTest/java"
+cd "$ROOT"
 : "${TAMA_JARS_DIR:?Set TAMA_JARS_DIR to the directory containing the host dependency JARs}"
 KOTLINC=$(command -v kotlinc)
 KOTLIN_HOME=$(cd "$(dirname "$(readlink -f "$KOTLINC")")/.." && pwd)
@@ -54,10 +56,15 @@ kotlinc -nowarn -cp "$CP" -include-runtime -d "$OUT/model-use-host.jar" \
     "$MAIN/io/github/nanomuse/net/OpenCodeSession.kt" \
     "$MAIN/ai/tama/net/GroqHistoryPolicy.kt" \
     "$MAIN/ai/tama/net/GeminiStreamTermination.kt" \
+    "$MAIN/ai/tama/net/GeminiStreamTiming.kt" \
     "$MAIN/ai/tama/router/AutoModelStore.kt" \
     "$MAIN/ai/tama/router/AutoModelRuntime.kt" \
     "$MAIN/ai/tama/router/AccountVersions.kt" \
     "$MAIN/ai/tama/router/ModelHealth.kt" \
+    "$MAIN/ai/tama/router/AutoModelFailure.kt" \
+    "$MAIN/ai/tama/router/AutoModelTurn.kt" \
+    "$MAIN/ai/tama/router/ModelRouter.kt" \
+    "$MAIN/ai/tama/router/CapabilityEvidence.kt" \
     "$MAIN/ai/tama/router/Profile.kt" \
     "$MAIN/ai/tama/router/TurnRouter.kt" \
     "$MAIN/com/openminis/app/sandbox/offload/OffloadArgs.kt" \
@@ -72,17 +79,56 @@ kotlinc -nowarn -cp "$CP" -include-runtime -d "$OUT/model-use-host.jar" \
     "$MAIN/ai/tama/net/ImageRequestSafety.kt" \
     "$MAIN/ai/tama/net/ProviderCredentials.kt" \
     "$MAIN/ai/tama/net/ProviderErrorDiagnostics.kt" \
+    "$MAIN/ai/tama/net/OpenRouterSpendLimit.kt" \
+    "$MAIN/ai/tama/media/CustomImageRoute.kt" \
+    "$MAIN/ai/tama/providers/ProviderEndpoints.kt" \
+    "$MAIN/ai/tama/providers/ChatModelKind.kt" \
+    "$MAIN/ai/tama/media/AgnesImages.kt" \
+    "$MAIN/ai/tama/media/AgnesImageApi.kt" \
+    "$MAIN/io/github/nanomuse/net/LanOnly.kt" \
+    "$TEST/ai/tama/media/AgnesImageApiTest.kt" \
+    "$TEST/ai/tama/providers/ChatModelKindTest.kt" \
+    "$MAIN/ai/tama/providers/ProviderKeyEnrollment.kt" \
+    "$MAIN/ai/tama/providers/ModelModalities.kt" \
+    "$MAIN/ai/tama/providers/ReviewedModelFeatures.kt" \
+    "$MAIN/ai/tama/router/CodeModelPreference.kt" \
+    "$MAIN/ai/tama/net/OwnKeyFailureSignals.kt" \
     "$MAIN/ai/tama/pricing/ModelCostGuard.kt" \
+    "$MAIN/ai/tama/pricing/DocumentedChatDispatch.kt" \
+    "$MAIN/ai/tama/pricing/DocumentedOpenAIChatBody.kt" \
+    "$MAIN/ai/tama/pricing/DocumentedGeminiBody.kt" \
+    "$MAIN/ai/tama/pricing/DocumentedFreeChat.kt" \
+    "$MAIN/ai/tama/pricing/FreeModelImport.kt" \
+    "$MAIN/ai/tama/pricing/FreeModelBulk.kt" \
+    "$MAIN/ai/tama/pricing/FreeModelList.kt" \
+    "$MAIN/ai/tama/pricing/FreeChatText.kt" \
+    "$MAIN/ai/tama/pricing/NvidiaChatPricing.kt" \
+    "$MAIN/ai/tama/pricing/OpenRouterPricing.kt" \
+    "$MAIN/ai/tama/providers/KeyProbePlan.kt" \
+    "$MAIN/ai/tama/providers/KeyProbe.kt" \
     "$MAIN/ai/tama/providers/KeyDestinationGuard.kt" \
+    "$MAIN/ai/tama/router/AutomaticCostGuard.kt" \
+    "$MAIN/com/openminis/app/provider/ModelsDevApi.kt" \
+    "$MAIN/com/openminis/app/provider/openrouter/OpenRouterModelsApi.kt" \
     "$MAIN/com/openminis/app/provider/anthropic/AnthropicProvider.kt" \
     "$MAIN/com/openminis/app/provider/openai/OpenAIProvider.kt" \
     "$MAIN/com/openminis/app/provider/openai/ThinkPrefixStreamParser.kt" \
     "$MAIN/com/openminis/app/provider/gemini/GeminiProvider.kt" \
     "$TEST/ai/tama/net/AnthropicDirectModelUseTransportTest.kt" \
     "$TEST/ai/tama/net/DirectModelUseTransportTest.kt" \
+    "$TEST_TAMA/ai/tama/net/GeminiDocumentedChatWireTest.kt" \
+    "$TEST_TAMA/ai/tama/net/FreeChatCompletionsWireTest.kt" \
+    "$TEST_TAMA/ai/tama/net/KeyProbeWireTest.kt" \
+    "$TEST/ai/tama/pricing/NvidiaChatPricingTest.kt" \
+    "$TEST/ai/tama/pricing/DocumentedFreeChatTest.kt" \
+    "$TEST/ai/tama/providers/ProviderKeyEnrollmentTest.kt" \
+    "$TEST/ai/tama/providers/ReviewedModelFeaturesTest.kt" \
+    "$TEST/ai/tama/pricing/FreeModelImportTest.kt" \
+    "$TEST/ai/tama/pricing/OpenRouterPricingTest.kt" \
     "$TEST/ai/tama/net/DirectModelUseGuardTest.kt" \
     "$TEST/ai/tama/net/ModelUseAttemptTrackerTest.kt" \
     "$TEST/ai/tama/pricing/ModelCostGuardTest.kt" \
     "$TEST/ai/tama/router/AutoModelStoreTest.kt"
-java -cp "$OUT/model-use-host.jar:$CP" RunnerKt parallel
-java -cp "$OUT/model-use-host.jar:$CP" RunnerKt normal
+# Match Gradle Test's JVM assertions (coroutine stack recovery can copy exceptions).
+java -ea -cp "$OUT/model-use-host.jar:$CP" RunnerKt parallel
+java -ea -cp "$OUT/model-use-host.jar:$CP" RunnerKt normal

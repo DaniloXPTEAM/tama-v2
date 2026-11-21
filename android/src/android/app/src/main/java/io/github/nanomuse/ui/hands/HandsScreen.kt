@@ -33,6 +33,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.openminis.app.MinisApp
 import com.openminis.app.R
+import io.github.nanomuse.models.ModelSlots
 import com.openminis.app.ui.settings.SettingsRow
 import com.openminis.app.ui.settings.SettingsScaffold
 import com.openminis.app.ui.settings.SettingsSection
@@ -65,7 +66,10 @@ fun HandsScreen(onBack: () -> Unit, onOpenProviders: () -> Unit, onOpenHandsMode
         owner.lifecycle.addObserver(obs)
         onDispose { owner.lifecycle.removeObserver(obs) }
     }
-    val readiness = remember(tick, config) { Hands.readiness(context) }
+    // nanoMuse: a model was chosen in a different screen without changing provider config.
+    val parallel = com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test"
+    val modelChange = if (parallel) ModelSlots.lastChanged.collectAsState().value else null
+    val readiness = remember(tick, config, modelChange) { Hands.readiness(context) }
     val visionEntries = remember(config) { Hands.visionEntries(context) }
 
     SettingsScaffold(title = stringResource(R.string.nm_hands_title), onBack = onBack) {
@@ -132,7 +136,7 @@ fun HandsScreen(onBack: () -> Unit, onOpenProviders: () -> Unit, onOpenHandsMode
                 // the model and how it was arrived at, so "why qwen-vl-max?" has its answer here
                 okText = readiness.model?.let { m -> m.label + " · " + stringResource(whyText(m.why)) } ?: "",
                 fixText = stringResource(R.string.nm_hands_need_model_fix),
-                onFix = onOpenProviders,
+                onFix = if (parallel && visionEntries.isNotEmpty()) onOpenHandsModel else onOpenProviders,
                 showDivider = !readiness.androidOk,
             )
             if (!readiness.androidOk) {

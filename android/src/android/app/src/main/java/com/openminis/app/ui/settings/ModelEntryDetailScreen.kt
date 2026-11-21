@@ -75,7 +75,9 @@ fun ModelEntryDetailScreen(
         instance?.let {
             io.github.nanomuse.cloud.ProviderCatalogue.match(
                 io.github.nanomuse.cloud.ProviderCatalogue.load(context), it,
-            )?.models?.get(entry.model.id)?.capabilities
+            )?.models?.get(entry.model.id)?.capabilities.orEmpty() +
+                if (ai.tama.media.AgnesImages.route(it) && ai.tama.media.AgnesImages.model(entry.model.id) != null)
+                    setOf("image_gen") else emptySet()
         }.orEmpty()
     }
     // nanoMuse: refresh changes ephemeral catalogue evidence without changing the entry.
@@ -152,12 +154,15 @@ fun ModelEntryDetailScreen(
                     val baseInputs = baseModel.inputModalities ?: emptyList()
                     val baseOutputs = baseModel.outputModalities ?: emptyList()
                     val newInputs = buildList {
+                        // nanoMuse: an approval-only save must not strip text or other unshown modalities.
+                        if (nmParallel) addAll(effectiveInput.filterNot { it in setOf("image", "pdf", "audio", "video") })
                         if (imageInput) add("image")
                         if (pdfInput) add("pdf")
                         if (audioInput) add("audio")
                         if (videoInput) add("video")
                     }
                     val newOutputs = buildList {
+                        if (nmParallel) addAll(effectiveOutput.filterNot { it in setOf("image", "audio") })
                         if (imageOutput) add("image")
                         if (audioOutput) add("audio")
                     }
@@ -178,7 +183,8 @@ fun ModelEntryDetailScreen(
                     } else {
                         entry.copy(overrides = newOverrides, isHidden = isHidden)
                     }
-                    providerRepository.updateEntry(updated)
+                    // nanoMuse: saving only a route review need not rewrite the provider configuration.
+                    if (!nmParallel || updated != entry) providerRepository.updateEntry(updated)
                     // nanoMuse: editing the model id or route cannot transfer consent to a
                     // different endpoint/model. The new identity must be reviewed separately.
                     if (instance != null && autoIdentity != null &&
@@ -330,7 +336,11 @@ fun ModelEntryDetailScreen(
             AlertDialog(
                 onDismissRequest = { confirmAutoImage = false },
                 title = { Text(stringResource(R.string.nm_auto_image_consent_title)) },
-                text = { Text(stringResource(R.string.nm_auto_image_consent_body)) },
+                text = {
+                    val agnesFree = instance?.let { providerRepository.tamaAgnesImageStatus(it, entry.model.id) } ==
+                        ai.tama.pricing.DocumentedFreeChat.Status.FREE
+                    Text(stringResource(if (agnesFree) R.string.nm_agnes_auto_image_permission else R.string.nm_auto_image_consent_body))
+                },
                 confirmButton = {
                     MinisTextButton(onClick = { autoImageApproved = true; confirmAutoImage = false }) {
                         Text(stringResource(R.string.nm_auto_image_allow))

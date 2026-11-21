@@ -138,8 +138,10 @@ object OwnTurns {
             messages: List<LLMMessage>, systemPrompt: String?, maxTokens: Int, temperature: Double?,
             imageParts: List<LLMMessage.ImagePart>, tools: List<AgentToolDefinition>, thinkingLevel: ThinkingLevel,
         ): Flow<LLMStreamChunk> = flow {
-            // nanoMuse: recheck when the cold stream is collected, not when it is created.
-            ai.tama.pricing.ModelCostGuard.requireAllowed()
+            // nanoMuse: the transport rechecks any chat-scoped evidence against
+            // the actual request. No ticket can authorize a Cloud request.
+            val ticket = ai.tama.pricing.DocumentedChatDispatch.ticket(currentCoroutineContext())
+            if (ticket == null) ai.tama.pricing.ModelCostGuard.requireAllowed() else ticket.requireCurrent()
             val model = inner.model
             val g = Gathered(currentCoroutineContext(), messages)
             var costBlocked = false

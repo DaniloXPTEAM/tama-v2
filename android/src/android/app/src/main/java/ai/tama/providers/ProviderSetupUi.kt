@@ -1,6 +1,10 @@
 package ai.tama.providers
 
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.runtime.produceState
+import androidx.compose.ui.unit.dp
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -37,40 +41,88 @@ internal fun KnownProviderSection(onSelect: (VoiceProviderTemplate) -> Unit) {
         ProviderCatalogue.ordered(ProviderCatalogue.load(context), mainland).filter { it.takesKey }
     }
     val featured = remember(providers) {
-        listOf("openrouter", "groq", "gemini", "openai", "anthropic")
+        listOf("openrouter", "groq", "gemini", "nvidia", "deepseek", "mistral", "openai", "anthropic")
             .mapNotNull { id -> providers.firstOrNull { it.id == id } }
     }
     var showAll by remember { mutableStateOf(false) }
-    val shown = if (showAll) featured + providers.filter { it !in featured } else featured
-    if (shown.isEmpty()) return
+    var query by remember { mutableStateOf("") }
+    var shownCount by remember(query) { mutableStateOf(24) }
+    val directory by produceState<List<ProviderDirectory.Vendor>>(emptyList(), showAll) {
+        if (showAll) value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            com.openminis.app.provider.ModelsDevApi.bundledRegistrySnapshot().values.map {
+                ProviderDirectory.Vendor(it.id, it.name ?: it.id, it.sdk, it.api, it.docs)
+            }
+        }
+    }
+    val results = remember(directory, query) { ProviderDirectory.search(directory, query) }
+    fun template(vendor: ProviderDirectory.Vendor): VoiceProviderTemplate? {
+        if (vendor.id == OwnKeyPresets.AGNES) return OwnKeyPresets.agnesPreset()
+        val key = if (vendor.id == "google") "gemini" else vendor.id
+        providers.firstOrNull { it.id == key }?.let { return OwnKeyPresets.template(it, mainland, chinese) }
+        val endpoint = ProviderDirectory.endpoint(vendor) ?: return null
+        val type = if (endpoint.protocol == "anthropic") ProviderType.anthropic else ProviderType.openAI
+        return newKeyTemplate(vendor.id, vendor.name, type, endpoint.base)
+    }
+    val customName = stringResource(R.string.nm_provider_custom)
     SettingsSection(
         header = stringResource(R.string.nm_provider_known_title),
         footer = stringResource(R.string.nm_provider_known_help),
     ) {
-        shown.forEachIndexed { index, provider ->
-            val template = OwnKeyPresets.template(provider, mainland, chinese)
+        if (!showAll) {
+            val agnes = OwnKeyPresets.agnesPreset()
+            SettingsRow(title = agnes.name, subtitle = agnes.baseURL, onClick = { onSelect(agnes) })
+        }
+        if (!showAll) featured.forEach { provider ->
+            val preset = OwnKeyPresets.template(provider, mainland, chinese)
             SettingsRow(
-                title = template.name,
-                subtitle = ProviderEndpoints.effective(template.providerType, template.baseURL, template.appendV1),
-                onClick = { onSelect(template) },
-                showDivider = !showAll || index != shown.lastIndex,
+                title = preset.name,
+                subtitle = ProviderEndpoints.effective(preset.providerType, preset.baseURL, preset.appendV1),
+                onClick = { onSelect(preset) },
             )
         }
-        if (!showAll && providers.size > shown.size) {
-            SettingsRow(
-                title = stringResource(R.string.nm_provider_show_all),
-                onClick = { showAll = true },
-                showDivider = false,
+        SettingsRow(
+            title = customName,
+            onClick = { onSelect(newKeyTemplate("tama-custom", customName, ProviderType.openAI, "")) },
+        )
+        SettingsRow(
+            title = stringResource(if (showAll) R.string.nm_provider_hide_catalogue else R.string.nm_provider_show_all),
+            onClick = { showAll = !showAll },
+            showDivider = false,
+        )
+    }
+    if (showAll) {
+        OutlinedTextField(
+            value = query, onValueChange = { query = it }, singleLine = true,
+            label = { Text(stringResource(R.string.nm_provider_search)) },
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        )
+        SettingsSection(header = stringResource(R.string.nm_provider_catalogue_count, results.size, directory.size)) {
+            results.take(shownCount).forEach { vendor ->
+                val preset = template(vendor)
+                SettingsRow(
+                    title = vendor.name,
+                    subtitle = preset?.let { ProviderEndpoints.effective(it.providerType, it.baseURL, it.appendV1) }
+                        ?: stringResource(R.string.nm_provider_no_preset),
+                    onClick = preset?.let { { onSelect(it) } },
+                    showChevron = preset != null,
+                )
+            }
+            if (results.size > shownCount) SettingsRow(
+                title = stringResource(R.string.nm_provider_more_results), onClick = { shownCount += 24 }, showDivider = false,
             )
         }
     }
 }
 
+private fun newKeyTemplate(id: String, name: String, type: ProviderType, base: String) = VoiceProviderTemplate(
+    id = id, name = name, providerType = type, baseURL = base, appendV1 = false,
+    capability = VoiceProviderTemplate.Capability.BOTH, baseURLMarkers = emptyList(), mockModels = emptyList(),
+)
+
 /** Suggest locally. Prefixes are hints, not proof of an account or recipient. */
 internal fun suggestedKeyProvider(context: android.content.Context, apiKey: String): VoiceProviderTemplate? {
     val providers = ProviderCatalogue.load(context).filter { it.takesKey }
-    // nanoMuse: AQ. is only a local hint; confirmation is still required before saving.
-    val hints = providers.map { it.id to it.keyHint } + listOf("gemini" to "AQ.…")
+    val hints = providers.map { it.id to it.keyHint } + listOf("gemini" to "AQ.…", "openrouter" to "sk-or-…")
     val matchId = ProviderKeySuggestion.match(apiKey, hints) ?: return null
     val provider = providers.firstOrNull { it.id == matchId } ?: return null
     return OwnKeyPresets.template(provider, Region.mainland(context), ProviderCatalogue.chinese(context))
@@ -110,13 +162,14 @@ internal fun KeyDestinationReview(key: String, endpoint: String?): Boolean {
     return allowed
 }
 
-/** An inferred endpoint is displayed immediately, but cannot be saved without this tap. */
+/** A suggestion does not change either endpoint or vendor until the person taps. */
 @Composable
-internal fun KeyProviderConfirmation(providerName: String, onConfirm: () -> Unit) {
+internal fun KeyProviderHint(providerName: String, applyPreset: (() -> Unit)?) {
     SettingsSection(footer = stringResource(R.string.nm_key_autofill_help)) {
         SettingsRow(
             title = stringResource(R.string.nm_key_autofill_confirm, providerName),
-            onClick = onConfirm,
+            onClick = applyPreset,
+            showChevron = applyPreset != null,
             showDivider = false,
         )
     }
@@ -152,10 +205,12 @@ internal fun freeModelImportStatusText(status: FreeModelImportStatus?): String? 
     FreeModelImportStatus.MissingKey -> stringResource(R.string.nm_free_import_missing_key)
     FreeModelImportStatus.Failed -> stringResource(R.string.nm_free_import_failed)
     FreeModelImportStatus.SaveFailed -> stringResource(R.string.nm_provider_save_failed)
-    is FreeModelImportStatus.Complete -> if (status.eligible == 0) {
-        stringResource(R.string.nm_free_import_empty)
-    } else {
-        stringResource(R.string.nm_free_import_found, status.eligible, status.added)
+    is FreeModelImportStatus.Complete -> when {
+        status.declaredImages != null -> stringResource(R.string.nm_agnes_free_summary,
+            status.eligible, status.declaredImages, status.unconfirmed)
+        status.unconfirmed > 0 -> stringResource(R.string.nm_free_import_classified, status.eligible, status.unconfirmed)
+        status.eligible == 0 -> stringResource(R.string.nm_free_import_empty)
+        else -> stringResource(R.string.nm_free_import_found, status.eligible, status.added)
     }
     FreeModelImportStatus.Unsupported -> stringResource(R.string.nm_free_import_unsupported)
     null -> null
@@ -167,29 +222,44 @@ internal fun FreeModelImportSection(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
     status: FreeModelImportStatus? = null,
+    lockedByZeroLimit: Boolean = false,
+    hasCatalogue: Boolean = true,
+    hasKey: Boolean = true,
+    agnes: Boolean = false,
 ) {
-    val unsupported = checked && !FreeModelImport.supports(type)
-    val statusText = freeModelImportStatusText(status).takeUnless { unsupported && status == FreeModelImportStatus.Unsupported }
-    val help = stringResource(R.string.nm_free_import_help)
-    val explanation = if (unsupported) "$help\n${stringResource(R.string.nm_free_import_unsupported)}" else help
-    SettingsSection(footer = listOfNotNull(explanation, statusText?.takeIf { checked || status == FreeModelImportStatus.SaveFailed }).joinToString("\n")) {
+    // A legacy filter must remain removable after the endpoint changes or
+    // loses its supported catalogue. Only enabling requires a catalogue.
+    val enabled = (hasCatalogue || checked) && hasKey && !lockedByZeroLimit
+    val statusText = freeModelImportStatusText(status)
+    val help = stringResource(when {
+        lockedByZeroLimit -> R.string.nm_reach_key_zero_body
+        !hasCatalogue -> R.string.nm_free_no_plan
+        !hasKey -> R.string.nm_free_import_missing_key
+        agnes -> R.string.nm_agnes_free_scope
+        FreeModelImport.supports(type) -> R.string.nm_free_import_help
+        else -> R.string.nm_free_direct_help
+    })
+    SettingsSection(footer = listOfNotNull(help, statusText?.takeIf { checked || status == FreeModelImportStatus.SaveFailed }).joinToString("\n")) {
         SettingsSwitchRow(
             title = stringResource(R.string.nm_free_import_title),
             checked = checked,
-            onCheckedChange = onCheckedChange,
+            onCheckedChange = { if (enabled && (!it || hasCatalogue)) onCheckedChange(it) },
+            enabled = enabled,
             showDivider = false,
         )
     }
 }
 
 @Composable
-internal fun FixedEndpointSection(endpoint: String) {
+internal fun OpenRouterEndpointSection() {
     SettingsSection(
         header = stringResource(R.string.add_provider_endpoint),
-        footer = stringResource(R.string.nm_endpoint_fixed_help),
+        footer = stringResource(R.string.nm_endpoint_fixed_help) + "\n" + stringResource(
+            R.string.nm_endpoint_effective, "${ProviderEndpoints.OPENROUTER_BASE}/v1",
+        ),
     ) {
         SettingsRow(
-            title = stringResource(R.string.nm_endpoint_effective, endpoint),
+            title = ProviderEndpoints.OPENROUTER_BASE,
             showChevron = false,
             showDivider = false,
         )

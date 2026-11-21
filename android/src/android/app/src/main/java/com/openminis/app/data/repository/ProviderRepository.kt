@@ -3,9 +3,18 @@ package com.openminis.app.data.repository
 import android.content.Context
 import android.content.SharedPreferences
 import android.util.Base64
+import ai.tama.media.AgnesImages
+import ai.tama.pricing.DocumentedChatDispatch
+import ai.tama.pricing.DocumentedFreeChat
+import ai.tama.router.AutoModelRuntime
+import ai.tama.router.AutoModelStore
 import ai.tama.pricing.FreeModelImport // nanoMuse: free-only import is separate from cost permission
 import ai.tama.pricing.FreeModelImportStatus
-import ai.tama.pricing.FreeModelImportEvidence
+import ai.tama.pricing.FreeChatCatalogue
+import ai.tama.pricing.FreeChatCatalogueEvidence
+import ai.tama.pricing.NvidiaChatPricing
+import ai.tama.providers.KeyProbe
+import ai.tama.providers.KeyProbePlan
 import ai.tama.pricing.ModelRefreshGate
 import com.openminis.app.backup.BackupSecrets
 import com.openminis.app.data.db.ProviderConfigDao
@@ -214,11 +223,16 @@ class ProviderRepository(private val context: Context) {
 
     // nanoMuse: a newer refresh or setting change supersedes an in-flight list.
     private val nmRefreshGate = ModelRefreshGate()
-    // nanoMuse: transient catalogue evidence for the post-save choice screen.
-    // Guarded by configLock; never persisted and contains no credentials.
-    private val nmFreeEvidence = mutableMapOf<String, FreeModelImportEvidence>()
+    // A catalogue check may run without changing the saved import list. Keep
+    // its own request generation, so neither change authorizes the other.
+    private val nmCatalogueGate = ModelRefreshGate()
+    private val nmFreeEvidence = MutableStateFlow<Map<String, FreeChatCatalogueEvidence>>(emptyMap())
+    internal val tamaFreeEvidence = nmFreeEvidence.asStateFlow()
     private val _nmFreeImportStatus = MutableStateFlow<Map<String, FreeModelImportStatus>>(emptyMap())
     val nmFreeImportStatus: StateFlow<Map<String, FreeModelImportStatus>> = _nmFreeImportStatus.asStateFlow()
+    // nanoMuse: observations belong to an account generation, never to a replacement key.
+    private val nmZeroSpendLimits = MutableStateFlow<Map<String, Long>>(emptyMap())
+    internal val tamaZeroSpendLimits = nmZeroSpendLimits.asStateFlow()
 
     // nanoMuse: the async loader can run immediately, so all locks and status
     // fields it may read must be initialized before launch.
@@ -263,6 +277,7 @@ class ProviderRepository(private val context: Context) {
             // heal corrupted modality). Mirrors iOS ProviderConfigStore.init.
             try {
                 ensureVoiceTemplateModels()
+                ensureAgnesImageModels()
             } catch (e: Exception) {
                 android.util.Log.w("ProviderRepo", "[Voice] ensureVoiceTemplateModels failed: ${e.message}")
             }
@@ -661,7 +676,8 @@ class ProviderRepository(private val context: Context) {
     fun reloadAfterRestoreRecovery() = synchronized(configLock) {
         // nanoMuse: an older fetch cannot write over a recovered configuration.
         nmRefreshGate.invalidateAll()
-        nmFreeEvidence.clear()
+        nmCatalogueGate.invalidateAll()
+        nmFreeEvidence.value = emptyMap()
         _nmFreeImportStatus.value = emptyMap()
         _config.value = loadConfig()
         loadAllThinkingRulesIntoCache()
@@ -669,8 +685,34 @@ class ProviderRepository(private val context: Context) {
 
     fun addInstance(instance: ProviderInstance) { addInstanceInternal(instance, checked = false) }
 
-    // nanoMuse: leave the form open when a new provider could not be stored.
-    fun addInstanceChecked(instance: ProviderInstance): Boolean = addInstanceInternal(instance, checked = true)
+    // nanoMuse: a second tap for the same pending ID must never replace or
+    // delete the key written by the first tap. Keep both writes under the
+    // ordered route/credential locks; the DB and keystore aren't crash-atomic.
+    internal fun addApiKeyInstanceChecked(instance: ProviderInstance, apiKey: String): Boolean {
+        if (instance.credentialType != ProviderCredential.apiKey ||
+            (AgnesImages.account(instance) && apiKey.isBlank())) return false
+        val secrets = try { encryptedPrefs } catch (_: Exception) { return false }
+        return synchronized(configLock) {
+            try { ensureConfigLoaded() } catch (_: Exception) { return@synchronized false }
+            if (!_configLoaded.value) return@synchronized false
+            AutoModelStore.credentialTransaction {
+                val prefKey = "apikey_${instance.id}"
+                val key = apiKey.trim().takeIf { it.isNotEmpty() }
+                ai.tama.providers.ProviderKeyEnrollment.add(
+                    exists = { _config.value.instances.any { it.id == instance.id } },
+                    read = { secrets.getString(prefKey, null) },
+                    key = key,
+                    store = { saveApiKeyChecked(instance.id, it) },
+                    publish = { addInstanceInternal(instance, checked = true) },
+                    restore = { previous ->
+                        val editor = secrets.edit()
+                        if (previous == null) editor.remove(prefKey) else editor.putString(prefKey, previous)
+                        editor.commit()
+                    },
+                )
+            }
+        }
+    }
 
     // nanoMuse: an OAuth login can finish before the person taps Save. Do not
     // add a provider for a signed-out or replaced account. Flush both stores
@@ -752,6 +794,7 @@ class ProviderRepository(private val context: Context) {
                 "[Voice] addInstance seeded ${voiceSeeds.size} voice-template models for ${instance.label}",
             )
         }
+        seedAgnesImages(config, instance)
         if (checked) {
             if (!saveConfigChecked(config)) return@synchronized false // nanoMuse
         } else saveConfig(config)
@@ -759,6 +802,56 @@ class ProviderRepository(private val context: Context) {
         // triggerBackgroundRefreshIfStale call) will fetch it.
         invalidateModelCache(instance.id)
         true // nanoMuse
+    }
+
+    private fun seedAgnesImages(config: ProviderConfig, instance: ProviderInstance): Boolean {
+        if (!AgnesImages.account(instance)) return false
+        var changed = false
+        for (spec in AgnesImages.models) {
+            val model = spec.metadata()
+            val existing = config.modelEntries.filter { it.providerInstanceId == instance.id && it.baseModel.id == model.id }
+            if (existing.isEmpty()) {
+                config.modelEntries.add(ModelEntry(providerInstanceId = instance.id, baseModel = model))
+                changed = true
+            } else for (entry in existing) {
+                if (entry.baseModel == model) continue
+                val index = config.modelEntries.indexOf(entry)
+                config.modelEntries[index] = entry.copy(baseModel = model)
+                changed = true
+            }
+        }
+        return changed
+    }
+
+    // nanoMuse: a known manual slot can predate, or outlive, its catalogue row. Restore only
+    // that missing row on an explicit review, never another entry, grant, group, or chosen model.
+    internal fun nmRegisterAgnesImage(instanceId: String, modelId: String, accountVersion: Long): String? =
+        synchronized(configLock) {
+            ensureConfigLoaded()
+            val config = workingCopy()
+            val instance = config.instances.singleOrNull { it.id == instanceId } ?: return@synchronized null
+            val spec = AgnesImages.model(modelId) ?: return@synchronized null
+            if (!instance.isEnabled || !AgnesImages.route(instance) || tamaOwnApiKey(instance) == null ||
+                AutoModelRuntime.accountVersion(instanceId) != accountVersion ||
+                config.modelEntries.any { it.providerInstanceId == instanceId && it.baseModel.id == modelId }) return@synchronized null
+            val entry = ModelEntry(instanceId, spec.metadata(), uuid = compositeEntryKey(instanceId, spec.id))
+            if (config.modelEntries.any { it.id == entry.id || compositeEntryKey(it.providerInstanceId, it.baseModel.id) == entry.id })
+                return@synchronized null
+            AutoModelStore.credentialTransaction {
+                if (AutoModelRuntime.accountVersion(instanceId) != accountVersion ||
+                    !AutoModelStore.forgetMissingImageReview(context, AutoModelStore.identity(entry, instance))) null
+                else {
+                    config.modelEntries.add(entry)
+                    if (saveConfigChecked(config)) entry.id else null
+                }
+            }
+        }
+
+    private fun ensureAgnesImageModels() = synchronized(configLock) {
+        if (_config.value.instances.none(AgnesImages::account)) return@synchronized
+        val config = workingCopy()
+        val changed = config.instances.fold(false) { prior, instance -> seedAgnesImages(config, instance) || prior }
+        if (changed) saveConfig(config)
     }
 
     /**
@@ -884,13 +977,15 @@ class ProviderRepository(private val context: Context) {
                 val priorRoute = ai.tama.router.AutoModelStore.routeFingerprint(prior)
                 if (priorRoute != newRoute) {
                     nmRefreshGate.invalidate(updated.id) // nanoMuse: also reject an old list after A → B → A
-                    nmFreeEvidence.remove(updated.id)
+                    nmCatalogueGate.invalidate(updated.id)
+                    nmFreeEvidence.value = nmFreeEvidence.value - updated.id
                     _nmFreeImportStatus.value = _nmFreeImportStatus.value - updated.id
                     ai.tama.router.AutoModelStore.synchronizeRoute(context, updated.id, priorRoute)
                 }
             }
             ai.tama.router.AutoModelStore.synchronizeRoute(context, updated.id, newRoute)
             config.instances[idx] = updated
+            seedAgnesImages(config, updated)
             if (checked) {
                 if (!saveConfigChecked(config)) return@synchronized false // nanoMuse
             } else saveConfig(config)
@@ -909,29 +1004,44 @@ class ProviderRepository(private val context: Context) {
     }
 
     // nanoMuse: do not replace the user's existing entries or their group pins.
-    fun setTamaImportFreeOnly(instanceId: String, enabled: Boolean): Boolean = synchronized(configLock) {
-        if (com.openminis.app.BuildConfig.APPLICATION_ID != "ai.tama.assistant.tamav2test") return@synchronized false
+    fun setTamaImportFreeOnly(instanceId: String, enabled: Boolean): Boolean =
+        setTamaImportFreeOnly(instanceId, enabled, null)
+
+    private fun setTamaImportFreeOnly(instanceId: String, enabled: Boolean, expected: OAuthKeySnapshot?): Boolean =
+        synchronized(configLock) {
+            if (expected == null) writeTamaImportFreeOnly(instanceId, enabled)
+            else ai.tama.router.AutoModelStore.credentialTransaction {
+                expected.providerId == instanceId && nmOAuthKeyStillCurrent(expected) && writeTamaImportFreeOnly(instanceId, enabled)
+            }
+        }
+
+    // nanoMuse: caller holds configLock; a bulk action also holds the credential lock.
+    private fun writeTamaImportFreeOnly(instanceId: String, enabled: Boolean): Boolean {
+        if (com.openminis.app.BuildConfig.APPLICATION_ID != "ai.tama.assistant.tamav2test") return false
         ensureConfigLoaded()
         val config = workingCopy()
         val index = config.instances.indexOfFirst { it.id == instanceId }
-        if (index < 0) return@synchronized false
-        if (config.instances[index].tamaImportFreeOnly == enabled) return@synchronized true
+        if (index < 0) return false
+        val live = config.instances[index]
+        if (tamaOwnApiKey(live) == null || (enabled && !tamaHasFreeCatalogue(live)) ||
+            (!enabled && tamaZeroSpendLimit(live))) return false
+        if (live.tamaImportFreeOnly == enabled) return true
         nmRefreshGate.invalidate(instanceId)
-        nmFreeEvidence.remove(instanceId)
         config.instances[index] = config.instances[index].copy(tamaImportFreeOnly = enabled)
         if (!saveConfigChecked(config)) {
             _nmFreeImportStatus.value = _nmFreeImportStatus.value + (instanceId to FreeModelImportStatus.SaveFailed)
-            return@synchronized false
+            return false
         }
         _nmFreeImportStatus.value = _nmFreeImportStatus.value - instanceId
         invalidateModelCache(instanceId)
-        true
+        return true
     }
 
     fun removeInstance(instanceId: String): Unit = synchronized(configLock) {
         ensureConfigLoaded()
         nmRefreshGate.invalidate(instanceId) // nanoMuse
-        nmFreeEvidence.remove(instanceId)
+        nmCatalogueGate.invalidate(instanceId)
+        nmFreeEvidence.value = nmFreeEvidence.value - instanceId
         _nmFreeImportStatus.value = _nmFreeImportStatus.value - instanceId
         ai.tama.router.AutoModelStore.accountChanged(context, instanceId)
         invalidateModelCache(instanceId)
@@ -1088,8 +1198,10 @@ class ProviderRepository(private val context: Context) {
             .filter { it.isEnabled }
             .sortedByDescending { it.createdAt }
         for (instance in enabledProviders) {
+            // nanoMuse: legacy generator entries can still claim text output in Test.
             val textEntry = config.modelEntries
-                .filter { it.providerInstanceId == instance.id && !it.isHidden && it.model.isTextOutput }
+                .filter { it.providerInstanceId == instance.id && !it.isHidden && it.model.isTextOutput &&
+                    !AgnesImages.imageOnlyInTest(it.model.id) }
                 .lastOrNull()
             if (textEntry != null) return textEntry
         }
@@ -1211,7 +1323,7 @@ class ProviderRepository(private val context: Context) {
         return instance.isEnabled
     }
 
-    fun replaceEntries(instanceId: String, models: List<LLMModel>) = synchronized(configLock) {
+    fun replaceEntries(instanceId: String, refreshed: List<LLMModel>) = synchronized(configLock) {
         ensureConfigLoaded()
         // Hot path for concurrent autoRefreshModels coroutines (one per
         // enabled instance) — without this lock, two replaceEntries() calls
@@ -1224,6 +1336,9 @@ class ProviderRepository(private val context: Context) {
             val current = config.instances.firstOrNull { it.id == instanceId }
             if (current == null || current.tamaImportFreeOnly) return@synchronized
         }
+        val agnes = config.instances.firstOrNull { it.id == instanceId }?.let(AgnesImages::account) == true
+        val models = if (agnes) refreshed.filter { AgnesImages.model(it.id) == null } + AgnesImages.models.map { it.metadata() }
+            else refreshed
         val existing = config.modelEntries.filter { it.providerInstanceId == instanceId }
         val existingEntryIds = existing.map { it.id }.toSet()
 
@@ -1348,7 +1463,9 @@ class ProviderRepository(private val context: Context) {
     fun addEntry(entry: ModelEntry): Unit = synchronized(configLock) {
         ensureConfigLoaded()
         val config = workingCopy()
-        if (!entry.isCustom) {
+        val agnesImage = AgnesImages.model(entry.baseModel.id) != null &&
+            config.instances.singleOrNull { it.id == entry.providerInstanceId }?.let(AgnesImages::account) == true
+        if (!entry.isCustom || agnesImage) {
             val exists = config.modelEntries.any {
                 it.providerInstanceId == entry.providerInstanceId && it.baseModel.id == entry.baseModel.id
             }
@@ -1393,7 +1510,9 @@ class ProviderRepository(private val context: Context) {
             // chat/tools, but does not approve a route or grant cost permission.
             val discovered = if (com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test" &&
                 io.github.nanomuse.cloud.NanoMuseCloud.instance(context)?.id != identity.providerId)
-                tamaFreeModelCapabilities(identity.providerId, identity.modelId) else emptySet()
+                _config.value.modelEntries.firstOrNull { it.id == identity.entryId }?.let { entry ->
+                    instance(identity.providerId)?.let { provider -> tamaModelMetadata(entry, provider)?.chatCapabilities }
+                }.orEmpty() else emptySet()
             ai.tama.router.AutoModelStore.capabilities(context, identity, catalogue + discovered)
         }
 
@@ -2332,28 +2451,189 @@ class ProviderRepository(private val context: Context) {
         val key: OAuthKeySnapshot,
     )
 
+    internal fun tamaZeroSpendLimit(instance: ProviderInstance): Boolean =
+        nmZeroSpendLimits.value[instance.id] == ai.tama.router.AutoModelRuntime.accountVersion(instance.id) &&
+            instance.providerType == ProviderType.openRouter && tamaOwnApiKey(instance) != null
+
+    /** Only the exact official OpenRouter account may be restricted by a key limit response. */
+    internal fun tamaRecordZeroSpendLimit(instanceId: String, accountVersion: Long, zero: Boolean = true): Boolean = synchronized(configLock) {
+        val live = instance(instanceId) ?: return@synchronized false
+        if (live.providerType != ProviderType.openRouter || tamaOwnApiKey(live) == null) return@synchronized false
+        ai.tama.router.AutoModelRuntime.runIfCurrent(instanceId, accountVersion) {
+            val previous = nmZeroSpendLimits.value
+            nmZeroSpendLimits.value = if (zero) previous + (instanceId to accountVersion) else previous - instanceId
+        }
+    }
+
+    private fun nmFreeRefreshMode(instance: ProviderInstance): Boolean =
+        instance.tamaImportFreeOnly || tamaZeroSpendLimit(instance)
+
+    // nanoMuse: limited to this process and to the account generation that
+    // actually got the payment refusal. Never label the model globally as paid.
+    private val _tamaPaymentRefusals = MutableStateFlow<Map<Pair<String, String>, Long>>(emptyMap())
+    internal val tamaPaymentRefusals = _tamaPaymentRefusals.asStateFlow()
+
+    internal fun tamaRecordPaymentRefusal(instanceId: String, modelId: String, account: Long?): Unit = synchronized(configLock) {
+        val live = instance(instanceId) ?: return@synchronized
+        if (tamaOwnApiKey(live) == null || account == null) return@synchronized
+        AutoModelRuntime.runIfCurrent(instanceId, account) {
+            val next = _tamaPaymentRefusals.value.toMutableMap()
+            next[instanceId to modelId] = account
+            _tamaPaymentRefusals.value = next.entries.toList().takeLast(512).associate { it.toPair() }
+        }
+    }
+
+    internal fun tamaPaymentRefused(instanceId: String, modelId: String): Boolean =
+        _tamaPaymentRefusals.value[instanceId to modelId] == AutoModelRuntime.accountVersion(instanceId)
+
+    private fun tamaModelBase(instance: ProviderInstance): String? = when {
+        instance.azureMode -> null
+        AgnesImages.account(instance) -> ai.tama.providers.ProviderEndpoints.AGNES_BASE
+        else -> ai.tama.providers.ProviderEndpoints.factoryBase(instance.providerType, instance.customBaseURL, instance.appendV1Suffix)
+    }
+
+    private fun tamaFreeRoute(instance: ProviderInstance): DocumentedFreeChat.Route? = DocumentedFreeChat.route(
+        tamaModelBase(instance), openAiChat = instance.providerType == ProviderType.openAI && !instance.useResponsesAPI,
+        gemini = instance.providerType == ProviderType.gemini, openRouter = instance.providerType == ProviderType.openRouter,
+    )
+
+    internal fun tamaHasFreeChatRoute(instance: ProviderInstance): Boolean = tamaFreeRoute(instance) != null
+
+    internal fun tamaHasFreeCatalogue(instance: ProviderInstance): Boolean = DocumentedFreeChat.hasCatalogue(
+        tamaModelBase(instance), openAiChat = instance.providerType == ProviderType.openAI && !instance.useResponsesAPI,
+        gemini = instance.providerType == ProviderType.gemini, openRouter = instance.providerType == ProviderType.openRouter,
+    )
+
+    private fun nmCurrentCatalogue(instance: ProviderInstance, now: Long): FreeChatCatalogue? =
+        nmFreeEvidence.value[instance.id]?.current(AutoModelStore.routeFingerprint(instance),
+            AutoModelRuntime.accountVersion(instance.id), now)
+
+    private fun nmBundledFreeStatus(instance: ProviderInstance, id: String, now: Long): DocumentedFreeChat.Status {
+        val base = tamaModelBase(instance)
+        val quote = ModelsDevApi.bundledProvider(base)?.models?.get(id)
+        if (tamaFreeRoute(instance) == DocumentedFreeChat.Route.NVIDIA && NvidiaChatPricing.allows(base, id,
+                quote?.zeroTokenPrice == true, quote?.inputModalities, quote?.outputModalities, now)) {
+            return DocumentedFreeChat.Status.FREE
+        }
+        val priced = (quote?.inputCost ?: 0.0) > 0 || (quote?.outputCost ?: 0.0) > 0
+        val safeBase = base?.takeUnless { it == DocumentedFreeChat.GEMINI_BASE && instance.providerType != ProviderType.gemini }
+        return DocumentedFreeChat.status(safeBase, id, now, priced)
+    }
+
+    internal fun tamaAgnesImageStatus(instance: ProviderInstance, modelId: String): DocumentedFreeChat.Status? {
+        if (!AgnesImages.route(instance) || AgnesImages.model(modelId) == null || tamaOwnApiKey(instance) == null) return null
+        return if (tamaPaymentRefused(instance.id, modelId)) DocumentedFreeChat.Status.PAYMENT_REQUIRED
+            else DocumentedFreeChat.Status.FREE
+    }
+
+    // Image evidence is for display here; it cannot authorize any chat transport.
+    internal fun tamaProviderModelStatus(instance: ProviderInstance, modelId: String): DocumentedFreeChat.Status =
+        tamaAgnesImageStatus(instance, modelId) ?: tamaFreeChatStatus(instance, modelId)
+
+    internal fun tamaFreeChatStatus(instance: ProviderInstance, modelId: String): DocumentedFreeChat.Status {
+        if (tamaOwnApiKey(instance) == null) return DocumentedFreeChat.Status.UNKNOWN
+        if (tamaPaymentRefused(instance.id, modelId)) return DocumentedFreeChat.Status.PAYMENT_REQUIRED
+        val now = System.currentTimeMillis()
+        return when (tamaFreeRoute(instance)) {
+            DocumentedFreeChat.Route.OPENROUTER -> (nmCurrentCatalogue(instance, now) as? FreeChatCatalogue.OpenRouter)
+                ?.status(modelId, now) ?: nmBundledFreeStatus(instance, modelId, now)
+            DocumentedFreeChat.Route.GROQ -> (nmCurrentCatalogue(instance, now) as? FreeChatCatalogue.Groq)
+                ?.status(modelId, now)?.takeUnless { it == DocumentedFreeChat.Status.UNKNOWN }
+                ?: nmBundledFreeStatus(instance, modelId, now)
+            else -> nmBundledFreeStatus(instance, modelId, now)
+        }
+    }
+
+    internal fun tamaDocumentedChatAllowed(instance: ProviderInstance, modelId: String): Boolean =
+        tamaFreeRoute(instance) != null && tamaFreeChatStatus(instance, modelId) == DocumentedFreeChat.Status.FREE
+
+    /** Capture the client identity with the saved credential, then recheck just before I/O. */
+    internal fun tamaFreeChatTicket(
+        instanceId: String, account: Long?, route: String?, modelId: String,
+    ): DocumentedChatDispatch? = synchronized(configLock) {
+        if (account == null || route == null) return@synchronized null
+        val live = _config.value.instances.singleOrNull { it.id == instanceId } ?: return@synchronized null
+        val freeRoute = tamaFreeRoute(live) ?: return@synchronized null
+        if (!live.isEnabled || !tamaDocumentedChatAllowed(live, modelId)) return@synchronized null
+        val saved = nmOAuthKeySnapshot(instanceId)
+        val key = saved.key ?: return@synchronized null
+        if (saved.version != account || AutoModelStore.historyFingerprint(context, live) != route) return@synchronized null
+        DocumentedChatDispatch(modelId, key, freeRoute) {
+            synchronized(configLock) {
+                AutoModelStore.credentialTransaction {
+                    val current = _config.value.instances.singleOrNull { it.id == instanceId }
+                    current != null && current.isEnabled && tamaFreeRoute(current) == freeRoute &&
+                        AutoModelStore.historyFingerprint(context, current) == route &&
+                        nmOAuthKeyStillCurrent(saved) && tamaDocumentedChatAllowed(current, modelId)
+                }
+            }
+        }
+    }
+
+    internal fun tamaFreeChatOnly(instance: ProviderInstance): Boolean =
+        ai.tama.pricing.FreeModelList.restricted(
+            hasOwnKey = tamaOwnApiKey(instance) != null,
+            requested = instance.tamaImportFreeOnly,
+            zeroSpendLimit = tamaZeroSpendLimit(instance),
+        )
+
+    /** This check excludes unknown/paid routes. It cannot grant either cost permission. */
+    internal fun tamaAllowsChatModel(instance: ProviderInstance, modelId: String, requireFree: Boolean = false): Boolean {
+        if (AgnesImages.imageOnlyInTest(modelId)) return false
+        val restricted = requireFree || tamaFreeChatOnly(instance)
+        if (!restricted) return !tamaPaymentRefused(instance.id, modelId)
+        return ai.tama.pricing.FreeModelList.canDispatch(tamaFreeChatStatus(instance, modelId),
+            restricted = true, supportedRoute = tamaFreeRoute(instance) != null)
+    }
+
     /**
      * Current candidates for the optional post-save choice screen. Null means
      * no usable evidence; an empty set means a fresh check found no candidates.
      * This is not a spending authorization and does not verify account access.
      */
     internal fun tamaEligibleFreeModelIds(instanceId: String): Set<String>? = synchronized(configLock) {
-        val live = _config.value.instances.firstOrNull { it.id == instanceId } ?: return@synchronized null
-        val evidence = nmFreeEvidence[instanceId] ?: return@synchronized null
-        ai.tama.router.AutoModelStore.credentialTransaction {
-            evidence.current(
-                nmRefreshGate, live.tamaImportFreeOnly, ai.tama.router.AutoModelStore.routeFingerprint(live),
-                ai.tama.router.AutoModelRuntime.accountVersion(instanceId), System.currentTimeMillis(),
-            )
+        val live = _config.value.instances.singleOrNull { it.id == instanceId } ?: return@synchronized null
+        if (tamaOwnApiKey(live) == null) return@synchronized null
+        AutoModelStore.credentialTransaction { nmEligibleFreeIds(live, System.currentTimeMillis()) }
+    }
+
+    private fun nmEligibleFreeIds(live: ProviderInstance, now: Long): Set<String>? {
+        val (ids, status) = when (tamaFreeRoute(live)) {
+            DocumentedFreeChat.Route.OPENROUTER -> {
+                val catalogue = nmCurrentCatalogue(live, now) as? FreeChatCatalogue.OpenRouter ?: return null
+                catalogue.prices.quotes.keys to catalogue::status
+            }
+            DocumentedFreeChat.Route.GROQ -> {
+                val catalogue = nmCurrentCatalogue(live, now) as? FreeChatCatalogue.Groq ?: return null
+                catalogue.models to catalogue::status
+            }
+            DocumentedFreeChat.Route.NVIDIA, DocumentedFreeChat.Route.GEMINI -> {
+                val ids = ModelsDevApi.bundledProvider(tamaModelBase(live))?.models?.keys.orEmpty() +
+                    DocumentedFreeChat.offers[tamaModelBase(live)].orEmpty().flatMap { it.models }
+                ids to { id: String, at: Long -> nmBundledFreeStatus(live, id, at) }
+            }
+            null -> return emptySet()
+        }
+        return ids.filterTo(mutableSetOf()) {
+            !tamaPaymentRefused(live.id, it) && status(it, now) == DocumentedFreeChat.Status.FREE
         }
     }
 
     /**
      * One explicit action approves chat routes from current free-only evidence.
-     * This never turns on automatic mode or its separate cost permission. A
-     * changed account, route, refresh or disabled import invalidates the evidence.
+     * This never turns on automatic mode or its separate cost permission. The
+     * batch still needs the current account, route and import preference.
      */
-    internal fun tamaApproveFreeChatModels(instanceId: String): Int {
+    internal suspend fun tamaUseAllFreeChatModels(instanceId: String, key: OAuthKeySnapshot): Int {
+        val live = instance(instanceId) ?: return 0
+        if (key.providerId != instanceId || !live.isEnabled || !setTamaImportFreeOnly(instanceId, true, key)) return 0
+        // Fresh proof can predate import (or follow a read-only probe). It must
+        // not stop this explicit action from adding the missing model entries.
+        nmBeginRefresh(instanceId, key)?.let { nmRunRefresh(it) }
+        return tamaApproveFreeChatModels(instanceId, key)
+    }
+
+    private fun tamaApproveFreeChatModels(instanceId: String, expectedKey: OAuthKeySnapshot): Int {
         if (com.openminis.app.BuildConfig.APPLICATION_ID != "ai.tama.assistant.tamav2test") return 0
         val secrets = encryptedPrefs // initialize before acquiring either lock
         return synchronized(configLock) {
@@ -2361,16 +2641,13 @@ class ProviderRepository(private val context: Context) {
             // nanoMuse: a duplicated provider id cannot identify the account whose routes are approved.
             val matchingInstances = _config.value.instances.filter { it.id == instanceId }
             val live = matchingInstances.singleOrNull() ?: return@synchronized 0
-            if (!live.isEnabled || !live.tamaImportFreeOnly || live.providerType != ProviderType.openRouter ||
-                live.credentialType != ProviderCredential.apiKey ||
+            if (!live.isEnabled || !tamaFreeChatOnly(live) || live.credentialType != ProviderCredential.apiKey ||
                 io.github.nanomuse.cloud.NanoMuseCloud.instance(context)?.id == instanceId) return@synchronized 0
-            val evidence = nmFreeEvidence[instanceId] ?: return@synchronized 0
             ai.tama.router.AutoModelStore.credentialTransaction {
-                if (secrets.getString("apikey_$instanceId", null).isNullOrBlank()) return@credentialTransaction 0
-                val free = evidence.current(
-                    nmRefreshGate, live.tamaImportFreeOnly, ai.tama.router.AutoModelStore.routeFingerprint(live),
-                    ai.tama.router.AutoModelRuntime.accountVersion(instanceId), System.currentTimeMillis(),
-                ) ?: return@credentialTransaction 0
+                if (secrets.getString("apikey_$instanceId", null).isNullOrBlank() ||
+                    !nmOAuthKeyStillCurrent(expectedKey)) return@credentialTransaction 0
+                if (!ai.tama.providers.KeyDestinationGuard.permits(expectedKey.key, tamaModelBase(live))) return@credentialTransaction 0
+                val free = nmEligibleFreeIds(live, System.currentTimeMillis()) ?: return@credentialTransaction 0
                 val entries = _config.value.modelEntries
                 val ids = ai.tama.pricing.FreeModelBulk.select(instanceId, free, entries.map {
                     ai.tama.pricing.FreeModelBulk.Entry(it.id, it.providerInstanceId, it.model.id, it.isHidden)
@@ -2383,20 +2660,114 @@ class ProviderRepository(private val context: Context) {
         }
     }
 
-    /** Fresh exact-model capabilities from this own-key provider's free import only. */
+    /** Applies only to the conversational picker, not the provider catalogue or other slot types. */
+    internal fun tamaIsChatModel(entry: ModelEntry, instance: ProviderInstance): Boolean {
+        val id = entry.model.id
+        if (AgnesImages.imageOnlyInTest(id)) return false
+        val exact = ModelsDevApi.bundledProvider(tamaModelBase(instance))?.models?.get(id)
+        return ai.tama.providers.ChatModelKind.accepts(id,
+            exact?.inputModalities ?: entry.model.inputModalities,
+            exact?.outputModalities ?: entry.model.outputModalities,
+            io.github.nanomuse.avatar.ImageGen.looksLikeImageModel(id) || io.github.nanomuse.media.VideoGen.looksLikeVideoModel(id),
+        )
+    }
+
+    // nanoMuse: exact bundled model metadata is independent of list price.
+    // An older free import may have fresher modalities than the saved row.
+    internal fun tamaModelMetadata(entry: ModelEntry, instance: ProviderInstance): ai.tama.providers.ModelModalities? {
+        if (tamaOwnApiKey(instance) == null || entry.providerInstanceId != instance.id || entry.model.id != entry.baseModel.id) return null
+        if (AgnesImages.account(instance)) AgnesImages.model(entry.model.id)?.metadata()?.let {
+            return ai.tama.providers.ModelModalities.from(it.inputModalities, it.outputModalities)
+        }
+        val base = tamaModelBase(instance)
+        val exact = ModelsDevApi.bundledProvider(base)?.models?.get(entry.model.id)
+        val inputs = entry.baseModel.inputModalities?.takeIf { it.isNotEmpty() } ?: exact?.inputModalities
+        val outputs = entry.baseModel.outputModalities?.takeIf { it.isNotEmpty() } ?: exact?.outputModalities
+        val imported = tamaFreeModelCapabilities(instance.id, entry.model.id)
+        return ai.tama.providers.ModelModalities.from(
+            inputs, outputs, exact?.toolCalls == true || "tools" in imported, "vision" in imported, "chat" in imported,
+            // Voice templates can infer saved legacy voice flags. Do not show
+            // these as confirmed audio or video in the chat badge.
+            exact?.inputModalities, exact?.outputModalities,
+            coding = ai.tama.providers.ReviewedModelFeatures.coding(base, entry.model.id),
+            reasoning = entry.model.supportsReasoning == true || exact?.reasoning == true,
+        )
+    }
+
+    /** Fresh exact-model capabilities from this own-key provider's catalogue only. */
     internal fun tamaFreeModelCapabilities(instanceId: String, modelId: String): Set<String> = synchronized(configLock) {
-        val live = _config.value.instances.firstOrNull { it.id == instanceId } ?: return@synchronized emptySet()
-        if (live.providerType != ProviderType.openRouter || live.credentialType != ProviderCredential.apiKey) return@synchronized emptySet()
-        val evidence = nmFreeEvidence[instanceId] ?: return@synchronized emptySet()
-        ai.tama.router.AutoModelStore.credentialTransaction {
-            evidence.currentCapabilities(
-                nmRefreshGate, live.tamaImportFreeOnly, ai.tama.router.AutoModelStore.routeFingerprint(live),
-                ai.tama.router.AutoModelRuntime.accountVersion(instanceId), System.currentTimeMillis(), modelId,
-            )
+        val live = _config.value.instances.singleOrNull { it.id == instanceId } ?: return@synchronized emptySet()
+        if (tamaOwnApiKey(live) == null || tamaPaymentRefused(instanceId, modelId)) return@synchronized emptySet()
+        val now = System.currentTimeMillis()
+        (nmCurrentCatalogue(live, now) as? FreeChatCatalogue.OpenRouter)?.capabilities(modelId, now).orEmpty()
+    }
+
+    private fun nmBeginCatalogueCheck(instance: ProviderInstance, key: OAuthKeySnapshot): ModelRefreshGate.Ticket? = synchronized(configLock) {
+        val live = _config.value.instances.singleOrNull { it.id == instance.id } ?: return@synchronized null
+        val route = AutoModelStore.routeFingerprint(instance)
+        if (!live.isEnabled || route != AutoModelStore.routeFingerprint(live) || key.providerId != live.id ||
+            !tamaOwnKeyMaterial(live, key.key) || !nmOAuthKeyStillCurrent(key) ||
+            !ai.tama.providers.KeyDestinationGuard.permits(key.key, tamaModelBase(live))) return@synchronized null
+        nmCatalogueGate.begin(live.id, false, route) // price checks don't depend on the import flag
+    }
+
+    private fun nmCommitCatalogue(
+        check: ModelRefreshGate.Ticket, key: OAuthKeySnapshot, catalogue: FreeChatCatalogue?,
+    ): Boolean = synchronized(configLock) {
+        val live = _config.value.instances.singleOrNull { it.id == check.providerId } ?: return@synchronized false
+        AutoModelStore.credentialTransaction {
+            if (!live.isEnabled || !nmCatalogueGate.isCurrent(check, false, AutoModelStore.routeFingerprint(live)) ||
+                !nmOAuthKeyStillCurrent(key)) return@credentialTransaction false
+            nmFreeEvidence.value = if (catalogue != null) nmFreeEvidence.value +
+                (live.id to FreeChatCatalogueEvidence(check.route, key.version, catalogue))
+            else nmFreeEvidence.value - live.id
+            true
         }
     }
 
-    private fun nmBeginRefresh(instanceId: String): NmRefresh? {
+    internal suspend fun tamaCheckSavedGroqKey(instance: ProviderInstance, snapshot: OAuthKeySnapshot): KeyProbePlan.Result {
+        if (tamaFreeRoute(instance) != DocumentedFreeChat.Route.GROQ) return KeyProbe.unavailable
+        val check = nmBeginCatalogueCheck(instance, snapshot) ?: return KeyProbe.unavailable
+        val plan = KeyProbePlan.create(instance.providerType, tamaModelBase(instance)) ?: return KeyProbe.unavailable
+        val startedAt = System.currentTimeMillis()
+        val result = KeyProbe.check(plan, snapshot.key ?: return KeyProbe.unavailable)
+        kotlinx.coroutines.currentCoroutineContext().ensureActive()
+        val catalogue = when (result.outcome) {
+            KeyProbePlan.Outcome.ACCEPTED -> result.availableModels?.let { FreeChatCatalogue.Groq(startedAt, it) }
+            KeyProbePlan.Outcome.NO_CREDIT -> FreeChatCatalogue.Groq(startedAt, emptySet(), paymentRequired = true)
+            else -> null
+        }
+        return if (nmCommitCatalogue(check, snapshot, catalogue)) result else KeyProbe.unavailable
+    }
+
+    private suspend fun nmReadOpenRouterCatalogue(instance: ProviderInstance, key: OAuthKeySnapshot): OpenRouterModelsApi.FreeCatalogue? {
+        if (tamaFreeRoute(instance) != DocumentedFreeChat.Route.OPENROUTER) return null
+        val check = nmBeginCatalogueCheck(instance, key) ?: return null
+        val result = OpenRouterModelsApi.fetchFreeCatalogue(key.key ?: return null)
+        kotlinx.coroutines.currentCoroutineContext().ensureActive()
+        if (!nmCommitCatalogue(check, key, result?.let { FreeChatCatalogue.OpenRouter(it.prices) })) return null
+        return result
+    }
+
+    internal fun tamaNeedsFreeChatEvidence(live: ProviderInstance, modelId: String): Boolean {
+        val route = tamaFreeRoute(live)
+        return (route == DocumentedFreeChat.Route.OPENROUTER ||
+            (route == DocumentedFreeChat.Route.GROQ && DocumentedFreeChat.groqOffers(modelId))) &&
+            !tamaPaymentRefused(live.id, modelId) && nmCurrentCatalogue(live, System.currentTimeMillis()) == null
+    }
+
+    /** Reopen an expired/missing proof for the selected client. Read-only: no entries or settings change. */
+    internal suspend fun tamaEnsureFreeChatEvidence(instanceId: String, modelId: String, account: Long?, route: String?) {
+        val live = instance(instanceId) ?: return
+        val freeRoute = tamaFreeRoute(live)
+        if (!tamaNeedsFreeChatEvidence(live, modelId)) return
+        val key = nmOAuthKeySnapshot(instanceId)
+        if (key.version != account || AutoModelStore.historyFingerprint(context, live) != route) return
+        if (freeRoute == DocumentedFreeChat.Route.GROQ) tamaCheckSavedGroqKey(live, key)
+        else nmReadOpenRouterCatalogue(live, key)
+    }
+
+    private fun nmBeginRefresh(instanceId: String, expected: OAuthKeySnapshot? = null): NmRefresh? {
         try {
             encryptedPrefs // nanoMuse: initialize the keystore before either lock
             return synchronized(configLock) {
@@ -2406,19 +2777,19 @@ class ProviderRepository(private val context: Context) {
                 // Capture the route and credential together. A scheduled old
                 // route must not pick up a newer account's key when it starts.
                 val key = nmOAuthKeySnapshot(copy.id)
+                if (expected != null && (key.providerId != expected.providerId || key.version != expected.version ||
+                        key.key != expected.key)) return@synchronized null
                 val route = ai.tama.router.AutoModelStore.routeFingerprint(copy)
-                val ticket = nmRefreshGate.begin(copy.id, copy.tamaImportFreeOnly, route)
-                nmFreeEvidence.remove(copy.id)
-                _nmFreeImportStatus.value = if (copy.tamaImportFreeOnly)
+                val ticket = nmRefreshGate.begin(copy.id, nmFreeRefreshMode(copy), route)
+                _nmFreeImportStatus.value = if (ticket.freeOnly)
                     _nmFreeImportStatus.value + (copy.id to FreeModelImportStatus.Checking)
                 else _nmFreeImportStatus.value - copy.id
                 NmRefresh(copy, ticket, key)
             }
         } catch (_: Exception) {
             synchronized(configLock) {
-                if (_config.value.instances.any { it.id == instanceId && it.tamaImportFreeOnly }) {
+                if (_config.value.instances.any { it.id == instanceId && nmFreeRefreshMode(it) }) {
                     nmRefreshGate.invalidate(instanceId)
-                    nmFreeEvidence.remove(instanceId)
                     _nmFreeImportStatus.value = _nmFreeImportStatus.value + (instanceId to FreeModelImportStatus.Failed)
                 }
             }
@@ -2430,7 +2801,7 @@ class ProviderRepository(private val context: Context) {
     private fun nmRefreshCurrent(refresh: NmRefresh): Boolean {
         val live = _config.value.instances.firstOrNull { it.id == refresh.instance.id } ?: return false
         return nmRefreshGate.isCurrent(
-            refresh.ticket, live.tamaImportFreeOnly, ai.tama.router.AutoModelStore.routeFingerprint(live),
+            refresh.ticket, nmFreeRefreshMode(live), ai.tama.router.AutoModelStore.routeFingerprint(live),
         )
     }
 
@@ -2447,7 +2818,7 @@ class ProviderRepository(private val context: Context) {
             // changes. Otherwise a key can change between the check and save.
             // The configuration lock is already held, in the established order.
             ai.tama.router.AutoModelStore.credentialTransaction {
-                if (nmRefreshCurrent(refresh) && !refresh.instance.tamaImportFreeOnly &&
+                if (nmRefreshCurrent(refresh) && !refresh.ticket.freeOnly &&
                     keySnapshot != null && nmOAuthKeyStillCurrent(keySnapshot)) {
                     replaceEntries(instanceId, models)
                 }
@@ -2470,15 +2841,6 @@ class ProviderRepository(private val context: Context) {
 
     private suspend fun nmRefreshFreeModels(refresh: NmRefresh) {
         val instance = refresh.instance
-        if (!FreeModelImport.supports(instance.providerType)) {
-            synchronized(configLock) {
-                if (nmRefreshCurrent(refresh)) {
-                    _nmFreeImportStatus.value = _nmFreeImportStatus.value + (instance.id to FreeModelImportStatus.Unsupported)
-                    markInstanceFetched(instance.id)
-                }
-            }
-            return
-        }
         // OpenRouter OAuth yields a permanent API key too. Pair it with the
         // account generation so a late result cannot follow a key rotation.
         val keySnapshot = refresh.key
@@ -2489,30 +2851,47 @@ class ProviderRepository(private val context: Context) {
             }
             return
         }
-        val response = OpenRouterModelsApi.fetchFreeCatalogue(key)
-        kotlinx.coroutines.currentCoroutineContext().ensureActive()
-        // Compute eligibility without holding either lock. The response and its
-        // price evidence are from the same request; no key or URL is retained.
-        val eligible = response?.let { FreeModelImport.eligible(it.models, it.prices, System.currentTimeMillis()) }
-        val prices = response?.prices
-        nmWithCurrentFreeRefresh(refresh, keySnapshot) {
-            if (eligible == null || prices == null) {
-                _nmFreeImportStatus.value = _nmFreeImportStatus.value + (instance.id to FreeModelImportStatus.Failed)
-            } else {
-                val config = workingCopy()
-                val additions = FreeModelImport.additions(instance.id, config.modelEntries, eligible)
-                if (additions.isNotEmpty()) config.modelEntries.addAll(additions)
-                if (additions.isNotEmpty() && !saveConfigChecked(config)) {
-                    _nmFreeImportStatus.value = _nmFreeImportStatus.value + (instance.id to FreeModelImportStatus.SaveFailed)
-                } else {
-                    nmFreeEvidence[instance.id] = FreeModelImportEvidence(
-                        refresh.ticket, keySnapshot.version, prices, eligible.mapTo(mutableSetOf()) { it.id },
-                    )
-                    markInstanceFetched(instance.id)
-                    _nmFreeImportStatus.value = _nmFreeImportStatus.value +
-                        (instance.id to FreeModelImportStatus.Complete(eligible.size, additions.size))
+        val freeRoute = tamaFreeRoute(instance)
+        val models = when (freeRoute) {
+            DocumentedFreeChat.Route.OPENROUTER -> nmReadOpenRouterCatalogue(instance, keySnapshot)?.models
+            DocumentedFreeChat.Route.GROQ -> {
+                val checked = tamaCheckSavedGroqKey(instance, keySnapshot)
+                when (val ids = checked.availableModels) {
+                    null -> emptyList<LLMModel>().takeIf { checked.outcome == KeyProbePlan.Outcome.NO_CREDIT }
+                    else -> kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                        val bundled = ModelsDevApi.bundledModels(tamaModelBase(instance)).associateBy { it.id }
+                        ids.map { bundled[it] ?: LLMModel(id = it, displayName = it, provider = "Groq") }
+                    }
                 }
             }
+            DocumentedFreeChat.Route.NVIDIA, DocumentedFreeChat.Route.GEMINI, null ->
+                if (tamaHasFreeCatalogue(instance)) kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    ModelsDevApi.bundledModels(tamaModelBase(instance))
+                } else emptyList()
+        }
+        kotlinx.coroutines.currentCoroutineContext().ensureActive()
+        nmWithCurrentFreeRefresh(refresh, keySnapshot) {
+            if (models == null) {
+                _nmFreeImportStatus.value = _nmFreeImportStatus.value + (instance.id to FreeModelImportStatus.Failed)
+                return@nmWithCurrentFreeRefresh
+            }
+            val currentIds = nmEligibleFreeIds(instance, System.currentTimeMillis()).orEmpty()
+            // An unconfirmed row is not an approved or selectable free route.
+            val catalogueModels = if (AgnesImages.account(instance)) models + AgnesImages.models.map { it.metadata() } else models
+            val visible = ai.tama.pricing.FreeModelList.filterForDisplay(catalogueModels.distinctBy { it.id }, true) {
+                tamaProviderModelStatus(instance, it.id)
+            }
+            val config = workingCopy()
+            val additions = FreeModelImport.additions(instance.id, config.modelEntries, visible)
+            config.modelEntries.addAll(additions)
+            _nmFreeImportStatus.value = _nmFreeImportStatus.value + (instance.id to
+                if (additions.isEmpty() || saveConfigChecked(config)) {
+                    markInstanceFetched(instance.id)
+                    val declaredImages = AgnesImages.models.filter {
+                        tamaAgnesImageStatus(instance, it.id) == DocumentedFreeChat.Status.FREE
+                    }.mapTo(mutableSetOf()) { it.id }.takeIf { AgnesImages.account(instance) }
+                    FreeModelImport.summarize(visible.mapTo(mutableSetOf()) { it.id }, currentIds, additions.size, declaredImages)
+                } else FreeModelImportStatus.SaveFailed)
         }
     }
 
@@ -2532,7 +2911,7 @@ class ProviderRepository(private val context: Context) {
     // nanoMuse: publish a failure only for the request that still owns the
     // screen status. Never include exception text, URLs, credentials or names.
     private fun nmRefreshFailed(refresh: NmRefresh) = synchronized(configLock) {
-        if (refresh.instance.tamaImportFreeOnly && nmRefreshCurrent(refresh)) {
+        if (refresh.ticket.freeOnly && nmRefreshCurrent(refresh)) {
             ai.tama.router.AutoModelStore.credentialTransaction {
                 _nmFreeImportStatus.value = if (nmOAuthKeyStillCurrent(refresh.key))
                     _nmFreeImportStatus.value + (refresh.instance.id to FreeModelImportStatus.Failed)
@@ -2557,7 +2936,7 @@ class ProviderRepository(private val context: Context) {
                     return
                 }
             }
-            if (refresh.instance.tamaImportFreeOnly) nmRefreshFreeModels(refresh)
+            if (refresh.ticket.freeOnly) nmRefreshFreeModels(refresh)
             else refreshStandardModels(refresh.instance, refresh)
         } catch (e: kotlinx.coroutines.CancellationException) {
             nmRefreshFailed(refresh)
@@ -2711,9 +3090,22 @@ class ProviderRepository(private val context: Context) {
                     // [T-android-provider-type-parity] openAIResponses lists
                     // models from the same /v1/models endpoint — only the
                     // completion endpoint differs.
-                    ProviderType.openAI, ProviderType.openAIResponses ->
-                        OpenAIModelsApi.fetchModels(apiKey, baseURL, customUserAgent = instance.customUserAgent)
-                    ProviderType.openRouter -> OpenRouterModelsApi.fetchModels(apiKey)
+                    ProviderType.openAI, ProviderType.openAIResponses -> OpenAIModelsApi.fetchModels(
+                        apiKey, baseURL, customUserAgent = instance.customUserAgent,
+                    )
+                    ProviderType.openRouter -> {
+                        val snapshot = nmKeySnapshot
+                        val check = snapshot?.let { nmBeginCatalogueCheck(instance, it) }
+                        var catalogue: FreeChatCatalogue.OpenRouter? = null
+                        val discovered = OpenRouterModelsApi.fetchModels(apiKey, onTextCatalogue = if (check != null) { prices ->
+                            catalogue = FreeChatCatalogue.OpenRouter(prices)
+                        } else null)
+                        if (check != null && snapshot != null) {
+                            kotlinx.coroutines.currentCoroutineContext().ensureActive()
+                            nmCommitCatalogue(check, snapshot, catalogue)
+                        }
+                        discovered
+                    }
                     // [T-provider-dynamic-catalog-reconcile] xAI: fetch the live
                     // catalog, fall back to the built-in list.
                     //
@@ -2795,7 +3187,10 @@ class ProviderRepository(private val context: Context) {
         // gateways by hostname, and when there's no match `fetchModels` returns
         // empty so the existing list (vLLM/Ollama on a private host) is preserved.
         val fallbackBaseURL = modelsDevBaseURL(instance)
-        val fallbackModels = ModelsDevApi.fetchModels(fallbackBaseURL)
+        // nanoMuse: do not fill a personal gateway with another tenant's models.
+        val fallbackModels = if (nmParallel && tamaOwnApiKey(instance) != null)
+            ModelsDevApi.bundledModels(tamaModelBase(instance))
+        else ModelsDevApi.fetchModels(fallbackBaseURL)
         if (fallbackModels.isNotEmpty()) {
             android.util.Log.i("ProviderRepo", "models.dev fallback returned ${fallbackModels.size} models for ${instance.label}")
             if (nmParallel) kotlinx.coroutines.currentCoroutineContext().ensureActive() // nanoMuse
@@ -2953,13 +3348,19 @@ class ProviderRepository(private val context: Context) {
     // stays open on failure. This does not expose the credential to logs.
     fun saveApiKeyChecked(instanceId: String, key: String): Boolean {
         val secrets = try { encryptedPrefs } catch (_: Exception) { return false }
+        // A plaintext recovery store may disappear from view on next launch.
+        // Never acknowledge a checked key save there in the isolated app.
+        if (com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test" &&
+            secrets !is androidx.security.crypto.EncryptedSharedPreferences) return false
         return try {
             ai.tama.router.AutoModelStore.credentialTransaction {
                 ai.tama.router.OAuthLoginAttempts.supersede(instanceId)
                 val prefKey = "apikey_$instanceId"
                 val previous = secrets.getString(prefKey, null)
                 if (previous != key) ai.tama.router.AutoModelStore.accountChanged(context, instanceId)
-                val written = try { secrets.edit().putString(prefKey, key).commit() } catch (_: Exception) { false }
+                val written = try {
+                    secrets.edit().putString(prefKey, key).commit() && secrets.getString(prefKey, null) == key
+                } catch (_: Exception) { false }
                 if (!written) {
                     // commit() can update the in-memory preference even when its
                     // disk write fails. Restore it so the displayed key and the
@@ -3061,6 +3462,23 @@ class ProviderRepository(private val context: Context) {
      */
     fun usableApiKey(instance: ProviderInstance): String? =
         loadApiKey(instance.id) ?: if (instance.allowsEmptyAPIKey) "" else null
+
+    // nanoMuse: do not treat the Cloud sign-in, OAuth, or an empty gateway credential as a personal key.
+    internal fun tamaOwnApiKey(instance: ProviderInstance): String? {
+        if (com.openminis.app.BuildConfig.APPLICATION_ID != "ai.tama.assistant.tamav2test" ||
+            instance.credentialType != ProviderCredential.apiKey) return null
+        val key = loadApiKey(instance.id)
+        return key.takeIf { tamaOwnKeyMaterial(instance, it) }
+    }
+
+    // nanoMuse: classify an already-built client even if its stored key has since changed.
+    internal fun tamaOwnKeyMaterial(instance: ProviderInstance, key: String?): Boolean {
+        if (com.openminis.app.BuildConfig.APPLICATION_ID != "ai.tama.assistant.tamav2test" ||
+            instance.credentialType != ProviderCredential.apiKey || key.isNullOrBlank()) return false
+        val cloud = io.github.nanomuse.cloud.NanoMuseCloud.instance(context)
+        return ai.tama.providers.OwnKeyScope.active(true, true, key, managedRelay = cloud?.id == instance.id ||
+            instance.effectiveBaseURL?.let(io.github.nanomuse.net.OwnProviderProxy::isRelay) == true)
+    }
 
     fun deleteApiKey(instanceId: String) {
         val parallel = com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test" // nanoMuse
@@ -3418,7 +3836,8 @@ class ProviderRepository(private val context: Context) {
             // nanoMuse: a pre-restore response must not replace restored entries.
             if (com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test") {
                 nmRefreshGate.invalidateAll()
-                nmFreeEvidence.clear()
+                nmCatalogueGate.invalidateAll()
+                nmFreeEvidence.value = emptyMap()
                 _nmFreeImportStatus.value = emptyMap()
             }
             val local = _config.value

@@ -44,5 +44,6 @@ class SharedPreferences {
         fun putBoolean(key: String, value: Boolean) = apply { values[key] = value }
         fun remove(key: String) = apply { values.remove(key) }
         fun apply() = Unit
+        fun commit() = true // This in-memory editor already wrote the values.
     }
 }

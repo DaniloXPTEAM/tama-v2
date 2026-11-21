@@ -52,6 +52,26 @@ class ProviderModelsWireTest {
         }
     }
 
+    @Test fun `openrouter explicitly asks for image output and reads the serving modalities`() {
+        val fixed = OpenRouterModelsApi.catalogueRequest("synthetic-key", "image")
+        assertEquals("https://openrouter.ai/api/v1/models?output_modalities=image", fixed.url.toString())
+        MockWebServer().use { server ->
+            server.start()
+            server.enqueue(MockResponse().setBody("""{"data":[{"id":"vendor/output",
+              "architecture":{"input_modalities":["text"],"output_modalities":["IMAGE_OUTPUT"]}}]}"""))
+            val result = runBlocking {
+                OpenRouterModelsApi.fetchFreeCatalogue(
+                    fixed.newBuilder().url(server.url("/api/v1/models?output_modalities=image")).build(), OkHttpClient(),
+                )
+            }!!
+            val model = result.models.single()
+            val caps = ModelModalities.from(model.inputModalities, model.outputModalities)
+            assertEquals(setOf("image"), caps.outputs)
+            assertFalse("vision" in caps.chatCapabilities)
+            assertEquals("GET", server.takeRequest(3, TimeUnit.SECONDS)!!.method)
+        }
+    }
+
     @Test fun `gemini custom model listing uses the chosen path and auth without a google fallback`() {
         MockWebServer().use { server ->
             server.start()

@@ -230,6 +230,28 @@ class ImageModelRequestsTest {
         Unit
     }
 
+    @Test fun `OpenRouter keeps its existing Images API request and bearer`() = runBlocking {
+        MockWebServer().use { server ->
+            val model = "google/gemini-2.5-flash-image"
+            server.enqueue(MockResponse().setBody("""{"data":[]}"""))
+            val client = okhttp3.OkHttpClient.Builder().addInterceptor { chain ->
+                val request = chain.request()
+                assertEquals("https://openrouter.ai/api/v1/images/generations", request.url.toString())
+                chain.proceed(request.newBuilder().url(server.url(request.url.encodedPath)).build())
+            }.build()
+            val provider = OpenAIProvider("fixture-key", LLMModel(model, model, "OpenRouter"),
+                "https://openrouter.ai/api/v1", client)
+            ImageModelRequests.request(provider, "Draw", allowFormatRetry = false)
+            val wire = requireNotNull(server.takeRequest(5, TimeUnit.SECONDS))
+            assertEquals("Bearer fixture-key", wire.getHeader("Authorization"))
+            val body = JSONObject(wire.body.readUtf8())
+            assertEquals(model, body.getString("model"))
+            assertEquals("b64_json", body.getString("response_format"))
+            assertEquals(1, server.requestCount)
+        }
+        Unit
+    }
+
     @Test fun `single attempt edit does not retry a rejected response format`() = runBlocking {
         val server = MockWebServer()
         server.start()
@@ -375,8 +397,12 @@ class ImageModelRequestsTest {
         val server = MockWebServer()
         server.start()
         try {
-            val failure = ai.tama.media.ImageDispatch.AuthorizationChanged()
+            val failure = ImageDispatch.AuthorizationChanged()
             val preflight: () -> Unit = { throw failure }
+            // Crossing an IO coroutine can recover the stack on a copy of this exception.
+            fun assertBlocked(actual: Throwable?) {
+                assertTrue(actual is ImageDispatch.AuthorizationChanged && (actual === failure || actual.cause === failure))
+            }
             val openai = OpenAIProvider("fixture-key", LLMModel("image", "Image", "openAI"),
                 server.url("/v1").toString().trimEnd('/'))
             val gemini = GeminiProvider("fixture-key", LLMModel("image", "Image", "gemini"),
@@ -384,13 +410,13 @@ class ImageModelRequestsTest {
             val dash = ImageGen.Endpoint(instance(ProviderType.openAI).copy(
                 customBaseURL = server.url("/dashscope/compatible-mode/v1").toString().trimEnd('/'),
             ), "fixture-key", "qwen-image-3.0")
-            assertSame(failure, runCatching {
+            assertBlocked(runCatching {
                 ImageModelRequests.request(openai, "Draw", allowFormatRetry = false, beforeRequest = preflight)
             }.exceptionOrNull())
-            assertSame(failure, runCatching {
+            assertBlocked(runCatching {
                 ImageModelRequests.request(gemini, "Draw", allowFormatRetry = false, beforeRequest = preflight)
             }.exceptionOrNull())
-            assertSame(failure, runCatching {
+            assertBlocked(runCatching {
                 ImageGen.generate(Mockito.mock(Context::class.java), dash, "Draw", allowFormatRetry = false, beforeRequest = preflight)
             }.exceptionOrNull())
             assertEquals(0, server.requestCount)

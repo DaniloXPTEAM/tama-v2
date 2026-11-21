@@ -14,11 +14,22 @@ object AutoModelFailure {
         ) : Decision
     }
 
+    /** No replay, no paid route, and no switch after a partial scoped reply. */
+    internal fun canSwitchFreeChat(decision: Decision?, ownKeyAutomatic: Boolean, receivedChunk: Boolean): Boolean =
+        ownKeyAutomatic && !receivedChunk && decision is Decision.Cooldown && decision.reason in setOf(
+            ModelHealth.Failure.RATE_LIMIT, ModelHealth.Failure.QUOTA, ModelHealth.Failure.FORBIDDEN,
+            ModelHealth.Failure.SERVER, ModelHealth.Failure.NETWORK, ModelHealth.Failure.NO_CREDIT,
+            ModelHealth.Failure.KEY_SPEND_LIMIT, ModelHealth.Failure.SPEND_LIMIT,
+        )
+
     fun classify(
         error: Throwable,
         sentTools: Boolean,
         switchOnAmbiguousAccessDenied: Boolean = true,
+        ownKeyTurn: Boolean = false,
+        ownKeyAutomatic: Boolean = false,
     ): Decision? {
+        if (ownKeyTurn && error is java.net.SocketTimeoutException) return Decision.Cooldown(ModelHealth.Failure.NETWORK)
         val llm = error as? LLMError ?: return null
         if (llm is LLMError.Cancelled) return null
         // A relay refusal can be a safety/policy refusal. Only an explicit allowance
@@ -32,12 +43,26 @@ object AutoModelFailure {
         if (!switchOnAmbiguousAccessDenied && ai.tama.net.OpenRouterSpendLimit.keyLimitIsZero(reach)) {
             return Decision.Cooldown(ModelHealth.Failure.KEY_SPEND_LIMIT)
         }
-        // An ambiguous 403 may be a policy or regional refusal, even if its text
-        // mentions tools. Only an explicitly classified credit/quota issue can move on.
+        if (ownKeyTurn) when (llm.tamaOwnKeyHint) {
+            ai.tama.net.OwnKeyFailureSignals.Hint.MODEL_UNAVAILABLE ->
+                return Decision.Cooldown(ModelHealth.Failure.MODEL_UNAVAILABLE, reach?.retryAfterS, reach?.retryAfterPresent == true)
+            ai.tama.net.OwnKeyFailureSignals.Hint.SPEND_LIMIT ->
+                return Decision.Cooldown(ModelHealth.Failure.SPEND_LIMIT, reach?.retryAfterS, reach?.retryAfterPresent == true)
+            ai.tama.net.OwnKeyFailureSignals.Hint.POLICY_REFUSAL -> return null
+            null -> if (reach?.httpStatus == 408) return Decision.Cooldown(ModelHealth.Failure.NETWORK)
+        }
+        // Auto may switch away from a real access denial on a personal route.
+        // It is not a bad key, credit issue or an HTTP status invented from SSE.
         if (!switchOnAmbiguousAccessDenied && reach != null &&
             (reach.kind == ProviderReach.Kind.ACCESS_DENIED ||
                 (reach.httpStatus == 403 && reach.kind != ProviderReach.Kind.NO_CREDIT &&
-                    reach.kind != ProviderReach.Kind.QUOTA))) return null
+                    reach.kind != ProviderReach.Kind.QUOTA))) {
+            return if (ownKeyTurn && ownKeyAutomatic && reach.httpStatus == 403 &&
+                reach.kind == ProviderReach.Kind.ACCESS_DENIED &&
+                !ai.tama.net.OwnKeyFailureSignals.policyRefusal(emptyList(), reach.originalMessage)) {
+                Decision.Cooldown(ModelHealth.Failure.FORBIDDEN, reach.retryAfterS, reach.retryAfterPresent)
+            } else null
+        }
         val message = reach?.originalMessage?.takeIf { it.isNotBlank() }
             ?: (llm as? LLMError.ProviderError)?.detail
         if (sentTools && CapabilityEvidence.explicitlyUnsupportedTools(reach?.httpStatus, message)) {

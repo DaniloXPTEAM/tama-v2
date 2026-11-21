@@ -4,6 +4,8 @@ import android.content.Context
 import com.openminis.app.data.model.ModelEntry
 import com.openminis.app.data.model.ProviderInstance
 import java.security.MessageDigest
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 /**
  * Device-local consent and capability evidence for an exact model route. None of these
@@ -126,6 +128,10 @@ object AutoModelStore {
         AutoModelRuntime.invalidateAccount(providerId)
     }
 
+    // UI invalidation only. Dispatch always reads the saved mode and rechecks authorization.
+    private val _modeChanges = MutableStateFlow(0L)
+    internal val modeChanges = _modeChanges.asStateFlow()
+
     /** Manual is the safe default until the person turns automatic selection on. */
     fun enabled(context: Context): Boolean = prefs(context).getBoolean(MODE, false)
 
@@ -138,6 +144,7 @@ object AutoModelStore {
     fun setEnabled(context: Context, enabled: Boolean) {
         advanceAutomaticPolicy()
         prefs(context).edit().putBoolean(MODE, enabled).apply()
+        _modeChanges.value = automaticPolicyRevision
     }
 
     /**
@@ -213,6 +220,25 @@ object AutoModelStore {
             reviewVersions[identity.providerId] ?: 0L,
             preferences.getBoolean(prefix(identity) + "approved", false),
             preferences.getBoolean(prefix(identity) + "image_approved", false))
+    }
+
+    /** Inspect the saved grant and override without letting a stale UI snapshot change the route. */
+    @Synchronized
+    internal fun inspectImageReview(context: Context, identity: Identity): Pair<Boolean, Boolean?> {
+        val preferences = prefs(context)
+        if (preferences.getString(currentRouteKey(identity.providerId), null) != identity.route) return false to null
+        val key = capabilityKey(identity, Need.IMAGE_GENERATION)
+        return preferences.getBoolean(prefix(identity) + "image_approved", false) to
+            if (preferences.contains(key)) preferences.getBoolean(key, false) else null
+    }
+
+    /** Caller proved the row is absent while holding the provider config lock. */
+    @Synchronized
+    internal fun forgetMissingImageReview(context: Context, identity: Identity): Boolean {
+        val written = prefs(context).edit().remove(prefix(identity) + "image_approved")
+            .remove(capabilityKey(identity, Need.IMAGE_GENERATION)).commit()
+        advanceReview(identity.providerId)
+        return written
     }
 
     /** Check an in-flight image selection without restoring an obsolete route or grant. */

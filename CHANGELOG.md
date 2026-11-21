@@ -4,6 +4,38 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+- Displayed the saved image from an Android Test image tool call in chat, even when the model does not repeat the attachment link or agent steps are hidden.
+
+- Restored missing free-chat evidence for approved accounts in Android Test without requiring a manual model pick first. Separated Agnes image evidence from chat pricing and showed the exact saved image approval that needs attention.
+
+- Routed standalone image requests, including the spelling “iamgem”, directly to the image tool in Android Test. Kept legacy Agnes image entries out of chat and replaced fake tool transcripts with a notice.
+
+- Kept image calls from managed shells on their own chat's free-only policy in Android Test.
+
+- Showed chat mode, the active personal-key route and separate input/output capabilities in the Android Test picker. Added code wrapping without changing copied text.
+
+- Added a searchable bundled provider directory and a dedicated custom compatible form to Android Test. Automatic code requests prefer capable, approved models.
+
+- Kept unverified image generators out of free-only Android Test requests and choices.
+
+- Distinguished image input from image output and queried the OpenRouter image-output catalogue in the Android Test build.
+
+- Distinguished confirmed free chat offers from unverified account plans and prices in the Android Test build, without asking users to declare a plan.
+
+- Prevented a read-only Android test key check from sending the key again after an HTTP 503 that requests an immediate retry.
+
+- Adjusted the parallel Android test build’s chat header, model picker, avatar footer and Hands setup, with PT-BR labels.
+
+- Counted confirmed personal-key chat responses and offered a larger approved context after a confirmed input overflow in the parallel Android test build.
+
+- Clarified image cost refusals for personal-key chat in the parallel Android test build without changing media permissions.
+
+- Added a read-only key check to the saved-provider screen and kept provider-prefix hints from replacing the address on paste in the parallel Android test build.
+
+- Unified the personal-key free chat filter and bulk approval in the parallel Android test build without changing the cost guards.
+
+- Fixed automatic chat recovery for misconfigured recipients and explicit provider refusals on personal-key routes in the parallel Android test build.
+
 - Clarified the parallel Android chat usage sheet when provider usage has not been reported.
 
 - Added a reversible free-catalogue view filter for own-key OpenRouter providers in the parallel Android test build.

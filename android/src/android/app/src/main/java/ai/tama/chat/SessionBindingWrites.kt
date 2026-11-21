@@ -29,8 +29,14 @@ internal class SessionBindingWrites(private val scope: CoroutineScope) {
         submitVersioned(sessionId, action).result
 
     /** A snapshot is ordered with writes but does not invalidate a rollback. */
-    fun <T> read(sessionId: String, action: suspend () -> T): Deferred<T> =
-        checkNotNull(enqueue(sessionId, isWrite = false, expected = null, action = action)).result
+    fun <T> read(sessionId: String, action: suspend () -> T): Deferred<T> = readVersioned(sessionId, action).result
+
+    fun <T> readVersioned(sessionId: String, action: suspend () -> T): Write<T> =
+        checkNotNull(enqueue(sessionId, isWrite = false, expected = null, action = action))
+
+    fun isCurrent(sessionId: String, version: Long): Boolean = synchronized(lock) {
+        (latestWrite[sessionId] ?: 0L) == version
+    }
 
     fun <T> submitVersioned(sessionId: String, action: suspend () -> T): Write<T> =
         checkNotNull(enqueue(sessionId, isWrite = true, expected = null, action = action))

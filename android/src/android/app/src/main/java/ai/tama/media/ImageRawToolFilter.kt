@@ -1,48 +1,54 @@
 package ai.tama.media
 
+import java.util.Locale
+
 /**
- * Filters literal tool syntax from an image reply, including markers split across
- * stream chunks. It never parses or executes text as a tool. Pending memory is
- * bounded by the marker length, even when a provider never closes the tag.
+ * Removes literal tool transcripts from an assistant text stream. Once a known
+ * marker is seen, drop the suffix of this completion: it can contain a forged
+ * result or attachment even after the closing tag. This is not a tool parser.
  */
 internal class ImageRawToolFilter(private val replacement: String) {
-    private val markers = listOf("<tool_call", "<function=")
     private val pending = StringBuilder()
-    private val tail = StringBuilder()
-    private var close: String? = null
+    private var discarded = false
 
-    fun push(text: String): String = buildString {
-        for (char in text) {
-            val closing = close
-            if (closing != null) {
-                tail.append(char.lowercaseChar())
-                if (tail.length > closing.length) tail.deleteCharAt(0)
-                if (tail.toString() == closing) { close = null; tail.setLength(0) }
-                continue
-            }
-            pending.append(char)
-            while (pending.isNotEmpty()) {
-                val prefix = pending.toString().lowercase(java.util.Locale.ROOT)
-                val match = markers.firstOrNull { it == prefix }
-                if (match != null) {
-                    append(replacement)
-                    pending.setLength(0)
-                    close = if (match == "<tool_call") "</tool_call>" else "</function>"
-                    tail.setLength(0)
-                    break
+    fun push(text: String): String {
+        if (discarded) return ""
+        if (pending.isEmpty() && '<' !in text) return text
+        return buildString {
+            for (char in text) {
+                pending.append(char)
+                while (pending.isNotEmpty()) {
+                    val prefix = pending.toString().lowercase(Locale.ROOT)
+                    if (prefix in markers) {
+                        pending.setLength(0)
+                        discarded = true
+                        append(replacement)
+                        return@buildString
+                    }
+                    if (markers.any { it.startsWith(prefix) }) break
+                    append(pending[0])
+                    pending.deleteCharAt(0)
                 }
-                if (markers.any { it.startsWith(prefix) }) break
-                append(pending[0])
-                pending.deleteCharAt(0)
             }
         }
     }
 
     fun finish(): String {
-        if (close != null) { pending.setLength(0); return "" }
         val value = pending.toString()
         pending.setLength(0)
-        val lower = value.lowercase(java.util.Locale.ROOT)
-        return if (lower.startsWith("<tool") || lower.startsWith("<function")) replacement else value
+        // The stream can end in the middle of a recognizable marker.
+        val name = value.lowercase(Locale.ROOT).removePrefix("<").removePrefix("/")
+        return if (tagPrefixes.any { name.startsWith(it) }) replacement else value
+    }
+
+    private companion object {
+        val markers = setOf(
+            "<tool_call", "</tool_call>", "<function=", "</function>",
+            "<functioncalls>", "</functioncalls>", "<function_calls>", "</function_calls>",
+            "<functionresult>", "</functionresult>", "<function_result>", "</function_result>",
+            "<tool_result>", "</tool_result>", "<invoke name=", "</invoke>",
+            "<shellexecute>", "</shellexecute>", "<shell_execute>", "</shell_execute>",
+        )
+        val tagPrefixes = setOf("tool", "function", "shell", "invoke")
     }
 }

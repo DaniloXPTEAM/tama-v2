@@ -8,7 +8,16 @@ import com.openminis.app.data.model.ProviderType
  * overwritten. OpenRouter's transport always uses its own fixed endpoint.
  */
 internal object ProviderEndpoints {
-    private const val OPENROUTER = "https://openrouter.ai/api/v1"
+    const val OPENROUTER_BASE = "https://openrouter.ai/api"
+    private const val OPENROUTER = "$OPENROUTER_BASE/v1"
+    const val AGNES_BASE = "https://apihub.agnes-ai.com/v1"
+
+    fun isAgnesBase(value: String?): Boolean = value != null && try {
+        val uri = java.net.URI(value.trim())
+        uri.scheme.equals("https", ignoreCase = true) && uri.host.equals("apihub.agnes-ai.com", ignoreCase = true) &&
+            (uri.port == -1 || uri.port == 443) && uri.userInfo == null && uri.rawQuery == null &&
+            uri.rawFragment == null && uri.rawPath?.trimEnd('/') == "/v1"
+    } catch (_: Exception) { false }
 
     /** Only the actual public OpenAI base can receive its built-in model list. */
     fun isOfficialOpenAIBase(value: String): Boolean = try {
@@ -24,7 +33,7 @@ internal object ProviderEndpoints {
         ProviderType.openAI, ProviderType.openAIResponses -> "https://api.openai.com"
         ProviderType.anthropic -> "https://api.anthropic.com"
         ProviderType.gemini -> "https://generativelanguage.googleapis.com/v1beta"
-        ProviderType.openRouter -> OPENROUTER
+        ProviderType.openRouter -> OPENROUTER_BASE
         ProviderType.xAI -> "https://api.x.ai"
         ProviderType.kimiCode -> "https://api.kimi.com/coding"
         ProviderType.antigravity, ProviderType.unsupported -> ""
@@ -77,8 +86,8 @@ internal object ProviderEndpoints {
 /** A local hint only. The caller must ask the person before changing providers. */
 internal object ProviderKeySuggestion {
     /** Never replace a manual URL or an explicitly chosen vendor. */
-    fun mayFill(endpointEdited: Boolean, hasSelectedVendor: Boolean, autoSuggested: Boolean): Boolean =
-        !endpointEdited && (!hasSelectedVendor || autoSuggested)
+    fun mayOfferPreset(endpointEdited: Boolean, hasSelectedVendor: Boolean): Boolean =
+        !endpointEdited && !hasSelectedVendor
 
     fun match(key: String, hints: List<Pair<String, String?>>): String? {
         val pasted = key.trim()

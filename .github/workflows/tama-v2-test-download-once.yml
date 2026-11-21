@@ -1,0 +1,223 @@
+name: Tama V2 Test public signed APK
+run-name: 'Tama V2 Test assinado · download público do commit 255a8aa'
+
+on:
+  push:
+    branches: ["arena/a4704b56-tama-v2"]
+    paths: [".github/workflows/tama-v2-test-download-once.yml"]
+
+permissions:
+  contents: read
+
+env:
+  TAMA_TEST_SOURCE_SHA: '255a8aa171db886707edab1a3bb105b7a56d8afd'
+  TAMA_TEST_APK_NAME: Tama-V2-Test-255a8aa171db.apk
+  EXPECTED_CERT_SHA256: 'E5:9C:BA:96:EF:A4:EB:21:9E:D5:A1:90:3F:D6:8F:87:AA:BB:6C:D2:75:07:CD:6F:88:D1:04:E2:5E:0F:93:4F'
+  NDK_VERSION: 27.2.12479018
+
+jobs:
+  tama-test-apk:
+    # The push runs this delivery workflow, but the APK source is the already
+    # verified commit below. Keep this exception separate from main delivery.
+    if: >-
+      ${{ github.event_name == 'push'
+          && github.repository == 'DaniloXPTEAM/tama-v2'
+          && github.ref == 'refs/heads/arena/a4704b56-tama-v2' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.TAMA_TEST_SOURCE_SHA }}
+          submodules: recursive
+          persist-credentials: false
+      - name: Confirm the pinned APK source
+        shell: bash
+        run: test "$(git rev-parse HEAD)" = "$TAMA_TEST_SOURCE_SHA"
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache-jdk: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.26'
+          cache: false
+      - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+        with:
+          packages: platforms;android-36 build-tools;35.0.0 cmake;3.22.1 ndk;${{ env.NDK_VERSION }}
+      - name: Build required native dependencies locally
+        shell: bash
+        env:
+          GOTOOLCHAIN: auto
+        run: |
+          export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/$NDK_VERSION"
+          export GOROOT="$(go env GOROOT)" GOPATH="$(go env GOPATH)"
+          export PATH="$GOPATH/bin:$PATH"
+          bash scripts/android/build-natives.sh
+      - name: Assemble only the stably signed Tama V2 Test
+        shell: bash
+        working-directory: android/src/android
+        env:
+          TAMA_TEST_KEYSTORE_BASE64: ${{ secrets.TAMA_TEST_KEYSTORE_BASE64 }}
+          TAMA_TEST_STORE_PASSWORD: ${{ secrets.TAMA_TEST_STORE_PASSWORD }}
+          TAMA_TEST_KEY_ALIAS: ${{ secrets.TAMA_TEST_KEY_ALIAS }}
+          TAMA_TEST_KEY_PASSWORD: ${{ secrets.TAMA_TEST_KEY_PASSWORD }}
+        run: |
+          set +x
+          set -euo pipefail
+          missing=()
+          for name in TAMA_TEST_KEYSTORE_BASE64 TAMA_TEST_STORE_PASSWORD TAMA_TEST_KEY_ALIAS TAMA_TEST_KEY_PASSWORD; do
+            if [[ -z "${!name:-}" ]]; then
+              missing+=("$name")
+            fi
+          done
+          if ((${#missing[@]})); then
+            printf '::error::Missing signing secrets: %s. No debug fallback is allowed.\n' "${missing[*]}"
+            exit 1
+          fi
+          umask 077
+          TAMA_TEST_KEYSTORE_FILE=$(mktemp --suffix=.p12 "$RUNNER_TEMP/tama-test-signing.XXXXXX")
+          export TAMA_TEST_KEYSTORE_FILE
+          trap 'rm -f -- "$TAMA_TEST_KEYSTORE_FILE"' EXIT
+          if ! printf '%s' "$TAMA_TEST_KEYSTORE_BASE64" | base64 --decode > "$TAMA_TEST_KEYSTORE_FILE" ||
+             [[ ! -s "$TAMA_TEST_KEYSTORE_FILE" ]]; then
+            echo '::error::The test keystore could not be decoded.'
+            exit 1
+          fi
+          unset TAMA_TEST_KEYSTORE_BASE64
+          # Fail in seconds, not after a 6-minute build, if the secrets do not match the keystore.
+          if [[ "$TAMA_TEST_STORE_PASSWORD" != "$TAMA_TEST_KEY_PASSWORD" ]]; then
+            echo '::error::TAMA_TEST_STORE_PASSWORD e TAMA_TEST_KEY_PASSWORD sao diferentes; em PKCS12 precisam ser iguais.'
+            exit 1
+          fi
+          if ! keytool -list -keystore "$TAMA_TEST_KEYSTORE_FILE" -storetype PKCS12 -storepass:env TAMA_TEST_STORE_PASSWORD >/dev/null 2>&1; then
+            echo '::error::TAMA_TEST_STORE_PASSWORD nao abre o keystore (senha errada ou keystore corrompido).'
+            exit 1
+          fi
+          if ! keytool -list -keystore "$TAMA_TEST_KEYSTORE_FILE" -storetype PKCS12 -storepass:env TAMA_TEST_STORE_PASSWORD -alias "$TAMA_TEST_KEY_ALIAS" >/dev/null 2>&1; then
+            echo '::error::TAMA_TEST_KEY_ALIAS nao existe neste keystore.'
+            exit 1
+          fi
+          ks_fp=$(keytool -list -v -keystore "$TAMA_TEST_KEYSTORE_FILE" -storetype PKCS12 -storepass:env TAMA_TEST_STORE_PASSWORD -alias "$TAMA_TEST_KEY_ALIAS" 2>/dev/null | sed -nE 's/^[[:space:]]*SHA256: (.*)$/\1/p' | head -1)
+          if [[ "$ks_fp" != "$EXPECTED_CERT_SHA256" ]]; then
+            printf '::error::O certificado do keystore nao e o esperado (recebido: %s).\n' "$ks_fp"
+            exit 1
+          fi
+          export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/$NDK_VERSION"
+          # Keep Gradle output in memory; only fixed diagnostic categories can reach the Actions log.
+          python3 - <<'PY'
+          import runpy
+          import subprocess
+
+          build = subprocess.run([
+              './gradlew', ':app:assembleTamaTest', '--max-workers=1', '--console=plain', '--no-daemon',
+              '--no-build-cache', '--no-configuration-cache',
+              '-Dorg.gradle.jvmargs=-Xmx4608m -XX:MaxMetaspaceSize=768m -Dfile.encoding=UTF-8',
+              '-Pkotlin.compiler.execution.strategy=in-process', '-Pkotlin.incremental=false',
+          ], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+          if build.returncode:
+              categories = runpy.run_path('../../../scripts/android/summarize-build-failure.py')['categories']
+              for category in categories(build.stdout[-8_000_000:].decode('utf-8', 'replace'), build.returncode):
+                  print(f'::error title=Tama V2 Test build::{category}. Raw Gradle output was not logged.')
+              raise SystemExit(max(1, build.returncode))
+          PY
+      - name: Verify APK identity, version and stable signature
+        id: verified
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$TAMA_TEST_SOURCE_SHA"
+          original=android/src/android/app/build/outputs/apk/tamaTest/app-tamaTest.apk
+          test -s "$original"
+          stage="$RUNNER_TEMP/tama-v2-test-public"
+          mkdir -m 0700 -- "$stage"
+          apk="$stage/$TAMA_TEST_APK_NAME"
+          install -m 0600 -- "$original" "$apk"
+          cmp -s -- "$original" "$apk"
+          tools="$ANDROID_HOME/build-tools/35.0.0"
+          badging=$("$tools/aapt" dump badging "$apk")
+          package_line=$(sed -n '/^package: /p' <<< "$badging")
+          package=$(sed -n "s/^package: name='\([^']*\)'.*/\1/p" <<< "$package_line")
+          code=$(sed -n "s/.* versionCode='\([0-9][0-9]*\)'.*/\1/p" <<< "$package_line")
+          version=$(sed -n "s/.* versionName='\([^']*\)'.*/\1/p" <<< "$package_line")
+          if [[ "$package" != ai.tama.assistant.tamav2test || "$code" != 530 || "$version" != 1.0.9-tama.1-teste.3 ]]; then
+            echo '::error::Unexpected Android package or version; nothing will be uploaded.'
+            exit 1
+          fi
+          if [[ "$(sed -n '/^native-code: /p' <<< "$badging")" != "native-code: 'arm64-v8a'" ]]; then
+            echo '::error::Unexpected APK ABI; nothing will be uploaded.'
+            exit 1
+          fi
+          if ! signature=$("$tools/apksigner" verify --print-certs "$apk" 2>/dev/null); then
+            echo '::error::The APK signature did not verify; nothing will be uploaded.'
+            exit 1
+          fi
+          mapfile -t fingerprints < <(sed -nE 's/^Signer #[0-9]+ certificate SHA-256 digest: (.*)$/\1/p' <<< "$signature")
+          if [[ ${#fingerprints[@]} -ne 1 || ! ${fingerprints[0]:-} =~ ^[0-9a-fA-F]{64}$ ]]; then
+            echo '::error::Expected a single verified signing certificate; nothing will be uploaded.'
+            exit 1
+          fi
+          actual=$(sed -E 's/(..)/\1:/g; s/:$//' <<< "${fingerprints[0]^^}")
+          if [[ "$actual" != "$EXPECTED_CERT_SHA256" ]]; then
+            printf '::error::Certificate SHA-256 mismatch (APK: %s; expected: %s). Nothing will be uploaded.\n' \
+              "$actual" "$EXPECTED_CERT_SHA256"
+            exit 1
+          fi
+          read -r apk_sha256 _ < <(sha256sum -- "$apk")
+          size=$(stat -c '%s' -- "$apk")
+          [[ "$apk_sha256" =~ ^[0-9a-f]{64}$ && "$size" =~ ^[1-9][0-9]*$ ]]
+          printf 'apk_sha256=%s\nsize=%s\n' "$apk_sha256" "$size" >> "$GITHUB_OUTPUT"
+          printf '::notice title=Tama V2 Test verified::source=%s; package=%s; versionCode=%s; versionName=%s; size=%s; APK SHA-256=%s; certificate SHA-256=%s\n' \
+            "$TAMA_TEST_SOURCE_SHA" "$package" "$code" "$version" "$size" "$apk_sha256" "$actual"
+      - name: Publish only the verified APK as a public Actions artifact for one day
+        id: published
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          path: ${{ runner.temp }}/tama-v2-test-public/${{ env.TAMA_TEST_APK_NAME }}
+          archive: false
+          retention-days: 1
+          if-no-files-found: error
+      - name: Download the published artifact by ID without extracting the APK
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          artifact-ids: ${{ steps.published.outputs.artifact-id }}
+          path: ${{ runner.temp }}/tama-v2-test-download
+          skip-decompress: true
+      - name: Verify the downloaded bytes and record the public download link
+        shell: bash
+        env:
+          APK_SHA256: ${{ steps.verified.outputs.apk_sha256 }}
+          APK_SIZE: ${{ steps.verified.outputs.size }}
+          ARTIFACT_ID: ${{ steps.published.outputs.artifact-id }}
+          ARTIFACT_URL: ${{ steps.published.outputs.artifact-url }}
+          ARTIFACT_DIGEST: ${{ steps.published.outputs.artifact-digest }}
+        run: |
+          set -euo pipefail
+          apk="$RUNNER_TEMP/tama-v2-test-download/$TAMA_TEST_APK_NAME"
+          test -s "$apk"
+          read -r downloaded_hash _ < <(sha256sum -- "$apk")
+          if [[ "$downloaded_hash" != "$APK_SHA256" || "${ARTIFACT_DIGEST#sha256:}" != "$APK_SHA256" ||
+                "$(stat -c '%s' -- "$apk")" != "$APK_SIZE" ]]; then
+            echo '::error::The published artifact does not match the verified APK.'
+            exit 1
+          fi
+          [[ "$ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]]
+          repo_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY"
+          test "$ARTIFACT_URL" = "$repo_url/actions/runs/$GITHUB_RUN_ID/artifacts/$ARTIFACT_ID"
+          {
+            printf '### TAMA V2 Test, download público\n\n'
+            printf '[Baixar `%s`](%s) (login no GitHub, retenção de 1 dia)\n\n' "$TAMA_TEST_APK_NAME" "$ARTIFACT_URL"
+            printf 'SHA-256: `%s` · %s bytes\n\n' "$downloaded_hash" "$APK_SIZE"
+            printf '[Código-fonte correspondente](%s/tree/%s) · [Licenças e avisos](%s/blob/%s/LICENCIAMENTO_TAMA.md)\n' \
+              "$repo_url" "$TAMA_TEST_SOURCE_SHA" "$repo_url" "$TAMA_TEST_SOURCE_SHA"
+          } >> "$GITHUB_STEP_SUMMARY"
+          printf '::notice title=Tama V2 Test public download::artifact=%s; source=%s; APK SHA-256=%s; size=%s\n' \
+            "$ARTIFACT_ID" "$TAMA_TEST_SOURCE_SHA" "$downloaded_hash" "$APK_SIZE"
+      - name: Remove the runner's APK copies
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          rm -f -- android/src/android/app/build/outputs/apk/tamaTest/app-tamaTest.apk \
+            "$RUNNER_TEMP/tama-v2-test-public/$TAMA_TEST_APK_NAME" \
+            "$RUNNER_TEMP/tama-v2-test-download/$TAMA_TEST_APK_NAME"

@@ -12,6 +12,19 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class SessionBindingWritesTest {
+    @Test fun `binding observation ignores other chats and detects the same value queued anew`() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        try {
+            val queue = SessionBindingWrites(scope)
+            val observed = queue.readVersioned("side") { "same entry" }
+            assertEquals("same entry", observed.result.await())
+            queue.submit("other") { Unit }.await()
+            assertTrue(queue.isCurrent("side", observed.version))
+            queue.submit("side") { "same entry" }.await()
+            assertFalse(queue.isCurrent("side", observed.version))
+        } finally { scope.cancel() }
+    }
+
     @Test fun `a later manual selection is not overwritten by an older delayed fallback`() = runBlocking {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         try {

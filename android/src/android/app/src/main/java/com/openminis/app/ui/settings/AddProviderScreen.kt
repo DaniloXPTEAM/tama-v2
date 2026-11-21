@@ -102,10 +102,8 @@ fun AddProviderScreen(
     val presetTemplate = remember(preset) { io.github.nanomuse.cloud.OwnKeyPresets.template(presetContext, preset) }
     var step by remember { mutableStateOf(if (presetTemplate != null) AddProviderStep.CONFIGURE else AddProviderStep.CHOOSE_TYPE) }
     // nanoMuse: keep a pasted key only while the form is open, including when
-    // the person explicitly accepts a suggested provider.
+    // the person explicitly chooses a suggested provider.
     var pendingApiKey by remember { mutableStateOf("") }
-    // nanoMuse: a prefix-suggested provider must be confirmed before saving.
-    var suggestionOrigin by remember { mutableStateOf<ProviderType?>(null) }
     var selectedType by remember { mutableStateOf<ProviderType?>(presetTemplate?.providerType) }
     var selectedCredential by remember {
         mutableStateOf<ProviderCredential?>(
@@ -134,7 +132,6 @@ fun AddProviderScreen(
             }
             AddProviderStep.CONFIGURE -> {
                 pendingApiKey = "" // nanoMuse: do not carry a key to a different form via Back
-                suggestionOrigin = null // nanoMuse
                 // nanoMuse: a preset came straight to the form; back leaves the screen.
                 if (presetTemplate != null && selectedVoiceTemplate === presetTemplate) {
                     onBack()
@@ -201,21 +198,11 @@ fun AddProviderScreen(
             voiceTemplate = selectedVoiceTemplate,
             apiKey = pendingApiKey,
             onApiKeyChange = { pendingApiKey = it },
-            autoSuggested = suggestionOrigin != null,
-            onKeySuggestion = { template ->
-                // nanoMuse: the visible form may be filled from a unique prefix,
-                // but Save stays disabled until the recipient is confirmed.
-                if (template != null) {
-                    if (suggestionOrigin == null) suggestionOrigin = selectedType
-                    selectedVoiceTemplate = template
-                    selectedType = template.providerType
-                } else if (suggestionOrigin != null) {
-                    selectedType = suggestionOrigin
-                    selectedVoiceTemplate = null
-                    suggestionOrigin = null
-                }
+            onSelectSuggestedProvider = { template ->
+                // nanoMuse: an explicit tap, never an automatic change on paste.
+                selectedVoiceTemplate = template
+                selectedType = template.providerType
             },
-            onConfirmSuggestion = { suggestionOrigin = null },
             onBack = handleBack,
             onSaved = onSaved,
         )
@@ -452,11 +439,9 @@ private fun ConfigureProviderScreen(
     credentialType: ProviderCredential,
     providerRepository: ProviderRepository,
     voiceTemplate: com.openminis.app.data.model.VoiceProviderTemplate? = null,
-    apiKey: String, // nanoMuse: survives an inferred provider suggestion
+    apiKey: String, // nanoMuse: keep the key when the person explicitly changes vendor
     onApiKeyChange: (String) -> Unit,
-    autoSuggested: Boolean,
-    onKeySuggestion: (com.openminis.app.data.model.VoiceProviderTemplate?) -> Unit,
-    onConfirmSuggestion: () -> Unit,
+    onSelectSuggestedProvider: (com.openminis.app.data.model.VoiceProviderTemplate) -> Unit,
     onBack: () -> Unit,
     onSaved: () -> Unit,
 ) {
@@ -501,7 +486,6 @@ private fun ConfigureProviderScreen(
         mutableStateOf(voiceTemplate?.appendV1 ?: (providerType != ProviderType.gemini))
     }
     var endpointEdited by remember(providerType, voiceTemplate?.id) { mutableStateOf(false) }
-    var importFreeOnly by remember { mutableStateOf(false) }
     val regionalProvider = remember(voiceTemplate?.id) {
         io.github.nanomuse.cloud.ProviderCatalogue.load(context).firstOrNull {
             it.id == voiceTemplate?.id && !it.baseUrlGlobal.isNullOrBlank()
@@ -533,14 +517,6 @@ private fun ConfigureProviderScreen(
             }
         }
 
-        // nanoMuse: this is an import preference, not a spending authorization.
-        if (nmParallel) {
-            ai.tama.providers.FreeModelImportSection(
-                type = providerType,
-                checked = importFreeOnly,
-                onCheckedChange = { importFreeOnly = it },
-            )
-        }
         if (nmParallel && credentialType == ProviderCredential.apiKey && regionalProvider != null) {
             ai.tama.providers.EndpointRegionSection(mainland) { selected ->
                 if (selected != mainland) {
@@ -560,24 +536,14 @@ private fun ConfigureProviderScreen(
                 providerType = providerType,
                 label = label,
                 apiKey = apiKey,
-                onApiKeyChange = { key ->
-                    onApiKeyChange(key)
-                    // nanoMuse: never overwrite a hand-edited address or a vendor
-                    // that the person explicitly chose. The match remains local.
-                    if (nmParallel && ai.tama.providers.ProviderKeySuggestion.mayFill(
-                            endpointEdited, voiceTemplate != null, autoSuggested,
-                        )) {
-                        onKeySuggestion(ai.tama.providers.suggestedKeyProvider(context, key))
-                    }
-                },
+                onApiKeyChange = onApiKeyChange,
                 customBaseURL = customBaseURL,
                 onCustomBaseURLChange = { customBaseURL = it; endpointEdited = true },
                 appendV1Suffix = appendV1Suffix,
                 onAppendV1Change = { appendV1Suffix = it; endpointEdited = true },
-                importFreeOnly = importFreeOnly,
-                autoSuggested = autoSuggested,
-                suggestedProviderName = voiceTemplate?.name.orEmpty(),
-                onConfirmSuggestion = onConfirmSuggestion,
+                requireCustomAddress = voiceTemplate?.id == "tama-custom",
+                canOfferPreset = ai.tama.providers.ProviderKeySuggestion.mayOfferPreset(endpointEdited, voiceTemplate != null),
+                onSelectSuggestedProvider = onSelectSuggestedProvider,
                 providerRepository = providerRepository,
                 onSaved = onSaved,
             )
@@ -585,7 +551,6 @@ private fun ConfigureProviderScreen(
                 providerType = providerType,
                 label = label,
                 providerRepository = providerRepository,
-                importFreeOnly = importFreeOnly,
                 onSaved = onSaved,
             )
         }
@@ -605,10 +570,9 @@ private fun ColumnScope.ApiKeyConfigSection(
     onCustomBaseURLChange: (String) -> Unit,
     appendV1Suffix: Boolean, // nanoMuse: shared with the regional endpoint selector
     onAppendV1Change: (Boolean) -> Unit,
-    importFreeOnly: Boolean,
-    autoSuggested: Boolean,
-    suggestedProviderName: String,
-    onConfirmSuggestion: () -> Unit,
+    requireCustomAddress: Boolean,
+    canOfferPreset: Boolean,
+    onSelectSuggestedProvider: (com.openminis.app.data.model.VoiceProviderTemplate) -> Unit,
     providerRepository: ProviderRepository,
     onSaved: () -> Unit,
 ) {
@@ -656,12 +620,6 @@ private fun ColumnScope.ApiKeyConfigSection(
         }
     }
 
-    // nanoMuse: the pre-filled host is only a prefix-based guess. Explicit
-    // confirmation is required before any key can be saved or sent there.
-    if (nmParallel && autoSuggested) {
-        ai.tama.providers.KeyProviderConfirmation(suggestedProviderName, onConfirmSuggestion)
-    }
-
     // ── Endpoint (skip for OpenRouter — fixed base URL) ─────────────────
     if (providerType != ProviderType.openRouter) {
         val defaultUrl = when (providerType) {
@@ -695,14 +653,17 @@ private fun ColumnScope.ApiKeyConfigSection(
         val baseUrlProblem = io.github.nanomuse.net.LanOnly.refusedHost(customBaseURL)?.let { stringResource(R.string.nm_lan_only_https, it) }
         SettingsSection(
             header = stringResource(R.string.add_provider_endpoint),
-            footer = baseUrlProblem ?: baseUrlFooter,
+            footer = baseUrlProblem ?: if (requireCustomAddress &&
+                !ai.tama.providers.ProviderDirectory.validCustomAddress(customBaseURL))
+                stringResource(R.string.nm_provider_custom_url_required) else baseUrlFooter,
         ) {
             SettingsCardBlock {
-                RowLabel(text = stringResource(R.string.add_provider_custom_api_base_optional))
+                RowLabel(text = stringResource(if (requireCustomAddress) R.string.nm_provider_custom_url
+                    else R.string.add_provider_custom_api_base_optional))
                 SectionTextField(
                     value = customBaseURL,
                     onValueChange = onCustomBaseURLChange,
-                    placeholder = defaultUrl,
+                    placeholder = if (requireCustomAddress) "https://api.example.com/v1" else defaultUrl,
                     singleLine = true,
                 )
             }
@@ -718,7 +679,7 @@ private fun ColumnScope.ApiKeyConfigSection(
         }
     } else if (nmParallel) {
         // nanoMuse: the OpenRouter transport has a fixed host; show the actual value.
-        ai.tama.providers.FixedEndpointSection("https://openrouter.ai/api/v1")
+        ai.tama.providers.OpenRouterEndpointSection()
     }
 
     // ── API Format (OpenAI only) ────────────────────────────────────────
@@ -749,47 +710,35 @@ private fun ColumnScope.ApiKeyConfigSection(
     }
 
     // nanoMuse: a prefix suggests an owner, not consent to send a key to another host.
-    val nmDestination = if (nmParallel) ai.tama.providers.ProviderEndpoints.factoryBase(
+    // nanoMuse: never display or test a stock destination for an empty custom field.
+    val nmCustomAddressMissing = nmParallel && requireCustomAddress &&
+        !ai.tama.providers.ProviderDirectory.validCustomAddress(customBaseURL)
+    val nmDestination = if (nmParallel && !nmCustomAddressMissing) ai.tama.providers.ProviderEndpoints.factoryBase(
         providerType, ai.tama.providers.ProviderEndpoints.storageBase(providerType, customBaseURL, appendV1Suffix), appendV1Suffix,
     ) else null
-    val nmDestinationAllowed = if (nmParallel) ai.tama.providers.KeyDestinationReview(apiKey, nmDestination) else true
-    // nanoMuse: this opt-in probe sends only a GET to a known official model list.
-    // A changed input gets fresh state; a late reply cannot describe another key.
+    val nmHasFreeCatalogue = ai.tama.pricing.DocumentedFreeChat.hasCatalogue(nmDestination,
+        openAiChat = providerType == ProviderType.openAI && !useResponsesAPI,
+        gemini = providerType == ProviderType.gemini, openRouter = providerType == ProviderType.openRouter)
+    var importFreeOnly by remember(nmDestination, useResponsesAPI) { mutableStateOf(false) }
     if (nmParallel) {
-        val plan = ai.tama.providers.KeyProbePlan.create(providerType, nmDestination)
-        val probeResult = remember(providerType, apiKey, nmDestination, autoSuggested) {
-            mutableStateOf<ai.tama.providers.KeyProbePlan.Outcome?>(null)
+        ai.tama.providers.FreeModelImportSection(type = providerType, checked = importFreeOnly,
+            onCheckedChange = { importFreeOnly = it }, hasCatalogue = nmHasFreeCatalogue, hasKey = apiKey.isNotBlank(),
+            agnes = ai.tama.providers.ProviderEndpoints.isAgnesBase(nmDestination)) // nanoMuse: show separate image evidence.
+    }
+    val nmDestinationAllowed = if (nmCustomAddressMissing) false
+        else if (nmParallel) ai.tama.providers.KeyDestinationReview(apiKey, nmDestination) else true
+    var probeResult by remember(providerType, apiKey, nmDestination, nmDestinationAllowed) {
+        mutableStateOf<ai.tama.providers.KeyProbePlan.Result?>(null)
+    }
+    if (nmParallel) {
+        val hintContext = LocalContext.current
+        val hint = remember(apiKey) { ai.tama.providers.suggestedKeyProvider(hintContext, apiKey) }
+        if (hint != null && ai.tama.providers.ProviderEndpoints.effective(
+                hint.providerType, hint.baseURL, hint.appendV1,
+            ) != nmDestination) {
+            ai.tama.providers.KeyProviderHint(hint.name, if (canOfferPreset) ({ onSelectSuggestedProvider(hint) }) else null)
         }
-        val probeRunning = remember(providerType, apiKey, nmDestination, autoSuggested) { mutableStateOf(false) }
-        val probeKey = apiKey.trim()
-        SettingsSection(footer = stringResource(R.string.nm_key_probe_help)) {
-            MinisButton(
-                onClick = {
-                    if (plan != null && !autoSuggested && nmDestinationAllowed &&
-                        ai.tama.providers.KeyDestinationGuard.permits(probeKey, nmDestination) &&
-                        ai.tama.providers.KeyProbePlan.validKey(probeKey)) {
-                        probeRunning.value = true
-                        probeResult.value = null
-                        scope.launch {
-                            try { probeResult.value = ai.tama.providers.KeyProbe.check(plan, probeKey) }
-                            finally { probeRunning.value = false }
-                        }
-                    }
-                },
-                enabled = plan != null && !autoSuggested && nmDestinationAllowed && !probeRunning.value &&
-                    ai.tama.providers.KeyProbePlan.validKey(probeKey),
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-            ) { Text(stringResource(if (probeRunning.value) R.string.quicktest_testing else R.string.nm_key_probe_button)) }
-            val probeMessage = when {
-                plan == null -> R.string.nm_key_probe_unsupported
-                probeResult.value == ai.tama.providers.KeyProbePlan.Outcome.ACCEPTED -> R.string.nm_key_probe_accepted
-                probeResult.value == ai.tama.providers.KeyProbePlan.Outcome.REJECTED -> R.string.nm_key_probe_rejected
-                probeResult.value == ai.tama.providers.KeyProbePlan.Outcome.DENIED -> R.string.nm_key_probe_denied
-                probeResult.value == ai.tama.providers.KeyProbePlan.Outcome.UNAVAILABLE -> R.string.nm_key_probe_unavailable
-                else -> null
-            }
-            if (probeMessage != null) Text(stringResource(probeMessage), modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
-        }
+        ai.tama.providers.KeyProbeSection(providerType, apiKey, nmDestination, nmDestinationAllowed) { probeResult = it }
     }
     // ── Save button (outside any section — terminal action) ────────────
     Spacer(Modifier.height(20.dp))
@@ -806,21 +755,21 @@ private fun ColumnScope.ApiKeyConfigSection(
                 credentialType = ProviderCredential.apiKey,
                 customBaseURL = storedBase,
                 appendV1Suffix = appendV1Suffix,
-                tamaImportFreeOnly = nmParallel && importFreeOnly, // nanoMuse
+                tamaImportFreeOnly = nmParallel && ((importFreeOnly && nmHasFreeCatalogue && apiKey.isNotBlank()) ||
+                    probeResult?.zeroSpendLimit == true), // nanoMuse
                 // Only OpenAI-family providers expose the Responses API toggle.
                 useResponsesAPI = providerType == ProviderType.openAI && useResponsesAPI,
             )
             // nanoMuse: do not leave the form or start a fetch if either local
             // credential or provider storage rejects the write.
             if (nmParallel) {
-                if (apiKey.isNotBlank() && !providerRepository.saveApiKeyChecked(instance.id, apiKey.trim())) {
+                if (!providerRepository.addApiKeyInstanceChecked(instance, apiKey)) {
                     saveFailed = true
                     return@MinisButton
                 }
-                if (!providerRepository.addInstanceChecked(instance)) {
-                    if (apiKey.isNotBlank()) runCatching { providerRepository.deleteApiKey(instance.id) }
-                    saveFailed = true
-                    return@MinisButton
+                if (probeResult?.zeroSpendLimit == true) {
+                    val version = ai.tama.router.AutoModelRuntime.accountVersion(instance.id)
+                    providerRepository.tamaRecordZeroSpendLimit(instance.id, version)
                 }
             } else {
                 providerRepository.addInstance(instance)
@@ -842,8 +791,8 @@ private fun ColumnScope.ApiKeyConfigSection(
         // private relays need no key. Official endpoints and OAuth flows
         // keep requiring a credential. Mirrors iOS AddProviderView.
         // nanoMuse: no saving while the endpoint is a plain http:// address off the local network
-        enabled = (!nmParallel || (!autoSuggested && nmDestinationAllowed)) && io.github.nanomuse.net.LanOnly.refusedHost(customBaseURL) == null && (
-            apiKey.isNotBlank() || (
+        enabled = nmDestinationAllowed && io.github.nanomuse.net.LanOnly.refusedHost(customBaseURL) == null && (
+            apiKey.isNotBlank() || (!ai.tama.providers.ProviderEndpoints.isAgnesBase(nmDestination) &&
                 (if (nmParallel) ai.tama.providers.ProviderEndpoints.storageBase(providerType, customBaseURL, appendV1Suffix) != null
                     else customBaseURL.isNotBlank()) &&
                     (providerType == ProviderType.openAI || providerType == ProviderType.anthropic)
@@ -863,7 +812,6 @@ private fun ColumnScope.OAuthConfigSection(
     providerType: ProviderType,
     label: String,
     providerRepository: ProviderRepository,
-    importFreeOnly: Boolean, // nanoMuse
     onSaved: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -950,7 +898,6 @@ private fun ColumnScope.OAuthConfigSection(
                     label = label.ifBlank { providerType.displayName },
                     providerType = providerType,
                     credentialType = ProviderCredential.oauth,
-                    tamaImportFreeOnly = nmParallel && importFreeOnly, // nanoMuse
                 )
                 if (nmParallel) {
                     val snapshot = authenticatedSnapshot
@@ -1089,7 +1036,7 @@ private fun ColumnScope.OAuthConfigSection(
         }
         // nanoMuse: OpenRouter always uses its fixed host even for manual OAuth.
         if (nmParallel && providerType == ProviderType.openRouter) {
-            ai.tama.providers.FixedEndpointSection("https://openrouter.ai/api/v1")
+            ai.tama.providers.OpenRouterEndpointSection()
         }
         // nanoMuse: plain http:// only for addresses on the local network
         val manualBaseProblem = io.github.nanomuse.net.LanOnly.refusedHost(customBaseURL)?.let { stringResource(R.string.nm_lan_only_https, it) }
@@ -1137,7 +1084,6 @@ private fun ColumnScope.OAuthConfigSection(
                     credentialType = ProviderCredential.oauth,
                     customBaseURL = if (nmParallel && providerType == ProviderType.openRouter) null else trimmedBase.ifEmpty { null },
                     appendV1Suffix = appendV1Suffix,
-                    tamaImportFreeOnly = nmParallel && importFreeOnly, // nanoMuse
                 )
                 // nanoMuse: the parallel app stores a real manual bearer in
                 // both OAuth storage and its API-key mirror where applicable.

@@ -11,5 +11,12 @@ fun main() {
     val unknown = ImageFailureInstruction.forCode("image_failed")
     check("may have been charged" in unknown)
     check("Do not retry" in unknown)
+    check("charged" !in ImageFailureInstruction.forCode("image_failed", neutralCharge = true))
+    check(!OwnKeyImagePolicy.generates(true, listOf("text"), setOf("vision")))
+    check(!OwnKeyImagePolicy.generates(false, listOf("image"), setOf("image_gen")))
+    check(OwnKeyImagePolicy.generates(true, listOf("text", "image"), emptySet()))
+    check(OwnKeyImagePolicy.generates(true, null, setOf("image_gen")))
+    check(OwnKeyImagePolicy.reason(false) == OwnKeyImagePolicy.Reason.NO_GENERATOR)
+    check(OwnKeyImagePolicy.reason(true) == OwnKeyImagePolicy.Reason.NO_VERIFIED_FREE_GENERATOR)
     println("PASSOU: avisos de bloqueio e falha sem rede")
 }

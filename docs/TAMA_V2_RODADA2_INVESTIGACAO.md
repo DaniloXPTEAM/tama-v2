@@ -1,0 +1,74 @@
+# Tama V2 Test — investigação da rodada 2
+
+Veja também a [correção P0-1 e o roteiro de aceite](TAMA_V2_RODADA2_P0_1.md).
+
+## O que o histórico prova
+
+- **FEITO — `154f076fdaed76f1ef5646895a1954dd74d237f9` e `06f9daf^`.** Com base e chave válidas, `ProviderFactory.kt` já construía o cliente OpenAI compatível para `https://api.groq.com/openai/v1`. `OpenAIProvider.kt` usava o ID selecionado e postava em `/chat/completions`, sem veto local pelo preço. `GeminiProvider.kt` também não tinha esse veto. É um caminho utilizável pelo código; o funcionamento da conta gratuita, do modelo `openai/gpt-oss-120b` e dos limites reais nesses commits não foi testado no aparelho.
+- **FEITO — `06f9dafa`, primeiro veto de custo no histórico da `main`.** `git log -S'ModelCostGuard.requireAllowed()'` e o diff com o pai mostram a chamada entrando no stream de OpenAI e de Gemini antes do envio. `3711f582` (`main`) contém essa mesma guarda. Compilamos a implementação histórica em JVM: no pacote Test e com consentimento desligado, lançou `Blocked` antes do dublê de envio (0 chamadas); no pacote normal o dublê recebeu 1 chamada. Sem credenciais ou rede. Isso reproduz um mecanismo compatível com a recusa local de 16–41 ms; não prova qual ramo o Poco percorreu em cada turno.
+- **FEITO — `43df5eea`, filtro de chat na PR #7 (`d786d9b`).** `FreeModelImport.supports` e `tamaEligibleFreeModelIds` só reconheciam evidência fresca do OpenRouter. `ProviderRepository.tamaAllowsChatModel` e `ModelSlots.chatEntriesOf` removiam as rotas sem evidência quando o filtro era ligado. É um segundo bloqueio, independente de `06f9dafa` e ausente na `main` comparada.
+- **FEITO — catálogo local.** `models-dev-api.json` tem 225 provedores. Nos campos `cost.input` e `cost.output`, Groq tem 1/16 zeros, NVIDIA 99/103 e Agnes 2/3. Isso não equivale a preço final ou a acesso por conta. O `openai/gpt-oss-120b` da Groq tem tarifa de plano na amostra; a informação da conta deve ser separada do preço de tabela. O modo filtrado da PR não consultava esse catálogo para os três.
+
+Referências de reprodução: `git show <rev>:android/src/android/app/src/main/java/com/openminis/app/provider/{openai/OpenAIProvider,gemini/GeminiProvider}.kt` (um caminho por vez), `git diff 06f9daf^ 06f9daf` e `git log --ancestry-path -S'ModelCostGuard.requireAllowed()' 154f076..3711f58 -- android/src/android/app/src/main/java/com/openminis/app/provider`.
+
+## Onde uma recusa local pode ocorrer
+
+Caminhos relativos a `android/src/android/app/src/main/java`. Não confundir recepção de HTTP, execução de ferramenta e envio de chat.
+
+| Regra e código | Condição no Test | Mensagem relevante / ação indicada |
+| --- | --- | --- |
+| `ai/tama/pricing/ModelCostGuard.kt`; transportes `provider/{openai,gemini,anthropic}`, `provider/voice`, `OwnTurns`, `QuickTestSheet`, `ModelUseOffloadHandler`, `MediaOffloadHandler` | Custo não comprovado e consentimento de processo desligado/revogado. Não é resposta HTTP. | Chat compatível: ver lista e custo em Provedores; usar só rotas com evidência da API. Nas demais rotas, selecionar opção comprovada ou revisar a autorização aplicável, nunca ativá-la sozinho. |
+| `ai/tama/pricing/FreeModelList.kt`, `ProviderRepository.kt`, `ChatViewModel.kt`, `ModelSlots.kt` | Filtro da conta ou teto zero do OpenRouter; modelo sem evidência atual, ou de fora da lista restrita. | Atualizar e escolher modelo elegível no OpenRouter. Em conta direta compatível, conferir se o provedor divulga evidência para esse modelo e essa rota. |
+| `ai/tama/providers/KeyDestinationGuard.kt` | Prefixo indica outro destinatário, sem confirmação para o endereço exato. | Revisar o endereço em Provedores, sem enviar a chave para destino incorreto. Não é uma regra de custo. |
+| `ai/tama/router/AutomaticCostGuard.kt`, `ModelRouter.kt`, `AutoModelStore.kt`, `ModelHealth.kt` e seleção/reserva/revalidação em `ChatViewModel.kt` | Auto exige rota habilitada, visível, credencial, aprovação, custo, capacidades, contexto e orçamento. Também pula duplicatas, rotas já tentadas, destinatários não confirmados e cooldowns. | `nm_auto_none` antes ocultava os motivos vindos do seletor. Distinguir aprovação, custo, configuração alterada, contexto e espera, sem mostrar nomes ou erros brutos do provedor. |
+| `DirectModelUseGuard.kt`, `VisionGroupResolver.kt`, `AutomaticAvatarGuard.kt`, `AutomaticVideoGuard.kt`, `MediaModelChangeGuard.kt`, `ImageDispatch.kt` | Uso direto durante Auto/edição da política; mídia precisa do modelo e permissão próprios. | Mensagens específicas do uso direto, visão, Avatar, vídeo e imagem. Revisar o slot ou usar o modo manual apropriado; uma rota gratuita de chat não libera esses caminhos. |
+| `ChatViewModel.kt` (ferramentas) | Argumentos truncados ou chamada inválida. Não é `ModelCostGuard.Blocked`. | Não executar a ferramenta; tentar novamente com um pedido menor, sem copiar argumentos para o diagnóstico. |
+
+**NÃO VERIFICADO:** status e conta do provedor no Poco, termos de cobrança e acesso aos modelos por plano. Nenhum diagnóstico solicita chaves, payloads ou capturas.
+
+## Evidência de gratuidade consultada em 18/11/2026
+
+| Provedor | Evidência encontrada e limite da conclusão |
+| --- | --- |
+| OpenRouter | [Catálogo](https://openrouter.ai/docs/api_reference/models) e [limites da chave](https://openrouter.ai/docs/api_reference/limits). Na correção P0-1, uma cotação fresca de zero para o ID exato libera o chat de texto, com ou sem `:free`. O limite de preço da requisição não é garantia sobre serviços BYOK ou plugins configurados fora dela. |
+| Groq | [Limites de Free/Developer](https://console.groq.com/docs/rate-limits), [modelos e tarifas](https://console.groq.com/docs/models) e [cobrança](https://console.groq.com/docs/billing-faqs). `openai/gpt-oss-120b`, `openai/gpt-oss-20b` e `qwen/qwen3.8-27b` são a lista de chat usada da oferta gratuita. O P0-1 usa a interseção com os IDs do teste mínimo da chave. A API documentada aceita a mesma rota para Free e Developer; os cabeçalhos medem limites, não a cobrança do pedido. **NÃO VERIFICADO:** plano de uma chave por endpoint de metadados. Não enviamos inferência para descobrir. |
+| Google Gemini | [Cobrança por projeto](https://ai.google.dev/gemini-api/docs/billing), [preço](https://ai.google.dev/gemini-api/docs/pricing) e [IDs da Gemma 4](https://ai.google.dev/gemini-api/docs/changelog). Gemini 2.5 Flash, Flash-Lite, Pro e Gemini 3.6 Flash têm opção gratuita e paga. As duas Gemma 4 (`gemma-4-31b-it`, `gemma-4-26b-a4b-it`) têm entrada/saída gratuita e tier pago indisponível na tabela do Gemini Developer API. Só esses IDs exatos entram sem preço embutido e sem autorização geral. |
+| NVIDIA | [NIM hospedado para prototipagem](https://www.nvidia.com/en-us/ai-data-science/products/nim-microservices/). A [página Qwen3](https://build.nvidia.com/qwen/qwen3-coder-480b-a35b-instruct) mostra também preços serverless; o [endpoint gratuito do Qwen2.5 Coder 32B](https://build.nvidia.com/qwen/qwen2_5-coder-32b-instruct) consta como obsoleto. O P0-1 usa o preço zero do ID exato no catálogo embutido correspondente para liberar o chat de texto; os zeros não confirmam plano nem acesso. |
+| Mistral | [Uso e limites](https://docs.mistral.ai/admin/user-management-finops/tier): Free não inclui API. [Labs](https://docs.mistral.ai/inference/model-lifecycle) são sem cobrança, mas a documentação marca exemplos como temporários. Nenhum modelo de produção foi liberado por esse rótulo. |
+| Cerebras | [Free Trial](https://inference-docs.cerebras.ai/support/rate-limits) é crédito com prazo, não tier gratuito permanente. Limites de Qwen 3.8 27B podem coincidir com o pago. |
+
+O app não pede declaração. `DocumentedFreeChat` separa Free, plano não confirmado, preço informado e cobrança recusada. `DocumentedChatDispatch` valida modelo/base/chave e conta no stream e de novo antes do envio; não altera a permissão global nem a nuvem; na Groq, “Testar chave” também atualiza a evidência da conta salva. A evidência local expira para exigir revisão. Antes do POST, a rota Gemini verifica o corpo completo: só partes de chat, funções locais e imagens inline JPEG, PNG ou WebP. Busca e execução hospedadas, cache, referência a arquivos remotos e mídia de saída não herdam o ticket. A lista usa metadados, não uma inferência de teste: uma resposta 2xx ou um cabeçalho de limite não provam custo zero. Uma falta de crédito devolvida durante o chat remove a rota da lista gratuita daquela conta, sem inferir cobrança de outros usuários.
+
+### Modalidades
+
+A atualização da lista completa no Test consulta o catálogo de texto e solicita, separadamente, `output_modalities=image` ao OpenRouter. O segundo resultado não apaga o de texto em caso de erro. Entrada `image` deixa o modelo ler imagens; saída `image` descreve geração, mas não comprova que o endpoint do aplicativo é compatível ou gratuito. A cotação de chat guarda as modalidades do ID exato. O catálogo embutido da rota correspondente documenta entrada de imagem para Gemma 4 31B e Nemotron 3 Nano Omni; nome, variante irmã e modalidade de outro provedor não servem de evidência. Áudio/vídeo nas informações do modelo só são confirmados com metadados, sem modificar os atalhos legados de voz.
+
+### NVIDIA: geração e edição de imagens (18/11/2026)
+
+A base de chat `https://integrate.api.nvidia.com/v1` não comprovou uma API de imagem compatível com `/images/generations`. A documentação usa outro host e outro corpo no NIM:
+
+| Modelo | Referência oficial | O que ainda falta para o Test |
+| --- | --- | --- |
+| FLUX.1 schnell | [NIM `ai.api.nvidia.com/v1/genai/black-forest-labs/flux.1-schnell`](https://docs.api.nvidia.com/nim/reference/black-forest-labs-flux_1-schnell-infer) | Adaptador NIM de texto para imagem, contrato de resposta e gratuidade da rota/chave. |
+| FLUX.1 dev | [NIM `ai.api.nvidia.com/v1/genai/black-forest-labs/flux.1-dev`](https://docs.api.nvidia.com/nim/reference/black-forest-labs-flux_1-dev-infer) | Adaptador NIM, esquema das referências aceitas e custo. O preview cita referências de exemplo para Canny/Depth. |
+| FLUX.1 Kontext dev | [NIM `ai.api.nvidia.com/v1/genai/black-forest-labs/flux.1-kontext-dev`](https://docs.api.nvidia.com/nim/reference/black-forest-labs-flux_1-kontext-dev-infer) | A operação documentada exige uma imagem; o preview lista imagens de exemplo. Faltam suporte a referências do usuário no endpoint escolhido, adaptador e custo. |
+| FLUX.2 Klein 4B | [NIM `ai.api.nvidia.com/v1/genai/black-forest-labs/flux.2-klein-4b`](https://docs.api.nvidia.com/nim/reference/black-forest-labs-flux_2-klein-4b-infer) | Adaptador para o modo explícito de geração/edição e confirmação de acesso e custo. A referência do preview limita a entrada de edição. |
+| Qwen Image e Qwen Image Edit | [Qwen Image](https://build.nvidia.com/qwen/qwen-image/deploy), [Qwen Image Edit](https://build.nvidia.com/qwen/qwen-image-edit/deploy) | As páginas documentam download/implantação. Não confirmei uma rota pública NVIDIA de inferência com preço zero. Não confundir parceiro ou instância hospedada com o catálogo de chat. |
+
+Nenhum POST de imagem foi feito. Em “Somente gratuitos” os modelos de imagem sem rota comprovadamente gratuita não aparecem como opção nem são trocados por um padrão pago. A seleção salva é preservada e o bloqueio é reavaliado antes de enviar. Fora desse modo, a tela ainda exige as permissões existentes; a resposta ao negar não foi alterada.
+
+### Catálogo e escolha para código
+
+Em `154f076`, `AddProviderScreen` tinha seis tipos nativos, incluindo OpenAI compatível. Os 225 provedores são registros do asset `models-dev-api.json`, não 225 integrações testadas. A lista Test em **Provedores → Adicionar → Mostrar todos os provedores** pesquisa nome, ID e endereço; quando não há protocolo conhecido ou base válida, a entrada fica visível sem formulário pré-configurado. Groq, Gemini, NVIDIA, DeepSeek e Mistral têm formulários conhecidos. Agnes AI e os sete roteadores solicitados usam as bases do catálogo OpenAI compatível. Os três modelos Agnes são de chat; nenhum tem saída de imagem no asset.
+
+Na falta de lista ao vivo para uma chave própria, o catálogo embutido só preenche modelos da base correspondente: não se usa outro provedor por semelhança de nomes ou só pelo host. O ranking de código é uma preferência do Auto para alguns pares base/ID (inclui Qwen Coder 480B/32B, GPT-OSS e Gemma 4); não prova capacidade, não muda grupos manuais e não permite uma rota sem autorização ou que falhe nos requisitos de custo e tamanho.
+
+### Como conferir no app
+
+- Depois de salvar uma chave com **Somente modelos gratuitos**, o cartão **Usar para** oferece só chat e revalida a conta, o endereço e o filtro. Se nenhum modelo qualificar, não troca o chat padrão por outro.
+- No seletor do chat com chave própria, veja a rota em uso e o modo **Automático/Manual**. A opção de modo vale para todos os chats, não aprova modelos e não altera permissões de custo. A troca fica desativada no seletor enquanto há uma resposta em andamento.
+- As etiquetas **Entrada** e **Saída** descrevem modalidades do modelo, não a capacidade do app de gerar mídia naquela rota. **Ferramentas** indica suporte de chat, não autorização para executar ações.
+- Em **Configurações → Modelos → Configurações avançadas de custo** ficam as duas permissões independentes. Não ative nenhuma delas para fazer um teste que exige custo zero.
+- As linhas longas dos blocos de código podem ser quebradas só na exibição; copiar continua levando o texto original. Pedidos explícitos de código como resposta podem usar um modelo só de texto; executar, salvar, anexar arquivos ou continuar uma ação mantém as exigências de ferramentas.
+
+O OpenRouter permite o stream principal de texto com cotação zero do ID exato. O ticket é restrito ao chat e exige preço máximo zero e ausência de fallback no pedido. A verificação não atesta o custo de BYOK, plug-ins ou outros serviços configurados na conta. Não há ticket de custo de imagem nesta versão. O comando `nanomuse-media image`, quando chamado por um shell de chat gerenciado no Test, lê o vínculo da conversa daquele processo. Uma conversa lateral em modo gratuito não usa o gerador pago do chat padrão. Uma troca de vínculo durante a permissão invalida a tentativa.

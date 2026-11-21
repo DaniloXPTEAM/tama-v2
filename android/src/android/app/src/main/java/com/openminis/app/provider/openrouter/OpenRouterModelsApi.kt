@@ -8,6 +8,7 @@ import com.openminis.app.provider.applyUserAgentOverride
 import com.openminis.app.provider.ProviderModelsCache
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONArray
@@ -16,6 +17,10 @@ import org.json.JSONObject
 object OpenRouterModelsApi {
     private val client = OkHttpClient.Builder().proxyAuthenticator(io.github.nanomuse.net.OwnProviderProxy.authenticator).build() // nanoMuse: Settings → Network, a proxy with a password
     private val cache = ProviderModelsCache("openrouter")
+    private val catalogueClient by lazy {
+        client.newBuilder().followRedirects(false).followSslRedirects(false).retryOnConnectionFailure(false)
+            .callTimeout(8, java.util.concurrent.TimeUnit.SECONDS).build()
+    }
 
     /**
      * Fetch OpenRouter's model catalog. OpenRouter returns rich metadata
@@ -28,55 +33,44 @@ object OpenRouterModelsApi {
      *   bypass the cache entirely (matches existing callers).
      * @param forceRefresh Skip the cache read but still write-through on success.
      */
-    suspend fun fetchModels(
+    internal suspend fun fetchModels(
         apiKey: String,
         context: Context? = null,
         forceRefresh: Boolean = false,
+        onTextCatalogue: ((ai.tama.pricing.OpenRouterPricing.Catalogue) -> Unit)? = null,
     ): List<LLMModel> = withContext(Dispatchers.IO) {
         val cacheKey = apiKey
-        if (context != null && !forceRefresh) {
+        if (context != null && !forceRefresh && onTextCatalogue == null) {
             cache.load(context, cacheKey)?.let { return@withContext it }
         }
 
         val request = catalogueRequest(apiKey) // nanoMuse: same host for both catalogue paths
 
-        // nanoMuse: reuse this existing fetch in the parallel app to retain only
-        // short-lived catalogue price evidence in memory. It is not a dispatch
-        // authorization and the ordinary 7-day model cache is not price evidence.
-        val priceTicket = if (com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test")
-            ai.tama.pricing.OpenRouterCatalogueCapture.memory.begin(System.currentTimeMillis()) else null
-        var priceCaptured = false
-        try {
-            val response = client.newCall(request).execute()
+        val parallel = com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test"
+        val startedAt = System.currentTimeMillis()
+        val (models, priceData) = (if (parallel) catalogueClient else client).newCall(request).execute().use { response ->
             val body = response.body?.string() ?: return@withContext emptyList()
-
             if (!response.isSuccessful) {
-                if (context != null && (response.code == 401 || response.code == 403)) {
-                    cache.invalidate(context, cacheKey)
-                }
+                if (context != null && (response.code == 401 || response.code == 403)) cache.invalidate(context, cacheKey)
                 return@withContext emptyList()
             }
-
-            val (models, priceData) = try {
-                val json = JSONObject(body)
-                val data = json.optJSONArray("data") ?: return@withContext emptyList()
+            try {
+                val data = JSONObject(body).optJSONArray("data") ?: return@withContext emptyList()
                 parseModels(data) to data
             } catch (_: Exception) {
                 return@withContext emptyList()
             }
-
-            val enriched = ModelsDevApi.enrichModels(models)
-            if (context != null) cache.save(context, cacheKey, enriched)
-            if (priceTicket != null) {
-                ai.tama.pricing.OpenRouterCatalogueCapture.memory.finish(priceTicket, priceData)
-                priceCaptured = true
-            }
-            enriched
-        } finally {
-            // A failed or cancelled refresh must not resurrect an older quote.
-            if (priceTicket != null && !priceCaptured)
-                ai.tama.pricing.OpenRouterCatalogueCapture.memory.finish(priceTicket, null)
         }
+        if (onTextCatalogue != null) onTextCatalogue(ai.tama.pricing.OpenRouterPricing.parse(priceData, startedAt))
+        val enriched = if (!parallel) ModelsDevApi.enrichModels(models) else {
+            // nanoMuse: /models defaults to text output. An independent
+            // image query cannot erase a successful text catalogue.
+            val images = fetchFreeCatalogue(catalogueRequest(apiKey, "image"), catalogueClient)
+                ?.models.orEmpty().filter { "image" in it.outputModalities.orEmpty() }
+            ModelsDevApi.enrichModelsForBase((images + models).distinctBy { it.id }, "https://openrouter.ai/api/v1")
+        }
+        if (context != null) cache.save(context, cacheKey, enriched)
+        enriched
     }
 
     // nanoMuse: the ordinary seven-day model cache contains no price evidence.
@@ -88,7 +82,7 @@ object OpenRouterModelsApi {
     )
 
     internal suspend fun fetchFreeCatalogue(apiKey: String): FreeCatalogue? =
-        fetchFreeCatalogue(catalogueRequest(apiKey), client)
+        fetchFreeCatalogue(catalogueRequest(apiKey), catalogueClient)
 
     // nanoMuse: injectable transport for local, credential-free wire tests. The
     // production entry point above always builds the fixed OpenRouter request.
@@ -108,8 +102,10 @@ object OpenRouterModelsApi {
         }
     }
 
-    internal fun catalogueRequest(apiKey: String): Request = Request.Builder() // nanoMuse: also verified by wire tests
-        .url("https://openrouter.ai/api/v1/models")
+    internal fun catalogueRequest(apiKey: String, outputModality: String? = null): Request = Request.Builder() // nanoMuse
+        .url("https://openrouter.ai/api/v1/models".toHttpUrl().newBuilder().apply {
+            if (outputModality != null) addQueryParameter("output_modalities", outputModality)
+        }.build())
         .header("Authorization", "Bearer $apiKey")
         .header("HTTP-Referer", "https://github.com/OpenMinis/OpenMinis")
         .header("X-Title", "TAMA AI App")

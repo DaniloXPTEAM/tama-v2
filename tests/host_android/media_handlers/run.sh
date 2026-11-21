@@ -4,6 +4,7 @@ set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/../../.." && pwd)
 HERE="$ROOT/tests/host_android/media_handlers"
 MAIN="$ROOT/android/src/android/app/src/main/java"
+TEST="$ROOT/android/src/android/app/src/test/java"
 : "${TAMA_JARS_DIR:?Set TAMA_JARS_DIR to the directory containing the host dependency JARs}"
 KOTLINC=$(command -v kotlinc)
 KOTLIN_HOME=$(cd "$(dirname "$(readlink -f "$KOTLINC")")/.." && pwd)
@@ -11,10 +12,12 @@ JUNIT_JAR=${JUNIT_JAR:-$TAMA_JARS_DIR/junit-4.13.2-source.jar}
 HAMCREST_JAR=${HAMCREST_JAR:-$TAMA_JARS_DIR/hamcrest-core-1.3.jar}
 JSON_JAR=${JSON_JAR:-$TAMA_JARS_DIR/json-20231013-source.jar}
 COROUTINES_JAR=${COROUTINES_JAR:-$KOTLIN_HOME/lib/kotlinx-coroutines-core-jvm.jar}
-for dependency in "$JUNIT_JAR" "$HAMCREST_JAR" "$JSON_JAR" "$COROUTINES_JAR"; do
+OKIO_JAR=${OKIO_JAR:-$TAMA_JARS_DIR/okio-3.6.0-source.jar}
+OKHTTP_JAR=${OKHTTP_JAR:-$TAMA_JARS_DIR/okhttp-4.12.0-source.jar}
+for dependency in "$OKIO_JAR" "$OKHTTP_JAR" "$JUNIT_JAR" "$HAMCREST_JAR" "$JSON_JAR" "$COROUTINES_JAR"; do
     [ -f "$dependency" ] || { echo "Missing host dependency: $dependency" >&2; exit 1; }
 done
-CP="$JUNIT_JAR:$HAMCREST_JAR:$JSON_JAR:$COROUTINES_JAR"
+CP="$OKIO_JAR:$OKHTTP_JAR:$JUNIT_JAR:$HAMCREST_JAR:$JSON_JAR:$COROUTINES_JAR"
 OUT=$(mktemp -d)
 trap 'rm -rf "$OUT"' EXIT
 python3 "$HERE/prepare_tests.py" "$ROOT" "$OUT"
@@ -35,12 +38,27 @@ kotlinc -nowarn -cp "$CP" -include-runtime -d "$OUT/media-host.jar" \
     "$MAIN/ai/tama/sandbox/OffloadPeerBindings.kt" \
     "$MAIN/ai/tama/pricing/ModelCostGuard.kt" \
     "$MAIN/ai/tama/chat/ChatSessionJobs.kt" \
+    "$MAIN/ai/tama/chat/SessionBindingWrites.kt" \
+    "$MAIN/ai/tama/media/CliImageScope.kt" \
+    "$TEST/ai/tama/media/CliImageScopeTest.kt" \
+    "$TEST/ai/tama/chat/SessionBindingWritesTest.kt" \
     "$MAIN/ai/tama/media/ImageAttemptTracker.kt" \
     "$MAIN/ai/tama/media/VideoAttemptTracker.kt" \
     "$MAIN/ai/tama/media/AutomaticVideoGuard.kt" \
     "$MAIN/ai/tama/media/MediaModelChangeGuard.kt" \
     "$MAIN/ai/tama/media/AutoImageNotices.kt" \
+    "$MAIN/ai/tama/media/OwnKeyImagePolicy.kt" \
+    "$MAIN/ai/tama/media/CustomImageRoute.kt" \
+    "$MAIN/ai/tama/providers/ProviderEndpoints.kt" \
+    "$MAIN/ai/tama/media/AgnesImages.kt" \
+    "$MAIN/ai/tama/media/AgnesImageApi.kt" \
+    "$MAIN/io/github/nanomuse/net/LanOnly.kt" \
+    "$MAIN/ai/tama/net/ImageRequestSafety.kt" \
+    "$MAIN/ai/tama/net/OwnKeyFailureSignals.kt" \
+    "$MAIN/ai/tama/media/ImageFailureInstruction.kt" \
+    "$MAIN/ai/tama/pricing/DocumentedFreeChat.kt" \
     "$MAIN/ai/tama/media/ImageDispatch.kt" \
+    "$MAIN/ai/tama/media/MediaPrompt.kt" \
     "$MAIN/ai/tama/media/MediaImageGate.kt" \
     "$MAIN/ai/tama/media/MediaImageServices.kt" \
     "$MAIN/ai/tama/media/MediaVideoServices.kt" \

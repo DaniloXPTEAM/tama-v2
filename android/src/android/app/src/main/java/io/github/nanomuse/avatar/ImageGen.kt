@@ -8,6 +8,7 @@ import com.openminis.app.MinisApp
 import com.openminis.app.data.model.LLMMessage
 import com.openminis.app.data.model.LLMModel
 import com.openminis.app.data.model.ModelEntry
+import com.openminis.app.data.model.ProviderCredential
 import com.openminis.app.data.model.ProviderInstance
 import com.openminis.app.data.model.ProviderType
 import com.openminis.app.logging.AppLogger
@@ -17,6 +18,15 @@ import com.openminis.app.provider.gemini.GeminiProvider
 import com.openminis.app.provider.openai.OpenAIProvider
 import io.github.nanomuse.cloud.NanoMuseCloud
 import io.github.nanomuse.media.RelayMediaPolicy
+import ai.tama.media.AgnesImageApi
+import ai.tama.media.AgnesImages
+import ai.tama.media.CustomImageRoute
+import ai.tama.media.ImageDispatch
+import ai.tama.media.OwnKeyImagePolicy
+import ai.tama.pricing.DocumentedFreeChat
+import ai.tama.providers.KeyDestinationGuard
+import ai.tama.providers.ProviderEndpoints
+import ai.tama.router.AutoModelStore
 import ai.tama.net.singleUseImageBody
 import ai.tama.net.singleUseImageClient
 import kotlinx.coroutines.CancellationException
@@ -50,6 +60,14 @@ object ImageGen {
     // nanoMuse: a choice changed away and back must not revive an in-flight image request.
     private var imageChoiceRevision = 0L
     @Synchronized internal fun imageChoiceRevision(): Long = imageChoiceRevision
+    private val parallel: Boolean get() = com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test"
+
+    private fun customOpenAi(instance: ProviderInstance): Boolean = parallel &&
+        instance.credentialType == ProviderCredential.apiKey && instance.customBaseURL != null &&
+        instance.providerType in setOf(ProviderType.openAI, ProviderType.openAIResponses) &&
+        !instance.azureMode && !speaksDashScope(baseUrlOf(instance)) &&
+        !ai.tama.providers.ProviderEndpoints.isOfficialOpenAIBase(baseUrlOf(instance))
+
     private fun advanceImageChoice() {
         check(imageChoiceRevision < Long.MAX_VALUE) { "image choice version exhausted" }
         imageChoiceRevision++
@@ -85,24 +103,126 @@ object ImageGen {
      * (contract C11, [io.github.nanomuse.cloud.Capabilities]): a DeepSeek or Groq key draws
      * nothing, and a ChatGPT plan signed in through the Codex OAuth is chat and vision only.
      */
+    // nanoMuse: scoped to personal keys in Test. A free chat filter is not
+    // evidence that a different endpoint (image creation) is free.
+    internal fun freeImagesOnly(context: Context, instanceId: String? = null): Boolean {
+        if (com.openminis.app.BuildConfig.APPLICATION_ID != "ai.tama.assistant.tamav2test") return false
+        val repo = (context.applicationContext as? MinisApp)?.providerRepositoryOrNull ?: return false
+        val id = instanceId ?: io.github.nanomuse.models.ModelSlots.ownChatInstance(context)?.id ?: return false
+        return repo.instance(id)?.let(repo::tamaFreeChatOnly) == true
+    }
+
+    internal data class SavedChoice(val instanceId: String, val model: String)
+
+    internal fun savedChoice(context: Context): SavedChoice? {
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val instanceId = prefs.getString(KEY_INSTANCE, null) ?: return null
+        return SavedChoice(instanceId, prefs.getString(KEY_MODEL, null).orEmpty().trim())
+    }
+
+    internal fun agnesAccounts(context: Context): List<ProviderInstance> =
+        (context.applicationContext as? MinisApp)?.providerRepositoryOrNull?.config?.value?.instances
+            .orEmpty().filter { it.isEnabled && AgnesImages.account(it) }
+
+    internal fun hasDeclaredFreeImage(context: Context): Boolean {
+        val repo = (context.applicationContext as? MinisApp)?.providerRepositoryOrNull ?: return false
+        return repo.config.value.instances.any { AgnesImages.route(it) && availableModels(context, it).isNotEmpty() }
+    }
+
+    internal fun noFreeImageAvailable(context: Context): Boolean {
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val picked = prefs.getString(KEY_INSTANCE, null)
+        if (freeImagesOnly(context) || (picked != null && freeImagesOnly(context, picked))) {
+            if (picked == null) return !hasDeclaredFreeImage(context)
+            val repo = (context.applicationContext as? MinisApp)?.providerRepositoryOrNull ?: return true
+            val inst = repo.instance(picked) ?: return true
+            return !AgnesImages.route(inst) || prefs.getString(KEY_MODEL, null) !in availableModels(context, inst)
+        }
+        val repo = (context.applicationContext as? MinisApp)?.providerRepositoryOrNull ?: return false
+        return repo.config.value.instances.any { it.isEnabled && repo.tamaFreeChatOnly(it) } && eligibleInstances(context).isEmpty()
+    }
+
+    /** No exemption for another base, model, cloud account, key, or learned payment refusal. */
+    internal fun declaredFree(context: Context, ep: Endpoint): Boolean {
+        if (!AgnesImages.route(ep.instance) || AgnesImages.model(ep.model) == null || ep.apiKey.isBlank()) return false
+        val repo = (context.applicationContext as? MinisApp)?.providerRepositoryOrNull ?: return false
+        val live = repo.config.value.instances.singleOrNull { it.id == ep.instanceId } ?: return false
+        return live.isEnabled && AgnesImages.route(live) &&
+            AutoModelStore.routeFingerprint(live) == AutoModelStore.routeFingerprint(ep.instance) &&
+            repo.tamaOwnApiKey(live) == ep.apiKey && ep.model in availableModels(context, live)
+    }
+
+    private fun requireImageCostScope(context: Context, ep: Endpoint) {
+        if (!OwnKeyImagePolicy.mayRequest(freeImagesOnly(context) || freeImagesOnly(context, ep.instanceId), declaredFree(context, ep))) {
+            throw OwnKeyImagePolicy.NoVerifiedFreeGenerator()
+        }
+    }
+
     fun eligibleInstances(context: Context): List<ProviderInstance> {
         val app = context.applicationContext as? MinisApp ?: return emptyList()
         val repo = app.providerRepositoryOrNull ?: return emptyList()
         val cloudId = NanoMuseCloud.instance(context)?.id
+        val freeOnly = freeImagesOnly(context)
         val relayCanDraw = cloudId != null &&
             NanoMuseCloud.baseUrl(context) != NanoMuseCloud.DEFAULT_BASE &&
             repo.config.value.instances.firstOrNull { it.id == cloudId }
                 ?.let { availableModels(context, it).isNotEmpty() } == true
         return repo.config.value.instances.filter { inst ->
-            (inst.id != cloudId || relayCanDraw) &&
+            if (AgnesImages.account(inst)) return@filter availableModels(context, inst).isNotEmpty()
+            !freeOnly && !freeImagesOnly(context, inst.id) && (inst.id != cloudId || relayCanDraw) &&
                 ImageModelRequests.supports(inst) &&
-                io.github.nanomuse.cloud.Capabilities.allows(context, inst, io.github.nanomuse.cloud.ProviderCatalogue.IMAGE)
+                if (inst.id != cloudId && customOpenAi(inst)) {
+                    val key = repo.usableApiKey(inst)
+                    key != null &&
+                        inst.imageEndpointMode != com.openminis.app.data.model.ImageEndpointMode.chatCompletions &&
+                        availableModels(context, inst).isNotEmpty()
+                } else io.github.nanomuse.cloud.Capabilities.allows(context, inst, io.github.nanomuse.cloud.ProviderCatalogue.IMAGE)
         }
     }
 
     /** No configured provider can draw: the one sentence that says so (C11), or null when one can. */
     fun unavailableLine(context: Context): String? =
-        if (eligibleInstances(context).isEmpty()) io.github.nanomuse.cloud.Capabilities.unavailableLine(context, io.github.nanomuse.cloud.ProviderCatalogue.IMAGE) else null
+        selectionProblem(context)?.let { context.getString(it.message) }
+            ?: if (noFreeImageAvailable(context)) context.getString(com.openminis.app.R.string.nm_free_image_unavailable)
+            else if (eligibleInstances(context).isEmpty()) io.github.nanomuse.cloud.Capabilities.unavailableLine(context, io.github.nanomuse.cloud.ProviderCatalogue.IMAGE) else null
+
+    /** A selected custom route is not silently replaced by another provider. */
+    internal fun selectionProblem(context: Context): CustomImageRoute.Problem? {
+        if (!parallel) return null
+        val repo = (context.applicationContext as? MinisApp)?.providerRepositoryOrNull ?: return null
+        val saved = savedChoice(context)
+        if (saved == null && endpoint(context) != null) return null
+        val instance = if (saved != null) repo.instance(saved.instanceId)
+            else agnesAccounts(context).firstOrNull() ?: io.github.nanomuse.models.ModelSlots.ownChatInstance(context)
+        val selected = saved?.model
+        if (instance?.let(AgnesImages::account) == true || selected?.let(AgnesImages::model) != null) {
+            if (instance == null || !instance.isEnabled || !AgnesImages.route(instance) ||
+                (selected != null && AgnesImages.model(selected) == null)) return CustomImageRoute.Problem.AGNES_UNAVAILABLE
+            if (repo.tamaOwnApiKey(instance) == null) return CustomImageRoute.Problem.NEEDS_KEY
+            // nanoMuse: distinguish an ambiguous legacy pin from an HTTP or key failure.
+            if (selected != null) {
+                val matching = repo.entriesFor(instance.id).filter { it.baseModel.id == selected }
+                if (matching.isNotEmpty() && AgnesImages.registeredEntry(matching) == null)
+                    return CustomImageRoute.Problem.AGNES_IMAGE_AMBIGUOUS
+            }
+            val ids = selected?.let { listOf(it) } ?: AgnesImages.models.map { it.id }
+            if (ids.all { repo.tamaPaymentRefused(instance.id, it) }) return CustomImageRoute.Problem.AGNES_PAYMENT
+            return if (ids.any { it in availableModels(context, instance) }) null else CustomImageRoute.Problem.AGNES_UNAVAILABLE
+        }
+        if (saved != null && (instance == null || !instance.isEnabled || selected.isNullOrBlank()))
+            return CustomImageRoute.Problem.UNCONFIRMED
+        if (instance == null || !customOpenAi(instance) || instance.id == NanoMuseCloud.instance(context)?.id) return null
+        if (noFreeImageAvailable(context)) return null
+        if (CustomImageRoute.nvidia(baseUrlOf(instance))) return CustomImageRoute.Problem.NVIDIA_NATIVE
+        val catalogue = availableModels(context, instance)
+        if (instance.imageEndpointMode == com.openminis.app.data.model.ImageEndpointMode.chatCompletions)
+            return CustomImageRoute.Problem.UNCONFIRMED
+        if (selected?.let { it in catalogue } ?: catalogue.isNotEmpty()) return null
+        val entries = repo.entriesFor(instance.id).filterNot { it.isHidden }.associate {
+            it.model.id to (repo.tamaModelMetadata(it, instance)?.outputs ?: it.model.outputModalities?.toSet())
+        }
+        return CustomImageRoute.missingModel(selected, entries)
+    }
 
     /**
      * Model entries of [instance] that draw: the catalogue says so (`image` among the output
@@ -114,11 +234,16 @@ object ImageGen {
     fun imageEntries(context: Context, instance: ProviderInstance): List<ModelEntry> {
         val app = context.applicationContext as? MinisApp ?: return emptyList()
         val repo = app.providerRepositoryOrNull ?: return emptyList()
+        if (freeImagesOnly(context) || freeImagesOnly(context, instance.id)) return emptyList() // nanoMuse
         val dashScope = speaksDashScope(baseUrlOf(instance))
         return repo.config.value.modelEntries.filter {
             it.providerInstanceId == instance.id && !it.isHidden && run {
                 val id = it.model.id
-                val draws = "image" in it.model.outputModalities.orEmpty() || looksLikeImageModel(id)
+                val outputs = repo.tamaModelMetadata(it, instance)?.outputs
+                // nanoMuse: explicit output metadata wins over the legacy name hint.
+                val draws = if (outputs != null) "image" in outputs
+                    else "image" in it.model.outputModalities.orEmpty() ||
+                        ((!customOpenAi(instance) || instance.id == NanoMuseCloud.instance(context)?.id) && looksLikeImageModel(id))
                 // Model Studio's native endpoint takes qwen-image and wan-image; z-image and the
                 // rest go through a different (asynchronous) API this build does not speak.
                 val native = id.startsWith("qwen-image", ignoreCase = true) ||
@@ -143,7 +268,24 @@ object ImageGen {
      * host leads; dated snapshots (`…-2026-03-03`) hide behind their undated alias.
      */
     fun availableModels(context: Context, instance: ProviderInstance): List<String> {
+        if (AgnesImages.account(instance)) {
+            if (!instance.isEnabled || !AgnesImages.route(instance)) return emptyList()
+            val repo = (context.applicationContext as? MinisApp)?.providerRepositoryOrNull ?: return emptyList()
+            val key = repo.tamaOwnApiKey(instance) ?: return emptyList()
+            if (!KeyDestinationGuard.permits(key, ProviderEndpoints.AGNES_BASE)) return emptyList()
+            if (repo.config.value.instances.count { it.id == instance.id } != 1) return emptyList()
+            val entries = repo.entriesFor(instance.id)
+            return AgnesImages.models.map { it.id }.filter { id ->
+                // A direct pick needs no /models response. If a row exists,
+                // honor the one registered identity and its visibility.
+                val matching = entries.filter { it.baseModel.id == id }
+                (matching.isEmpty() || AgnesImages.registeredEntry(matching)?.isHidden == false) &&
+                    !repo.tamaPaymentRefused(instance.id, id)
+            }
+        }
+        if (freeImagesOnly(context) || freeImagesOnly(context, instance.id)) return emptyList()
         var ids = imageEntries(context, instance).map { it.model.id }.distinct()
+        if (parallel) ids = ids.filter { AgnesImages.model(it) == null }
         if (instance.id == NanoMuseCloud.instance(context)?.id) {
             ids = RelayMediaPolicy.available(
                 NanoMuseCloud.baseUrl(context),
@@ -171,6 +313,7 @@ object ImageGen {
     fun recommendedModel(instance: ProviderInstance): String {
         val base = baseUrlOf(instance)
         return when {
+            AgnesImages.account(instance) -> AgnesImages.DEFAULT
             speaksDashScope(base) -> "qwen-image-3.0" // ¥0.18 a picture; the Pro tier draws the same face for ¥0.25–0.5
             base.contains("api.openai.com") -> "gpt-image-1"
             base.contains("api.x.ai") -> "grok-2-image"
@@ -211,30 +354,46 @@ object ImageGen {
      * nothing chosen, in the Models page's order (0.1.41, [io.github.nanomuse.models.SlotOrder]):
      * the chat provider's own image model when the chat provider is the person's own and
      * draws, else nanoMuse Cloud's when its menu actually has one, else the first own provider
-     * that draws.
+     * that draws. Tama V2 Test never replaces an explicit pick, and without a pick
+     * an enabled Agnes account limits the default to Agnes.
      * [automatic] leaves the choice aside and answers what that order gives now (the picker's
      * *Automatic* row says so).
      */
     fun endpoint(context: Context, automatic: Boolean = false): Endpoint? {
         val app = context.applicationContext as? MinisApp ?: return null
         val repo = app.providerRepositoryOrNull ?: return null
-        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val cloudId = io.github.nanomuse.cloud.NanoMuseCloud.instance(context)?.id
         val eligible = eligibleInstances(context).filter { inst ->
             inst.id != cloudId || availableModels(context, inst).isNotEmpty()
         }
-        val savedId = if (automatic) null else prefs.getString(KEY_INSTANCE, null)
+        val saved = if (automatic) null else savedChoice(context)
+        val savedId = saved?.instanceId
+        val savedModel = saved?.model?.takeIf { it.isNotBlank() }
+        if (parallel && saved != null) {
+            // The image slot is a selection, not permission to try a different provider.
+            val chosen = eligible.singleOrNull { it.id == savedId } ?: return null
+            val model = savedModel ?: return null
+            val agnes = AgnesImages.account(chosen)
+            if (!agnes && AgnesImages.model(model) != null) return null
+            if ((agnes || (chosen.id != cloudId && customOpenAi(chosen))) && model !in availableModels(context, chosen)) return null
+            val key = (if (agnes) repo.tamaOwnApiKey(chosen) else repo.usableApiKey(chosen)) ?: return null
+            return Endpoint(chosen, key, model)
+        }
+        // General cost permission is not an image-model choice. Once Agnes is
+        // configured, an unset slot stays on Agnes even if it is unavailable.
+        val defaults = if (savedId == null && agnesAccounts(context).isNotEmpty())
+            eligible.filter(AgnesImages::route) else eligible
         val inst = eligible.firstOrNull { it.id == savedId }
             ?: io.github.nanomuse.models.SlotOrder.resolve(
                 chosen = null,
-                chatProvider = io.github.nanomuse.models.ModelSlots.ownChatInstance(context)?.takeIf { own -> eligible.any { it.id == own.id } },
-                cloud = eligible.firstOrNull { it.id == cloudId },
-                firstOwn = eligible.firstOrNull { it.id != cloudId },
+                chatProvider = io.github.nanomuse.models.ModelSlots.ownChatInstance(context)?.takeIf { own -> defaults.any { it.id == own.id } },
+                cloud = defaults.firstOrNull { it.id == cloudId },
+                firstOwn = defaults.firstOrNull { it.id != cloudId },
             )?.value
             ?: return null
-        val model = prefs.getString(KEY_MODEL, null)?.takeIf { it.isNotBlank() && inst.id == savedId }
-            ?: suggestedModel(context, inst)
-        val key = repo.usableApiKey(inst) ?: return null
+        val model = savedModel?.takeIf { inst.id == savedId } ?: suggestedModel(context, inst)
+        if (model.isBlank()) return null
+        val key = (if (AgnesImages.account(inst)) repo.tamaOwnApiKey(inst) else repo.usableApiKey(inst)) ?: return null
         return Endpoint(inst, key, model)
     }
 
@@ -257,6 +416,7 @@ object ImageGen {
     }
 
     private fun provider(context: Context, ep: Endpoint, modelId: String): LLMProvider {
+        if (customOpenAi(ep.instance)) ai.tama.providers.KeyDestinationGuard.requireAllowed(true, ep.apiKey, ep.baseUrl)
         if (!ImageModelRequests.supportsModel(ep.instance.providerType, modelId)) {
             throw ImageGenException(context.getString(com.openminis.app.R.string.nm_avatar_no_model))
         }
@@ -283,17 +443,34 @@ object ImageGen {
         // nanoMuse: optional caller authorization, checked again at network dispatch.
         beforeRequest: (() -> Unit)? = null,
     ): Bitmap = withContext(Dispatchers.IO) {
+        if (AgnesImages.account(ep.instance)) return@withContext agnes(context, ep, prompt, size, emptyList(), beforeRequest)
+        if (parallel && AgnesImages.model(ep.model) != null) throw CustomImageRoute.Rejected()
         // nanoMuse: image selection and per-image permission are not price evidence.
+        requireImageCostScope(context, ep)
         ai.tama.pricing.ModelCostGuard.requireAllowed()
+        val costChecked = if (com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test") ({
+            requireImageCostScope(context, ep)
+            beforeRequest?.invoke()
+            Unit
+        }) else beforeRequest
         if (ep.model.isBlank()) throw ImageGenException("No image model set")
         // Model Studio's OpenAI-compatible host has no `images/generations` (the public one
         // answers 404 to every model); its native endpoint draws with the same key.
-        if (ep.isDashScope) return@withContext generateDashScope(ep, prompt, size, singleAttempt = !allowFormatRetry, beforeRequest = beforeRequest)
+        if (ep.isDashScope) return@withContext generateDashScope(ep, prompt, size, singleAttempt = !allowFormatRetry, beforeRequest = costChecked)
         val response = try {
             ImageModelRequests.request(provider(context, ep, ep.model), prompt, size,
-                allowFormatRetry = allowFormatRetry, beforeRequest = beforeRequest)
+                allowFormatRetry = allowFormatRetry && !customOpenAi(ep.instance), beforeRequest = costChecked)
+        } catch (e: CustomImageRoute.Rejected) {
+            throw e
+        } catch (e: com.openminis.app.data.model.LLMError.ProviderError) {
+            if (customOpenAi(ep.instance) && (e.nmProviderReach?.httpStatus in setOf(404, 405, 501) ||
+                    e.detail == "[404] /images/generations not supported (got chat completions response)"))
+                throw CustomImageRoute.Rejected()
+            throw ImageGenException(e.message ?: e.javaClass.simpleName)
         } catch (e: ImageGenException) {
             throw e
+        } catch (e: ai.tama.media.OwnKeyImagePolicy.NoVerifiedFreeGenerator) {
+            throw e // nanoMuse: keep the local free-only refusal distinct.
         } catch (e: ai.tama.media.AutomaticAvatarGuard.Blocked) {
             throw e
         } catch (e: ai.tama.media.ImageDispatch.AuthorizationChanged) {
@@ -318,9 +495,17 @@ object ImageGen {
         // nanoMuse: optional caller authorization, checked again at network dispatch.
         beforeRequest: (() -> Unit)? = null,
     ): Bitmap = withContext(Dispatchers.IO) {
+        if (AgnesImages.account(ep.instance)) return@withContext agnes(context, ep, instruction, "1024x1024", listOf(pngBytes(image)), beforeRequest)
+        if (parallel && AgnesImages.model(ep.model) != null) throw CustomImageRoute.Rejected()
         // nanoMuse: editing can have its own price even when chat is advertised free.
+        requireImageCostScope(context, ep)
         ai.tama.pricing.ModelCostGuard.requireAllowed()
-        if (ep.isDashScope) return@withContext editDashScope(ep, image, instruction, singleAttempt = !allowFormatRetry, beforeRequest = beforeRequest)
+        val costChecked = if (com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test") ({
+            requireImageCostScope(context, ep)
+            beforeRequest?.invoke()
+            Unit
+        }) else beforeRequest
+        if (ep.isDashScope) return@withContext editDashScope(ep, image, instruction, singleAttempt = !allowFormatRetry, beforeRequest = costChecked)
         val png = pngBytes(image)
         val response = try {
             // gpt-image-* edits with the same model; other hosts get the configured one.
@@ -330,8 +515,10 @@ object ImageGen {
                 images = listOf(LLMMessage.ImagePart(data = png, mimeType = "image/png")),
                 size = "1024x1024",
                 allowFormatRetry = allowFormatRetry,
-                beforeRequest = beforeRequest,
+                beforeRequest = costChecked,
             )
+        } catch (e: ai.tama.media.OwnKeyImagePolicy.NoVerifiedFreeGenerator) {
+            throw e // nanoMuse: keep the local free-only refusal distinct.
         } catch (e: ai.tama.media.AutomaticAvatarGuard.Blocked) {
             throw e
         } catch (e: ai.tama.media.ImageDispatch.AuthorizationChanged) {
@@ -348,6 +535,39 @@ object ImageGen {
         val bytes = response.mediaAttachments.firstOrNull()?.data
             ?: throw ImageGenException(response.text.take(200).ifBlank { "No image in edit response" })
         decode(bytes)
+    }
+
+    private val agnesApi by lazy { AgnesImageApi(http) }
+
+    internal suspend fun editAgnes(
+        context: Context, ep: Endpoint, prompt: String, size: String, references: List<ByteArray>, beforeRequest: (() -> Unit)?,
+    ): Bitmap = withContext(Dispatchers.IO) { agnes(context, ep, prompt, size, references, beforeRequest) }
+
+    private suspend fun agnes(
+        context: Context, ep: Endpoint, prompt: String, size: String, references: List<ByteArray>, beforeRequest: (() -> Unit)?,
+    ): Bitmap {
+        val repo = (context.applicationContext as? MinisApp)?.providerRepositoryOrNull ?: throw ImageDispatch.AuthorizationChanged()
+        val snapshot = repo.nmOAuthKeySnapshot(ep.instanceId)
+        fun requireCurrent() {
+            if (repo.tamaPaymentRefused(ep.instanceId, ep.model)) throw AgnesImageApi.Failure(AgnesImageApi.Problem.PAYMENT)
+            if (snapshot.key != ep.apiKey || !repo.nmOAuthKeyStillCurrent(snapshot) || !declaredFree(context, ep))
+                throw ImageDispatch.AuthorizationChanged()
+        }
+        requireCurrent()
+        val bytes = try {
+            agnesApi.request(ep.apiKey, ep.model, prompt, size, references) {
+                requireCurrent()
+                KeyDestinationGuard.requireAllowed(true, ep.apiKey, ProviderEndpoints.AGNES_BASE)
+                beforeRequest?.invoke()
+            }
+        } catch (e: AgnesImageApi.Failure) {
+            if (e.problem == AgnesImageApi.Problem.PAYMENT) repo.tamaRecordPaymentRefusal(ep.instanceId, ep.model, snapshot.version)
+            throw e
+        }
+        requireCurrent()
+        // Keep the provider's actual dimensions. Chat displays the result as
+        // returned; the avatar uses its existing square framing on screen.
+        return BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: throw AgnesImageApi.Failure(AgnesImageApi.Problem.NO_IMAGE)
     }
 
     /**

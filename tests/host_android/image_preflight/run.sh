@@ -5,5 +5,6 @@ OUT=$(mktemp -d)
 trap 'rm -rf "$OUT"' EXIT
 kotlinc -nowarn -include-runtime -d "$OUT/test.jar" \
   "$ROOT/android/src/android/app/src/main/java/ai/tama/media/ImageFailureInstruction.kt" \
+  "$ROOT/android/src/android/app/src/main/java/ai/tama/media/OwnKeyImagePolicy.kt" \
   "$ROOT/tests/host_android/image_preflight/HostTest.kt"
 java -jar "$OUT/test.jar"

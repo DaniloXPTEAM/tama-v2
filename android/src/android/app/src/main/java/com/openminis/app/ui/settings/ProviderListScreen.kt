@@ -442,6 +442,9 @@ private fun ProviderInstanceRow(
                     // say so instead of the alarming "No API key".
                     text = if (!apiKey.isNullOrBlank()) maskKey(apiKey)
                         else if (instance.allowsEmptyAPIKey) stringResource(R.string.provider_no_key_required)
+                        else if (com.openminis.app.BuildConfig.APPLICATION_ID == "ai.tama.assistant.tamav2test" &&
+                            ai.tama.providers.ProviderEndpoints.isAgnesBase(instance.effectiveBaseURL))
+                            stringResource(R.string.nm_own_key_required)
                         else "No API key",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,

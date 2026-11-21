@@ -2,7 +2,13 @@ name: Android verification without uploads
 
 on:
   push:
-    branches: ["arena/d9e25272-tama-v2"]
+    branches: ["arena/d9e25272-tama-v2", "arena/a4704b56-tama-v2"]
+  workflow_dispatch:
+    inputs:
+      deliver_to_drive:
+        description: "Deliver the signed test APK to a new restricted folder in My Drive (main only)"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -12,6 +18,8 @@ env:
 
 jobs:
   android-check:
+    # Only the reviewed default branch may perform private delivery. A branch push never uploads.
+    if: ${{ !inputs.deliver_to_drive || (github.event_name == 'workflow_dispatch' && github.repository == 'DaniloXPTEAM/tama-v2' && github.ref == 'refs/heads/main') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     steps:
@@ -22,14 +30,15 @@ jobs:
           ref: ${{ github.sha }}
       - name: Check parallel Android wiring and local SQLite fixture
         run: |
-          python3 -m unittest \
-            tests.test_tama_usage_order tests.test_tama_larger_context_static \
-            tests.test_tama_free_list_static tests.test_tama_free_bulk_static \
-            tests.test_tama_free_rank_static tests.test_tama_capability_review_static \
-            tests.test_tama_image_raw_static tests.test_tama_image_retry_static \
-            tests.test_tama_context_notice tests.test_tama_provider_refresh_label \
-            tests.test_tama_key_probe_static tests.test_tama_destination_audit \
-            tests.test_tama_test_signing_config tests.test_tama_build_failure_summary
+          PYTHONPATH=tests python3 -m unittest \
+            test_tama_usage_order test_tama_larger_context_static \
+            test_tama_free_list_static test_tama_free_bulk_static \
+            test_tama_free_rank_static test_tama_capability_review_static \
+            test_tama_image_raw_static test_tama_image_retry_static \
+            test_tama_context_notice test_tama_provider_refresh_label \
+            test_tama_key_probe_static test_tama_destination_audit test_tama_p0_1_chat_wiring \
+            test_tama_test_signing_config test_tama_build_failure_summary \
+            test_tama_private_drive test_tama_parallel_screens test_tama_round4_wiring
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: temurin
@@ -50,15 +59,20 @@ jobs:
           export GOROOT="$(go env GOROOT)" GOPATH="$(go env GOPATH)"
           export PATH="$GOPATH/bin:$PATH"
           bash scripts/android/build-natives.sh
-      # Optional private test signer. No key or APK is uploaded or cached.
+      # The signer is optional for verification and mandatory for manual private delivery.
       - name: Prepare optional private test signer
         env:
           TEST_STORE: ${{ secrets.TAMA_TEST_KEYSTORE_BASE64 }}
           TEST_STORE_PASSWORD: ${{ secrets.TAMA_TEST_STORE_PASSWORD }}
           TEST_KEY_ALIAS: ${{ secrets.TAMA_TEST_KEY_ALIAS }}
           TEST_KEY_PASSWORD: ${{ secrets.TAMA_TEST_KEY_PASSWORD }}
+          PRIVATE_DELIVERY: ${{ inputs.deliver_to_drive || false }}
         run: |
           if [ -z "$TEST_STORE$TEST_STORE_PASSWORD$TEST_KEY_ALIAS$TEST_KEY_PASSWORD" ]; then
+            if [ "$PRIVATE_DELIVERY" = true ]; then
+              echo '::error::Private delivery requires the stable test signer.'
+              exit 1
+            fi
             echo '::warning::No stable test signer configured; this build uses a temporary debug key.'
             exit 0
           fi
@@ -78,11 +92,11 @@ jobs:
         run: |
           if [ -f "$RUNNER_TEMP/tama-test-signing.jks" ]; then export TAMA_TEST_KEYSTORE_FILE="$RUNNER_TEMP/tama-test-signing.jks"; fi
           export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/$NDK_VERSION"
-          # Preserve the failing exit code; the summary contains fixed labels only, not logs.
-          set -o pipefail
+          # Keep raw Gradle output in the runner; publish only the exit category and source locations.
+          umask 077
           if ./gradlew :app:assembleTamaTest --max-workers=1 --console=plain --no-daemon \
             '-Dorg.gradle.jvmargs=-Xmx4608m -XX:MaxMetaspaceSize=768m -Dfile.encoding=UTF-8' \
-            -Pkotlin.compiler.execution.strategy=in-process -Pkotlin.incremental=false 2>&1 | tee "$RUNNER_TEMP/tama-assemble.log"; then
+            -Pkotlin.compiler.execution.strategy=in-process -Pkotlin.incremental=false > "$RUNNER_TEMP/tama-assemble.log" 2>&1; then
             rm -f "$RUNNER_TEMP/tama-assemble.log"
           else
             status=$?
@@ -97,47 +111,6 @@ jobs:
           ./gradlew :app:assembleDebug --max-workers=1 --console=plain --no-daemon \
             '-Dorg.gradle.jvmargs=-Xmx4608m -XX:MaxMetaspaceSize=768m -Dfile.encoding=UTF-8' \
             -Pkotlin.compiler.execution.strategy=in-process -Pkotlin.incremental=false
-      - name: Run parallel history tests
-        working-directory: android/src/android
-        env:
-          TAMA_TEST_STORE_PASSWORD: ${{ secrets.TAMA_TEST_STORE_PASSWORD }}
-          TAMA_TEST_KEY_ALIAS: ${{ secrets.TAMA_TEST_KEY_ALIAS }}
-          TAMA_TEST_KEY_PASSWORD: ${{ secrets.TAMA_TEST_KEY_PASSWORD }}
-        run: |
-          if [ -f "$RUNNER_TEMP/tama-test-signing.jks" ]; then export TAMA_TEST_KEYSTORE_FILE="$RUNNER_TEMP/tama-test-signing.jks"; fi
-          export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/$NDK_VERSION"
-          ./gradlew :app:testTamaTestUnitTest \
-            --tests 'ai.tama.net.GroqHistoryPolicyTest' \
-            --tests 'ai.tama.net.GroqHistoryWireTest' \
-            --tests 'ai.tama.net.ProviderHistoryInteroperabilityTest' \
-            --tests 'ai.tama.net.AutomaticFailureWireTest' \
-            --tests 'ai.tama.router.ModelRouteHistoryTest' \
-            --tests 'ai.tama.router.AutoFailureSimulationTest' \
-            --tests 'ai.tama.router.AutoModelFailureTest' \
-            --tests 'ai.tama.router.ModelRouterTest' \
-            --tests 'ai.tama.router.ImageRetryOfferTest' \
-            --tests 'ai.tama.router.LargerContextTest' \
-            --tests 'ai.tama.router.AutomaticCostGuardTest' \
-            --tests 'ai.tama.pricing.FreeModelImportTest' \
-            --tests 'ai.tama.pricing.OpenRouterPricingTest' \
-            --tests 'ai.tama.media.ImageToolPresentationTest' \
-            --tests 'ai.tama.media.ImageRawToolFilterTest' \
-            --tests 'ai.tama.providers.ProviderEndpointsTest' \
-            --max-workers=1 --console=plain --no-daemon \
-            '-Dorg.gradle.jvmargs=-Xmx4608m -XX:MaxMetaspaceSize=768m -Dfile.encoding=UTF-8' \
-            -Pkotlin.compiler.execution.strategy=in-process -Pkotlin.incremental=false
-      - name: Run normal debug isolation tests
-        working-directory: android/src/android
-        run: |
-          export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/$NDK_VERSION"
-          ./gradlew :app:testDebugUnitTest \
-            --tests 'ai.tama.net.GroqHistoryPolicyTest' \
-            --tests 'ai.tama.net.GroqNormalHistoryWireTest' \
-            --tests 'ai.tama.router.ModelRouteHistoryTest' \
-            --tests 'ai.tama.providers.ProviderEndpointsTest' \
-            --max-workers=1 --console=plain --no-daemon \
-            '-Dorg.gradle.jvmargs=-Xmx4608m -XX:MaxMetaspaceSize=768m -Dfile.encoding=UTF-8' \
-            -Pkotlin.compiler.execution.strategy=in-process -Pkotlin.incremental=false
       - name: Verify separate APK identities locally
         run: |
           python3 scripts/android/verify-parallel-apk.py \
@@ -146,6 +119,123 @@ jobs:
             --apk android/src/android/app/build/outputs/apk/tamaTest/app-tamaTest.apk \
             --normal-apk android/src/android/app/build/outputs/apk/debug/app-debug.apk \
             --out-dir /tmp/tama-identity-check
+      - name: Run parallel routing, key probe and history tests
+        working-directory: android/src/android
+        env:
+          TAMA_TEST_STORE_PASSWORD: ${{ secrets.TAMA_TEST_STORE_PASSWORD }}
+          TAMA_TEST_KEY_ALIAS: ${{ secrets.TAMA_TEST_KEY_ALIAS }}
+          TAMA_TEST_KEY_PASSWORD: ${{ secrets.TAMA_TEST_KEY_PASSWORD }}
+        run: |
+          if [ -f "$RUNNER_TEMP/tama-test-signing.jks" ]; then export TAMA_TEST_KEYSTORE_FILE="$RUNNER_TEMP/tama-test-signing.jks"; fi
+          export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/$NDK_VERSION"
+          umask 077
+          if ./gradlew :app:testTamaTestUnitTest \
+            --tests 'ai.tama.net.GroqHistoryPolicyTest' \
+            --tests 'ai.tama.net.GroqHistoryWireTest' \
+            --tests 'ai.tama.net.ProviderHistoryInteroperabilityTest' \
+            --tests 'ai.tama.net.AutomaticFailureWireTest' \
+            --tests 'ai.tama.net.GeminiDocumentedChatWireTest' \
+            --tests 'ai.tama.net.FreeChatCompletionsWireTest' \
+            --tests 'ai.tama.net.KeyProbeWireTest' \
+            --tests 'ai.tama.router.ModelRouteHistoryTest' \
+            --tests 'ai.tama.router.AutoFailureSimulationTest' \
+            --tests 'ai.tama.router.AutoModelFailureTest' \
+            --tests 'ai.tama.router.ModelRouterTest' \
+            --tests 'ai.tama.router.TurnRouterTest' \
+            --tests 'ai.tama.router.ShortcutParserTest' \
+            --tests 'ai.tama.router.ImageShortcutEligibilityTest' \
+            --tests 'ai.tama.router.ImageTurnGuardTest' \
+            --tests 'ai.tama.router.ImageRetryOfferTest' \
+            --tests 'ai.tama.router.LargerContextTest' \
+            --tests 'ai.tama.router.AutomaticCostGuardTest' \
+            --tests 'ai.tama.pricing.FreeModelImportTest' \
+            --tests 'ai.tama.pricing.DocumentedFreeChatTest' \
+            --tests 'ai.tama.pricing.NvidiaChatPricingTest' \
+            --tests 'ai.tama.pricing.OpenRouterPricingTest' \
+            --tests 'ai.tama.providers.ProviderModelsWireTest' \
+            --tests 'ai.tama.providers.ProviderKeyEnrollmentTest' \
+            --tests 'ai.tama.providers.ReviewedModelFeaturesTest' \
+            --tests 'ai.tama.media.ImageToolPresentationTest' \
+            --tests 'ai.tama.media.MediaOffloadImageTest' \
+            --tests 'ai.tama.media.AgnesImageApiTest' \
+            --tests 'ai.tama.media.ImageShortcutRunnerTest' \
+            --tests 'io.github.nanomuse.avatar.ImageModelRequestsTest' \
+            --tests 'ai.tama.media.AutoImageSelectionTest' \
+            --tests 'ai.tama.providers.ChatModelKindTest' \
+            --tests 'ai.tama.media.CliImageScopeTest' \
+            --tests 'ai.tama.chat.SessionBindingWritesTest' \
+            --tests 'ai.tama.media.ImageRawToolFilterTest' \
+            --tests 'ai.tama.media.MediaPromptTest' \
+            --tests 'ai.tama.providers.ProviderEndpointsTest' \
+            --max-workers=1 --console=plain --no-daemon \
+            '-Dorg.gradle.jvmargs=-Xmx4608m -XX:MaxMetaspaceSize=768m -Dfile.encoding=UTF-8' \
+            -Pkotlin.compiler.execution.strategy=in-process -Pkotlin.incremental=false > "$RUNNER_TEMP/tama-unit-tests.log" 2>&1; then
+            rm -f "$RUNNER_TEMP/tama-unit-tests.log"
+          else
+            status=$?
+            python3 ../../../scripts/android/summarize-build-failure.py "$RUNNER_TEMP/tama-unit-tests.log" "$status" \
+              app/build/test-results/testTamaTestUnitTest || true
+            rm -f "$RUNNER_TEMP/tama-unit-tests.log"
+            exit "$status"
+          fi
+      - name: Run normal debug isolation tests
+        working-directory: android/src/android
+        run: |
+          export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/$NDK_VERSION"
+          ./gradlew :app:testDebugUnitTest \
+            --tests 'ai.tama.net.GroqHistoryPolicyTest' \
+            --tests 'ai.tama.net.GroqNormalHistoryWireTest' \
+            --tests 'ai.tama.router.ShortcutParserTest' \
+            --tests 'io.github.nanomuse.avatar.ImageModelRequestsTest' \
+            --tests 'ai.tama.media.AutoImageSelectionTest' \
+            --tests 'ai.tama.router.ModelRouteHistoryTest' \
+            --tests 'ai.tama.providers.ProviderEndpointsTest' \
+            --max-workers=1 --console=plain --no-daemon \
+            '-Dorg.gradle.jvmargs=-Xmx4608m -XX:MaxMetaspaceSize=768m -Dfile.encoding=UTF-8' \
+            -Pkotlin.compiler.execution.strategy=in-process -Pkotlin.incremental=false
+      # UI tests use a separate opt-in target manifest. Compile it only during
+      # verification, never in a run that may deliver the signed app.
+      - name: Compile parallel Compose instrumentation locally
+        if: ${{ !inputs.deliver_to_drive }}
+        working-directory: android/src/android
+        run: |
+          export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/$NDK_VERSION"
+          umask 077
+          if ./gradlew -PtamaTestInstrumentation=true :app:compileTamaTestAndroidTestKotlin \
+            --max-workers=1 --console=plain --no-daemon \
+            '-Dorg.gradle.jvmargs=-Xmx4608m -XX:MaxMetaspaceSize=768m -Dfile.encoding=UTF-8' \
+            -Pkotlin.compiler.execution.strategy=in-process -Pkotlin.incremental=false > "$RUNNER_TEMP/tama-compose-compile.log" 2>&1; then
+            rm -f "$RUNNER_TEMP/tama-compose-compile.log"
+          else
+            status=$?
+            python3 ../../../scripts/android/summarize-build-failure.py "$RUNNER_TEMP/tama-compose-compile.log" "$status" || true
+            rm -f "$RUNNER_TEMP/tama-compose-compile.log"
+            exit "$status"
+          fi
+      - name: Check stable signature for private delivery
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.deliver_to_drive }}
+        env:
+          STORE_PASSWORD: ${{ secrets.TAMA_TEST_STORE_PASSWORD }}
+          TEST_ALIAS: ${{ secrets.TAMA_TEST_KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          expected=$(keytool -exportcert -keystore "$RUNNER_TEMP/tama-test-signing.jks" \
+            -storepass:env STORE_PASSWORD -alias "$TEST_ALIAS" | sha256sum | cut -d' ' -f1)
+          actual=$("$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs \
+            android/src/android/app/build/outputs/apk/tamaTest/app-tamaTest.apk | \
+            sed -n 's/^Signer #1 certificate SHA-256 digest: //p')
+          if [ -z "$actual" ] || [ "$actual" != "$expected" ]; then
+            echo '::error::The parallel APK was not signed by the configured test certificate.'
+            exit 1
+          fi
+      - name: Deliver only to a new restricted Drive folder
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.deliver_to_drive }}
+        env:
+          TAMA_TEST_DRIVE_OAUTH_JSON: ${{ secrets.TAMA_TEST_DRIVE_OAUTH_JSON }}
+        run: |
+          python3 scripts/android/deliver-private-drive.py android/src/android/app/build/outputs/apk/tamaTest/app-tamaTest.apk
       - name: Remove private test signer
         if: ${{ always() }}
-        run: rm -f "$RUNNER_TEMP/tama-test-signing.jks" "$RUNNER_TEMP/tama-assemble.log"
+        run: |
+          rm -f "$RUNNER_TEMP/tama-test-signing.jks" "$RUNNER_TEMP/tama-assemble.log" \
+            "$RUNNER_TEMP/tama-unit-tests.log" "$RUNNER_TEMP/tama-compose-compile.log"
